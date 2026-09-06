@@ -1,0 +1,22 @@
+{"ts": "2026-08-14T09:12:04.114228", "stage": "integration", "test_path": "outputs/tests/OTHER_TASK/integration/test_integration.py", "action": "tests_generated"}
+{"ts": "2026-08-14T09:12:08.664901", "action": "test_run", "stage": "integration", "iteration": 0, "stage_number": 1, "status": "fail", "counts": {"passed": 0, "failed": 0, "error": 1, "skipped": 0, "total": 1}, "tests": [], "failed_tests": [], "is_regression_check": false, "is_bootstrap": true}
+{"ts": "2026-08-14T09:12:10.229117", "action": "agent_fix_requested", "stage": "integration", "iteration": 1, "fix_id": "fix_0001"}
+{"ts": "2026-08-14T09:12:19.556340", "action": "agent_fix_generated", "stage": "integration", "iteration": 1, "fix_id": "fix_0001"}
+{"ts": "2026-08-14T09:12:25.118772", "action": "patch_created", "stage": "integration", "iteration": 1, "fix_id": "fix_0001", "patch_path": "outputs/logs/patches/OTHER_TASK/fix_0001.diff"}
+{"ts": "2026-08-14T09:12:29.664033", "action": "test_run", "stage": "integration", "iteration": 1, "stage_number": 1, "status": "fail", "counts": {"passed": 3, "failed": 1, "error": 0, "skipped": 0, "total": 4}, "tests": [], "failed_tests": ["test_phone_digits_exactly_ten"], "is_regression_check": false, "is_bootstrap": false}
+{"ts": "2026-08-14T09:12:31.117640", "action": "agent_fix_requested", "stage": "integration", "iteration": 2, "fix_id": "fix_0002"}
+{"ts": "2026-08-14T09:12:40.882115", "action": "agent_fix_generated", "stage": "integration", "iteration": 2, "fix_id": "fix_0002"}
+{"ts": "2026-08-14T09:12:46.330558", "action": "patch_apply_failed", "stage": "integration", "iteration": 2, "fix_id": "fix_0002", "detail": "hunk 2 of 3 failed to apply"}
+{ this line is deliberately not valid JSON -- a partial write from a process that was interrupted
+{"ts": "2026-08-14T09:12:48.664227", "action": "agent_fix_requested", "stage": "integration", "iteration": 3, "fix_id": "fix_0003"}
+{"ts": "2026-08-14T09:12:57.229880", "action": "agent_fix_generated", "stage": "integration", "iteration": 3, "fix_id": "fix_0003"}
+{"ts": "2026-08-14T09:13:03.552104", "action": "patch_apply_failed", "stage": "integration", "iteration": 3, "fix_id": "fix_0003", "detail": "Reversed (or previously applied) patch detected"}
+{"ts": "2026-08-14T09:13:05.118449", "action": "agent_fix_requested", "stage": "integration", "iteration": 4, "fix_id": "fix_0004"}
+{"ts": "2026-08-14T09:13:14.664772", "action": "agent_fix_generated", "stage": "integration", "iteration": 4, "fix_id": "fix_0004"}
+{"ts": "2026-08-14T09:13:20.330215", "action": "patch_created", "stage": "integration", "iteration": 4, "fix_id": "fix_0004", "patch_path": "outputs/logs/patches/OTHER_TASK/fix_0004.diff"}
+{"ts": "2026-08-14T09:13:24.882668", "action": "test_run", "stage": "integration", "iteration": 4, "stage_number": 1, "status": "fail", "counts": {"passed": 3, "failed": 1, "error": 0, "skipped": 0, "total": 4}, "tests": [], "failed_tests": ["test_phone_digits_exactly_ten"], "is_regression_check": false, "is_bootstrap": false}
+{"ts": "2026-08-14T09:13:26.229031", "action": "agent_fix_requested", "stage": "integration", "iteration": 5, "fix_id": "fix_0005"}
+{"ts": "2026-08-14T09:13:35.556784", "action": "agent_fix_generated", "stage": "integration", "iteration": 5, "fix_id": "fix_0005"}
+{"ts": "2026-08-14T09:13:41.118226", "action": "patch_created", "stage": "integration", "iteration": 5, "fix_id": "fix_0005", "patch_path": "outputs/logs/patches/OTHER_TASK/fix_0005.diff"}
+{"ts": "2026-08-14T09:13:45.664559", "action": "test_run", "stage": "integration", "iteration": 5, "stage_number": 1, "status": "fail", "counts": {"passed": 3, "failed": 1, "error": 0, "skipped": 0, "total": 4}, "tests": [], "failed_tests": ["test_phone_digits_exactly_ten"], "is_regression_check": false, "is_bootstrap": false}
+{"ts": "2026-08-14T09:13:46.000000", "action": "test_run", "stage": "integration", "iteration": "1-regcheck", "stage_number": 1, "status": "fail", "counts": {"passed": 3, "failed": 1, "error": 0, "skipped": 0, "total": 4}, "tests": [], "failed_tests": ["test_phone_digits_exactly_ten"], "is_regression_check": true, "is_bootstrap": false}

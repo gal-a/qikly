@@ -1,0 +1,64 @@
+# A template. Copy this into your own repository, not into this one.
+#
+# It runs a qikly task and keeps what came out: the generated pytest suite, the
+# code that satisfies it, and a JUnit XML file that test-management tools and
+# CI dashboards already read.
+#
+# Two things to change before it will do anything useful for you:
+#   1. GEMINI_API_KEY as a repository secret. Every run spends money.
+#   2. `task:` set to a task_id that exists under
+#      inputs_private/config/tasks/ in your repository.
+
+name: qikly
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "task_id to run"
+        required: true
+  # Deliberately not `on: push`. A run costs money on every trigger and takes
+  # minutes, so the default is that a person asks for it. Uncomment this once
+  # you know what a run costs you and want it gating changes to a spec.
+  #
+  # pull_request:
+  #   paths:
+  #     - "inputs_private/config/tasks/**"
+
+permissions:
+  contents: read
+
+jobs:
+  qikly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: qikly
+        uses: gal-a/qikly@v0.1.0
+        with:
+          task: ${{ inputs.task }}
+          api-key: ${{ secrets.GEMINI_API_KEY }}
+          # Pin it. A convergence rate belongs to a tool version as much as to
+          # a model, so an unpinned install makes two runs incomparable.
+          qikly-version: "qikly==0.1.0"
+
+      # The JUnit XML is the part another system reads. Publish it as a check,
+      # or send it to Xray, qTest or TestRail from here.
+      - name: Publish the test results
+        if: ${{ always() && steps.qikly.outputs.junit-xml != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-xml
+          path: ${{ steps.qikly.outputs.junit-xml }}
+
+      - name: Say what happened
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ steps.qikly.outputs.converged }}" = "true" ]; then
+            echo "Converged: the code passes every generated test, unit included."
+          else
+            echo "Did not fully converge. The run log names the blocking tests."
+            echo "That is a normal outcome and the artifacts are still worth reading."
+          fi

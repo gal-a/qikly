@@ -1,0 +1,53 @@
+# Short, filesystem-safe identifier (letters/digits/underscore only, must not
+# start with a digit). Must match this file's own name (inputs/config/tasks/<task_id>.yaml).
+# Namespaces this task's own inputs_private/data/<task_id>/, outputs/data/<task_id>/,
+# outputs/tests/<task_id>/, and outputs/agent_src/code/<task_id>/ -- so any
+# number of V&V tasks can run in this same project, including concurrently
+# in separate processes, without their files colliding.
+task_id: "CALC_CALENDAR"
+
+task_name: "CALC - Date-Range Charge Calculation"
+
+description: "Implement a pipeline that reads two CSV files of billing requests (a customer, a date range, and a flat monthly rate), validates them, and computes the charge owed for each date range -- stressing calendar arithmetic (variable month lengths, leap years) rather than currency rounding."
+
+inputs:
+  - "inputs_private/data/CALC_CALENDAR/input_01.csv"
+  - "inputs_private/data/CALC_CALENDAR/input_02.csv"
+
+outputs:
+  - "outputs/data/CALC_CALENDAR/output.json"
+
+# Describes the implementation's expected shape so test generation can target
+# it without the prompts hardcoding any task-specific function names. Written
+# once per task; integration/system test generation reads this section
+# directly out of this file's text.
+interface:
+  module: "outputs.agent_src.code.CALC_CALENDAR.calc"
+  integration_functions:
+    - "extract(input_path) -> list[dict]  # reads one input file, returns its raw rows"
+    - "transform(rows) -> dict  # validates each billing request and computes its charge_amount; returns {\"accepted\": [...], \"rejected\": [...]}, where each accepted entry includes the computed charge_amount, and each rejected entry is the original row plus a \"reason\" field"
+    - "load(data, output_path) -> None  # writes the {\"accepted\": [...], \"rejected\": [...]} result to the output file as JSON"
+  system_entrypoint: "run_calc(input_paths, output_path) -> None  # runs extract on each path in input_paths (a list), combines the raw rows, then transform -> load end-to-end"
+
+requirements:
+  - "Read both CSV files listed in this task's inputs (inputs_private/data/CALC_CALENDAR/input_01.csv and inputs_private/data/CALC_CALENDAR/input_02.csv), and combine their rows into a single list before validation"
+  - "Validate each billing request: customer_id (string), start_date (a calendar date), end_date (a calendar date), monthly_rate (a dollar amount)"
+  - "Apply reasonable, strict real-world validation to customer_id, start_date, end_date, and monthly_rate -- reject anything malformed or implausible"
+  - "For each valid request, compute the charge_amount owed for the date range described by start_date and end_date, given the flat monthly_rate, as a currency amount rounded to the nearest cent"
+  - "A request that fails validation is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
+  - "Write the result to outputs/data/CALC_CALENDAR/output.json as a single JSON object with two keys: \"accepted\" (the list of valid requests, each with its computed charge_amount) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+
+acceptance_criteria:
+  - "All valid billing requests appear in the output JSON's \"accepted\" list, and only valid requests appear there"
+  - "Invalid or malformed requests are excluded from \"accepted\" and instead appear in \"rejected\", each with a reason"
+  - "Output JSON is a single object with \"accepted\" and \"rejected\" keys, each a list of objects"
+  - "Each rejected row's reason names the specific field that caused rejection (e.g. \"customer_id\", \"start_date\", \"end_date\", \"monthly_rate\") rather than a generic message like \"invalid row\""
+  - "customer_id is only valid if it is a non-empty string once whitespace-trimmed"
+  - "start_date and end_date are only valid if each parses as a real calendar date in \"YYYY-MM-DD\" format -- a date that doesn't exist on the calendar (e.g. 2026-01-40) is invalid, as is a non-date string"
+  - "monthly_rate is only valid if it is a positive number (greater than zero)"
+  - "end_date must not be earlier than start_date"
+  - "start_date and end_date must fall within the same calendar month and year -- a date range spanning two different months is invalid, since this task only computes a single month's charge"
+  - "The number of billed days in the date range is counted inclusively -- both start_date and end_date count as billed days (e.g. January 1 to January 5 is 5 billed days, not 4)"
+  - "The number of days in the covering calendar month must be the true number of days that month actually has -- including February having 29 days in a leap year (divisible by 4, except century years not divisible by 400) and 28 days otherwise -- never a fixed assumption like 28 or 30 days for every month"
+  - "charge_amount is computed as monthly_rate multiplied by (billed days in the range, counted inclusively) divided by (the true number of days in the covering month), rounded to exactly two decimal places using round-half-up"
+  - "A date range covering the entire calendar month (start_date is the 1st of the month, end_date is that month's actual last day) results in charge_amount exactly equal to monthly_rate"

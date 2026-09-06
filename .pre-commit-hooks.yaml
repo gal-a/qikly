@@ -1,0 +1,31 @@
+# Hooks other repositories can use, via:
+#
+#   repos:
+#     - repo: https://github.com/gal-a/qikly
+#       rev: v0.1.0
+#       hooks:
+#         - id: qikly-validate
+#
+# Only one hook, and it is the offline one. A pre-commit hook has to be fast
+# and free, because it runs on every commit whether or not you were thinking
+# about it. `--check-criteria` is the more interesting check and it costs a
+# model call per task, which would bill you for typing `git commit`. That
+# belongs in CI, where a person chose to spend the money, and there is a
+# GitHub Action for it.
+#
+# This one reads task files and nothing else: that they parse, that the
+# required sections are there, that acceptance_criteria is a list rather than
+# one long string, that every fixture path resolves, and that criteria name
+# values rather than adjectives. Every one of those is an error that otherwise
+# surfaces twenty minutes and several dollars into a run.
+
+- id: qikly-validate
+  name: qikly validate task files
+  description: >-
+    Check every qikly task file offline: valid YAML, required sections present,
+    acceptance_criteria a list of real criteria, and fixture paths that exist.
+    No model calls, no API key, no cost.
+  entry: qikly --validate
+  language: python
+  files: '(^|/)inputs_private/config/tasks/.*\.ya?ml$'
+  pass_filenames: false

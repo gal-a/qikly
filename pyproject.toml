@@ -1,0 +1,124 @@
+# Packaging config for PyPI.
+#
+# A fresh `pip install qikly` is runnable on its own: `qikly --init` creates
+# the project layout and a starter task in whatever directory you are standing
+# in, and `qikly --scaffold <file.py>` writes a task for code that already
+# exists. The bundled tasks, agent definitions, fixtures and default settings
+# ship inside the package (see paths.py), so an install and a git clone run
+# against the same defaults and produce the same outputs.
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qikly"
+version = "0.1.0"
+description = "An autonomous coding agent that writes its own hidden acceptance criteria, and the tests that enforce them, then converges real code against that bar."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Gal Arav" }]
+keywords = ["llm", "agent", "testing", "qa", "acceptance-criteria", "code-generation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
+
+# Mirrors requirements.txt. Kept in sync by hand rather than read from that
+# file at build time: dynamic dependencies make the built metadata depend on
+# files that aren't in the sdist, which is a classic source of "works from a
+# clone, broken from PyPI".
+# Upper bounds on every one, and the reason is on record rather than
+# theoretical: anthropic 1.x removed `temperature` from Messages.create(), so
+# a provider that had worked stopped working on a major bump nobody here made.
+# A floor alone lets that happen silently to a user on a fresh install.
+#
+# These are deliberately wide. The bound exists to stop a major version
+# arriving unannounced, not to pin a patch release, and raising one after
+# testing is a two-line change.
+dependencies = [
+    "PyYAML>=6.0,<7",
+    "google-genai>=2.0,<3",
+    "pytest>=8.0,<10",
+    "rich>=13.0,<16",
+]
+
+# Not installed by default: pick the one you use. Only Gemini is a hard
+# dependency, and tests/test_provider_signatures.py checks whichever of these
+# happens to be present against what the code sends it.
+[project.optional-dependencies]
+openai = ["openai>=1.0,<4"]
+anthropic = ["anthropic>=0.30,<2"]
+all-providers = ["openai>=1.0,<4", "anthropic>=0.30,<2"]
+
+[project.urls]
+Homepage = "https://github.com/gal-a/qikly"
+Repository = "https://github.com/gal-a/qikly"
+
+[project.scripts]
+qikly = "qikly.cli:main"
+qikly-all = "qikly.orchestrator.run_all:main"
+qikly-report = "qikly.orchestrator.reports.report:main"
+qikly-metrics = "qikly.orchestrator.reports.metrics_report:main"
+qikly-diff-criteria = "qikly.orchestrator.tuning.diff_acceptance_criteria:main"
+
+[tool.setuptools]
+# src layout: the package lives in src/, not at the repo root. That keeps the
+# project's own inputs/, inputs_private/, and outputs/ from sitting next to
+# importable code, and it makes it impossible to import qikly from the
+# source tree by accident when you meant to exercise the installed copy --
+# which is exactly the mistake that hides a broken wheel until after upload.
+package-dir = { "" = "src" }
+
+# Explicit, not auto-discovered: auto-discovery would sweep in `outputs` and
+# any `inputs_private` the developer has locally as if they were packages.
+packages = [
+    "qikly",
+    "qikly.agent_api",
+    "qikly.agent_api.code_loader",
+    "qikly.agent_api.prompts",
+    "qikly.agent_api.providers",
+    "qikly.agent_tools",
+    "qikly.orchestrator",
+    "qikly.orchestrator.reports",
+    "qikly.orchestrator.tuning",
+]
+# No py-modules. The root run.py is a clone convenience only -- installing a
+# top-level module named `run` would reintroduce exactly the collision that
+# nesting everything under qikly/ removes.
+
+[tool.setuptools.package-data]
+# The bundled defaults ship in the wheel. This is what makes a fresh
+# `pip install` immediately runnable: the example tasks, agent definitions,
+# sample data, and default settings.yaml are all present,
+# so a new user's first run produces the same outputs as a clone's.
+# Their own specs go in inputs_private/ in their project directory, which is
+# never packaged -- see qikly/paths.py.
+"qikly" = [
+    "inputs_public/config/*.yaml",
+    "inputs_public/config/tasks/*.yaml",
+    "inputs_public/reference/*/*.py",
+    "inputs_public/agent_defs/*.md",
+    "inputs_public/data/**/*",
+]
+
+[tool.pytest.ini_options]
+# tests/ only. Without this, a bare `pytest` also collects outputs/tests/,
+# which holds generated suites from previous runs: they import task modules
+# that may not exist, and their failures say nothing about this package.
+testpaths = ["tests"]
+# No -q here. A project addopts of "-q" combines with a "-q" the user types
+# into -qq, and -qq suppresses the "N passed" summary line entirely: the run
+# then reports a bare "100%" and says nothing about how many tests ran or
+# whether any failed. That is not hypothetical. The same collision inside this
+# tool's own pytest calls silently zeroed an entire experiment's measurement,
+# which is why those calls now pass "-o addopts=". Anyone who wants quiet
+# output can still type -q and get the summary with it.

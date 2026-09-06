@@ -1,0 +1,51 @@
+# Event-stream aggregation over JSONL, rather than row validation over CSV.
+# Added because every other bundled task reads CSV rows and validates fields,
+# which makes "works across domains" a weaker claim than it looks: three
+# families, one structural shape. This one aggregates an append-only event
+# log, where the hard part is deciding which events count toward which
+# number rather than whether a field is well-formed.
+#
+# The log format is this project's own transaction log (outputs/logs/
+# transactions_*.jsonl), so the correct semantics are known exactly rather
+# than invented -- see orchestrator/run_summary.py for the real thing.
+task_id: "AGG_RUNLOG"
+
+task_name: "AGG - Run log aggregation"
+
+description: "Implement a summarizer that reads one or more append-only JSONL run logs, each recording the events of a single automated test-and-fix run, and writes a per-log and combined summary of what happened during those runs to a single JSON output."
+
+inputs:
+  - "inputs_private/data/AGG_RUNLOG/input_01.jsonl"
+  - "inputs_private/data/AGG_RUNLOG/input_02.jsonl"
+
+outputs:
+  - "outputs/data/AGG_RUNLOG/output.json"
+
+interface:
+  module: "outputs.agent_src.code.AGG_RUNLOG.runlog"
+  integration_functions:
+    - "load_events(log_path) -> list[dict]  # reads one JSONL log, returns its events in file order"
+    - "summarize(events) -> dict  # reduces one log's events to that run's counts"
+    - "write_summary(summary, output_path) -> None  # writes the {\"runs\": [...], \"totals\": {...}} result as JSON"
+  system_entrypoint: "run_summary(log_paths, output_path) -> None  # loads and summarizes each path in log_paths (a list), combines them, then writes end-to-end"
+
+requirements:
+  - "Read both JSONL logs listed in this task's inputs (inputs_private/data/AGG_RUNLOG/input_01.jsonl and inputs_private/data/AGG_RUNLOG/input_02.jsonl). Each line is a self-contained JSON object describing one event."
+  - "Every event has an \"action\" field naming what happened. The actions that appear are: tests_generated, test_run, agent_fix_requested, agent_fix_generated, patch_created, patch_apply_failed, and all_tests_passed."
+  - "A test_run event carries a \"counts\" object (passed/failed/error/skipped/total), a \"status\" of pass or fail, a \"stage\", and the boolean flags \"is_bootstrap\" and \"is_regression_check\"."
+  - "For each log, report: how many test runs happened, how many iterations of real fixing work the run took, how many fix cycles were attempted, how many patches were applied, how many failed to apply, how many regression re-checks ran and how many of those failed, whether the run finished successfully, and how many lines could not be read."
+  - "Summarize each log separately, then also report combined totals across all logs."
+  - "Write the result to outputs/data/AGG_RUNLOG/output.json as a single JSON object with two keys: \"runs\" (a list of per-log summaries, in the order the logs were given, each including the log's own path under \"source\") and \"totals\" (the same count fields, summed across every log)."
+  - "The logs are written by a long-running process and are not guaranteed to be complete or well-formed at the point they are read"
+
+acceptance_criteria:
+  - "Output JSON is a single object with \"runs\" and \"totals\" keys; \"runs\" is a list with one entry per input log, in the order the logs were given, and each entry names its own log path under \"source\""
+  - "A test_run event whose \"is_bootstrap\" is true is counted as a test run, but is NOT counted as an iteration of fixing work -- it is the guaranteed initial failure that exists before any code has been written, not a fix attempt"
+  - "A test_run event whose \"is_regression_check\" is true is counted under the regression-check counts, and is NOT counted as an iteration of fixing work -- it re-checks an already-passing stage rather than advancing the current one"
+  - "A regression re-check is counted as a regression failure only when its own \"status\" is fail; a regression check that passes is still counted as a check that ran"
+  - "A patch_apply_failed event is counted as a failed patch and is NOT counted among applied patches -- a patch that did not apply left the code unchanged, whatever was attempted"
+  - "A line that is not valid JSON is skipped and counted under the unreadable-line count, and does not stop the rest of the file from being read or cause the run to fail"
+  - "A log containing no events at all produces a summary with every count at zero and an unsuccessful outcome, rather than an error or a missing entry"
+  - "A run is reported as having finished successfully if and only if an all_tests_passed event appears in its log; a log that simply ends without one did not finish successfully, however many tests passed along the way"
+  - "Every count in \"totals\" equals the sum of that same field across every entry in \"runs\""
+  - "Counts are integers, never null or absent -- a field with nothing to count is 0"

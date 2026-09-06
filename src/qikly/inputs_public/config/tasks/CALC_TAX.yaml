@@ -1,0 +1,51 @@
+# Short, filesystem-safe identifier (letters/digits/underscore only, must not
+# start with a digit). Must match this file's own name (inputs/config/tasks/<task_id>.yaml).
+# Namespaces this task's own inputs_private/data/<task_id>/, outputs/data/<task_id>/,
+# outputs/tests/<task_id>/, and outputs/agent_src/code/<task_id>/ -- so any
+# number of V&V tasks can run in this same project, including concurrently
+# in separate processes, without their files colliding.
+task_id: "CALC_TAX"
+
+task_name: "CALC - Order Line-Item Tax"
+
+description: "Implement a simple pipeline that reads two CSV files of order line items, validates them, computes subtotal/tax/total for each valid line, and writes the result to a single JSON output alongside an explanation for every line that was rejected."
+
+inputs:
+  - "inputs_private/data/CALC_TAX/input_01.csv"
+  - "inputs_private/data/CALC_TAX/input_02.csv"
+
+outputs:
+  - "outputs/data/CALC_TAX/output.json"
+
+# Describes the implementation's expected shape so test generation can target
+# it without the prompts hardcoding any task-specific function names. Written
+# once per task; integration/system test generation reads this section
+# directly out of this file's text.
+interface:
+  module: "outputs.agent_src.code.CALC_TAX.calc"
+  integration_functions:
+    - "extract(input_path) -> list[dict]  # reads one input file, returns its raw rows"
+    - "transform(rows) -> dict  # validates each row and computes subtotal/tax/total for valid ones; returns {\"accepted\": [...], \"rejected\": [...]}, where each accepted entry includes the computed subtotal, tax, and total, and each rejected entry is the original row plus a \"reason\" field"
+    - "load(data, output_path) -> None  # writes the {\"accepted\": [...], \"rejected\": [...]} result to the output file as JSON"
+  system_entrypoint: "run_calc(input_paths, output_path) -> None  # runs extract on each path in input_paths (a list), combines the raw rows, then transform -> load end-to-end"
+
+requirements:
+  - "Read both CSV files listed in this task's inputs (inputs_private/data/CALC_TAX/input_01.csv and inputs_private/data/CALC_TAX/input_02.csv), and combine their rows into a single list before validation"
+  - "Validate each row: order_id (string), item_price (a dollar amount), quantity (a whole number), tax_rate (a percentage, e.g. 8.25 means 8.25%)"
+  - "Apply reasonable, strict real-world data-quality validation to item_price, quantity, and tax_rate -- reject anything malformed, implausible, or out of range"
+  - "For each valid row, compute the line subtotal (item_price times quantity), the tax owed (subtotal times tax_rate), and the line total (subtotal plus tax), all as currency amounts rounded to the nearest cent"
+  - "A row that fails validation is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
+  - "Write the result to outputs/data/CALC_TAX/output.json as a single JSON object with two keys: \"accepted\" (the list of valid rows, each with its computed subtotal, tax, and total) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+
+acceptance_criteria:
+  - "All valid rows appear in the output JSON's \"accepted\" list, and only valid rows appear there"
+  - "Invalid or malformed rows are excluded from \"accepted\" and instead appear in \"rejected\", each with a reason"
+  - "Output JSON is a single object with \"accepted\" and \"rejected\" keys, each a list of objects"
+  - "Each rejected row's reason names the specific field that caused rejection (e.g. \"item_price\", \"quantity\", \"tax_rate\") rather than a generic message like \"invalid row\""
+  - "item_price is only valid if it is a positive number (greater than zero) -- zero, negative, non-numeric, or missing values are invalid"
+  - "quantity is only valid if it is a positive whole number written with digits only -- zero, negative, non-integer (e.g. '2.5'), or non-numeric values are invalid"
+  - "tax_rate is only valid if it is a non-negative number -- a negative tax_rate is invalid. A tax_rate representing more than 100% is also invalid, since no real per-item sales tax rate is ever that high"
+  - "A tax_rate of exactly 0 is valid (a tax-exempt line): the computed tax is 0.00 and the line total equals the subtotal exactly"
+  - "All computed currency amounts (subtotal, tax, total) are rounded to exactly two decimal places using round-half-up -- a value exactly halfway between two cents rounds UP (e.g. a computed tax of 4.125 rounds to 4.13), not Python's default round-half-to-even banker's rounding, and not truncation"
+  - "Computed currency amounts must be exact to the cent regardless of binary floating-point representation error -- for example, if an intermediate calculation's raw floating-point result is something like 434.99999999999994, the reported amount must still be exactly 435.00, not a value with visible floating-point drift"
+  - "For every accepted row, the reported total is exactly equal to the reported subtotal plus the reported tax, to the cent -- there is no rounding inconsistency between the three reported values"

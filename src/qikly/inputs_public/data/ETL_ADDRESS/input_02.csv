@@ -1,0 +1,13 @@
+id,street,city,state,zip
+13,789 North Pine Road,Sacramento,CA,95814
+14,456 Oak Avenue,San Francisco,CA,94102-1234
+15,999 Willow Way,Austin,tx,73301
+16,888 Chestnut St,New York,ny,10001
+17,777 S Aspen Blvd,Denver,ZZ,80202
+18,666 Poplar Rd,Los Angeles,CA,90001
+3,000 Fake St,Nowhere,CA,00000
+19,Route 66,Los Angeles,CA,90001
+20,123 Main Street,Los Angeles,CA,90001-9999
+21,123 Main Street,Los Angeles,puerto rico,90001
+22,   ,Los Angeles,CA,90001
+23,123 Main Street,   ,CA,90001

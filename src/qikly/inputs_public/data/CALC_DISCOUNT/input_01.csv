@@ -1,0 +1,10 @@
+order_id,subtotal,discount_type,discount_value
+1,100.00,percent,20
+2,50.00,percent,8.25
+3,40.00,percent,0
+4,30.00,percent,100
+5,60.00,flat,15.00
+6,20.00,flat,35.00
+7,-10.00,percent,10
+16,10.00,percent,41.25
+17,0.30,percent,10

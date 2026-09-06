@@ -1,0 +1,53 @@
+# Short, filesystem-safe identifier (letters/digits/underscore only, must not
+# start with a digit). Must match this file's own name (inputs/config/tasks/<task_id>.yaml).
+# Namespaces this task's own inputs_private/data/<task_id>/, outputs/data/<task_id>/,
+# outputs/tests/<task_id>/, and outputs/agent_src/code/<task_id>/ -- so any
+# number of V&V tasks can run in this same project, including concurrently
+# in separate processes, without their files colliding.
+task_id: "ETL_ADDRESS"
+
+task_name: "ETL - Address Normalization"
+
+description: "Implement a simple ETL pipeline that reads two CSV files of postal address rows, validates and normalizes them, and writes deduplicated, cleaned rows to a single JSON output alongside an explanation for every row that was rejected."
+
+inputs:
+  - "inputs_private/data/ETL_ADDRESS/input_01.csv"
+  - "inputs_private/data/ETL_ADDRESS/input_02.csv"
+
+outputs:
+  - "outputs/data/ETL_ADDRESS/output.json"
+
+# Describes the implementation's expected shape so test generation can target
+# it without the prompts hardcoding any task-specific function names. Written
+# once per task; integration/system test generation reads this section
+# directly out of this file's text.
+interface:
+  module: "outputs.agent_src.code.ETL_ADDRESS.etl"
+  integration_functions:
+    - "extract(input_path) -> list[dict]  # reads one input file, returns its raw rows"
+    - "transform(rows) -> dict  # validates, normalizes, and deduplicates address rows; returns {\"accepted\": [...], \"rejected\": [...]}, where each rejected entry is the original row plus a \"reason\" field"
+    - "load(data, output_path) -> None  # writes the {\"accepted\": [...], \"rejected\": [...]} result to the output file as JSON"
+  system_entrypoint: "run_etl(input_paths, output_path) -> None  # runs extract on each path in input_paths (a list), combines the raw rows, then transform -> load end-to-end"
+
+requirements:
+  - "Read both CSV files listed in this task's inputs (inputs_private/data/ETL_ADDRESS/input_01.csv and inputs_private/data/ETL_ADDRESS/input_02.csv), and combine their rows into a single list before validation"
+  - "Validate each row: id (int), street (string), city (string), state (string), zip (string)"
+  - "Apply reasonable, strict real-world data-quality validation to street, city, state, and zip -- reject anything malformed, incomplete, or implausible"
+  - "Normalize accepted fields into a consistent format before writing output: title case for street and city (each word's first letter capitalized, the rest lowercase, once whitespace is trimmed and collapsed to single spaces), a consistent two-letter state code, and a consistent zip format"
+  - "Treat rows as duplicates -- and keep only the first occurrence -- whenever they represent the same address once normalized"
+  - "A row that fails validation, or that's a duplicate of an earlier row, is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected (which field was invalid, or that it duplicated an earlier row)"
+  - "Write the result to outputs/data/ETL_ADDRESS/output.json as a single JSON object with two keys: \"accepted\" (the list of valid, normalized rows) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+
+acceptance_criteria:
+  - "All valid rows appear in the output JSON's \"accepted\" list, and only valid rows appear there"
+  - "Invalid, malformed, or duplicate rows are excluded from \"accepted\" and instead appear in \"rejected\", each with a reason"
+  - "Output JSON is a single object with \"accepted\" and \"rejected\" keys, each a list of objects"
+  - "Each rejected row's reason names the specific field that caused rejection (e.g. \"zip\", \"state\", \"street\") rather than a generic message like \"invalid row\" -- except duplicates, whose reason identifies them as a duplicate rather than naming a field"
+  - "A zip code is only valid if, after normalization, it is exactly 5 digits -- a ZIP+4 style input (5 digits, a hyphen, then 4 more digits) is normalized by keeping only the first 5 digits; any zip containing a letter, or with fewer than 5 or more than 5 digits before an optional '-XXXX' suffix, is invalid"
+  - "A state is only valid if it identifies one of the 50 real US states -- given as its standard two-letter USPS code, or as its full English name -- and must normalize to that standard two-letter code. This must work regardless of letter case: lowercase ('illinois'), uppercase ('ILLINOIS'), and title case ('Illinois') must each independently normalize successfully to 'IL' -- do not assume the input is always all-lowercase or always all-uppercase. A value that isn't a real US state's code or name (a typo, a foreign country, a made-up abbreviation, or a US territory like Puerto Rico or Washington D.C.) is invalid"
+  - "A street is only valid if it is non-empty once whitespace-trimmed and contains at least one alphabetic character"
+  - "A city is only valid if it is non-empty once whitespace-trimmed and contains at least one alphabetic character"
+  - "Street type abbreviations, matched case-insensitively as a standalone word (with or without a trailing period), must be expanded to their standard full word before title-casing the street: 'st' becomes 'Street', 'ave' becomes 'Avenue', 'rd' becomes 'Road', 'blvd' becomes 'Boulevard', 'dr' becomes 'Drive', 'ln' becomes 'Lane', 'ct' becomes 'Court', 'pl' becomes 'Place', 'cir' becomes 'Circle'. A street type already spelled out in full is left as written (aside from title-casing). For example, both '100 Oak Blvd' and '100 Oak Boulevard' must normalize to the exact same street string"
+  - "Directional prefixes within the street, matched case-insensitively as a standalone word, must be expanded to their standard full word before title-casing the street: 'n' becomes 'North', 's' becomes 'South', 'e' becomes 'East', 'w' becomes 'West', 'ne' becomes 'Northeast', 'nw' becomes 'Northwest', 'se' becomes 'Southeast', 'sw' becomes 'Southwest'. For example, both '100 N Oak St' and '100 North Oak Street' must normalize to the exact same street string"
+  - "Two rows are duplicates of each other if their street, city, state, and zip all match once every field is normalized as described above -- even if their id differs, even if they used different abbreviation or capitalization styles before normalization, and even when the two rows came from different input files. Only the first occurrence of such a pair is kept, in the order the input files were read"
+  - "In particular, a row spelling out a directional prefix and/or street type in full (e.g. '100 North Oak Boulevard') and another row using the abbreviated form of the same directional prefix and/or street type for the same street name, city, state, and zip (e.g. '100 N Oak Blvd') must be recognized as duplicates of each other -- the abbreviation must not cause the duplicate to be missed"

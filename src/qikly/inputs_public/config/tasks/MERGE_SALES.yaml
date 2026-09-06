@@ -1,0 +1,59 @@
+# Short, filesystem-safe identifier (letters/digits/underscore only, must not
+# start with a digit). Must match this file's own name (inputs/config/tasks/<task_id>.yaml).
+# Namespaces this task's own inputs_private/data/<task_id>/, outputs/data/<task_id>/,
+# outputs/tests/<task_id>/, and outputs/agent_src/code/<task_id>/ -- so any
+# number of V&V tasks can run in this same project, including concurrently
+# in separate processes, without their files colliding.
+task_id: "MERGE_SALES"
+
+task_name: "MERGE - Overlapping Sales Export Reconciliation"
+
+description: "Implement a pipeline that reads two CSV files of sales transaction exports whose date ranges may overlap, validates them, and combines them into a single deduplicated set of transactions -- without double-counting a transaction that appears in both exports because their coverage windows overlap."
+
+inputs:
+  - "inputs_private/data/MERGE_SALES/input_01.csv"
+  - "inputs_private/data/MERGE_SALES/input_02.csv"
+
+outputs:
+  - "outputs/data/MERGE_SALES/output.json"
+
+# Describes the implementation's expected shape so test generation can target
+# it without the prompts hardcoding any task-specific function names. Written
+# once per task; integration/system test generation reads this section
+# directly out of this file's text.
+interface:
+  module: "outputs.agent_src.code.MERGE_SALES.merge"
+  integration_functions:
+    - "extract(input_path) -> list[dict]  # reads one input file, returns its raw rows"
+    - "transform(rows) -> dict  # validates each transaction and deduplicates by transaction_id across both files; returns {\"accepted\": [...], \"rejected\": [...]}, where each accepted transaction_id appears at most once, and each rejected entry is the original row plus a \"reason\" field"
+    - "load(data, output_path) -> None  # writes the {\"accepted\": [...], \"rejected\": [...]} result to the output file as JSON"
+  system_entrypoint: "run_merge(input_paths, output_path) -> None  # runs extract on each path in input_paths (a list), combines the raw rows, then transform -> load end-to-end"
+
+requirements:
+  - "Read both CSV files listed in this task's inputs (inputs_private/data/MERGE_SALES/input_01.csv and inputs_private/data/MERGE_SALES/input_02.csv), and combine their rows into a single list before validation. The two exports' date ranges may overlap, so the same real transaction can appear in both files"
+  - "Validate each transaction: transaction_id (string), amount (a dollar amount), date (a calendar date)"
+  - "Apply reasonable, strict real-world validation to amount and date -- reject anything malformed or implausible"
+  - "The same transaction_id must never be double-counted just because it appears in both files' overlapping coverage windows"
+  - "A transaction that fails validation is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
+  - "Write the result to outputs/data/MERGE_SALES/output.json as a single JSON object with two keys: \"accepted\" (the list of valid, deduplicated transactions) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+
+acceptance_criteria:
+  - "All valid, non-duplicate transactions appear in the output JSON's \"accepted\" list, and only those appear there"
+  - "Invalid or unresolvably duplicate transactions are excluded from \"accepted\" and instead appear in \"rejected\", each with a reason"
+  - "Output JSON is a single object with \"accepted\" and \"rejected\" keys, each a list of objects"
+  - "Each rejected row's reason names the specific field that caused rejection (e.g. \"amount\", \"date\") for a validation failure, or clearly identifies a mismatched-duplicate transaction_id for that specific case -- never a generic message like \"invalid row\""
+  - "transaction_id is only valid if it is a non-empty string once whitespace-trimmed"
+  - "amount is only valid if it is a positive number (greater than zero) -- zero, negative, non-numeric, or missing values are invalid"
+  - "date is only valid if it parses as a real calendar date in \"YYYY-MM-DD\" format"
+  - "transaction_id is the sole identifier of a transaction -- two rows are the same transaction if and only if they share the same transaction_id, regardless of which file they came from, and regardless of whether their amount or date also matches"
+  - "If the same transaction_id appears in both input files with the exact same amount, it is the same real transaction recorded in both overlapping exports -- it must appear exactly once in \"accepted\", not twice, even though it appeared as two separate input rows"
+  - "If the same transaction_id appears in both input files with differing amounts, this is an unresolvable data inconsistency -- both occurrences are excluded from \"accepted\" and instead both appear in \"rejected\", each with a reason identifying it as a mismatched duplicate (not silently keeping either one)"
+  - "A transaction_id that appears in only one of the two files is included in \"accepted\" as-is (if otherwise valid), with no deduplication needed"
+
+# A hand-written implementation that satisfies this spec, used only to check
+# whether a generated suite refuses code that is correct, and to give the
+# arm-versus-arm comparison a substrate neither arm produced. NEVER shown to
+# any agent: nothing reads this path except research/false_rejection.py and
+# research/shared_substrate.py.
+reference:
+  implementation: "reference/MERGE_SALES/merge.py"

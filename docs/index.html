@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qikly</title>
+<meta name="description" content="Your AI writes both the code and its tests. How do you know the tests are really valid? Qikly solution: Hide the acceptance criteria from the agent that writes the code.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --ground: #f2f5f4;
+  --surface: #ffffff;
+  --surface-2: #e8eeed;
+  --ink: #12191a;
+  --ink-soft: #52605e;
+  --ink-faint: #7b8886;
+  --rule: #d2dbd9;
+  --accent: #0e6a70;
+  --accent-soft: #d9ebea;
+  --warn: #8a5c04;
+  --warn-bg: #f6ebd4;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0b0f10;
+    --surface: #141a1b;
+    --surface-2: #1d2526;
+    --ink: #e3eae8;
+    --ink-soft: #98a5a3;
+    --ink-faint: #6d7b79;
+    --rule: #293334;
+    --accent: #57b8bd;
+    --accent-soft: #112f2e;
+    --warn: #d9a743;
+    --warn-bg: #2f2411;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0b0f10;
+  --surface: #141a1b;
+  --surface-2: #1d2526;
+  --ink: #e3eae8;
+  --ink-soft: #98a5a3;
+  --ink-faint: #6d7b79;
+  --rule: #293334;
+  --accent: #57b8bd;
+  --accent-soft: #112f2e;
+  --warn: #d9a743;
+  --warn-bg: #2f2411;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+a { color: var(--accent); }
+
+/* ------------------------------------------------------------- hero -- */
+
+.hero {
+  padding: 72px 0 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.wordmark {
+  font-family: Archivo, sans-serif;
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -.02em;
+  margin: 0;
+}
+
+.wordmark span { color: var(--accent); }
+
+h1 {
+  font-family: Archivo, sans-serif;
+  font-weight: 700;
+  font-size: clamp(2rem, 5.2vw, 3.1rem);
+  letter-spacing: -.028em;
+  line-height: 1.06;
+  text-wrap: balance;
+  margin: 0;
+  max-width: 24ch;
+}
+
+.lede {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--ink-soft);
+  max-width: 62ch;
+}
+
+.lede strong { color: var(--ink); font-weight: 600; }
+
+.install {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .95rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  border-radius: 7px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-x: auto;
+  max-width: 460px;
+}
+
+.install .prompt { color: var(--ink-faint); }
+
+.links { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.btn {
+  font-size: .9rem;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 9px 16px;
+  border-radius: 7px;
+  border: 1px solid var(--rule);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--ground); }
+.btn:hover { border-color: var(--accent); }
+
+/* --------------------------------------------------------- sections -- */
+
+section.band { padding: 56px 0; border-bottom: 1px solid var(--rule); }
+
+h2 {
+  font-family: Archivo, sans-serif;
+  font-weight: 600;
+  font-size: 1.5rem;
+  letter-spacing: -.018em;
+  margin: 0 0 16px;
+  text-wrap: balance;
+}
+
+h3 {
+  font-family: Archivo, sans-serif;
+  font-weight: 600;
+  font-size: 1.02rem;
+  letter-spacing: -.01em;
+  margin: 0 0 6px;
+}
+
+p { margin: 0 0 14px; max-width: 66ch; }
+p:last-child { margin-bottom: 0; }
+
+.eyebrow {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .7rem;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+
+code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .87em;
+  background: var(--accent-soft);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+pre {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .84rem;
+  line-height: 1.55;
+  margin: 0 0 14px;
+}
+
+pre code { background: none; padding: 0; }
+
+/* the split */
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  overflow: hidden;
+  margin: 22px 0 0;
+}
+
+.half { background: var(--surface); padding: 20px; }
+.half p { font-size: .93rem; color: var(--ink-soft); margin: 0; }
+.half .tag {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .68rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  display: block;
+  margin-bottom: 8px;
+}
+
+/* numbers */
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+
+.fig { background: var(--surface); padding: 18px; }
+
+.fig-n {
+  font-family: Archivo, sans-serif;
+  font-weight: 700;
+  font-size: 1.9rem;
+  line-height: 1;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  display: block;
+}
+
+.fig-l {
+  font-size: .85rem;
+  color: var(--ink-soft);
+  display: block;
+  margin-top: 6px;
+}
+
+.fig-ci {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .7rem;
+  color: var(--ink-faint);
+  display: block;
+  margin-top: 3px;
+}
+
+.caveat {
+  background: var(--warn-bg);
+  border-radius: 7px;
+  padding: 14px 16px;
+  font-size: .92rem;
+  color: var(--ink);
+}
+
+.caveat strong { color: var(--warn); }
+
+footer {
+  padding: 34px 0 60px;
+  color: var(--ink-faint);
+  font-size: .85rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  justify-content: space-between;
+}
+
+@media (max-width: 620px) {
+  .split { grid-template-columns: 1fr; }
+}
+
+.replication {
+  margin: 10px 0 0;
+  max-width: 60ch;
+  font-size: .95rem;
+  opacity: .82;
+}
+
+
+
+
+
+.route-note {
+  margin-top: 18px;
+  font-size: .9rem;
+  color: var(--ink-soft);
+}
+/* The two panels below use the diagram's own colours, so a reader connects
+   them without being told: accent for the side that sees the criteria, warn
+   for the side the criteria are kept from. */
+.half.sees-all .tag { color: var(--accent); }
+/* The same accent, so the claim reads as belonging to the green side. */
+.says-all { color: var(--accent); }
+/* An example under a placeholder command, quieter than the command. */
+.uses .eg { display: block; margin-top: 4px; font-size: .82em; color: var(--ink-soft); }
+.half.sees-all { border-top: 2px solid var(--accent); }
+.half.sees-spec .tag { color: var(--warn); }
+.half.sees-spec { border-top: 2px solid var(--warn); }
+
+/* The obvious objection, answered inline. Set apart from the argument it
+   answers so a reader can see it is being met rather than glossed. */
+.counter {
+  margin-top: 14px;
+  padding-left: 16px;
+  border-left: 2px solid var(--rule);
+  font-size: .95rem;
+  color: var(--ink-soft);
+}
+.counter b { color: var(--ink); }
+
+.flow { margin: 24px 0 0; }
+.flow svg { width: 100%; height: auto; display: block; }
+.flow text { font-family: "IBM Plex Sans", system-ui, sans-serif; }
+.n-h { font-size: 13px; font-weight: 600; fill: var(--ink); text-anchor: middle; }
+.n-s { font-size: 11px; fill: var(--ink-soft); text-anchor: middle; }
+.n-b { font-family: "IBM Plex Mono", monospace; font-size: 11px; fill: var(--ink-soft); }
+.n-key { fill: var(--accent); font-weight: 500; }
+.n-e { font-family: "IBM Plex Mono", monospace; font-size: 10px; fill: var(--ink-faint); }
+.n-strip { fill: var(--warn); }
+.n-acc { fill: var(--accent); }
+.n-mid { text-anchor: middle; }
+.flow figcaption {
+  margin-top: 12px;
+  font-size: .89rem;
+  color: var(--ink-soft);
+  max-width: 62ch;
+}
+
+.terms {
+  margin: 16px 0 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 18px;
+  align-items: baseline;
+}
+.terms dt {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .82rem;
+  color: var(--accent);
+}
+.terms dd { margin: 0; font-size: .91rem; color: var(--ink-soft); }
+
+.tablewrap { overflow-x: auto; margin: 18px 0 0; }
+.uses { border-collapse: collapse; width: 100%; font-size: .87rem; }
+.uses th, .uses td {
+  border: 1px solid var(--rule);
+  padding: 9px 11px;
+  text-align: left;
+  vertical-align: top;
+}
+.uses thead th {
+  background: var(--surface-2);
+  font-size: .76rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.uses tbody td { background: var(--surface); color: var(--ink-soft); }
+.uses tbody td:first-child { color: var(--ink); font-weight: 600; }
+.uses td.yes {
+  text-align: center;
+  color: var(--accent);
+  font-weight: 700;
+  font-family: "IBM Plex Mono", monospace;
+}
+.uses td:nth-child(5) { width: 1%; }
+.uses td:nth-child(5) code {
+  white-space: pre-line;
+  display: block;
+  line-height: 1.5;
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="hero">
+    <p class="wordmark">qikly<span>.</span></p>
+    <h1>Your AI writes both the code and its tests. How do you know the tests are really valid?</h1>
+    <p class="answer"><strong>Qikly solution: Hide the acceptance criteria from the agent that writes the code.</strong></p>
+    <p class="lede">
+      A student who writes the exam paper, writes the answer key and then sits
+      the exam will pass. That is what happens when one model is given the
+      acceptance criteria and asked to produce both the implementation and the
+      suite that checks it. Everything goes green, and the green means nothing.
+      <strong>qikly takes the answer key away from the student.</strong>
+    </p>
+    <div class="install">
+      <span><span class="prompt">$</span> pip install qikly</span>
+      <span><span class="prompt">$</span> qikly --demo</span>
+    </div>
+    <div class="links">
+      <a class="btn btn-primary" href="https://github.com/gal-a/qikly">Source on GitHub</a>
+      <a class="btn" href="https://github.com/gal-a/qikly/blob/main/docs/DESIGN_1_CASE_STUDY.md">How it works, with one repair end to end</a>
+    </div>
+  </header>
+
+  <section class="band">
+    <p class="eyebrow">The idea</p>
+    <h2>A passing test suite is only evidence if the author could not read the answer key</h2>
+    <p>
+      Give a model the acceptance criteria and ask it to write both the code and
+      the tests, and it will write tests that pass. That is not verification,
+      it is a model agreeing with itself. The only way the agreement means
+      anything is if the two halves are kept apart.
+    </p>
+    <figure class="flow">
+      <svg viewBox="0 0 820 392" role="img"
+           aria-labelledby="flow-t flow-d" preserveAspectRatio="xMidYMid meet">
+        <title id="flow-t">How the task file is split, and how the loop turns</title>
+        <desc id="flow-d">One task file feeds two agents. The test generation
+        agent sees all three sections. The coding agent sees only the first
+        two, never the acceptance criteria. Both meet at pytest. A failing run
+        returns to the coding agent carrying the error text alone. Once the
+        integration and system stages pass, the test generation agent writes
+        the unit stage, and that is the only point at which it is allowed to
+        read the implementation.</desc>
+
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink-faint)"/>
+          </marker>
+          <marker id="ar-w" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--warn)"/>
+          </marker>
+          <marker id="ar-a" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)"/>
+          </marker>
+        </defs>
+
+        <!-- task file -->
+        <rect x="8" y="140" width="162" height="118" rx="7"
+              fill="var(--surface)" stroke="var(--rule)"/>
+        <text x="89" y="163" class="n-h">one task file</text>
+        <text x="22" y="187" class="n-b">1  requirements</text>
+        <text x="22" y="207" class="n-b">2  interface (signatures)</text>
+        <rect x="16" y="216" width="146" height="26" rx="4"
+              fill="var(--accent-soft)" stroke="var(--accent)"/>
+        <text x="22" y="234" class="n-b n-key">3  acceptance_criteria</text>
+
+        <!-- split to the two agents -->
+        <path d="M 170 178 L 224 178 L 224 74 L 276 74" fill="none"
+              stroke="var(--ink-faint)" stroke-width="1.4" marker-end="url(#ar)"/>
+        <path d="M 170 224 L 224 224 L 224 326 L 276 326" fill="none"
+              stroke="var(--ink-faint)" stroke-width="1.4" marker-end="url(#ar)"/>
+
+        <!-- test generation agent -->
+        <rect x="278" y="42" width="184" height="64" rx="7"
+              fill="var(--surface)" stroke="var(--accent)"/>
+        <text x="370" y="66" class="n-h">test generation agent</text>
+        <text x="370" y="86" class="n-s">sees 1, 2 and 3, not the code</text>
+
+        <!-- coding agent -->
+        <rect x="278" y="294" width="184" height="64" rx="7"
+              fill="var(--surface)" stroke="var(--warn)" stroke-dasharray="5 3"/>
+        <text x="370" y="318" class="n-h">coding agent</text>
+        <text x="370" y="338" class="n-s n-strip">sees 1 and 2, never 3</text>
+
+        <!-- into pytest -->
+        <path d="M 462 74 L 506 74 L 506 186 L 552 186" fill="none"
+              stroke="var(--ink-faint)" stroke-width="1.4" marker-end="url(#ar)"/>
+        <text x="512" y="134" class="n-e">the suite</text>
+        <text x="512" y="150" class="n-s n-mid">integration, system,</text>
+        <text x="512" y="164" class="n-s n-mid">then unit</text>
+        <path d="M 462 326 L 506 326 L 506 214 L 552 214" fill="none"
+              stroke="var(--ink-faint)" stroke-width="1.4" marker-end="url(#ar)"/>
+        <text x="512" y="262" class="n-e">the code</text>
+
+        <rect x="554" y="172" width="112" height="56" rx="28"
+              fill="var(--surface-2)" stroke="var(--rule)"/>
+        <text x="610" y="206" class="n-h">pytest</text>
+
+        <!-- pass -->
+        <path d="M 666 200 L 714 200" fill="none" stroke="var(--ink-faint)"
+              stroke-width="1.4" marker-end="url(#ar)"/>
+        <text x="690" y="192" class="n-e n-mid">pass</text>
+        <rect x="716" y="172" width="96" height="56" rx="7"
+              fill="var(--surface)" stroke="var(--rule)"/>
+        <text x="764" y="196" class="n-h">converged</text>
+        <text x="764" y="214" class="n-s">code + suite</text>
+
+        <!-- fail, back to the coding agent -->
+        <path d="M 610 228 L 610 380 L 370 380 L 370 360" fill="none"
+              stroke="var(--warn)" stroke-width="1.4" stroke-dasharray="5 3"
+              marker-end="url(#ar-w)"/>
+        <text x="490" y="374" class="n-e n-strip n-mid">fail: the error text, never the rule</text>
+
+        <!-- the outer loop: unit tests written later, from the code -->
+        <path d="M 610 172 L 610 16 L 370 16 L 370 42" fill="none"
+              stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="5 3"
+              marker-end="url(#ar-a)"/>
+        <text x="490" y="10" class="n-e n-acc n-mid">integration and system pass: now write the unit stage, code visible</text>
+      </svg>
+      <figcaption>
+        The main flow consists of two loops. The dashed orange one is the repair cycle: a failing run
+        returns the error text and nothing else, so the coding agent cannot
+        write code shaped to a rule it was shown. The dashed teal one is the
+        staged expansion: integration and system tests are written before any
+        code exists, and only once they pass is the unit stage written, which
+        is the single point where test generation may read the implementation.
+      </figcaption>
+    </figure>
+
+    <div class="split">
+      <div class="half sees-all">
+        <span class="tag">Test generation sees</span>
+        <p>
+          The requirements, the input and output contract, and every acceptance
+          criterion in full. It writes integration, system and unit tests
+          against the standard.
+        </p>
+      </div>
+      <div class="half sees-spec">
+        <span class="tag">The coding agent sees</span>
+        <p>
+          The same specification with the criteria section removed, plus the
+          text of whatever test just failed. The same vague brief a developer
+          usually works from.
+        </p>
+      </div>
+    </div>
+
+    <p class="counter">
+      You might argue, <b>"just use one model for the code and another for the tests."</b>
+      That helps a little. It does not fix the underlying issue.
+    </p>
+    <p class="counter">
+      Both models still read the same criteria, so both still write to them.
+      The code is still built to satisfy the standard it is about to be judged
+      by. Changing who types it does not change what they were shown.
+    </p>
+    <p class="counter">
+      It is also a habit rather than a mechanism. Nothing checks that the two
+      models stayed different, and a config change a year from now undoes it
+      with no test to notice.
+    </p>
+    <p class="counter">
+      Withholding the acceptance criteria works differently. They are cut out
+      of the task file before the coding agent is handed it, so there is no
+      channel left for them to arrive through, whichever model is writing.
+      <code>qikly --explain</code> prints what each side received, so you can
+      see the cut rather than trust it. <em>You can also do both</em>: qikly
+      picks a model per agent role.
+</p>
+
+  </section>
+
+  <section class="band">
+    <p class="eyebrow">Getting started</p>
+    <h2>One command, about thirty seconds, writes nothing outside its own folder</h2>
+    <pre><code>pip install qikly
+qikly --demo</code></pre>
+    <p>
+      The demo runs one task end to end in a throwaway directory and prints
+      where the code, the tests, and the full record of every FIX and PATCH
+      landed. Bring your own model key; the provider is configurable per agent
+      and per test stage.
+    </p>
+    <h3>Three words, so the commands below make sense</h3>
+    <p>
+      A <strong>task file</strong> is one YAML file and it holds everything.
+      It has three parts, and the split above is a split between them:
+    </p>
+    <dl class="terms">
+      <dt>#1 <code>requirements</code></dt>
+      <dd>What the code must do, in the words a person would use. The coding
+      agent reads this.</dd>
+      <dt>#2 <code>interface</code></dt>
+      <dd>The contract, and a description rather than code: the function
+      signatures, and the dotted path where the module will live. Both
+      agents read it. Neither is given an implementation to read from
+      it, because when integration and system tests are written there is
+      not one yet.</dd>
+      <dt>#3 <code>acceptance_criteria</code></dt>
+      <dd>What counts as correct, each one checkable and naming its boundary
+      value. <strong>Only test generation reads this.</strong></dd>
+    </dl>
+    <p class="route-note">
+      "Spec" in this page means the first two together, which is what the
+      coding agent is given. The criteria are the standard, and they are the
+      part held back.
+    </p>
+    <p class="route-note">
+      One thing the three parts do not say, and it matters:
+      <strong class="says-all">test generation never reads the implementation either.</strong>
+      Integration and system tests are written before any code exists, from the
+      specification alone. The unit stage is the single exception, written last
+      from the code that just cleared the earlier stages, because unit tests
+      have to name real functions.
+    </p>
+
+    <h3>Which command depends on which parts you already have</h3>
+    <p>
+      A tick means you already have it. Everything without a tick is either
+      written for you or is what you sit down to write.
+    </p>
+
+    <div class="tablewrap">
+    <table class="uses">
+      <thead>
+        <tr>
+          <th>Where you are starting</th>
+          <th title="requirements">#1</th>
+          <th title="interface">#2</th>
+          <th title="acceptance_criteria">#3</th>
+          <th>Run</th>
+          <th>What happens</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Before anything else: see what is withheld</td>
+          <td></td><td></td><td></td>
+          <td><code>qikly --explain &lt;MY_TASK&gt;</code><br><span class="eg">e.g. <code>qikly --explain CALC_TAX</code></span></td>
+          <td>Prints a task file twice, once as each agent receives it, and the
+          difference between them. No API key, no model call, about a second.
+          <b>You get:</b> the acceptance criteria on one side and the same file
+          with them cut out on the other, which is the claim everything else
+          here rests on. <b>Shown in full below this table.</b></td>
+        </tr>
+        <tr>
+          <td>Just looking</td>
+          <td></td><td></td><td></td>
+          <td><code>qikly --demo</code></td>
+          <td>A bundled task end to end in a throwaway folder. Needs an API key, because this one really does call a model. Thirty seconds, <b>You get:</b> a working implementation, three test suites, and the full record of every FIX and PATCH, in a directory you can delete.
+          under a cent.</td>
+        </tr>
+        <tr>
+          <td>Code someone else wrote, and you want <em>that code</em> verified</td>
+          <td></td><td class="yes">Y</td><td></td>
+          <td><code>qikly --scaffold &lt;MY_MODULE&gt;.py</code><br>
+          then uncomment <code>seed.implementation</code></td>
+          <td>Scaffold reads the real signatures out of the file you point it at and
+          fills in <b>#2</b> for you. <b>#1</b> and <b>#3</b> stay yours to
+          write: criteria read out of an implementation can only describe what
+          that implementation already does, which is a bar it passes by
+          construction. <b>You get:</b> two task files. One tests the code you
+          already have; the other writes a fresh implementation of the same
+          interface. Keep whichever matches the job and delete the other. Then
+          a suite built from a standard your code was never measured against,
+          and a list of what it fails.</td>
+        </tr>
+        <tr>
+          <td>You know what it must do, not yet how to check it</td>
+          <td class="yes">Y</td><td></td><td></td>
+          <td><code>qikly --init</code></td>
+          <td>Creates the directory layout and one starter task to edit. Its criteria
+          show the habit that matters most: name the value, not the quality.
+          &quot;100 is accepted and 101 is rejected&quot; forces a test at the
+          boundary; &quot;amounts must be reasonable&quot; does not.
+          <b>You get:</b> a task file to fill in, with your fixtures where a
+          run will look for them.</td>
+        </tr>
+        <tr>
+          <td>Same, but you want a first draft of the bar</td>
+          <td class="yes">Y</td><td class="yes">Y</td><td></td>
+          <td><code>qikly --tasks &lt;MY_TASKS&gt;
+--generate-criteria</code></td>
+          <td>Drafts <b>#3</b> from <b>#1</b> alone, then runs. <b>You get:</b> a first draft of the bar written into your task file for you to read and
+          correct, plus the implementation and the suites. Run
+          <code>--compare-criteria</code> on a task where you did write the
+          criteria, to see what a draft would have missed.</td>
+        </tr>
+        <tr>
+          <td>The rules are written, but in a ticket</td>
+          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
+          <td><code>qikly --criteria-from ticket.md
+--task-id &lt;MY_TASK&gt;</code></td>
+          <td>Reads <b>#3</b> out of a ticket you saved to a file: a bullet
+          list, an "Acceptance Criteria" heading, or Gherkin scenarios. Only
+          that section is read, so pasting a whole ticket does not turn its
+          description into part of the bar, and prose is never split into rules
+          nobody wrote. <b>You get:</b> acceptance criteria you already had, in
+          the task file, ready to read over before the first run.</td>
+        </tr>
+        <tr>
+          <td>You have written all three</td>
+          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
+          <td><code>qikly --tasks &lt;MY_TASKS&gt;</code></td>
+          <td>Everything you wrote is used, and nothing is drafted on your
+          behalf. <b>You get:</b> an implementation, integration, system and
+          unit suites, a convergence report, and a run summary recording the
+          model and settings that produced them.</td>
+        </tr>
+        <tr>
+          <td>You have all three but doubt they agree</td>
+          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
+          <td><code>qikly --check-criteria
+--tasks &lt;MY_TASKS&gt;</code></td>
+          <td>One model call asking whether any implementation could satisfy
+          <b>1</b> and <b>3</b> at once. Advisory, and exits non-zero on a
+          contradiction so a pipeline can gate on it. <b>You get:</b> a list of the requirement and criterion pairs that cannot both hold, before spending a stage budget on them.</td>
+        </tr>
+        <tr>
+          <td>A previous run stopped before finishing</td>
+          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
+          <td><code>qikly --tasks &lt;MY_TASKS&gt;
+--resume</code></td>
+          <td>Generating the tests and the first implementation already cost
+          model calls, and they are still on disk. This keeps them and picks up
+          where it stopped rather than paying twice. It names what it is reusing before it starts, so you can see what you are about to pay for. <b>You get:</b> the same outputs as a full run, without paying for the parts already built.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="route-note">
+      <code>&lt;MY_TASKS&gt;</code> is one task_id or several separated by
+      commas. A task_id is a filename under
+      <code>inputs_private/config/tasks/</code> without the <code>.yaml</code>:
+      <code>--tasks CALC_TAX</code>,
+      <code>--tasks CALC_TAX,MERGE_SALES</code>, or omit it to run every task
+      found. <code>&lt;MY_TASK&gt;</code>, singular, takes exactly one.
+    </p>
+
+  </section>
+
+  <section class="band">
+    <p class="eyebrow">Checkable, not asserted</p>
+    <h2>See the acceptance criteria being removed, in one command</h2>
+    <p>
+      The first row of the table above, in full. This is the claim the rest of
+      the page rests on, so it is worth watching rather than believing.
+    </p>
+    <pre><code>qikly --explain CALC_TAX</code></pre>
+    <p>
+      It prints the task file twice: once as the test generation agent receives
+      it, once as the coding agent does, and the difference between them. On
+      that task, eleven acceptance criteria go to one side and twelve lines are
+      cut before the other side sees the file. No API key, no model call, about
+      a second.
+    </p>
+    <p>
+      Behind it, <code>qikly</code>'s own test suite carries
+      <code>tests/test_withholding.py</code>, which fails the build if any call
+      site ever lets a criterion through to the coding agent. The withholding is
+      not a promise about how a model was prompted, it is a property of the
+      code. A tool built to
+      stop you trusting a green checkmark should not ask you to trust its own.
+    </p>
+    <div class="figures">
+      <div class="fig">
+        <span class="fig-n">~60%</span>
+        <span class="fig-l">converged end to end, unit tests included</span>
+        <span class="fig-ci">measured twice, sixteen days apart</span>
+      </div>
+      <div class="fig">
+        <span class="fig-n">~80%</span>
+        <span class="fig-l">passed integration and system tests</span>
+        <span class="fig-ci">small cheap model, so read it as a floor</span>
+      </div>
+      <div class="fig">
+        <span class="fig-n">0</span>
+        <span class="fig-l">runs reported success on code their own tests rejected</span>
+        <span class="fig-ci">across every run measured</span>
+      </div>
+    </div>
+    <p class="replication">Those are round numbers on purpose. A 427-run sweep gave 59% and 80%; a second sweep of 140 runs sixteen days later gave 67% and 87%, well inside the first one’s intervals. Two sweeps agreeing is worth more than either one’s decimal places.</p>
+    <p>
+      A run that cannot satisfy its own suite exits non-zero, names the blocking
+      tests, and ships nothing. That is the property worth having: the failure
+      mode is a refusal, not a false pass.
+    </p>
+    <p>
+      One run is an artifact, not a rate. The same task with the same seed
+      converges on some runs and not others, which is why a figure here comes
+      from repetition and names the model and date it was taken on.
+    </p>
+    
+  </section>
+
+  <footer>
+    <span>Apache License 2.0</span>
+    <span><a href="https://github.com/gal-a/qikly">github.com/gal-a/qikly</a></span>
+  </footer>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,46 @@
+name: Install or run problem
+description: What happened when you installed qikly or ran it the first time
+labels: ["install"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Four fields, and nothing else is needed.
+
+        A report where nothing broke is just as useful as one where something
+        did: "all three steps worked on macOS 15 / 3.12" is a complete answer,
+        and it is the only way to know the tool runs anywhere but the author's
+        machine.
+  - type: input
+    id: os
+    attributes:
+      label: OS and version
+      placeholder: macOS 15.1, Ubuntu 24.04, Windows 11
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      description: The output of `python --version`.
+      placeholder: "3.12.4"
+    validations:
+      required: true
+  - type: dropdown
+    id: step
+    attributes:
+      label: Which step broke
+      options:
+        - Nothing broke
+        - Installing it
+        - qikly --explain
+        - qikly --demo
+        - Something else, described below
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: The exact error text
+      description: Pasted raw. No need to trim or tidy it, and the full traceback is better than the last line.
+      render: text

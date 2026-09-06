@@ -1,0 +1,11 @@
+# Action versions are the one dependency nothing else here watches. The Python
+# dependencies carry deliberate upper bounds that a bot must not raise on its
+# own, so only github-actions is enabled.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
