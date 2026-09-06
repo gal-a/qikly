@@ -56,7 +56,7 @@ jobs:
       # the last comment instead of adding one.
       - name: Comment on the pull request
         if: always()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const marker = '<!-- qikly-run -->';
