@@ -254,6 +254,17 @@ export GEMINI_API_KEY=...     # or API_KEY, or your provider's own variable
 qikly --demo
 ```
 
+On Windows, in PowerShell, where `export` is not a command:
+
+```powershell
+pip install qikly
+$env:GEMINI_API_KEY = "..."
+qikly --demo
+```
+
+Other providers, and how to set a key so it survives a new terminal, are in
+[docs/PROVIDER_KEY_SETUP.md](docs/PROVIDER_KEY_SETUP.md).
+
 ### Which command depends on which parts you already have
 
 A task file is one YAML file with three parts, and the split above is a split
@@ -338,10 +349,10 @@ Those are round numbers because they were measured three times: a 427-run sweep,
 a 140-run sweep sixteen days later on the same tasks and settings, and a 400-run
 sweep after correcting the benchmark itself, when eight of the ten tasks turned
 out to be carrying acceptance criteria that no input row could trigger. All
-three landed inside each other's intervals. Both used `gemini-3.5-flash-lite`, a small cheap model chosen to make
-repeated sweeps affordable, so treat them as a floor. Two sweeps agreeing is
-worth more than either one's decimal places, so the decimal places are not
-quoted.
+three landed inside each other's intervals. All three used
+`gemini-3.5-flash-lite`, a small cheap model chosen to make repeated sweeps
+affordable, so treat them as a floor. Three sweeps agreeing is worth more than
+any one of them's decimal places, so the decimal places are not quoted.
 
 A run that exhausts its budget exits non-zero, names the tests that blocked it,
 and keeps the full record. It never reports success on code its own tests
@@ -823,7 +834,7 @@ evidence no test can produce.
 cannot satisfy its own suite exits non-zero, names the blocking tests, and
 ships nothing. That is the property worth having. Three of the four causes are
 defects in the specification rather than in the model, so most stalls are fixed
-by editing text: see [the stall taxonomy](docs/DESIGN_2_PERFORMANCE.md#when-a-run-stalls-and-what-to-do-about-it).
+by editing text: see [the stall taxonomy](docs/DESIGN_2_PERFORMANCE.md#when-a-run-stalls).
 
 **Test generation can miss a criterion you wrote.** A correct, hand-written
 criterion can end up with no test asserting it, so the coding agent is never

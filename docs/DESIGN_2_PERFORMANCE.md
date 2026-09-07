@@ -236,7 +236,7 @@ get right, and the current design controls all four.
 
 The remaining piece is fixture coverage. In a fault-injection comparison a
 planted fault can only be caught if some input row reaches the behaviour it
-changes, which is exactly what the [fixture proposal agent](#the-five-agents)
+changes, which is exactly what the [fixture proposal agent](DESIGN_3_MECHANISM.md#the-five-agents)
 was built to close. Results will follow once substantial user data has
 accumulated and been carefully analysed.
 

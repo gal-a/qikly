@@ -28,7 +28,7 @@ inputs:
     default: ""
   api-key:
     description: >-
-      API key for your model provider, passed through as GEMINI_API_KEY. Use a
+      API key for your model provider, passed through as API_KEY. Use a
       repository secret, never a literal. A run makes many model calls, so this
       key spends money on every invocation.
     required: true
@@ -88,7 +88,13 @@ runs:
       id: run
       shell: bash
       env:
-        GEMINI_API_KEY: ${{ inputs.api-key }}
+        # API_KEY, the provider-agnostic name, never a provider's own. This
+        # said GEMINI_API_KEY until 2026-09-07, and the router only accepts
+        # that name when the provider is gemini, so the documented openai and
+        # anthropic examples could not authenticate at all. The generic name
+        # is what every provider module reads after normalisation, so one
+        # variable is correct for all three.
+        API_KEY: ${{ inputs.api-key }}
         LLM_PROVIDER: ${{ inputs.provider }}
         LLM_MODEL: ${{ inputs.model }}
         # Nothing in CI can act on a version notice, and a network call on

@@ -91,9 +91,9 @@ clears before the next is generated.
 | **The coding agent** | The same file with the criteria section removed, plus the text of whatever test just failed. The same vague brief a developer usually works from. |
 
 Two dotted lines in the diagram, pointing opposite ways. The first is the whole
-idea: the coding agent is never told the standard it is judged against, so when
-a test fails it has to reason from behaviour rather than recall an answer it was
-given. The second is the one exception, and it runs the other way: unit tests
+idea: the coding agent is never told the acceptance criteria it is judged
+against, only the requirements and the interface, so when a test fails it has to
+reason from behaviour rather than recall an answer it was given. The second is the one exception, and it runs the other way: unit tests
 are written last, from the code, because they have to name real functions.
 
 ---

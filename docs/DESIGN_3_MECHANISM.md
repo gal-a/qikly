@@ -189,7 +189,7 @@ The four that matter most, most valuable first:
 
 The engine is open source under Apache 2.0, because the central claim is one nobody should take on faith. The whole argument rests on the coding agent genuinely never seeing the bar, and that is something you can test and verify rather than just accept.
 
-Read the four prompt files, read the function that strips `acceptance_criteria` out of the specification before the prompt is built, and watch a run do it.
+Read the prompt builders in `src/qikly/agent_api/prompts/`, read the function that strips `acceptance_criteria` out of the specification before the prompt is built, and watch a run do it.
 
 That verification is the point of publishing the engine at all.
 

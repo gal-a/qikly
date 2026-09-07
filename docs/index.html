@@ -408,6 +408,7 @@ footer {
     </p>
     <div class="install">
       <span><span class="prompt">$</span> pip install qikly</span>
+      <span><span class="prompt">$</span> export GEMINI_API_KEY=...</span>
       <span><span class="prompt">$</span> qikly --demo</span>
     </div>
     <div class="links">
@@ -573,6 +574,7 @@ footer {
     <p class="eyebrow">Getting started</p>
     <h2>One command, about thirty seconds, writes nothing outside its own folder</h2>
     <pre><code>pip install qikly
+export GEMINI_API_KEY=...
 qikly --demo</code></pre>
     <p>
       The demo runs one task end to end in a throwaway directory and prints
@@ -765,7 +767,7 @@ qikly --demo</code></pre>
       <div class="fig">
         <span class="fig-n">~60%</span>
         <span class="fig-l">converged end to end, unit tests included</span>
-        <span class="fig-ci">measured twice, sixteen days apart</span>
+        <span class="fig-ci">measured three times, across 967 runs</span>
       </div>
       <div class="fig">
         <span class="fig-n">~80%</span>
@@ -778,7 +780,7 @@ qikly --demo</code></pre>
         <span class="fig-ci">across every run measured</span>
       </div>
     </div>
-    <p class="replication">Those are round numbers on purpose. A 427-run sweep gave 59% and 80%; a second sweep of 140 runs sixteen days later gave 67% and 87%, well inside the first one’s intervals. Two sweeps agreeing is worth more than either one’s decimal places.</p>
+    <p class="replication">Those are round numbers on purpose. A 427-run sweep gave 59% and 80%; a second sweep of 140 runs sixteen days later gave 67% and 87%, well inside the first one’s intervals. Then the benchmark itself turned out to be wrong: in eight of the ten tasks some acceptance criteria could not be triggered by any input row, so part of the bar was not lower, it was absent. Thirty-one rows were added and 400 runs were taken again, giving 64% and 83%. The prediction was that convergence would fall once the bar was genuinely enforceable. It did not move. Three sweeps agreeing, one of them against a corrected benchmark, is worth more than any one of their decimal places.</p>
     <p>
       A run that cannot satisfy its own suite exits non-zero, names the blocking
       tests, and ships nothing. That is the property worth having: the failure

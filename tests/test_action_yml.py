@@ -86,6 +86,35 @@ def test_the_provider_variables_match_what_the_code_reads(action):
         assert name in env, f"{name} is not passed through"
 
 
+def test_the_key_reaches_every_provider_and_not_just_one(action):
+    """
+    The action takes one `api-key` input and one `provider` input, so whichever
+    variable it exports the key into has to be a name that every provider
+    accepts. It exported GEMINI_API_KEY until 2026-09-07, which the router
+    accepts only when the provider is gemini: the openai and anthropic examples
+    in docs/PROVIDER_KEY_SETUP.md therefore could not authenticate at all, and
+    the failure arrived as "API_KEY environment variable is not set" on a job
+    where the user had plainly supplied a key.
+
+    Asserted against the router rather than against a literal, so adding a
+    fourth provider whose key variable list is narrower fails here rather than
+    in somebody's pipeline.
+    """
+    from qikly.agent_api.providers.router import _PROVIDERS, accepted_key_vars
+
+    env = _run_step(action)["env"]
+    supplied = {name for name in env if name.endswith("API_KEY")}
+    assert supplied, "the action passes no API key through at all"
+
+    for provider in _PROVIDERS:
+        accepted = set(accepted_key_vars(provider))
+        assert supplied & accepted, (
+            f"the action exports {sorted(supplied)}, none of which "
+            f"{provider} accepts ({sorted(accepted)}), so a run with "
+            f"provider: {provider} cannot authenticate"
+        )
+
+
 def test_a_stall_does_not_fail_the_build_by_default(action):
     """
     A run that does not converge is an expected outcome rather than a broken
