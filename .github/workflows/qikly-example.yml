@@ -47,7 +47,7 @@ jobs:
       # or send it to Xray, qTest or TestRail from here.
       - name: Publish the test results
         if: ${{ always() && steps.qikly.outputs.junit-xml != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: junit-xml
           path: ${{ steps.qikly.outputs.junit-xml }}
