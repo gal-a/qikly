@@ -117,7 +117,7 @@ def _task_without_acceptance_criteria(task_id):
 def _extract_target_files(fix_text):
     """
     Pull the file paths out of a FIX's target_files: list (see
-    inputs/agent_defs/code_agent.md for the format the model is asked to
+    agent_defs/code_agent.md for the format the model is asked to
     follow). Used so the PATCH prompt only has to load the files the FIX
     said it would touch, not the whole task codebase. Returns [] if the
     section is missing or empty -- callers should fall back to loading
@@ -138,7 +138,7 @@ def agent_generate_acceptance_criteria(task_id, seed=None):
     """
     Proposes acceptance_criteria from a task's requirements/interface/
     description alone, playing the QA-hardening role a human currently has
-    to play by hand (see inputs/agent_defs/acceptance_criteria_prompt.md).
+    to play by hand (see agent_defs/acceptance_criteria_prompt.md).
     Returns a plain list[str] -- deliberately not written to any file, so a
     caller can merge in user-supplied custom criteria with a plain
     `generated + custom` and so this never mutates an existing task's real,
@@ -197,7 +197,7 @@ def agent_generate_acceptance_criteria_review(task_id, current_criteria, impleme
     criteria proposed so far and a real, converged implementation that
     already satisfies them, asks the model to find what a plausible
     implementation could still get away with (see
-    inputs/agent_defs/acceptance_criteria_review_prompt.md). This is where
+    agent_defs/acceptance_criteria_review_prompt.md). This is where
     the loop gets the signal one-shot generation structurally can't have --
     an actual implementation choice to react to, not just the spec text.
     Returns a list[(category, criterion_text)] of NEW findings only,

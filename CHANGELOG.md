@@ -39,6 +39,13 @@ packaging tools would read as `1.1`.
 First public release, and the first version number that will ever appear on
 PyPI. It goes backwards from the 1.1.0 in the private repository on purpose.
 
+**On the `research/` files named below.** Five ship and eight do not, and the
+entries here describe what a measurement found rather than what you can rerun.
+`research/README.md` labels every harness public or private and says why; if a
+file mentioned in this changelog is not in your copy, that is the reason and
+not a packaging fault. The ones that ship are `backanalysis.py`,
+`mutation_test.py`, `stage_breakdown.py`, `stats_helpers.py` and the README.
+
 `1.x` promises a stable public API. `--init`, `--scaffold`, `--resume`,
 `--check-criteria` and `--version` were all added in the two days before this
 release, and the command surface is going to keep moving. Under semantic

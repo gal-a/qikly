@@ -189,7 +189,7 @@ def _parse_args():
     parser = argparse.ArgumentParser(description="Live terminal view of V&V task runs.")
     parser.add_argument(
         "--tasks", default=None,
-        help="Comma-separated task_ids to watch (default: every task under inputs/config/tasks/)"
+        help="Comma-separated task_ids to watch (default: every task under config/tasks/ (yours in inputs_private/, plus the bundled ones))"
     )
     parser.add_argument("--interval", type=float, default=POLL_INTERVAL, help="Poll interval in seconds")
     return parser.parse_args()
@@ -202,7 +202,7 @@ def main():
     task_ids = [t.strip() for t in args.tasks.split(",")] if args.tasks else discover_task_ids()
     task_ids = [t for t in task_ids if t]
     if not task_ids:
-        print("No tasks found under inputs/config/tasks/ (and none given via --tasks).")
+        print("No tasks found under config/tasks/ (yours in inputs_private/, plus the bundled ones), and none given via --tasks.")
         return
 
     watchers = [TaskWatcher(t) for t in task_ids]

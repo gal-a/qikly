@@ -475,7 +475,7 @@ def _parse_args():
     parser = argparse.ArgumentParser(
         description="Generate an HTML debugging-timeline report from a V&V run's transaction log."
     )
-    parser.add_argument("--task", default=None, help="task_id (default: every task under inputs/config/tasks/)")
+    parser.add_argument("--task", default=None, help="task_id (default: every task under config/tasks/ (yours in inputs_private/, plus the bundled ones))")
     parser.add_argument("--run", default=None, help="run_timestamp to report on (default: that task's latest run)")
     return parser.parse_args()
 

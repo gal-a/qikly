@@ -332,3 +332,44 @@ def test_a_genuinely_missing_fixture_is_still_an_error(tmp_path):
     errors, _ = validate.check_task(str(path))
     assert any("input file not found" in e for e in errors), (
         "the fix must not swallow a real missing fixture")
+
+
+@pytest.mark.parametrize("count", [1, 2, 3, 4, 12])
+def test_the_criteria_preview_never_promises_more_than_it_prints(count):
+    """
+    `qikly --init` writes a starter task with exactly two acceptance criteria,
+    so the first --explain a new user ever runs is on a task with fewer than
+    three of them. The label said "The first three:" unconditionally and then
+    printed two, on the one command whose whole job is to make the central
+    claim checkable rather than trusted.
+    """
+    NL = chr(10)
+    criteria = [f"criterion {i}" for i in range(1, count + 1)]
+    before = NL.join(["requirements:", "  - r", "acceptance_criteria:"]
+                     + [f"  - {c}" for c in criteria]) + NL
+    after = NL.join(["requirements:", "  - r"]) + NL
+    facts = {
+        "task_id": "T",
+        "task_path": "config/tasks/T.yaml",
+        "criteria_count": count,
+        "criteria": criteria,
+        "test_generation_sees": before,
+        "coding_agent_sees": after,
+        "test_generation_chars": len(before),
+        "coding_agent_chars": len(after),
+        "withheld_ok": True,
+        "leaked": [],
+    }
+    out = explain.render(facts)
+
+    listed = [ln for ln in out.splitlines() if ln.strip().startswith(
+        tuple(f"{i}. criterion" for i in range(1, 4)))]
+    assert len(listed) == min(count, 3)
+
+    if count > 3:
+        assert "The first three:" in out
+        assert f"... and {count - 3} more" in out
+    else:
+        assert "The first three" not in out, (
+            f"{count} criteria on file, but the label still promises three")
+        assert "more" not in out.split("THE CODING AGENT")[0]

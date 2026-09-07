@@ -15,7 +15,7 @@ outputs/reports/acceptance_criteria/, same content as the console output --
 so a run's results can be reviewed (including by reading the file directly)
 without needing the terminal output pasted back in.
 
-    python -m orchestrator.tuning.gen_and_eval_acceptance_criteria                    # every task under inputs/config/tasks/
+    python -m orchestrator.tuning.gen_and_eval_acceptance_criteria                    # every task under config/tasks/
     python -m orchestrator.tuning.gen_and_eval_acceptance_criteria --task ETL_ADDRESS
     python -m orchestrator.tuning.gen_and_eval_acceptance_criteria --task ETL_ADDRESS,ETL_EMAIL
 """
@@ -64,7 +64,7 @@ def _parse_args():
     parser.add_argument(
         "--task", default=None,
         help="Comma-separated task_id(s), e.g. ETL_ADDRESS or ETL_ADDRESS,ETL_EMAIL "
-             "(default: every task under inputs/config/tasks/)"
+             "(default: every task under config/tasks/ (yours in inputs_private/, plus the bundled ones))"
     )
     parser.add_argument("--seed", type=int, default=None)
     return parser.parse_args()

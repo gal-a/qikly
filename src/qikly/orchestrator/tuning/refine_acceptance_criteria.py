@@ -4,7 +4,7 @@ Iteratively refines auto-generated acceptance_criteria by actually running
 convergence against them and asking the model to adversarially review the
 resulting real implementation for gaps a naive-but-plausible implementation
 could still get away with (see
-inputs/agent_defs/acceptance_criteria_review_prompt.md). This mirrors the
+agent_defs/acceptance_criteria_review_prompt.md). This mirrors the
 real, iterative human-tuning history behind ETL_ADDRESS/ETL_EMAIL's actual
 acceptance_criteria far more closely than the one-shot MVP
 (orchestrator/tuning/gen_and_eval_acceptance_criteria.py) can -- one-shot generation
@@ -13,7 +13,7 @@ implementation choice each round.
 
 Each round runs a full convergence (orchestrator.orchestrate(), unchanged,
 as a black box) against a scratch task file
-(inputs/config/tasks/<task_id>_DRAFT.yaml), rewritten so its own generated
+(inputs_private/config/tasks/<task_id>_DRAFT.yaml), rewritten so its own generated
 code and output live under <task_id>_DRAFT's directories -- never the real
 task's outputs/agent_src/code/<task_id>/ or outputs/data/<task_id>/ -- while
 still reading the real task's input fixtures unchanged (those paths are
@@ -174,7 +174,7 @@ def _parse_args():
     )
     group.add_argument(
         "--all", action="store_true",
-        help="Run against every task discovered under inputs/config/tasks/. Explicit "
+        help="Run against every task discovered under config/tasks/ (yours in inputs_private/, plus the bundled ones). Explicit "
              "opt-in only -- there is no implicit default-to-all, since each task is "
              "--rounds full multi-iteration convergence runs, not a single cheap call."
     )

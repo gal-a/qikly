@@ -94,7 +94,19 @@ def render(facts):
 
     lines.append(f"  This task declares {count} acceptance criteria.")
     lines.append("")
-    lines.append("  THE TEST GENERATION AGENT receives all of them. The first three:")
+    # The label has to agree with what is printed below it. It said "The first
+    # three" unconditionally until 2026-09-07, and `qikly --init` writes a
+    # starter task with exactly two criteria, so the very first --explain a new
+    # user runs announced three and listed two. This is the command the README
+    # calls the one worth running first, precisely because it makes the central
+    # claim checkable rather than trusted, which makes it the worst place in
+    # the tool to be caught miscounting.
+    if count == 1:
+        lines.append("  THE TEST GENERATION AGENT receives it:")
+    elif count <= 3:
+        lines.append("  THE TEST GENERATION AGENT receives all of them:")
+    else:
+        lines.append("  THE TEST GENERATION AGENT receives all of them. The first three:")
     lines.append("")
     for i, item in enumerate(facts["criteria"][:3], start=1):
         lines.append(f"    {i}. {item}")

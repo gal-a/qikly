@@ -167,7 +167,7 @@ def verify_task_id(task_id):
     files colliding. It must double as a Python package segment (test files
     import the generated code through it), hence the identifier
     restriction. task_id is supplied by the caller (see run.py); this just
-    validates it and confirms inputs/config/tasks/<task_id>.yaml agrees
+    validates it and confirms config/tasks/<task_id>.yaml agrees
     with itself, catching a renamed file whose internal task_id wasn't
     updated to match.
     """

@@ -100,7 +100,7 @@ def _parse_args():
     parser.add_argument(
         "--tasks", default=None,
         help="Comma-separated task_ids to scope every stage to, e.g. ETL_NAME_SPLIT,MERGE_SALES "
-             "(default: every task under inputs/config/tasks/). Passed through as run.py's "
+             "(default: every task under config/tasks/ (yours in inputs_private/, plus the bundled ones)). Passed through as run.py's "
              "--tasks, gen_and_eval_acceptance_criteria.py's --task, and refine_acceptance_criteria.py's "
              "--task (replacing --all)."
     )
@@ -163,7 +163,7 @@ def main():
         task_ids = [t.strip() for t in args.tasks.split(",") if t.strip()]
         unknown = sorted(set(task_ids) - set(discover_task_ids()))
         if unknown:
-            print(f"Unknown task_id(s): {', '.join(unknown)} -- not found under inputs/config/tasks/")
+            print(f"Unknown task_id(s): {', '.join(unknown)} -- not found under config/tasks/ (yours in inputs_private/, plus the bundled ones)")
             return
     else:
         task_ids = discover_task_ids()
