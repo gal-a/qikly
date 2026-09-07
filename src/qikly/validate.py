@@ -162,5 +162,5 @@ def render(results):
             lines.append(f"  warn    {item}")
     lines.append("")
     lines.append(f"{len(results)} task(s): {errors} error(s), {warnings} warning(s). "
-                 f"Nothing was called and nothing was spent.")
+                 f"No model was called and nothing was spent.")
     return "\n".join(lines), errors

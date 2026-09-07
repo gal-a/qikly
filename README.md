@@ -317,6 +317,11 @@ construction is the exact failure this tool exists to prevent.
 and prints what it built and where. It writes nothing outside that directory,
 so a first run leaves everything else untouched. About 30 seconds.
 
+![One `qikly --demo` run, unedited: criteria withheld, tests generated, a test
+failing, a patch, green.](docs/images/qikly_demo.gif)
+
+That is a real run on `gemini-3.5-flash-lite`, 38 seconds, not sped up.
+
 From a clone instead:
 
 ```bash

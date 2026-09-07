@@ -16,8 +16,9 @@ by a stranger is a claim nobody made.
 So each file below is marked, and the split is enforced rather than
 remembered:
 
-  **public**   backs a figure that is already published, and travels with the
-               repository so anyone can rerun or dispute it
+  **public**   backs a number that has been published, including one that was
+               published and then withdrawn, and travels with the repository so
+               anyone can rerun or dispute it
   **private**  the open refinement question. Held back until its results are
                settled enough to publish deliberately, not by default
 
@@ -34,7 +35,7 @@ python research/mutation_test.py --all
 
 | Script | What it measures |
 |---|---|
-| **public** `mutation_test.py` | Fault detection. Injects a known fault into an implementation its own suite accepts, re-runs the suite, and records whether it noticed. Produces the 38% figure. It also produced a claim that `>` to `>=` survived all 22 suites, which did not survive re-checking: see `recheck_gt.py`. Reports are timestamped now; they were not, and the run behind that claim was overwritten. |
+| **public** `mutation_test.py` | Fault detection. Injects a known fault into an implementation its own suite accepts, re-runs the suite, and records whether it noticed. **Its own headline detection rate is withdrawn**, and the withdrawal is the reason the harness is here. An earlier figure was quoted from a run whose report was not timestamped and was later overwritten, and a second claim from the same period, that `>` to `>=` survived all 22 suites, did not survive re-checking either: see `recheck_gt.py`. Reports are timestamped now. Nothing this script has produced is currently cited as a public number, and it ships so that the next one can be disputed rather than trusted. |
 | **public** `backanalysis.py` | Cross-execution agreement. Runs an implementation retained from one run against a suite retained from a different run of the same task. Produces the 950 verdicts. |
 | **private** `false_rejection.py` | **Does the suite refuse code that is correct?** The measurement missing every time this research stalled: detection, escapes and cross-arm all score "stricter" and "wrong more often" identically, so none of them can turn "tighter" into "better". Needs a `reference:` block in the task naming a human-written implementation that no agent ever sees. Integration and system stages only, since unit tests bind to an implementation's own helper names. No model calls. |
 | **private** `shared_substrate.py` | **Both bars, the same code, the same planted faults. No effect, and a mechanism instead:** 25 pairs, 1,724 identical faults. Each suite is fitted to the implementation it converged alongside, the initial arm gaining 15 faults at home and the refined arm 19, and on a hand-written reference neither arm ever saw the refined suite is behind in 6 of 7 pairs. Before the suites are held to the same test count the refined arm's own code shows p = 0.007, which is the number the four earlier designs would have published. Every positive result this project has produced was withdrawn for one reason: the two arms were compared on different artifacts, so suite size, sample size or mutable surface could explain the gap instead of the bar. Here one implementation is chosen, one fault set is planted in it, and both arms' suites are shown exactly those mutants, so a larger suite gets no extra chances and neither arm can expose more surface. The baseline is per test rather than per suite, because every archived arm suite refuses code it was not written for and a whole-suite gate would discard all of them: keep the tests that pass on clean code, and a fault is caught when one of those flips. Scores each pair on its own initial code, its own refined code, and the task's reference where one exists, since a result that holds on only one substrate is a fact about that implementation. No model calls: runs entirely from preserved artifacts. |
