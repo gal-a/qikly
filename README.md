@@ -1,8 +1,11 @@
 # qikly
 
-**Your AI writes both the code and its tests. How do you know the tests are really valid?**
+**The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
 
-**Qikly solution: Hide the acceptance criteria from the agent that writes the code.**
+**The solution: two agents. One turns the acceptance criteria into tests. The other writes the code and never sees the acceptance criteria.**
+
+*For self-contained Python modules that transform data. Not for a large
+existing repository.*
 
 Imagine a student who writes the exam paper, writes the answer key, and then
 sits the exam. They pass. Obviously they pass, and nobody would accept that as
@@ -25,9 +28,7 @@ reasoning and every diff is recorded.
 out, the same vague brief a developer works from, while test generation gets
 it in full. When a test fails, the agent sees the failure message and never
 the rule it broke. Without that asymmetry both sides read the same spec
-identically and every test passes first try, which proves nothing. With it, a
-green suite means code written by someone who could not read the standard
-nevertheless satisfies it.
+identically and every test passes first try, which proves nothing.
 
 ```mermaid
 flowchart TD
@@ -160,48 +161,47 @@ checks the two stayed different.
 The two compose nicely, incidentally, since qikly picks a provider and model
 per agent role. You can withhold *and* use two models.
 
+### "Why not just add a reviewer agent?"
+
+The newer version of the same question, and the one worth answering carefully,
+because independent verification steps are now shipping in mainstream coding
+agents: a second agent, often from a different model family, reviews what the
+first one produced.
+
+It helps, and it does not reach this. A reviewer given the same specification
+has read the same acceptance criteria, and resolves the same ambiguity the same
+way. It will catch a mistake that is visible from that context: an inconsistency,
+a requirement plainly skipped, an obvious bug. It cannot catch the case this
+tool is built for, where the code and the standard agree because both came from
+one reading of a line that could have been read two ways. Nobody in that loop
+is wrong relative to the shared interpretation, which is exactly why everybody
+agrees.
+
+The problem was never that nothing was checking. It is that everything checking
+had already seen the answer key. Withholding is what makes the check structural
+rather than one more opinion drawn from the same context, and it is enforced by
+a test rather than by an arrangement someone has to remember to keep.
+
+There is a second difference, and it outlasts the run: a reviewer emits a
+verdict, and this emits a pytest suite you still have in six months.
+
 Design rationale, and the harder problem of where `acceptance_criteria` comes
 from in the first place: **[docs/DESIGN_1_CASE_STUDY.md](docs/DESIGN_1_CASE_STUDY.md)**,
 the first of three parts.
 
-## Features
-
-| | What it does |
-|---|---|
-| **Withheld acceptance criteria** | The coding agent never receives them. Enforced by `tests/test_withholding.py`, not by an instruction |
-| **Staged test generation** | Integration, then system, then unit. Integration and system are written before any implementation exists, so they cannot be shaped to it |
-| **Regression re-checks** | Every stage that has already passed is re-run after each later fix, so a repair cannot quietly break an earlier stage |
-| **Executable output** | Plain pytest files you keep, read, and put in CI long after the run |
-| **JUnit XML** | `outputs/reports/junit/<task>_<timestamp>.xml`, the format Xray, qTest, TestRail, Jenkins, GitLab and GitHub Actions all ingest |
-| **Import criteria from a ticket** | `--criteria-from FILE` reads bullet lists, an "Acceptance Criteria" section, or Gherkin scenarios out of a ticket you paste into a file |
-| **Score a drafted bar against yours** | `--compare-criteria TASK` drafts criteria from your requirements alone, then reports what a generated bar would have missed, treating yours as ground truth |
-| **Draft criteria** | `--generate-criteria` writes a first bar from requirements alone, for a task that has none |
-| **Contradiction check** | `--check-criteria` asks whether any implementation could satisfy both the requirements and the criteria, before a stage budget is spent |
-| **Fixture proposals** | A separate agent names the criteria no input row can trigger and proposes the smallest row that would. It never edits your data |
-| **Scaffold from code** | `--scaffold FILE` reads an existing module and writes two task files: one that tests that code, one that writes a fresh implementation of the same interface |
-| **Jira import** | `--criteria-from-jira PROJ-412` reads criteria from a named field or the issue description, through the same parser the file importer uses |
-| **Convergence trends** | `--trends` shows each task's rate over time from summaries already on disk, marking any period where the model or settings changed |
-| **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
-| **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
-| **Show the withholding** | `--explain TASK` prints what each side is given and the difference. No model call, no API key |
-| **Offline validation** | `--validate` checks task files for free: valid YAML, criteria as a list, fixture paths that resolve, criteria naming values not adjectives |
-| **Machine-readable output** | `--json` on `--explain` and `--validate` |
-| **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **Approval gate** | `--review-patches` prints each diff and waits for y/N; `--dry-run` generates every patch and applies none |
-| **Retrieval within a file** | A module over ~16k characters contributes the definitions the failure names, in full, plus a one-line signature for everything else. Deterministic, AST-based, no index and no extra model call |
-| **Seeded inputs** | Supply your own implementation or any test stage instead of generating it |
-| **Full audit trail** | Every test run, FIX, PATCH and apply outcome in an append-only log, plus HTML timeline and metrics reports |
-| **Run provenance** | Every summary records the model, provider, date and generation settings, because a convergence rate belongs to a configuration as much as to a tool |
-| **Any provider** | Gemini, OpenAI or Anthropic, selectable per agent role |
-| **Concurrent tasks** | Each task in its own process, output prefixed `[task_id]` |
-| **GitHub Action** | `gal-a/qikly@v0.1.0`, uploading the suite, the code and the JUnit XML |
-
-## Where it fits
+## What it is for
 
 Built for **self-contained Python modules that transform data**: ETL, merges,
 calculations, validation. That is the layer where a wrong answer looks like a
 right answer, and where a test written from the rule is the only thing that
 catches it.
+
+**Where it does not fit today:** an existing large repository. PATCH prompts
+load only the files a FIX names, and while a large file is now excerpted rather
+than loaded whole, there is no cross-file index. See
+[Where it fits today](#where-it-fits-today).
+
+## How to use the tools in this project
 
 Four ways in, and the table under [Quick start](#which-command-depends-on-which-parts-you-already-have)
 says which command each one needs:
@@ -215,11 +215,6 @@ says which command each one needs:
    procedure rather than a generator.
 4. **Run a catalog unattended.** Non-zero exit on any non-convergence, so a
    scheduler or CI job can run many specs and keep the reports.
-
-**Where it does not fit today:** an existing large repository. PATCH prompts
-load only the files a FIX names, and while a large file is now excerpted rather
-than loaded whole, there is no cross-file index. See
-[Where it fits today](#where-it-fits-today).
 
 ## Try it without spending anything
 
@@ -857,6 +852,54 @@ requirements never asked for. How much it sharpens a bar is
 
 **One provider per run**, and no cross-run trend reporting yet: the metrics
 report covers a single run.
+
+## Features
+
+Split three ways, because a single list mixed things that are not alike:
+what the loop guarantees whatever you type, what you type, and what you are
+left holding afterwards.
+
+### What the loop does on its own
+
+| | What it does |
+|---|---|
+| **Withheld acceptance criteria** | The coding agent never receives them. Enforced by `tests/test_withholding.py`, not by an instruction |
+| **Staged test generation** | Integration, then system, then unit. Integration and system are written before any implementation exists, so they cannot be shaped to it |
+| **Regression re-checks** | Every stage that has already passed is re-run after each later fix, so a repair cannot quietly break an earlier stage |
+| **Retrieval within a file** | A module over ~16k characters contributes the definitions the failure names, in full, plus a one-line signature for everything else. Deterministic, AST-based, no index and no extra model call |
+| **Seeded inputs** | Supply your own implementation or any test stage instead of generating it |
+| **Any provider** | Gemini, OpenAI or Anthropic, selectable per agent role |
+| **Concurrent tasks** | Each task in its own process, output prefixed `[task_id]` |
+| **Run provenance** | Every summary records the model, provider, date and generation settings, because a convergence rate belongs to a configuration as much as to a tool |
+| **Approval gate** | `--review-patches` prints each diff and waits for y/N; `--dry-run` generates every patch and applies none |
+
+### Commands
+
+| | What it does |
+|---|---|
+| **Show the withholding** | `--explain TASK` prints what each side is given and the difference. No model call, no API key |
+| **Offline validation** | `--validate` checks task files for free: valid YAML, criteria as a list, fixture paths that resolve, criteria naming values not adjectives |
+| **Scaffold from code** | `--scaffold FILE` reads an existing module and writes two task files: one that tests that code, one that writes a fresh implementation of the same interface |
+| **Draft criteria** | `--generate-criteria` writes a first bar from requirements alone, for a task that has none |
+| **Score a drafted bar against yours** | `--compare-criteria TASK` drafts criteria from your requirements alone, then reports what a generated bar would have missed, treating yours as ground truth |
+| **Contradiction check** | `--check-criteria` asks whether any implementation could satisfy both the requirements and the criteria, before a stage budget is spent |
+| **Import criteria from a ticket** | `--criteria-from FILE` reads bullet lists, an "Acceptance Criteria" section, or Gherkin scenarios out of a ticket you paste into a file |
+| **Jira import** | `--criteria-from-jira PROJ-412` reads criteria from a named field or the issue description, through the same parser the file importer uses |
+| **Fixture proposals** | A separate agent names the criteria no input row can trigger and proposes the smallest row that would. It never edits your data |
+| **Convergence trends** | `--trends` shows each task's rate over time from summaries already on disk, marking any period where the model or settings changed |
+| **Machine-readable output** | `--json` on `--explain` and `--validate` |
+
+### What you keep
+
+| | What it does |
+|---|---|
+| **Executable output** | Plain pytest files you keep, read, and put in CI long after the run |
+| **JUnit XML** | `outputs/reports/junit/<task>_<timestamp>.xml`, the format Xray, qTest, TestRail, Jenkins, GitLab and GitHub Actions all ingest |
+| **Full audit trail** | Every test run, FIX, PATCH and apply outcome in an append-only log, plus HTML timeline and metrics reports |
+| **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
+| **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
+| **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
+| **GitHub Action** | `gal-a/qikly@v0.1.0`, uploading the suite, the code and the JUnit XML |
 
 ## Further reading
 

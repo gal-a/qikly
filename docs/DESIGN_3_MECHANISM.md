@@ -47,6 +47,16 @@ It is the first thing most people ask, and it does help a little. It does not re
 
 Withholding removes the channel rather than the coincidence, so it holds whichever model is writing. The two compose nicely, incidentally, since qikly picks a provider and model per agent role: you can withhold *and* use two models.
 
+### "Why not just add a reviewer agent?"
+
+The newer form of the same question, and the one to answer carefully, because independent verification steps are now shipping in mainstream coding agents: a second agent, usually from a different model family, reviews what the first produced.
+
+It helps, and it stops in the same place. A reviewer handed the same specification has read the same acceptance criteria and resolves the same ambiguity the same way. It catches what is visible from that context: an inconsistency, a requirement plainly skipped, a bug that looks like a bug. It cannot catch the case this design exists for, where the code and the standard agree because both came from one reading of a line that admitted two. Relative to the shared interpretation nobody in that loop is wrong, which is precisely why they all agree.
+
+The problem was never that nothing was checking. It is that everything checking had already read the answer key. Model diversity varies who is looking; withholding varies what they were shown, which is the only one of the two that changes what can be found. And it is enforced by a test rather than by an arrangement someone has to remember to keep.
+
+One more difference, and it is the one that outlasts the run: a reviewer emits a verdict, and this emits a pytest suite that is still there in six months, running against tomorrow's commit.
+
 ## The mechanism
 
 A task file has **three** parts, and the cut runs between the third and the
