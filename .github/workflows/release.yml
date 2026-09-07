@@ -76,7 +76,19 @@ jobs:
         run: |
           python -m venv /tmp/fresh
           /tmp/fresh/bin/pip install --quiet dist/*.whl
-          /tmp/fresh/bin/qikly --version
+          # --explain rather than --version, and the difference is the point:
+          # --version proves the entry point resolves and nothing else, while
+          # --explain has to find the bundled task, parse it, and build both
+          # halves of the prompt out of the wheel's own package data. It still
+          # needs no API key. A wheel that shipped the code but not the tasks
+          # passes --version and fails here, which is the failure that would
+          # otherwise reach a user as "qikly --demo does nothing".
+          /tmp/fresh/bin/qikly --explain CALC_TAX > explain.txt
+          grep -q "THE CODING AGENT" explain.txt || { echo "--explain produced no withholding section"; exit 1; }
+          if grep -q "declares no acceptance_criteria" explain.txt; then
+            echo "the wheel's CALC_TAX has no acceptance criteria, so nothing was withheld"
+            exit 1
+          fi
           for script in qikly qikly-all qikly-report qikly-metrics qikly-diff-criteria; do
             test -x "/tmp/fresh/bin/$script" || { echo "missing console script: $script"; exit 1; }
           done
