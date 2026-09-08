@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="qikly">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1a1b"/>
+      <stop offset="1" stop-color="#0a1112"/>
+    </linearGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#8fdcdc"/>
+    </linearGradient>
+    <linearGradient id="streak" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#57b8bd" stop-opacity="0"/>
+      <stop offset="1" stop-color="#57b8bd" stop-opacity="0.85"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#0e6a70" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#0e6a70" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="256" cy="248" r="250" fill="url(#glow)"/>
+  <g transform="translate(256,0) skewX(-9) translate(-256,0)">
+    <rect x="34" y="150" width="150" height="30" rx="15" fill="url(#streak)" opacity="0.45"/>
+    <rect x="10" y="228" width="210" height="30" rx="15" fill="url(#streak)" opacity="0.65"/>
+    <rect x="40" y="306" width="170" height="30" rx="15" fill="url(#streak)" opacity="0.35"/>
+    <text x="268" y="327" text-anchor="middle" font-family="'Segoe UI', Arial, Helvetica, sans-serif"
+          font-size="460" font-weight="800" fill="url(#word)">q</text>
+  </g>
+</svg>
