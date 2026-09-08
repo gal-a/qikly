@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/gal-a/qikly/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
-[![license](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+[![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/gal-a/qikly/blob/main/LICENSE)
 
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
 

@@ -60,8 +60,11 @@ anthropic = ["anthropic>=0.30,<2"]
 all-providers = ["openai>=1.0,<4", "anthropic>=0.30,<2"]
 
 [project.urls]
-Homepage = "https://github.com/gal-a/qikly"
+Homepage = "https://test.qikly.com/"
+Documentation = "https://test.qikly.com/"
 Repository = "https://github.com/gal-a/qikly"
+Issues = "https://github.com/gal-a/qikly/issues"
+Changelog = "https://github.com/gal-a/qikly/blob/main/CHANGELOG.md"
 
 [project.scripts]
 qikly = "qikly.cli:main"

@@ -38,7 +38,7 @@ packaging tools would read as `1.1`.
 
 First public release, and the first version number that will ever appear on
 PyPI. This project was developed privately for months, and 0.3.0 as its first
-public version says the tool has been well exercised: 854 offline tests in the
+public version says the tool has been well exercised: 871 offline tests in the
 tree you clone, a seven-environment CI matrix, and end-to-end runs on Ubuntu,
 Windows and macOS. Some bugs will still be there, so feedback on this first
 public release is very welcome.
