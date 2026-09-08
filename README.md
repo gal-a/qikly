@@ -187,7 +187,7 @@ There is a second difference, and it outlasts the run: a reviewer emits a
 verdict, and this emits a pytest suite you still have in six months.
 
 Design rationale, and the harder problem of where `acceptance_criteria` comes
-from in the first place: **[docs/design_1_case_study.md](docs/design_1_case_study.md)**,
+from in the first place: **[docs/design_1_case_study.md](https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md)**,
 the first of three parts.
 
 ## What it is for
@@ -268,7 +268,7 @@ qikly --demo
 ```
 
 Other providers, and how to set a key so it survives a new terminal, are in
-[docs/PROVIDER_KEY_SETUP.md](docs/PROVIDER_KEY_SETUP.md).
+[docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md).
 
 ### Which command depends on which parts you already have
 
@@ -323,7 +323,7 @@ and prints what it built and where. It writes nothing outside that directory,
 so a first run leaves everything else untouched. About 30 seconds.
 
 ![One `qikly --demo` run, unedited: criteria withheld, tests generated, a test
-failing, a patch, green.](docs/images/qikly_demo.gif)
+failing, a patch, green.](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_demo.gif)
 
 That is a real run on `gemini-3.5-flash-lite`, 38 seconds, not sped up.
 
@@ -369,7 +369,7 @@ and keeps the full record. It never reports success on code its own tests
 reject.
 
 Ten example tasks ship with the tool across four domains, listed in
-[docs/design_3_mechanism.md](docs/design_3_mechanism.md#example-tasks).
+[docs/design_3_mechanism.md](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md#example-tasks).
 
 **Measuring rather than producing.** One run is an artifact, not a rate: the
 same task with the same seed converges on some runs and not others. To claim
@@ -381,7 +381,7 @@ python -m qikly.orchestrator.run_all --repeat 10
 
 That writes an aggregate report with confidence intervals and groups the
 non-converging runs by what they got stuck on. Details in
-[docs/design_3_mechanism.md](docs/design_3_mechanism.md#measuring-rather-than-producing).
+[docs/design_3_mechanism.md](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md#measuring-rather-than-producing).
 
 ## When a run does not converge
 
@@ -396,7 +396,7 @@ collection error (nothing ran at all), and run `--check-criteria`, `--validate`
 and `propose_fixtures`.
 
 **Each of those, with the signature to look for and the fix:**
-[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+[docs/TROUBLESHOOTING.md](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md).
 
 ## Output
 
@@ -414,7 +414,7 @@ Everything is namespaced by `task_id` so concurrent runs never collide:
 | `outputs/reports/iterations/<task_id>_<run_timestamp>_report.html` | **Start here.** A single-page debugging timeline for the run. Open it in a browser. Generated automatically at the end of every `run.py` invocation (path printed to console), or on demand: `python -m qikly.orchestrator.reports.report [--task ID] [--run TIMESTAMP]`. Links to the matching metrics report; stays focused on the narrative, no duplicated numbers. |
 | `outputs/reports/metrics/<task_id>_<run_timestamp>_metrics.html` | A numbers-first companion: a KPI row (iterations, FIX/PATCH attempts, regressions caught, apply-failure rate, run duration), a per-stage iteration chart, and a FIX/PATCH outcome breakdown. Links back to the matching debugging timeline. Same generation triggers as the timeline report, or on demand: `python -m qikly.orchestrator.reports.metrics_report [--task ID] [--run TIMESTAMP]`. Scoped to one run today; see [Where it fits today](#where-it-fits-today). |
 | `outputs/reports/run_summary/<task_id>_<run_timestamp>.json` | The same numbers as the metrics report, as JSON instead of HTML, so runs can be compared across time by a script. Written automatically at the end of every `run.py` invocation. Stays on your disk. The only network calls this project makes are to your configured LLM provider and, unless disabled, a check for a newer release at startup (see [Version check](#version-check)). |
-| `outputs/reports/aggregate/aggregate_<timestamp>.{html,json}` | Many runs at once, rather than one: see [Running everything at once](docs/design_3_mechanism.md#measuring-rather-than-producing) for what it reports and why. Written by `--repeat`, or on demand: `python -m qikly.orchestrator.reports.aggregate_report [--task ID] [--last N]`. Reads the `run_summary/` JSONs only, so no LLM calls and free to re-run. |
+| `outputs/reports/aggregate/aggregate_<timestamp>.{html,json}` | Many runs at once, rather than one: see [Running everything at once](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md#measuring-rather-than-producing) for what it reports and why. Written by `--repeat`, or on demand: `python -m qikly.orchestrator.reports.aggregate_report [--task ID] [--last N]`. Reads the `run_summary/` JSONs only, so no LLM calls and free to re-run. |
 
 ## Running it on your own data
 
@@ -526,7 +526,7 @@ One trap. An *arbitrary* criterion, one that contradicts what the model
 correctly knows about the world, does not produce more iterations. It produces
 a stuck loop, because the model keeps "fixing" your restriction back open.
 Prefer edge cases that are objectively verifiable but do not fight reality.
-More on this in [docs/design_3_mechanism.md](docs/design_3_mechanism.md#using-it).
+More on this in [docs/design_3_mechanism.md](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md#using-it).
 
 ## Bringing acceptance criteria you have already written
 
@@ -738,7 +738,7 @@ for a stronger model on it before concluding anything about the tool: model
 choice moves convergence more than any setting in this file.
 
 **PowerShell, CI, persisting a key, restricting one, and what a wrong key or
-a wrong model looks like:** [docs/PROVIDER_KEY_SETUP.md](docs/PROVIDER_KEY_SETUP.md).
+a wrong model looks like:** [docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md).
 
 ### Checking a key works, for about a cent
 
@@ -844,7 +844,7 @@ evidence no test can produce.
 cannot satisfy its own suite exits non-zero, names the blocking tests, and
 ships nothing. That is the property worth having. Three of the four causes are
 defects in the specification rather than in the model, so most stalls are fixed
-by editing text: see [the stall taxonomy](docs/design_2_performance.md#when-a-run-stalls).
+by editing text: see [the stall taxonomy](https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md#when-a-run-stalls).
 
 **Test generation can miss a criterion you wrote.** A correct, hand-written
 criterion can end up with no test asserting it, so the coding agent is never
@@ -858,7 +858,7 @@ the generated suite are how you check it on your own task.
 to what an implementation actually does, so it is good at finding validation
 gaps in behaviour the code already attempts and cannot surface a behaviour the
 requirements never asked for. How much it sharpens a bar is
-[an open question](docs/design_2_performance.md#does-refining-the-criteria-make-the-suite-catch-more).
+[an open question](https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md#does-refining-the-criteria-make-the-suite-catch-more).
 
 **One provider per run**, and no cross-run trend reporting yet: the metrics
 report covers a single run.
@@ -917,9 +917,9 @@ The design write-up is in three parts, and each stands on its own.
 
 | | What is in it |
 |---|---|
-| **[1. The case](docs/design_1_case_study.md)** | Why an agent that writes its own tests is grading its own homework, and one `CALC_TAX` repair followed end to end: what the coding agent was given, the test it failed, the reasoning it produced from the failure alone, and the one-line patch. Start here. |
-| **[2. How well it works](docs/design_2_performance.md)** | Three sweeps and 967 runs, the benchmark defect found and corrected between them, the unit-stage gap, what makes a run stall, and the results this project measured and then withdrew. |
-| **[3. How it is built](docs/design_3_mechanism.md)** | What separates this from the alternatives, the five agents and what each may read, the FIX and PATCH separation, the ten example tasks, watching a run live, supplying your own code or tests, and the tools for generating and evaluating acceptance criteria. |
+| **[1. The case](https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md)** | Why an agent that writes its own tests is grading its own homework, and one `CALC_TAX` repair followed end to end: what the coding agent was given, the test it failed, the reasoning it produced from the failure alone, and the one-line patch. Start here. |
+| **[2. How well it works](https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md)** | Three sweeps and 967 runs, the benchmark defect found and corrected between them, the unit-stage gap, what makes a run stall, and the results this project measured and then withdrew. |
+| **[3. How it is built](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md)** | What separates this from the alternatives, the five agents and what each may read, the FIX and PATCH separation, the ten example tasks, watching a run live, supplying your own code or tests, and the tools for generating and evaluating acceptance criteria. |
 
 ## Where this came from
 
@@ -927,4 +927,4 @@ The separation this tool enforces is ordinary practice in safety-critical engine
 
 ## License
 
-Apache License 2.0, see [LICENSE](LICENSE).
+Apache License 2.0, see [LICENSE](https://github.com/gal-a/qikly/blob/main/LICENSE).
