@@ -21,6 +21,12 @@ Nothing yet.
   travels to the child alongside the key. A key the user really did set in
   `API_KEY` is still reported as `API_KEY`, and a test pins both directions.
 
+### Changed
+- The README's answer to "why not just add a reviewer agent?" is shorter. The
+  passage explaining why a reviewer cannot reach this took fifty-one words to
+  say what thirty-seven say, and stated the same point twice in the abstract.
+  No claim changed.
+
 ## 0.3.1
 
 ### Fixed
