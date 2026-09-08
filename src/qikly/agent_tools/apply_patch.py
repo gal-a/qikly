@@ -6,12 +6,25 @@ import subprocess
 
 def _find_patch_exe():
     """
-    Locate the `patch` binary. It's rarely on PATH on Windows even when Git
-    is installed, since Git for Windows ships it under usr\\bin, not cmd\\.
+    Locate a GNU `patch` binary.
+
+    `gpatch` is tried first, and the order is the point. macOS ships Apple's
+    BSD patch as `patch`, which rejects the GNU long options this module sends
+    (`--fuzz`, `--dry-run`). The remedy printed below is `brew install gpatch`,
+    and Homebrew installs it under the name `gpatch` rather than shadowing the
+    system one. Looking for `patch` first therefore found Apple's every time,
+    so a user could follow the instructions exactly and see nothing change.
+
+    On Linux and Windows there is no `gpatch`, so this falls through after one
+    PATH lookup.
+
+    It is also rarely on PATH on Windows even when Git is installed, since Git
+    for Windows ships it under usr\\bin, not cmd\\.
     """
-    found = shutil.which("patch")
-    if found:
-        return found
+    for name in ("gpatch", "patch"):
+        found = shutil.which(name)
+        if found:
+            return found
 
     git_exe = shutil.which("git")
     if git_exe:

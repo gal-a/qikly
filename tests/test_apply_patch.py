@@ -83,3 +83,34 @@ def test_windows_separators_are_normalised(tmp_path):
     p = write(tmp_path, diff(["outputs\\agent_src\\code\\CALC_TAX\\calc.py"]))
     _, resolved = _resolve_targets(p)
     assert resolved == [f"{CODE_ROOT}CALC_TAX/calc.py"]
+
+
+def test_gpatch_is_preferred_over_the_system_patch(monkeypatch):
+    """
+    macOS ships Apple's BSD patch as `patch`, and it rejects the GNU long
+    options this module sends. The error path tells the user to run
+    `brew install gpatch`, which installs the binary as `gpatch` rather than
+    replacing the system one, so a lookup that asked for `patch` first found
+    Apple's every time and the documented fix did nothing.
+    """
+    from qikly.agent_tools import apply_patch as ap
+
+    asked = []
+
+    def fake_which(name):
+        asked.append(name)
+        return {"gpatch": "/opt/homebrew/bin/gpatch",
+                "patch": "/usr/bin/patch"}.get(name)
+
+    monkeypatch.setattr(ap.shutil, "which", fake_which)
+    assert ap._find_patch_exe() == "/opt/homebrew/bin/gpatch"
+    assert asked[0] == "gpatch", "the system patch was consulted first"
+
+
+def test_the_system_patch_is_still_used_when_gpatch_is_absent(monkeypatch):
+    """Linux and Windows have no gpatch, and must be unaffected."""
+    from qikly.agent_tools import apply_patch as ap
+
+    monkeypatch.setattr(ap.shutil, "which",
+                        lambda name: "/usr/bin/patch" if name == "patch" else None)
+    assert ap._find_patch_exe() == "/usr/bin/patch"
