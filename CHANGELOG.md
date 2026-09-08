@@ -6,7 +6,46 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.3.1
+
+### Fixed
+- **An auth failure now names the variable the key came from.** Every provider
+  hardcoded "check `API_KEY` for typos", which is the wrong advice for the
+  common case: a key set in `GEMINI_API_KEY`, `OPENAI_API_KEY` or
+  `ANTHROPIC_API_KEY` and normalised into `API_KEY` internally. A user who had
+  never set `API_KEY`, and for whom it was not set, was told to go and check
+  it. The message now gives the variable actually read, that key's length, and
+  the shape the provider normally uses, so a key that is one character too long
+  is visible at a glance. Found on release day against a real key.
+- **A key that cannot be a key is refused before a model call is made.**
+  Leading or trailing whitespace, wrapping quotes the shell did not strip, a
+  byte order mark, a control character, an embedded space or a non-ASCII
+  character all now fail immediately, naming the variable at fault, rather than
+  being spent on a request the provider will reject. Length and prefix are
+  deliberately **not** grounds for refusal: providers add formats without
+  notice, and a stale refusal costs a user their whole run while a stale hint
+  costs a sentence.
+
 ### Changed
+- The license badge and the remaining relative links in `README.md` are
+  absolute, so they resolve on the PyPI project page. Relative links render
+  only on GitHub, and the 0.3.0 page shipped with fourteen of them dead.
+- `project.urls` now points at the landing page and adds Issues and Changelog,
+  so the PyPI sidebar links somewhere other than the repository.
+
+
+### Released in 0.3.0, undocumented there
+
+These shipped inside the `v0.3.0` tag but the changelog still filed them under
+Unreleased, so the published 0.3.0 release notes omit them. `git ls-tree
+v0.3.0` shows the three design documents present and `azure.py` absent. They
+are recorded here rather than moved up into 0.3.0, because that release's notes
+are already published and PyPI freezes a release's description at upload, so
+0.3.0 can never be made to tell the whole story. This is where a reader will
+now find it.
+
 - **`docs/DESIGN.md` is now three documents**, because one 7,500-word article
   asked a reader to finish the argument, the evidence and the architecture in
   one sitting to get any of them. Nothing was cut.
@@ -17,13 +56,11 @@ packaging tools would read as `1.1`.
   - [`design_3_mechanism.md`](docs/design_3_mechanism.md), the five agents, the
     FIX and PATCH separation, and the reference appendix.
 
-### Removed
-- **Azure OpenAI provider.** Three providers ship: Gemini, OpenAI, Anthropic.
+- **The Azure OpenAI provider was removed.** Three providers ship: Gemini, OpenAI, Anthropic.
   Azure was a near-duplicate of the OpenAI path with an extra endpoint variable,
   and every SDK carried is somebody else's release schedule to track. It is in
   the git history and can come back when someone asks for it.
 
-### Fixed
 - **The Anthropic provider was broken.** `anthropic` SDK 1.x removed
   `temperature` from `messages.create()`, so any run with `LLM_PROVIDER=anthropic`
   raised `TypeError` before a request was sent. Anthropic now has no determinism

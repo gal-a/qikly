@@ -13,7 +13,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qikly"
-version = "0.3.0"
+version = "0.3.1"
 description = "An autonomous coding agent that writes its own hidden acceptance criteria, and the tests that enforce them, then converges real code against that bar."
 readme = "README.md"
 requires-python = ">=3.10"

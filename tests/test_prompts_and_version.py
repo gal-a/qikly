@@ -351,3 +351,28 @@ def test_every_prompt_template_gets_every_placeholder_it_asks_for():
                     f"{template} asks for {sorted(missing)} and {name} does not pass it")
 
     assert not problems, "; ".join(problems)
+
+
+def test_the_package_version_matches_pyproject():
+    """
+    Two places declare the version and only one of them is checked at release.
+
+    `release.yml` refuses a tag that disagrees with `pyproject.toml`, which is
+    the check that protects PyPI. Nothing compared `qikly.__version__` against
+    it, so a bump that touched one and not the other would ship a wheel whose
+    `--version` reported the previous release. That is not caught by any
+    install check, because the wheel installs and runs perfectly; it just lies
+    about which one it is. Adding this after a 0.3.1 bump did exactly that.
+    """
+    import pathlib
+    import re
+
+    import qikly
+
+    root = pathlib.Path(qikly.__file__).resolve().parents[2]
+    text = (root / "pyproject.toml").read_text(encoding="utf-8")
+    declared = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M).group(1)
+    assert qikly.__version__ == declared, (
+        f"qikly.__version__ is {qikly.__version__} but pyproject.toml says "
+        f"{declared}. Bump both."
+    )

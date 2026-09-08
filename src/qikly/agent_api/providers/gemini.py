@@ -1,4 +1,5 @@
 import os
+from qikly.agent_api.providers import keys
 from qikly.agent_api.usage import record_usage
 from qikly.agent_api.providers.timeouts import timeout_milliseconds
 
@@ -42,9 +43,8 @@ def call_gemini(prompt, seed=None):
     except APIError as e:
         raise RuntimeError(
             f"Gemini API rejected the request ({e.code} {e.status}): "
-            f"{e.message.rstrip('.')}. If this looks like an auth error, check "
-            f"API_KEY for typos/whitespace and that it's an active key from "
-            f"Google AI Studio."
+            f"{e.message.rstrip('.')}. {keys.auth_hint('gemini')} "
+            f"It must be an active key from Google AI Studio."
         ) from e
 
     finish_reason = response.candidates[0].finish_reason

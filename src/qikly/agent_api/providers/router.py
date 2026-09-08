@@ -10,6 +10,8 @@ import contextlib
 import os
 import socket
 
+from qikly.agent_api.providers import keys
+
 DEFAULT_PROVIDER = "gemini"
 
 # provider name -> (module, function name, extra required env vars beyond API_KEY)
@@ -44,15 +46,36 @@ def _ensure_api_key(provider):
     Normalise whichever accepted variable is set into API_KEY. Returns True
     if a key is now available. Idempotent, and never overwrites an API_KEY
     that is already set.
+
+    Refuses a value that cannot be a key. A stray quote or a leading space
+    survives a paste silently and is only reported by the provider, one model
+    call later, as an unauthenticated request. Failing here costs nothing and
+    names the variable at fault. Only characters no provider's key ever
+    contains are refused; length and prefix are left alone, because those
+    change and a wrong refusal is worse than a late one.
     """
     if os.environ.get("API_KEY"):
+        _reject_unusable("API_KEY", os.environ["API_KEY"])
+        keys.remember_source("API_KEY")
         return True
     for var in _KEY_VARS.get(provider, []):
         value = os.environ.get(var)
         if value:
+            _reject_unusable(var, value)
             os.environ["API_KEY"] = value
+            keys.remember_source(var)
             return True
     return False
+
+
+def _reject_unusable(var, value):
+    problem = keys.defect(value)
+    if problem:
+        raise RuntimeError(
+            f"{var} {problem}, so it cannot be a valid API key "
+            f"({len(value)} characters). Fix that variable and run again. "
+            f"No model call was made."
+        )
 
 
 # Substrings that mean "the name never resolved", across platforms and SDKs.

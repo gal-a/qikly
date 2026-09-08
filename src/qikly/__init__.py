@@ -8,4 +8,4 @@ until they were nested under this one. They are generic enough names that
 installing them at the top level of site-packages would eventually collide
 with somebody else's `orchestrator`.
 """
-__version__ = "0.3.0"
+__version__ = "0.3.1"
