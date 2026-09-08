@@ -1,6 +1,6 @@
 # Publish to PyPI when a version tag is pushed.
 #
-# One command releases: `git tag v0.1.0 && git push origin v0.1.0`.
+# One command releases: `git tag v0.3.0 && git push origin v0.3.0`.
 #
 # No API token is stored anywhere. PyPI's trusted publishing exchanges this
 # workflow's short-lived OIDC identity for an upload token at the moment of
@@ -21,7 +21,7 @@
 # Add a required reviewer there if you want a human click before each upload.
 #
 # The version comes from pyproject.toml, and the tag has to agree with it: a
-# tag saying v0.2.0 on a tree that still says 0.1.0 would publish the wrong
+# tag saying v0.4.0 on a tree that still says 0.3.0 would publish the wrong
 # number under the right name, and PyPI never lets a version be reused. The
 # check below refuses that before anything is built.
 

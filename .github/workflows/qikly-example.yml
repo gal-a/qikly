@@ -35,13 +35,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - id: qikly
-        uses: gal-a/qikly@v0.1.0
+        uses: gal-a/qikly@v0.3.0
         with:
           task: ${{ inputs.task }}
           api-key: ${{ secrets.GEMINI_API_KEY }}
           # Pin it. A convergence rate belongs to a tool version as much as to
           # a model, so an unpinned install makes two runs incomparable.
-          qikly-version: "qikly==0.1.0"
+          qikly-version: "qikly==0.3.0"
 
       # The JUnit XML is the part another system reads. Publish it as a check,
       # or send it to Xray, qTest or TestRail from here.

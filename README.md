@@ -1,11 +1,12 @@
 # qikly
 
+[![tests](https://github.com/gal-a/qikly/actions/workflows/ci.yml/badge.svg)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
+[![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
+[![license](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
 
 **The solution: two agents. One turns the acceptance criteria into tests. The other writes the code and never sees the acceptance criteria.**
-
-*For self-contained Python modules that transform data. Not for a large
-existing repository.*
 
 Imagine a student who writes the exam paper, writes the answer key, and then
 sits the exam. They pass. Obviously they pass, and nobody would accept that as
@@ -191,8 +192,8 @@ the first of three parts.
 
 ## What it is for
 
-Built for **self-contained Python modules that transform data**: ETL, merges,
-calculations, validation. That is the layer where a wrong answer looks like a
+Built for **self-contained Python modules that transform data, not for a large
+existing repository.**: ETL, merges, calculations, validation. That is the layer where a wrong answer looks like a
 right answer, and where a test written from the rule is the only thing that
 catches it.
 
@@ -899,7 +900,7 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.1.0`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.3.0`, uploading the suite, the code and the JUnit XML |
 
 ## Further reading
 

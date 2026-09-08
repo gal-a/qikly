@@ -46,7 +46,7 @@ inputs:
     default: "3.12"
   qikly-version:
     description: >-
-      Version specifier to install, for example "qikly==0.1.0". Pin this. A
+      Version specifier to install, for example "qikly==0.3.0". Pin this. A
       convergence rate belongs to a tool version as much as to a model, so an
       unpinned install makes two runs incomparable.
     required: false

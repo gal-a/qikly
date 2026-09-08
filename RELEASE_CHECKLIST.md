@@ -101,7 +101,7 @@ The GitHub release **title** is printed in every user's terminal, by the
 version check, the next time they run anything:
 
 ```
-qikly 0.3.0 is available + <your title here> (you have 0.1.0)
+qikly 0.4.0 is available + <your title here> (you have 0.3.0)
 ```
 
 That one line is the only channel this project has to reach people who have
@@ -127,8 +127,8 @@ is what makes it a claim rather than an announcement.
 Do not upload by hand. Push the tag:
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
 `.github/workflows/release.yml` takes it from there. It refuses to publish

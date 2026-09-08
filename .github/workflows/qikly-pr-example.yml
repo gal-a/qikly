@@ -32,14 +32,14 @@ jobs:
       - name: Validate task files
         shell: bash
         run: |
-          python -m pip install --quiet "qikly==0.1.0"
+          python -m pip install --quiet "qikly==0.3.0"
           qikly --validate
 
       - id: qikly
-        uses: gal-a/qikly@v0.1.0
+        uses: gal-a/qikly@v0.3.0
         with:
           api-key: ${{ secrets.GEMINI_API_KEY }}
-          qikly-version: "qikly==0.1.0"
+          qikly-version: "qikly==0.3.0"
 
       - name: Build the comment
         id: body

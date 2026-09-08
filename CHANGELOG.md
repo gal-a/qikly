@@ -34,10 +34,17 @@ packaging tools would read as `1.1`.
   never land.
 - The missing-`patch` error now names how to install one, per platform.
 
-## 0.1.0
+## 0.3.0
 
 First public release, and the first version number that will ever appear on
-PyPI. It goes backwards from the 1.1.0 in the private repository on purpose.
+PyPI. There is no 0.1.0 or 0.2.0, and there never was: this project was
+developed privately for months and the first number it shows the world is the
+first one it publishes. 0.3.0 rather than 0.1.0 says that the tool has been
+exercised, in this case by 956 offline tests, a seven-environment CI matrix,
+and end-to-end runs on Ubuntu, Windows and macOS, before anyone outside the
+author's machine ever saw it.
+
+It still goes backwards from the 1.1.0 in the private repository, on purpose.
 
 **On the `research/` files named below.** Five ship and eight do not, and the
 entries here describe what a measurement found rather than what you can rerun.
