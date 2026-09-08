@@ -1,0 +1,77 @@
+orchestrator:
+  max_retries_per_stage: 10
+  test_order:
+    - "integration"
+    - "system"
+    - "unit"
+
+agent:
+  max_patch_size: 8000  # characters; an oversized PATCH is rejected and the agent is asked to retry smaller.
+    # Bootstrap (whole-file creation) and multi-rule fixes for the ETL task's
+    # generated code observed real sizes of 2000-3400 chars even when correct --
+    # 2000 was untested and too tight: it made the agent visibly mangle diffs
+    # trying to fit, which then failed to apply. Retune per task if a larger
+    # or smaller implementation pushes past this.
+
+logging:
+  save_transactions: true
+
+# Run summaries (outputs/reports/run_summary/*.json) have no settings: they are
+# written after every run, like the HTML reports, and stay on your disk.
+
+# Which model each of the four agents runs on.
+#
+# Everything falls back to `default`, and `default` falls back to the
+# LLM_PROVIDER / LLM_MODEL environment variables, so leaving this untouched
+# keeps the single-model behaviour. An exported LLM_PROVIDER or LLM_MODEL
+# overrides this file, which is what makes a one-off run easy.
+#
+# provider: gemini | openai | anthropic
+test_generation:
+  # How many acceptance criteria one test-generation call is shown.
+  #
+  # 0 means one call carrying the whole bar. That is how every published
+  # number in this project was measured, and it has a problem: the suite does
+  # not grow when the bar does. Across 67 archived suites, refinement raised
+  # the criteria count 54% while the generated suite got 6% smaller, so tests
+  # per criterion fell from 2.21 to 1.32. One call appears to produce roughly
+  # a fixed amount of test code however much it is asked to cover, which
+  # spreads coverage thinner rather than adding any.
+  #
+  # A positive value splits the bar into batches and makes one call per batch,
+  # writing one file per batch, so a longer bar costs more calls and produces
+  # more tests. Left at 0 by default: turning it on changes the shape of every
+  # run and invalidates comparison against the existing numbers, so it should
+  # be a deliberate choice rather than a silent upgrade.
+  criteria_per_batch: 0
+
+agents:
+  default:
+    provider: gemini
+    model: gemini-3.5-flash-lite
+
+  # FIX and PATCH. Invoked far more often than the other three, so this is
+  # where a cheap model pays for itself.
+  code: {}
+
+  # Test generation. `test` applies to all three stages; a stage's own entry
+  # overrides it. Unit is the stage that stalls most often and the only one
+  # that sees the implementation, so it is the one where a stronger model is
+  # most likely to pay without raising the cost of the other two.
+  test: {}
+  test_integration: {}
+  test_system: {}
+  test_unit: {}
+
+  # Drafts the acceptance criteria from the requirements.
+  criteria: {}
+
+  # Adversarially reviews the criteria against a finished implementation.
+  # A stronger model here is the change most likely to be worth its cost,
+  # since this is the agent asked to find what nobody wrote down.
+  review: {}
+
+  # Proposes fixture rows for criteria that no existing row can trigger.
+  # Runs only when a refinement round asks it to, and only ever writes a
+  # proposal file for a human to accept: it never edits your fixtures.
+  fixtures: {}

@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="840" viewBox="0 0 1600 840" role="img"
+     aria-label="Qikly: automated code and test generation, kept apart">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0a1112"/>
+      <stop offset="0.55" stop-color="#0d1a1b"/>
+      <stop offset="1" stop-color="#0b1416"/>
+    </linearGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#8fdcdc"/>
+    </linearGradient>
+    <linearGradient id="streak" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#57b8bd" stop-opacity="0"/>
+      <stop offset="1" stop-color="#57b8bd" stop-opacity="0.85"/>
+    </linearGradient>
+    <linearGradient id="trailP" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a855f7" stop-opacity="0"/>
+      <stop offset="1" stop-color="#a855f7" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="trailT" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#57b8bd" stop-opacity="0"/>
+      <stop offset="1" stop-color="#57b8bd" stop-opacity="0.55"/>
+    </linearGradient>
+    <pattern id="dots" width="26" height="26" patternUnits="userSpaceOnUse">
+      <circle cx="1.6" cy="1.6" r="1.6" fill="#57b8bd" opacity="0.10"/>
+    </pattern>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="840" fill="url(#bg)"/>
+  <rect width="1600" height="840" fill="url(#dots)"/>
+  <ellipse cx="1180" cy="360" rx="420" ry="300" fill="#0e6a70" opacity="0.20" filter="url(#soft)"/>
+  <ellipse cx="300" cy="640" rx="360" ry="240" fill="#7e22ce" opacity="0.13" filter="url(#soft)"/>
+
+  <!-- ================= left: wordmark ================= -->
+  <text x="96" y="196" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="25"
+        letter-spacing="6.5" fill="#57b8bd">AUTOMATED CODE + TEST GENERATION</text>
+
+  <g transform="skewX(-9)">
+    <rect x="52" y="268" width="120" height="15" rx="7.5" fill="url(#streak)" opacity="0.55"/>
+    <rect x="26" y="312" width="180" height="15" rx="7.5" fill="url(#streak)" opacity="0.8"/>
+    <rect x="60" y="356" width="140" height="15" rx="7.5" fill="url(#streak)" opacity="0.45"/>
+    <text x="118" y="368" font-family="'Segoe UI', Arial, Helvetica, sans-serif" font-size="188"
+          font-weight="800" letter-spacing="-5" fill="url(#word)">qikly</text>
+    <text x="560" y="368" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="132"
+          font-weight="700" fill="#57b8bd" opacity="0.95">&gt;</text>
+    <text x="626" y="368" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="132"
+          font-weight="700" fill="#57b8bd" opacity="0.6">&gt;</text>
+    <text x="692" y="368" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="132"
+          font-weight="700" fill="#57b8bd" opacity="0.3">&gt;</text>
+  </g>
+
+  <rect x="96" y="432" width="132" height="5" rx="2.5" fill="#57b8bd"/>
+
+  <text x="96" y="506" font-family="'Segoe UI', Arial, Helvetica, sans-serif" font-size="42"
+        font-weight="700" fill="#e3eae8">One spec in. Code and tests out.</text>
+  <text x="96" y="562" font-family="'Segoe UI', Arial, Helvetica, sans-serif" font-size="32"
+        fill="#98a5a3">Written by two agents that are never shown</text>
+  <text x="96" y="606" font-family="'Segoe UI', Arial, Helvetica, sans-serif" font-size="32"
+        fill="#98a5a3">the same thing.</text>
+
+  <g transform="translate(96, 668)">
+    <rect x="0" y="0" width="270" height="58" rx="29" fill="#112f2e" stroke="#2b8f95" stroke-width="1.5"/>
+    <text x="26" y="38" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="25"
+          fill="#8fdcdc">$ qikly --demo</text>
+  </g>
+  <text x="392" y="706" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="24"
+        fill="#6d7b79">38s &#183; 11 model calls</text>
+
+  <!-- ================= right: two files, kept apart ================= -->
+  <g transform="translate(880, 96) rotate(-2.2)">
+    <rect x="-190" y="52" width="150" height="12" rx="6" fill="url(#trailP)"/>
+    <rect x="-150" y="104" width="110" height="12" rx="6" fill="url(#trailP)" opacity="0.7"/>
+    <rect x="-120" y="156" width="80" height="12" rx="6" fill="url(#trailP)" opacity="0.4"/>
+    <rect x="0" y="0" width="620" height="248" rx="18" fill="#171226" stroke="#7e22ce" stroke-width="2.5"/>
+    <circle cx="34" cy="38" r="7" fill="#7e22ce"/>
+    <text x="58" y="46" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="26"
+          font-weight="700" fill="#e9d8ff">calc.py</text>
+    <text x="596" y="46" text-anchor="end" font-family="Consolas, 'DejaVu Sans Mono', monospace"
+          font-size="20" fill="#a78bda">CODING AGENT</text>
+    <line x1="24" y1="66" x2="596" y2="66" stroke="#3b2b57" stroke-width="1.5"/>
+    <text x="34" y="112" xml:space="preserve" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="23" fill="#b9a7d6">def transform(rows):</text>
+    <text x="34" y="150" xml:space="preserve" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="23" fill="#b9a7d6">    rate = _parse(row)</text>
+    <text x="34" y="188" xml:space="preserve" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="23" fill="#b9a7d6">    if rate &lt; 0 <tspan fill="#4ade80" font-weight="700">or rate &gt; 100</tspan>:</text>
+    <text x="34" y="226" xml:space="preserve" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="23" fill="#6d7b79">        reject(row)</text>
+  </g>
+
+  <g>
+    <line x1="900" y1="416" x2="1560" y2="416" stroke="#3d4a4a" stroke-width="2.5" stroke-dasharray="12 12"/>
+    <rect x="1074" y="392" width="312" height="48" rx="24" fill="#0d1a1b" stroke="#3d4a4a" stroke-width="1.5"/>
+    <text x="1230" y="424" text-anchor="middle" font-family="Consolas, 'DejaVu Sans Mono', monospace"
+          font-size="23" letter-spacing="1.5" fill="#98a5a3">kept apart</text>
+  </g>
+
+  <g transform="translate(940, 468) rotate(1.8)">
+    <rect x="-190" y="52" width="150" height="12" rx="6" fill="url(#trailT)"/>
+    <rect x="-150" y="104" width="110" height="12" rx="6" fill="url(#trailT)" opacity="0.7"/>
+    <rect x="-120" y="156" width="80" height="12" rx="6" fill="url(#trailT)" opacity="0.4"/>
+    <rect x="0" y="0" width="620" height="248" rx="18" fill="#0f2224" stroke="#2b8f95" stroke-width="2.5"/>
+    <circle cx="34" cy="38" r="7" fill="#57b8bd"/>
+    <text x="58" y="46" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="26"
+          font-weight="700" fill="#c7f0ef">test_calc.py</text>
+    <text x="596" y="46" text-anchor="end" font-family="Consolas, 'DejaVu Sans Mono', monospace"
+          font-size="20" fill="#6fb9bd">TEST AGENT</text>
+    <line x1="24" y1="66" x2="596" y2="66" stroke="#1e4144" stroke-width="1.5"/>
+    <text x="34" y="112" xml:space="preserve" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="23" fill="#9dc7c8">def test_tax_rate(rows):</text>
+    <text x="34" y="150" xml:space="preserve" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="23" fill="#9dc7c8">    for row in accepted:</text>
+    <text x="34" y="188" xml:space="preserve" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="23" fill="#9dc7c8">        assert 0 &lt;= rate &lt;= 100</text>
+    <text x="34" y="226" xml:space="preserve" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="23" fill="#6d7b79">    # from the criteria</text>
+  </g>
+
+  <g transform="translate(1128, 742)">
+    <rect x="0" y="0" width="300" height="56" rx="28" fill="#0f2a18" stroke="#15803d" stroke-width="2"/>
+    <path d="M30 28 l12 13 l22 -25" fill="none" stroke="#4ade80" stroke-width="5"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="86" y="37" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="25"
+          font-weight="700" fill="#4ade80">9/9 passed</text>
+  </g>
+</svg>

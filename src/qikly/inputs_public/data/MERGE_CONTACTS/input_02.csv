@@ -1,0 +1,7 @@
+contact_id,name,phone,email,last_modified
+C1,Alice Johnson,555-999-0000,alice.j@example.com,2026-01-03 14:00
+C2,Bob Smith,555-987-6543,bob.smith@example.com,2026-01-04 08:00
+C6,Frank Ocean,555-222-3333,frank@example.com,2026-01-01 09:00
+C3,Charlie Leigh,abc-def-ghij,charlie@example.com,2026-01-06 09:00
+C3,Charlie Lee,abc-def-ghij,charlie@example.com,2026-01-07 09:00
+C1,Alice Tie,555-000-1111,alice.tie@example.com,2026-01-01 10:00

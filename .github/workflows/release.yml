@@ -1,0 +1,124 @@
+# Publish to PyPI when a version tag is pushed.
+#
+# One command releases: `git tag v0.3.0 && git push origin v0.3.0`.
+#
+# No API token is stored anywhere. PyPI's trusted publishing exchanges this
+# workflow's short-lived OIDC identity for an upload token at the moment of
+# upload, which is why `permissions: id-token: write` is here and why there is
+# no `password:` line. A token in repository secrets is a long-lived
+# credential that can publish from anywhere; this one cannot be reused, cannot
+# be stolen from the repository, and stops working the instant the workflow
+# stops being the thing that ran.
+#
+# ONE-TIME SETUP, before the first tag, on https://pypi.org:
+#   Your projects -> Publishing -> Add a new pending publisher
+#     PyPI project name : qikly
+#     Owner             : gal-a
+#     Repository        : qikly
+#     Workflow name     : release.yml
+#     Environment       : pypi
+# Then here: Settings -> Environments -> New environment -> "pypi".
+# Add a required reviewer there if you want a human click before each upload.
+#
+# The version comes from pyproject.toml, and the tag has to agree with it: a
+# tag saying v0.4.0 on a tree that still says 0.3.0 would publish the wrong
+# number under the right name, and PyPI never lets a version be reused. The
+# check below refuses that before anything is built.
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: The tag must match the version in pyproject.toml
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          tag = os.environ["GITHUB_REF_NAME"].lstrip("v")
+          text = open("pyproject.toml", encoding="utf-8").read()
+          declared = re.search(r'^version\s*=\s*"([^"]+)"', text, re.M).group(1)
+          if tag != declared:
+              sys.exit(
+                  f"tag v{tag} does not match pyproject version {declared}. "
+                  "PyPI never allows a version to be reused, so publishing the "
+                  "wrong number is not something you can undo. Fix one of them."
+              )
+          print(f"tag and pyproject agree on {declared}")
+          PY
+
+      - name: The tests must pass on the exact tree being published
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pytest -q
+
+      - name: Build the wheel and the sdist
+        run: |
+          pip install build twine
+          python -m build
+          twine check dist/*
+
+      - name: The built wheel must install clean and its scripts must register
+        # Catches the packaging failures that a source checkout hides: package
+        # data left out of the wheel, an entry point that does not resolve,
+        # a dependency that only happened to be installed here.
+        run: |
+          python -m venv /tmp/fresh
+          /tmp/fresh/bin/pip install --quiet dist/*.whl
+          # --explain rather than --version, and the difference is the point:
+          # --version proves the entry point resolves and nothing else, while
+          # --explain has to find the bundled task, parse it, and build both
+          # halves of the prompt out of the wheel's own package data. It still
+          # needs no API key. A wheel that shipped the code but not the tasks
+          # passes --version and fails here, which is the failure that would
+          # otherwise reach a user as "qikly --demo does nothing".
+          /tmp/fresh/bin/qikly --explain CALC_TAX > explain.txt
+          grep -q "THE CODING AGENT" explain.txt || { echo "--explain produced no withholding section"; exit 1; }
+          if grep -q "declares no acceptance_criteria" explain.txt; then
+            echo "the wheel's CALC_TAX has no acceptance criteria, so nothing was withheld"
+            exit 1
+          fi
+          for script in qikly qikly-all qikly-report qikly-metrics qikly-diff-criteria; do
+            test -x "/tmp/fresh/bin/$script" || { echo "missing console script: $script"; exit 1; }
+          done
+          /tmp/fresh/bin/python -c "
+          import os, qikly
+          root = os.path.join(os.path.dirname(qikly.__file__), 'inputs_public')
+          tasks = os.listdir(os.path.join(root, 'config', 'tasks'))
+          assert tasks, 'the wheel shipped no bundled tasks'
+          assert not [t for t in tasks if '_EF' in t or '_WIDE' in t], \
+              'experiment leftovers reached the wheel: ' + str(tasks)
+          print(f'wheel carries {len(tasks)} bundled tasks')
+          "
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      # The whole point: this is what trusted publishing exchanges for an
+      # upload token. Without it the upload step has no credential at all.
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

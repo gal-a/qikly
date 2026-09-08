@@ -1,0 +1,146 @@
+# The one thing the test suite cannot prove.
+#
+# ci.yml runs 950 offline tests across seven environments and never makes a
+# single model call, which is deliberate: a suite that needs credentials gets
+# skipped in CI and then stops catching anything. The cost is that everything
+# CI proves stops at "it imports and its tests pass".
+#
+# Whether the loop actually converges -- criteria withheld, tests generated,
+# code written, a failure diagnosed, a patch applied, green -- had been
+# demonstrated on exactly one machine in the world, the author's laptop. This
+# workflow is how that stops being true, on three operating systems, against a
+# real provider, from the built wheel rather than a source checkout.
+#
+# Manual only. It spends money (about half a cent per leg) and it needs a key,
+# so it must never run on push, on a schedule, or from a fork.
+name: live run
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "Which provider to call for real"
+        type: choice
+        default: gemini
+        options: [gemini, openai, anthropic]
+      runners:
+        description: "Where to run it"
+        type: choice
+        default: all three
+        options: ["all three", "ubuntu only"]
+
+concurrency:
+  group: live-run
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Build the wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  live:
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      # One leg failing is a result, not a reason to cancel the other two. If
+      # Windows converges and macOS does not, that is the finding.
+      fail-fast: false
+      matrix:
+        os: ${{ inputs.runners == 'ubuntu only' && fromJSON('["ubuntu-latest"]') || fromJSON('["ubuntu-latest", "windows-latest", "macos-latest"]') }}
+
+    env:
+      LLM_PROVIDER: ${{ inputs.provider }}
+      # All three are set and the router picks the one its provider names, so
+      # this also exercises the fallback a real user hits: a machine that
+      # already talks to Gemini exports GEMINI_API_KEY, never API_KEY.
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      QIKLY_NO_VERSION_CHECK: "1"
+
+    defaults:
+      run:
+        # Git Bash on the Windows runner, so one script works everywhere and
+        # the wheel glob expands the same way on all three.
+        shell: bash
+
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: A key has to exist before anything is built or spent
+        # Without this the run reaches the first model call, spends the time
+        # getting there, and fails with a message about API_KEY that does not
+        # say which secret is missing from this repository.
+        run: |
+          case "$LLM_PROVIDER" in
+            gemini)    KEY="$GEMINI_API_KEY" ;;
+            openai)    KEY="$OPENAI_API_KEY" ;;
+            anthropic) KEY="$ANTHROPIC_API_KEY" ;;
+          esac
+          if [ -z "$KEY" ]; then
+            echo "::error::no repository secret set for $LLM_PROVIDER. Add ${LLM_PROVIDER}_API_KEY under Settings, Secrets and variables, Actions."
+            exit 1
+          fi
+          echo "$LLM_PROVIDER key present, ${#KEY} chars"
+
+      - name: Install the wheel, not the source tree
+        # The wheel is the artifact a user receives. A source checkout has
+        # every file whether or not the wheel shipped it, so installing the
+        # checkout here would prove nothing about what `pip install qikly`
+        # gives somebody.
+        run: |
+          python -m pip install --upgrade pip
+          pip install dist/*.whl
+          qikly --version
+
+      - name: Withholding, with no key and no network
+        # Cheap, deterministic, and it fails for a different reason than the
+        # demo does: this one is about the wheel's package data, not the
+        # provider. Running it first means a packaging fault never looks like
+        # a model fault.
+        run: |
+          qikly --explain CALC_TAX | tee explain.txt
+          grep -q "THE CODING AGENT" explain.txt
+
+      - name: A real converging run
+        # From an empty directory, because the demo writes its whole tree into
+        # the working directory and cli.py has chdir'd at import before.
+        run: |
+          mkdir -p live && cd live
+          qikly --demo
+
+      - name: Keep what it wrote
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-${{ matrix.os }}-${{ inputs.provider }}
+          path: live/demo/
+          # The generated tests, the agent's code, the transaction log and the
+          # console output. No key is ever written into any of them, but this
+          # is still a run's full working directory, so it does not sit around.
+          retention-days: 7
+          if-no-files-found: warn

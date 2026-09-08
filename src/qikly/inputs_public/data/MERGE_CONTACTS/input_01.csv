@@ -1,0 +1,11 @@
+contact_id,name,phone,email,last_modified
+C1,Alice Johnson,555-123-4567,alice@example.com,2026-01-01 10:00
+C2,Bob Smith,555-987-6543,bob@example.com,2026-01-05 09:00
+C3,Charlie Lee,555-111-2222,charlie@example.com,2026-01-02 08:00
+C4,,555-333-4444,dana@example.com,2026-01-01 12:00
+C5,Eve Adams,123,eve@example.com,2026-01-01 13:00
+C7,Frank,invalidphone,frank@example.com,2026-01-01 10:00
+C7,   ,555-111-2222,space@example.com,2026-01-01 10:00
+C7,Frank,555-1234,frank@example.com,2026-01-01 10:00
+C7,Frank,555-111-2222,frank.example.com,2026-01-01 10:00
+C7,Frank,555-111-2222,frank@example.com,2026/01/01 10:00

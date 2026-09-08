@@ -1,0 +1,11 @@
+id,name,email
+24,Henry Ford,henry.ford@example.com
+25,Isla Fox,ISLA.FOX@EXAMPLE.COM
+2,Bob Impersonator,bob.fake@example.com
+26,Bob Smith Two,bob@example.com
+27,Karen White,karen@sub.example.com
+oneword,Not A Number,oneword@example.com
+28,,missing.name@example.com
+29,Leo Nguyen,leo.n@example.co.uk
+30,Mallory Stone,mallory@.co
+31,999999,onlydigits@example.com

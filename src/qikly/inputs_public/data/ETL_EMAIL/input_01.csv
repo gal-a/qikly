@@ -1,0 +1,23 @@
+id,name,email
+1,Alice Johnson,alice@example.com
+2,Bob Smith,BOB@EXAMPLE.COM
+3,Charlie Brown,charlie.brown@example.com
+4,,missing_name@example.com
+five,David Wrong,david@example.com
+6,Eve Adams,
+7,Frank Castle,frank.castle@example.com
+8,   ,ghost@example.com
+-9,Negative Nancy,nancy@example.com
+0,Zero Zed,zero@example.com
+10,No Domain Nick,@nodomain.com
+11,Double At Dana,dana@@example.com
+12,No Dot Dean,dean@localhost
+1,Alice Duplicate,alice2@example.com
+15,Grace Hopper,GRACE.HOPPER@EXAMPLE.ORG
+16,12345,mathname@example.com
+17,  Jane   Doe  ,janedoe@example.com
+18,Case Dup Carl,BOB@example.com
++20,Plus Sign Pete,pete@example.com
+21,Dotty Dan,dan@sub..example.com
+22,Trailing Dot Tina,tina@example.com.
+23,Leading Dot Leo,leo@.example.com

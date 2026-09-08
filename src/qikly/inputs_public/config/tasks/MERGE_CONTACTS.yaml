@@ -1,0 +1,53 @@
+# Short, filesystem-safe identifier (letters/digits/underscore only, must not
+# start with a digit). Must match this file's own name (inputs/config/tasks/<task_id>.yaml).
+# Namespaces this task's own inputs_private/data/<task_id>/, outputs/data/<task_id>/,
+# outputs/tests/<task_id>/, and outputs/agent_src/code/<task_id>/ -- so any
+# number of V&V tasks can run in this same project, including concurrently
+# in separate processes, without their files colliding.
+task_id: "MERGE_CONTACTS"
+
+task_name: "MERGE - Contact Record Reconciliation"
+
+description: "Implement a pipeline that reads two CSV files of contact records exported from different systems, validates them, and reconciles records that refer to the same contact_id into a single, most-up-to-date record -- rather than keeping duplicates or arbitrarily picking whichever file's version happens to be read first or last."
+
+inputs:
+  - "inputs_private/data/MERGE_CONTACTS/input_01.csv"
+  - "inputs_private/data/MERGE_CONTACTS/input_02.csv"
+
+outputs:
+  - "outputs/data/MERGE_CONTACTS/output.json"
+
+# Describes the implementation's expected shape so test generation can target
+# it without the prompts hardcoding any task-specific function names. Written
+# once per task; integration/system test generation reads this section
+# directly out of this file's text.
+interface:
+  module: "outputs.agent_src.code.MERGE_CONTACTS.merge"
+  integration_functions:
+    - "extract(input_path) -> list[dict]  # reads one input file, returns its raw rows"
+    - "transform(rows) -> dict  # validates each contact record and reconciles same-contact_id records from both files into one up-to-date record; returns {\"accepted\": [...], \"rejected\": [...]}, where each accepted entry appears at most once per contact_id, and each rejected entry is the original row plus a \"reason\" field"
+    - "load(data, output_path) -> None  # writes the {\"accepted\": [...], \"rejected\": [...]} result to the output file as JSON"
+  system_entrypoint: "run_merge(input_paths, output_path) -> None  # runs extract on each path in input_paths (a list), combines the raw rows, then transform -> load end-to-end"
+
+requirements:
+  - "Read both CSV files listed in this task's inputs (inputs_private/data/MERGE_CONTACTS/input_01.csv and inputs_private/data/MERGE_CONTACTS/input_02.csv), and combine their rows into a single list before validation"
+  - "Validate each record: contact_id (string), name (string), phone (a phone number), email (an email address), last_modified (a date and time)"
+  - "Apply reasonable, strict real-world validation to name, phone, email, and last_modified -- reject anything malformed or implausible"
+  - "When the same contact_id appears in both input files, reconcile them into a single, most up-to-date record rather than keeping both or arbitrarily choosing one"
+  - "A record that fails validation is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
+  - "Write the result to outputs/data/MERGE_CONTACTS/output.json as a single JSON object with two keys: \"accepted\" (the list of valid, reconciled contact records) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+
+acceptance_criteria:
+  - "All valid contacts appear in the output JSON's \"accepted\" list, and only valid contacts appear there"
+  - "Invalid or malformed records are excluded from \"accepted\" and instead appear in \"rejected\", each with a reason"
+  - "Output JSON is a single object with \"accepted\" and \"rejected\" keys, each a list of objects"
+  - "Each rejected row's reason names the specific field that caused rejection (e.g. \"name\", \"phone\", \"email\", \"last_modified\") rather than a generic message like \"invalid row\""
+  - "name is only valid if it is non-empty once whitespace-trimmed and contains at least one alphabetic character"
+  - "phone is only valid if, once common formatting characters (spaces, dashes, dots, parentheses) are removed, it consists of exactly 10 digits -- fewer or more digits, or any letters, make it invalid"
+  - "email is only valid if it contains exactly one '@' with a non-empty local part and a domain part that itself contains at least one dot with a non-empty label on each side"
+  - "last_modified is only valid if it parses as a real date and time in \"YYYY-MM-DD HH:MM\" format"
+  - "contact_id appears at most once in the output JSON's \"accepted\" list -- if the same contact_id appears in both input files, only one reconciled record for it is ever produced"
+  - "When the same contact_id appears in both files, the version with the later last_modified timestamp is the one whose field values (name, phone, email) appear in the reconciled accepted record -- not whichever file or row happens to be read first or last"
+  - "When the same contact_id appears in both files, validity is determined by the more recent version's fields alone: if the more recent version is invalid, the contact_id is rejected entirely (with a reason describing the more recent version's problem), even if the older version would have been valid on its own -- there is no silent fallback to an older, valid version"
+  - "A contact_id that appears in only one of the two files is included as-is (if otherwise valid), with no merging needed"
+  - "When the same contact_id appears in both files with the exact same last_modified timestamp, the version appearing later in the combined input (file 1 then file 2, in read order) is used -- a defined, stable tie-break rather than an ambiguous one"

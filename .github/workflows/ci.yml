@@ -1,0 +1,142 @@
+name: tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Monday 06:00 UTC. Nothing here depends on the clock. It exists because
+    # test_provider_signatures.py is written to fail when an upstream SDK
+    # changes a signature, and a test that only runs on push finds that out
+    # whenever someone next happens to push, which on a finished project is
+    # never. This turns "eventually" into "within a week".
+    - cron: "0 6 * * 1"
+
+# A newer push cancels the run it superseded. Without this, three pushes in a
+# minute pay for three full matrices and only the last result is ever read.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege. Nothing in this workflow writes to the repository, and the
+# default token can.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # Ubuntu carries the whole supported Python range, because it is the
+        # cheapest runner and `requires-python = ">=3.10"` is a promise about
+        # all of them rather than about the two ends.
+        #
+        # Windows takes both ends deliberately. Path separators and newline
+        # handling are where this project has actually broken before, and a
+        # Linux-only pipeline would not have caught it.
+        #
+        # macOS takes one leg. It had never run there at all, which is a gap
+        # nothing else closes, and a private repository bills macOS minutes at
+        # ten times the Linux rate, so one is the honest number until the
+        # repository is public and they are free.
+        include:
+          - { os: ubuntu-latest, python-version: "3.10" }
+          - { os: ubuntu-latest, python-version: "3.11" }
+          - { os: ubuntu-latest, python-version: "3.12" }
+          - { os: ubuntu-latest, python-version: "3.13" }
+          - { os: windows-latest, python-version: "3.10" }
+          - { os: windows-latest, python-version: "3.13" }
+          - { os: macos-latest, python-version: "3.12" }
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Run the test suite
+        # No API key is provided, and none is needed. A suite that requires
+        # credentials gets skipped in CI and then stops catching anything.
+        #
+        # Deliberately a bare `pip install -e .` above: only the Gemini SDK is
+        # a dependency, and this is the install a first-time user performs, so
+        # it is the one that has to be green.
+        run: pytest -q
+
+      - name: Again with the optional SDKs installed
+        # The provider tests skip themselves when their SDK is absent, which is
+        # what keeps the bare install green. Skipped everywhere is the same as
+        # deleted, so they run here too, where an upstream bump to the OpenAI
+        # or Anthropic SDK is supposed to be what turns this red.
+        run: |
+          pip install -e ".[all-providers]"
+          pytest -q
+
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Build the wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Install the built wheel into a clean environment
+        # Installing the wheel rather than the source tree is what catches a
+        # missing package-data entry: the source tree has every file whether
+        # or not the wheel ships it.
+        run: |
+          python -m venv /tmp/fresh
+          /tmp/fresh/bin/pip install dist/*.whl
+          /tmp/fresh/bin/python -c "import qikly, os; \
+            p = os.path.dirname(qikly.__file__); \
+            assert os.path.exists(os.path.join(p, 'inputs_public/config/settings.yaml')), 'settings.yaml missing from the wheel'; \
+            assert os.path.isdir(os.path.join(p, 'inputs_public/agent_defs')), 'agent_defs missing from the wheel'; \
+            assert os.path.isdir(os.path.join(p, 'inputs_public/config/tasks')), 'task configs missing from the wheel'; \
+            print('wheel contents OK')"
+
+      - name: Console scripts are registered
+        run: |
+          /tmp/fresh/bin/qikly --help > /dev/null
+          echo "entry point OK"
+
+      - name: No experiment leftovers in the bundled tasks
+        run: |
+          # The research scripts write throwaway variant configs here and
+          # delete them at the end of a run. A killed run leaves them behind,
+          # and the package-data glob would then ship them as real tasks. A
+          # pytest test cannot check this, because during a local run they are
+          # legitimately present. CI never has a run in progress.
+          if ls src/qikly/inputs_public/config/tasks/ | grep -E "_EFI|_EFR|_CONV|_ARMI|_ARMR|_BASE" ; then
+            echo "::error::experiment task configs committed to the bundled tasks directory"
+            exit 1
+          fi
+          echo "bundled tasks OK"
+
+      - name: No stale project names survive
+        run: |
+          # Three files name the old project on purpose: this workflow states
+          # the pattern, the checklist repeats it, and the changelog records the
+          # rename. Without these excludes the guard always matches itself.
+          if grep -rIn "v_and_v\|v-and-v\|test_qikly\|test-qikly" --exclude-dir=.git --exclude-dir=outputs --exclude-dir=build --exclude-dir=dist --exclude-dir=.pytest_cache --exclude-dir=__pycache__ --exclude=ci.yml --exclude=CHANGELOG.md --exclude=RELEASE_CHECKLIST.md . ; then
+            echo "::error::stale project name found"
+            exit 1
+          fi
+          echo "naming OK"

@@ -1,0 +1,9 @@
+order_id,subtotal,discount_type,discount_value
+8,25.00,flat,0
+9,80.00,Percent,10
+10,45.00,FLAT,5.00
+11,90.00,percent,150
+12,55.00,flat,-10
+13,,percent,20
+14,70.00,coupon,10
+15,60.00,percent,abc

@@ -1,0 +1,74 @@
+# A template. Copy this into your own repository, not into this one.
+#
+# Runs qikly when a pull request changes a task file, and comments the result
+# on the PR. The comment is updated in place on each push rather than a new one
+# being added, because a PR with fourteen bot comments is a PR nobody reads.
+#
+# Before this does anything useful:
+#   1. GEMINI_API_KEY as a repository secret. Every run spends money.
+#   2. Decide whether you want it on every PR. A run takes minutes and costs
+#      real money, so `paths:` is scoped to task files deliberately.
+
+name: qikly on PR
+
+on:
+  pull_request:
+    paths:
+      - "inputs_private/config/tasks/**"
+      - "inputs_private/data/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  qikly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Free, offline, and catches a broken task file before spending anything
+      # on it. If this fails there is no point running the paid step.
+      - name: Validate task files
+        shell: bash
+        run: |
+          python -m pip install --quiet "qikly==0.3.0"
+          qikly --validate
+
+      - id: qikly
+        uses: gal-a/qikly@v0.3.0
+        with:
+          api-key: ${{ secrets.GEMINI_API_KEY }}
+          qikly-version: "qikly==0.3.0"
+
+      - name: Build the comment
+        id: body
+        shell: bash
+        run: |
+          url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          {
+            echo "text<<QIKLY_EOF"
+            qikly --pr-comment --artifacts-url "$url"
+            echo "QIKLY_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # Updated in place, keyed by a marker in the body, so each push replaces
+      # the last comment instead of adding one.
+      - name: Comment on the pull request
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- qikly-run -->';
+            const body = marker + '\n' + process.env.BODY;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const existing = await github.rest.issues.listComments({ owner, repo, issue_number });
+            const mine = existing.data.find(c => c.body && c.body.includes(marker));
+            if (mine) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+        env:
+          BODY: ${{ steps.body.outputs.text }}

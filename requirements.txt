@@ -1,0 +1,4 @@
+PyYAML>=6.0,<7
+google-genai>=2.0,<3
+pytest>=8.0,<10
+rich>=13.0,<16

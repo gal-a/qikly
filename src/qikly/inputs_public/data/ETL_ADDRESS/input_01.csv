@@ -1,0 +1,13 @@
+id,street,city,state,zip
+1,123 Main Street,Los Angeles,CA,90001
+2,456 Oak Ave,San Francisco,CA,94102
+3,789 N Pine Rd,Sacramento,CA,95814
+4,789 North Pine Road,Sacramento,CA,95814
+5,321 Cedar Blvd,Seattle,wa,98101
+6,654 Elm St,Chicago,Illinois,60601
+7,987 Birch Rd,Miami,FL,33101
+8,111 Maple Ave,Los Angeles,CA,9000A
+9,222 Spruce St,Los Angeles,CA,900
+10,,Los Angeles,CA,90001
+11,555 Fir St,,CA,90001
+12,12345,Los Angeles,CA,90001

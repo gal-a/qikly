@@ -1,0 +1,29 @@
+{"ts": "2026-08-13T15:27:24.865209", "stage": "integration", "test_path": "outputs/tests/DEMO_TASK/integration/test_integration.py", "action": "tests_generated"}
+{"ts": "2026-08-13T15:27:28.714119", "stage": "system", "test_path": "outputs/tests/DEMO_TASK/system/test_system.py", "action": "tests_generated"}
+{"ts": "2026-08-13T15:27:31.241702", "action": "test_run", "stage": "integration", "iteration": 0, "stage_number": 1, "status": "fail", "counts": {"passed": 0, "failed": 0, "error": 1, "skipped": 0, "total": 1}, "tests": [], "failed_tests": [], "is_regression_check": false, "is_bootstrap": true}
+{"ts": "2026-08-13T15:27:33.010455", "action": "agent_fix_requested", "stage": "integration", "iteration": 1, "fix_id": "fix_0001"}
+{"ts": "2026-08-13T15:27:41.882301", "action": "agent_fix_generated", "stage": "integration", "iteration": 1, "fix_id": "fix_0001"}
+{"ts": "2026-08-13T15:27:48.117744", "action": "patch_created", "stage": "integration", "iteration": 1, "fix_id": "fix_0001", "patch_path": "outputs/logs/patches/DEMO_TASK/fix_0001.diff"}
+{"ts": "2026-08-13T15:27:52.664120", "action": "test_run", "stage": "integration", "iteration": 1, "stage_number": 1, "status": "fail", "counts": {"passed": 2, "failed": 2, "error": 0, "skipped": 0, "total": 4}, "tests": [], "failed_tests": ["test_transform_rejects_blank_city", "test_transform_normalizes_whitespace"], "is_regression_check": false, "is_bootstrap": false}
+{"ts": "2026-08-13T15:27:54.223908", "action": "agent_fix_requested", "stage": "integration", "iteration": 2, "fix_id": "fix_0002"}
+{"ts": "2026-08-13T15:28:02.556311", "action": "agent_fix_generated", "stage": "integration", "iteration": 2, "fix_id": "fix_0002"}
+{"ts": "2026-08-13T15:28:07.901276", "action": "patch_apply_failed", "stage": "integration", "iteration": 2, "fix_id": "fix_0002", "detail": "Reversed (or previously applied) patch detected"}
+{"ts": "2026-08-13T15:28:09.442087", "action": "agent_fix_requested", "stage": "integration", "iteration": 3, "fix_id": "fix_0003"}
+{"ts": "2026-08-13T15:28:17.330914", "action": "agent_fix_generated", "stage": "integration", "iteration": 3, "fix_id": "fix_0003"}
+{"ts": "2026-08-13T15:28:22.664501", "action": "patch_created", "stage": "integration", "iteration": 3, "fix_id": "fix_0003", "patch_path": "outputs/logs/patches/DEMO_TASK/fix_0003.diff"}
+{"ts": "2026-08-13T15:28:27.118203", "action": "test_run", "stage": "integration", "iteration": 3, "stage_number": 1, "status": "pass", "counts": {"passed": 4, "failed": 0, "error": 0, "skipped": 0, "total": 4}, "tests": [], "failed_tests": [], "is_regression_check": false, "is_bootstrap": false}
+{"ts": "2026-08-13T15:28:31.775640", "action": "test_run", "stage": "system", "iteration": 0, "stage_number": 2, "status": "fail", "counts": {"passed": 3, "failed": 1, "error": 0, "skipped": 0, "total": 4}, "tests": [], "failed_tests": ["test_output_totals_reconcile"], "is_regression_check": false, "is_bootstrap": false}
+{"ts": "2026-08-13T15:28:33.229471", "action": "agent_fix_requested", "stage": "system", "iteration": 1, "fix_id": "fix_0004"}
+{"ts": "2026-08-13T15:28:42.664108", "action": "agent_fix_generated", "stage": "system", "iteration": 1, "fix_id": "fix_0004"}
+{"ts": "2026-08-13T15:28:48.552330", "action": "patch_created", "stage": "system", "iteration": 1, "fix_id": "fix_0004", "patch_path": "outputs/logs/patches/DEMO_TASK/fix_0004.diff"}
+{"ts": "2026-08-13T15:28:53.008814", "action": "test_run", "stage": "system", "iteration": 1, "stage_number": 2, "status": "pass", "counts": {"passed": 4, "failed": 0, "error": 0, "skipped": 0, "total": 4}, "tests": [], "failed_tests": [], "is_regression_check": false, "is_bootstrap": false}
+{"ts": "2026-08-13T15:28:55.664229", "action": "test_run", "stage": "integration", "iteration": "1-regcheck", "stage_number": 2, "status": "pass", "counts": {"passed": 4, "failed": 0, "error": 0, "skipped": 0, "total": 4}, "tests": [], "failed_tests": [], "is_regression_check": true, "is_bootstrap": false}
+{"ts": "2026-08-13T15:29:01.117335", "stage": "unit", "test_path": "outputs/tests/DEMO_TASK/unit/test_unit.py", "action": "tests_generated"}
+{"ts": "2026-08-13T15:29:06.884702", "action": "test_run", "stage": "unit", "iteration": 0, "stage_number": 3, "status": "fail", "counts": {"passed": 5, "failed": 1, "error": 0, "skipped": 0, "total": 6}, "tests": [], "failed_tests": ["test_normalize_street_suffix"], "is_regression_check": false, "is_bootstrap": false}
+{"ts": "2026-08-13T15:29:08.332190", "action": "agent_fix_requested", "stage": "unit", "iteration": 1, "fix_id": "fix_0005"}
+{"ts": "2026-08-13T15:29:17.006558", "action": "agent_fix_generated", "stage": "unit", "iteration": 1, "fix_id": "fix_0005"}
+{"ts": "2026-08-13T15:29:22.774013", "action": "patch_created", "stage": "unit", "iteration": 1, "fix_id": "fix_0005", "patch_path": "outputs/logs/patches/DEMO_TASK/fix_0005.diff"}
+{"ts": "2026-08-13T15:29:27.229886", "action": "test_run", "stage": "unit", "iteration": 1, "stage_number": 3, "status": "pass", "counts": {"passed": 6, "failed": 0, "error": 0, "skipped": 0, "total": 6}, "tests": [], "failed_tests": [], "is_regression_check": false, "is_bootstrap": false}
+{"ts": "2026-08-13T15:29:29.664471", "action": "test_run", "stage": "integration", "iteration": "1-regcheck", "stage_number": 3, "status": "pass", "counts": {"passed": 4, "failed": 0, "error": 0, "skipped": 0, "total": 4}, "tests": [], "failed_tests": [], "is_regression_check": true, "is_bootstrap": false}
+{"ts": "2026-08-13T15:29:32.118094", "action": "test_run", "stage": "system", "iteration": "1-regcheck", "stage_number": 3, "status": "pass", "counts": {"passed": 4, "failed": 0, "error": 0, "skipped": 0, "total": 4}, "tests": [], "failed_tests": [], "is_regression_check": true, "is_bootstrap": false}
+{"ts": "2026-08-13T15:29:34.552667", "action": "all_tests_passed", "stage": "unit", "stage_number": 3}

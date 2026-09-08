@@ -1,0 +1,50 @@
+# Short, filesystem-safe identifier (letters/digits/underscore only, must not
+# start with a digit). Must match this file's own name (inputs/config/tasks/<task_id>.yaml).
+# Namespaces this task's own inputs_private/data/<task_id>/, outputs/data/<task_id>/,
+# outputs/tests/<task_id>/, and outputs/agent_src/code/<task_id>/ -- so any
+# number of V&V tasks can run in this same project, including concurrently
+# in separate processes, without their files colliding.
+task_id: "ETL_NAME_SPLIT"
+
+task_name: "ETL - Full Name Splitting"
+
+description: "Implement a pipeline that reads two CSV files of single-field full names, validates them, and splits each into structured first_name, last_name, and suffix components -- stressing composite-field parsing ambiguity rather than single-field format validation."
+
+inputs:
+  - "inputs_private/data/ETL_NAME_SPLIT/input_01.csv"
+  - "inputs_private/data/ETL_NAME_SPLIT/input_02.csv"
+
+outputs:
+  - "outputs/data/ETL_NAME_SPLIT/output.json"
+
+# Describes the implementation's expected shape so test generation can target
+# it without the prompts hardcoding any task-specific function names. Written
+# once per task; integration/system test generation reads this section
+# directly out of this file's text.
+interface:
+  module: "outputs.agent_src.code.ETL_NAME_SPLIT.etl"
+  integration_functions:
+    - "extract(input_path) -> list[dict]  # reads one input file, returns its raw rows"
+    - "transform(rows) -> dict  # validates each full_name and splits it into first_name, last_name, and suffix; returns {\"accepted\": [...], \"rejected\": [...]}, where each accepted entry includes the split components, and each rejected entry is the original row plus a \"reason\" field"
+    - "load(data, output_path) -> None  # writes the {\"accepted\": [...], \"rejected\": [...]} result to the output file as JSON"
+  system_entrypoint: "run_etl(input_paths, output_path) -> None  # runs extract on each path in input_paths (a list), combines the raw rows, then transform -> load end-to-end"
+
+requirements:
+  - "Read both CSV files listed in this task's inputs (inputs_private/data/ETL_NAME_SPLIT/input_01.csv and inputs_private/data/ETL_NAME_SPLIT/input_02.csv), and combine their rows into a single list before validation"
+  - "Validate each row: full_name (a single string containing a person's full name)"
+  - "Apply reasonable, strict real-world validation to full_name -- reject anything malformed or that doesn't contain enough information to identify a first and last name"
+  - "For each valid row, split full_name into its component parts: first_name, last_name, and suffix (if present)"
+  - "A row that fails validation is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
+  - "Write the result to outputs/data/ETL_NAME_SPLIT/output.json as a single JSON object with two keys: \"accepted\" (the list of valid rows, each with its split first_name, last_name, and suffix) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+
+acceptance_criteria:
+  - "All valid names appear in the output JSON's \"accepted\" list, and only valid names appear there"
+  - "Invalid or malformed rows are excluded from \"accepted\" and instead appear in \"rejected\", each with a reason"
+  - "Output JSON is a single object with \"accepted\" and \"rejected\" keys, each a list of objects"
+  - "Each rejected row's reason names the specific field that caused rejection (i.e. \"full_name\") rather than a generic message like \"invalid row\""
+  - "full_name is only valid if, once whitespace-trimmed and collapsed, it contains at least two name parts (separated by whitespace or a comma) -- a single word alone is invalid, since there is no last name to extract"
+  - "If full_name contains a comma, the text before the comma is last_name and the text after is first_name -- this \"Last, First\" format takes precedence over space-separated parsing, and the text before the comma may itself contain multiple words (e.g. \"Van Der Berg, Anna\" splits to last_name \"Van Der Berg\", first_name \"Anna\")"
+  - "If full_name has no comma, a recognized suffix (\"Jr\", \"Sr\", \"II\", \"III\", \"IV\", or \"V\", matched case-insensitively and regardless of a trailing period) as the final whitespace-separated token is extracted into suffix and is never treated as part of last_name"
+  - "If full_name has no comma, the last whitespace-separated token is last_name (or, when a suffix was extracted per the previous rule, the token immediately before the suffix is last_name), and every token before that is joined together, preserving internal spacing, as first_name"
+  - "first_name and last_name are normalized to title case (each word's first letter capitalized, the rest lowercase) with whitespace trimmed and collapsed to single spaces"
+  - "suffix, when present, is normalized to a consistent real-world form: \"Jr.\" or \"Sr.\" with a trailing period regardless of whether the input included one, but the Roman-numeral suffixes \"II\", \"III\", \"IV\", and \"V\" are normalized in uppercase with no trailing period, since a period is not real-world convention for those"

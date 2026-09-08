@@ -1,0 +1,142 @@
+# A GitHub Action that runs one qikly task and keeps what it produced.
+#
+# The reason this exists is narrower than "CI support". qikly's output is a
+# pytest suite and a JUnit XML file, and both are only useful somewhere other
+# than the machine that made them: in a pull request, in an artifact, or
+# imported into whatever tracks tests for the team. This is the shortest path
+# from a task file in a repository to those artifacts existing.
+#
+# It deliberately does NOT fail your build by default. A run that does not
+# converge is a normal, expected outcome, not a broken pipeline, and a tool
+# whose first impression is a red X on someone's main branch does not get a
+# second look. Set fail-on-stall: true when you actually want it enforcing.
+
+name: qikly
+description: >-
+  Run a qikly task: generate a test suite from acceptance criteria the coding
+  agent never sees, then write code until that suite passes.
+author: qikly
+
+branding:
+  icon: check-circle
+  color: green
+
+inputs:
+  task:
+    description: "task_id to run. Omit to run every task found under inputs_private/config/tasks/."
+    required: false
+    default: ""
+  api-key:
+    description: >-
+      API key for your model provider, passed through as API_KEY. Use a
+      repository secret, never a literal. A run makes many model calls, so this
+      key spends money on every invocation.
+    required: true
+  provider:
+    description: "LLM_PROVIDER: gemini (default), openai or anthropic."
+    required: false
+    default: "gemini"
+  model:
+    description: "LLM_MODEL. Leave empty for the provider's default."
+    required: false
+    default: ""
+  python-version:
+    description: "Python to run on."
+    required: false
+    default: "3.12"
+  qikly-version:
+    description: >-
+      Version specifier to install, for example "qikly==0.3.0". Pin this. A
+      convergence rate belongs to a tool version as much as to a model, so an
+      unpinned install makes two runs incomparable.
+    required: false
+    default: "qikly"
+  fail-on-stall:
+    description: >-
+      Fail the job when a task exhausts its budget without converging. False by
+      default: a stall is information, and it already exits non-zero locally.
+    required: false
+    default: "false"
+  upload-artifacts:
+    description: "Upload the generated suite, the JUnit XML and the run reports."
+    required: false
+    default: "true"
+
+outputs:
+  junit-xml:
+    description: >-
+      Path to the merged JUnit XML, or empty if no stage produced one. Feed it
+      to a test-reporting action, or import it into Xray, qTest or TestRail.
+    value: ${{ steps.run.outputs.junit-xml }}
+  converged:
+    description: '"true" when every stage passed, including unit tests.'
+    value: ${{ steps.run.outputs.converged }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install qikly
+      shell: bash
+      run: python -m pip install --upgrade pip "${{ inputs.qikly-version }}"
+
+    - name: Run
+      id: run
+      shell: bash
+      env:
+        # API_KEY, the provider-agnostic name, never a provider's own. This
+        # said GEMINI_API_KEY until 2026-09-07, and the router only accepts
+        # that name when the provider is gemini, so the documented openai and
+        # anthropic examples could not authenticate at all. The generic name
+        # is what every provider module reads after normalisation, so one
+        # variable is correct for all three.
+        API_KEY: ${{ inputs.api-key }}
+        LLM_PROVIDER: ${{ inputs.provider }}
+        LLM_MODEL: ${{ inputs.model }}
+        # Nothing in CI can act on a version notice, and a network call on
+        # every job is a cost with no reader.
+        QIKLY_NO_VERSION_CHECK: "1"
+      run: |
+        set -o pipefail
+        args=""
+        if [ -n "${{ inputs.task }}" ]; then args="--tasks ${{ inputs.task }}"; fi
+
+        set +e
+        qikly $args 2>&1 | tee qikly-console.log
+        code=${PIPESTATUS[0]}
+        set -e
+
+        if [ "$code" -eq 0 ]; then
+          echo "converged=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "converged=false" >> "$GITHUB_OUTPUT"
+        fi
+
+        # The merged file is the run-level one, so exclude the per-stage files
+        # that sit beside it. Newest wins when several tasks ran.
+        xml=$(ls -t outputs/reports/junit/*.xml 2>/dev/null \
+              | grep -Ev '_(integration|system|unit)\.xml$' | head -1 || true)
+        echo "junit-xml=${xml}" >> "$GITHUB_OUTPUT"
+
+        if [ "$code" -ne 0 ]; then
+          echo "::notice title=qikly::A task did not fully converge. The run log names the blocking tests, and the generated suite is in the artifacts."
+        fi
+        if [ "${{ inputs.fail-on-stall }}" = "true" ]; then
+          exit $code
+        fi
+
+    - name: Upload what the run produced
+      if: ${{ inputs.upload-artifacts == 'true' && always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: qikly-${{ inputs.task || 'all' }}
+        if-no-files-found: ignore
+        path: |
+          outputs/tests/
+          outputs/agent_src/
+          outputs/reports/
+          qikly-console.log

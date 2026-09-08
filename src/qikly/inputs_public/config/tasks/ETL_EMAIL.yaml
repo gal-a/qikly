@@ -1,0 +1,51 @@
+# Short, filesystem-safe identifier (letters/digits/underscore only, must not
+# start with a digit). Must match this file's own name (inputs/config/tasks/<task_id>.yaml).
+# Namespaces this task's own inputs_private/data/<task_id>/, outputs/data/<task_id>/,
+# outputs/tests/<task_id>/, and outputs/agent_src/code/<task_id>/ -- so any
+# number of V&V tasks can run in this same project, including concurrently
+# in separate processes, without their files colliding.
+task_id: "ETL_EMAIL"
+
+task_name: "ETL - Email Verification"
+
+description: "Implement a simple ETL pipeline that reads two CSV files of contact rows, validates and normalizes them, and writes deduplicated, verified rows to a single JSON output alongside an explanation for every row that was rejected."
+
+inputs:
+  - "inputs_private/data/ETL_EMAIL/input_01.csv"
+  - "inputs_private/data/ETL_EMAIL/input_02.csv"
+
+outputs:
+  - "outputs/data/ETL_EMAIL/output.json"
+
+# Describes the implementation's expected shape so test generation can target
+# it without the prompts hardcoding any task-specific function names. Written
+# once per task; integration/system test generation reads this section
+# directly out of this file's text.
+interface:
+  module: "outputs.agent_src.code.ETL_EMAIL.etl"
+  integration_functions:
+    - "extract(input_path) -> list[dict]  # reads one input file, returns its raw rows"
+    - "transform(rows) -> dict  # validates, normalizes, and deduplicates rows; returns {\"accepted\": [...], \"rejected\": [...]}, where each rejected entry is the original row plus a \"reason\" field"
+    - "load(data, output_path) -> None  # writes the {\"accepted\": [...], \"rejected\": [...]} result to the output file as JSON"
+  system_entrypoint: "run_etl(input_paths, output_path) -> None  # runs extract on each path in input_paths (a list), combines the raw rows, then transform -> load end-to-end"
+
+requirements:
+  - "Read both CSV files listed in this task's inputs (inputs_private/data/ETL_EMAIL/input_01.csv and inputs_private/data/ETL_EMAIL/input_02.csv), and combine their rows into a single list before validation"
+  - "Validate each row: id (int), name (string), email (string)"
+  - "Apply reasonable, strict real-world data-quality validation to id, name, and email -- reject anything malformed, incomplete, or implausible"
+  - "Treat rows as duplicates -- and keep only the first occurrence -- whenever they share an identifying field once normalized"
+  - "Normalize accepted fields before writing output (e.g. consistent whitespace, consistent email case)"
+  - "A row that fails validation, or that's a duplicate of an earlier row, is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected (which field was invalid, or that it duplicated an earlier row)"
+  - "Write the result to outputs/data/ETL_EMAIL/output.json as a single JSON object with two keys: \"accepted\" (the list of valid, normalized rows) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+
+acceptance_criteria:
+  - "All valid rows appear in the output JSON's \"accepted\" list, and only valid rows appear there"
+  - "Invalid, malformed, or duplicate rows are excluded from \"accepted\" and instead appear in \"rejected\", each with a reason"
+  - "Email field is lowercase"
+  - "Output JSON is a single object with \"accepted\" and \"rejected\" keys, each a list of objects"
+  - "Each rejected row's reason names the specific field that caused rejection (e.g. \"id\", \"name\", \"email\") rather than a generic message like \"invalid row\" -- except duplicates, whose reason identifies them as a duplicate rather than naming a field"
+  - "An id is only valid if it is a positive integer written with digits only -- a leading '+' or '-' sign, decimal point, or any other non-digit character makes the row invalid"
+  - "A name consisting entirely of digits, or containing no alphabetic character at all, is implausible and makes the row invalid"
+  - "An email address is only valid if, in both the local part (before the '@') and the domain part (after the '@'), there is no leading dot, no trailing dot, and no two consecutive dots"
+  - "An email address's domain part must itself contain at least one dot, with at least one character on each side of every dot in the domain"
+  - "Two rows are duplicates of each other if their ids match, OR if their emails match once case-normalized -- even when their ids differ, and even when the two rows came from different input files. Only the first occurrence of such a pair is kept, in the order the input files were read"

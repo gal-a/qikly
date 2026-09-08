@@ -1,0 +1,60 @@
+# Short, filesystem-safe identifier (letters/digits/underscore only, must not
+# start with a digit). Must match this file's own name (inputs/config/tasks/<task_id>.yaml).
+# Namespaces this task's own inputs_private/data/<task_id>/, outputs/data/<task_id>/,
+# outputs/tests/<task_id>/, and outputs/agent_src/code/<task_id>/ -- so any
+# number of V&V tasks can run in this same project, including concurrently
+# in separate processes, without their files colliding.
+task_id: "MERGE_STOCK"
+
+task_name: "MERGE - Inventory Stock Reconciliation"
+
+description: "Implement a pipeline that reads two CSV files of inventory transactions (receive/ship/adjust), validates them, and processes them into a running per-SKU stock level -- reconciling both files into a single, correctly ordered event stream, not just concatenating them."
+
+inputs:
+  - "inputs_private/data/MERGE_STOCK/input_01.csv"
+  - "inputs_private/data/MERGE_STOCK/input_02.csv"
+
+outputs:
+  - "outputs/data/MERGE_STOCK/output.json"
+
+# Describes the implementation's expected shape so test generation can target
+# it without the prompts hardcoding any task-specific function names. Written
+# once per task; integration/system test generation reads this section
+# directly out of this file's text.
+interface:
+  module: "outputs.agent_src.code.MERGE_STOCK.merge"
+  integration_functions:
+    - "extract(input_path) -> list[dict]  # reads one input file, returns its raw rows"
+    - "transform(rows) -> dict  # validates each transaction and processes valid ones into a running per-SKU stock level; returns {\"accepted\": [...], \"rejected\": [...]}, where each accepted entry includes the resulting_stock for that SKU after this transaction, and each rejected entry is the original row plus a \"reason\" field"
+    - "load(data, output_path) -> None  # writes the {\"accepted\": [...], \"rejected\": [...]} result to the output file as JSON"
+  system_entrypoint: "run_merge(input_paths, output_path) -> None  # runs extract on each path in input_paths (a list), combines the raw rows, then transform -> load end-to-end"
+
+requirements:
+  - "Read both CSV files listed in this task's inputs (inputs_private/data/MERGE_STOCK/input_01.csv and inputs_private/data/MERGE_STOCK/input_02.csv), and combine their rows into a single list before validation"
+  - "Validate each transaction: sku (string), transaction_type (one of \"receive\", \"ship\", \"adjust\"), quantity (a whole number), timestamp (a date and time)"
+  - "Apply reasonable, strict real-world validation to sku, transaction_type, quantity, and timestamp -- reject anything malformed or implausible"
+  - "Process valid transactions to maintain an accurate running stock level per sku, in the correct order, rejecting any transaction that would make a sku's stock go negative"
+  - "A transaction that fails validation, or that would violate stock non-negativity, is not included among accepted -- but is not silently dropped either: record the original transaction alongside a brief, specific reason it was rejected"
+  - "Write the result to outputs/data/MERGE_STOCK/output.json as a single JSON object with two keys: \"accepted\" (the list of valid, processed transactions, each with its resulting stock level for that sku) and \"rejected\" (a list of objects, each the original transaction plus a \"reason\" field)"
+
+# A hand-written implementation that satisfies this spec, used only to check
+# whether a generated suite refuses code that is correct. NEVER shown to any
+# agent: nothing reads this path except research/false_rejection.py, and a
+# suite that fails it is wrong whatever else it catches.
+reference:
+  implementation: "reference/MERGE_STOCK/merge.py"
+
+acceptance_criteria:
+  - "All valid transactions appear in the output JSON's \"accepted\" list, and only valid, non-violating transactions appear there"
+  - "Invalid or stock-violating transactions are excluded from \"accepted\" and instead appear in \"rejected\", each with a reason"
+  - "Output JSON is a single object with \"accepted\" and \"rejected\" keys, each a list of objects"
+  - "Each rejected row's reason names the specific field that caused rejection (e.g. \"sku\", \"transaction_type\", \"quantity\", \"timestamp\") for a validation failure, or clearly identifies a stock-quantity violation (e.g. \"insufficient stock\") for a business-rule rejection -- never a generic message like \"invalid row\""
+  - "sku is only valid if it is a non-empty string once whitespace-trimmed"
+  - "transaction_type is only valid if it is exactly \"receive\", \"ship\", or \"adjust\", matched case-insensitively -- any other value is invalid"
+  - "For transaction_type \"receive\" or \"ship\", quantity is only valid if it is a positive whole number -- zero, negative, non-integer, or non-numeric values are invalid"
+  - "For transaction_type \"adjust\", quantity is only valid if it is a nonzero whole number -- it may be positive or negative, but zero, non-integer, or non-numeric values are invalid"
+  - "timestamp is only valid if it parses as a real date and time in \"YYYY-MM-DD HH:MM\" format -- malformed or missing timestamps are invalid"
+  - "Transactions from both input files must be combined into a single chronologically ordered stream by timestamp before computing running stock levels -- processing each file's rows in file order (or concatenating file 1's rows before file 2's) is not sufficient and will produce incorrect stock levels and incorrect accept/reject outcomes whenever the two files' timestamps interleave"
+  - "A \"receive\" adds its quantity to the sku's running stock; a \"ship\" subtracts its quantity; an \"adjust\" adds its (possibly negative) quantity -- in each case, if the resulting stock would be negative, the transaction is rejected as a stock violation and the sku's running stock is left unchanged by it"
+  - "For every accepted transaction, resulting_stock reflects the true chronologically correct running total for that sku, accounting for every other valid transaction (from either file) at or before this transaction's timestamp"
+  - "When two transactions for the same sku share the exact same timestamp, they are processed in the order they appear in the combined input (the order extract naturally produces, file 1 then file 2) -- a defined, stable tie-break rather than an ambiguous one"
