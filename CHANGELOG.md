@@ -8,6 +8,19 @@ packaging tools would read as `1.1`.
 
 Nothing yet.
 
+## 0.3.2
+
+### Fixed
+- **The variable named in an auth failure survives the process boundary.**
+  0.3.1 made that message name the variable the key came from, and then named
+  the wrong one for every real run. A run is a parent process and one child per
+  task; the parent normalises `GEMINI_API_KEY` into `API_KEY` before spawning,
+  so the child inherits an `API_KEY` that is already set and reported that as
+  the source. Users were sent back to a variable they had never touched, which
+  is the exact bug 0.3.1 set out to fix, one level down. The provenance now
+  travels to the child alongside the key. A key the user really did set in
+  `API_KEY` is still reported as `API_KEY`, and a test pins both directions.
+
 ## 0.3.1
 
 ### Fixed

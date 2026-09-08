@@ -309,6 +309,37 @@ def test_an_sdk_error_becomes_a_message_that_suggests_a_cause(
 
 
 @pytest.mark.parametrize("provider,fn_name,default_model", CASES)
+def test_the_error_names_the_variable_the_key_actually_came_from(
+        provider, fn_name, default_model, sdk, monkeypatch):
+    """
+    The assertion above is `"API_KEY" in message`, which is satisfied by
+    "GEMINI_API_KEY" too, so it cannot tell a right answer from a wrong one.
+    0.3.1 shipped a message naming the wrong variable and this file stayed
+    green. This test asserts the whole phrase instead.
+    """
+    from qikly.agent_api.providers import keys
+    from qikly.agent_api.providers import router as R
+
+    conventional = f"{provider.upper()}_API_KEY"
+    monkeypatch.delenv("API_KEY", raising=False)
+    monkeypatch.delenv(keys.SOURCE_ENV, raising=False)
+    keys.remember_source(None)
+    monkeypatch.setenv(conventional, "sk-not-a-real-key")
+    R._ensure_api_key(provider)
+
+    module, recorder = sdk(provider)
+    recorder.raise_with = FakeAPIError("401 Unauthorized")
+    with pytest.raises(RuntimeError) as caught:
+        getattr(module, fn_name)("a prompt")
+    message = str(caught.value)
+    assert f"came from {conventional}" in message, (
+        f"expected the message to name {conventional}, got: {message}"
+    )
+    assert f"Check {conventional} rather than" in message
+    keys.remember_source(None)
+
+
+@pytest.mark.parametrize("provider,fn_name,default_model", CASES)
 def test_usage_is_recorded_so_a_run_can_report_what_it_spent(
         provider, fn_name, default_model, sdk, monkeypatch):
     """

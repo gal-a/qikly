@@ -37,7 +37,8 @@ REAL_SHAPES = [
 
 
 @pytest.fixture(autouse=True)
-def _forget_source():
+def _forget_source(monkeypatch):
+    monkeypatch.delenv(keys.SOURCE_ENV, raising=False)
     keys.remember_source(None)
     yield
     keys.remember_source(None)
@@ -177,3 +178,51 @@ def test_no_provider_still_mentions_the_wrong_variable():
         if "check API_KEY" in p.read_text(encoding="utf-8")
     ]
     assert offenders == [], f"these still hardcode the wrong variable: {offenders}"
+
+
+# ------------------------------------------- across the process boundary ----
+
+def test_the_source_travels_to_a_child_process(monkeypatch):
+    """
+    A run is a parent and one child per task, and the parent normalises the key
+    into API_KEY before spawning. The child inherits an API_KEY that is already
+    set, so without help it reports "API_KEY" as the source for every real run
+    and sends the user to a variable they never touched. That was shipped in
+    0.3.1 and is the same bug 0.3.1 set out to fix, one level down.
+    """
+    for name in ("API_KEY", "GOOGLE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("GEMINI_API_KEY", "AQ.Ab8" + "c" * 47)
+
+    # Parent: normalises and records.
+    R._ensure_api_key("gemini")
+    assert keys.source() == "GEMINI_API_KEY"
+    assert os.environ[keys.SOURCE_ENV] == "GEMINI_API_KEY", (
+        "the child inherits os.environ, so the provenance must live there too"
+    )
+
+    # Child: fresh module state, inherited environment, API_KEY already set.
+    keys.remember_source(None)
+    monkeypatch.setenv(keys.SOURCE_ENV, "GEMINI_API_KEY")
+    assert R._ensure_api_key("gemini") is True
+    assert keys.source() == "GEMINI_API_KEY"
+    assert "GEMINI_API_KEY" in keys.auth_hint("gemini")
+
+
+def test_a_user_set_generic_key_is_still_reported_as_api_key(monkeypatch):
+    """The fallback must not invent a provenance that was never established."""
+    monkeypatch.delenv(keys.SOURCE_ENV, raising=False)
+    keys.remember_source(None)
+    monkeypatch.setenv("API_KEY", "user-set-this-directly")
+    assert R._ensure_api_key("gemini") is True
+    assert keys.source() == "API_KEY"
+    assert "API_KEY" in keys.auth_hint("gemini")
+
+
+def test_clearing_the_source_clears_the_inherited_one_too(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "gem-key")
+    monkeypatch.delenv("API_KEY", raising=False)
+    R._ensure_api_key("gemini")
+    keys.remember_source(None)
+    assert keys.source() is None
+    assert keys.SOURCE_ENV not in os.environ

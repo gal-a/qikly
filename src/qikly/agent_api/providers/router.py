@@ -56,7 +56,9 @@ def _ensure_api_key(provider):
     """
     if os.environ.get("API_KEY"):
         _reject_unusable("API_KEY", os.environ["API_KEY"])
-        keys.remember_source("API_KEY")
+        # Only claim API_KEY as the source if nothing upstream already named a
+        # better one. A child process inherits both the key and its provenance.
+        keys.remember_source(keys.source() or "API_KEY")
         return True
     for var in _KEY_VARS.get(provider, []):
         value = os.environ.get(var)

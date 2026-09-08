@@ -17,16 +17,36 @@ _source = None  # the environment variable the current API_KEY was taken from
 
 _QUOTES = "\"'"
 
+# A run is a parent process and one child per task, and the parent normalises
+# the key into API_KEY before spawning. The child therefore inherits an
+# API_KEY that is already set, takes the early return in _ensure_api_key, and
+# would report "API_KEY" as the source no matter what the user actually set.
+# That is the original bug wearing a different hat, so the true source travels
+# to the child in the environment beside the key it describes.
+SOURCE_ENV = "QIKLY_KEY_SOURCE"
+
 
 def remember_source(var):
-    """Record which environment variable API_KEY was normalised from."""
+    """
+    Record which environment variable API_KEY was normalised from, and pass it
+    to any child process. `None` clears both, which is what tests want.
+    """
     global _source
     _source = var
+    if var:
+        os.environ[SOURCE_ENV] = var
+    else:
+        os.environ.pop(SOURCE_ENV, None)
 
 
 def source():
-    """The variable the key came from, or None if nothing has resolved one."""
-    return _source
+    """
+    The variable the key came from, or None if nothing has resolved one.
+
+    Falls back to the inherited value so a child process names the variable the
+    user set rather than the one the parent normalised it into.
+    """
+    return _source or os.environ.get(SOURCE_ENV) or None
 
 
 def defect(value):
@@ -83,7 +103,7 @@ def auth_hint(provider=None):
     "54 characters" next to "normally 53" finds it immediately.
     """
     key = os.environ.get("API_KEY", "")
-    var = _source or "API_KEY"
+    var = source() or "API_KEY"
     if not key:
         return f"No key is set: {var} is empty."
     hint = (f"If this looks like an auth error, the key in use came from "
