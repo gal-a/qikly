@@ -49,7 +49,15 @@ def test_archived_runs_are_not_loaded(code_dir):
     """
     text = cl.load_codebase(str(code_dir))
     assert "stale" not in text
-    assert "old" not in text
+
+    # Compare against the archive directory itself, not the bare word "old".
+    # `assert "old" not in text` passed everywhere except macOS, where the
+    # temporary directory is /private/var/folders/..., and "folders" contains
+    # "old". The loaded text carries absolute paths in its "# FILE:" headers,
+    # so the substring matched the tmpdir rather than anything loaded.
+    archive = os.path.join(str(code_dir), "old")
+    assert not any(line.startswith("# FILE:") and archive in line
+                   for line in text.splitlines())
 
 
 def test_non_python_files_are_skipped(code_dir):

@@ -242,7 +242,16 @@ rather than the paid one.
 ## Quick start
 
 Requires **Python 3.10+** and **GNU `patch`** on `PATH`. On Windows it ships
-with Git under `usr\bin\patch.exe`, which the tool finds on its own.
+with Git under `usr\bin\patch.exe`, which the tool finds on its own. **On macOS
+you have to install it:** the system `patch` is Apple's BSD one, which rejects
+the options qikly sends, so no generated diff will apply.
+
+```bash
+brew install gpatch     # macOS only
+```
+
+qikly looks for `gpatch` before `patch`, so nothing else is needed afterwards
+and your system `patch` is left alone.
 
 ```bash
 pip install qikly

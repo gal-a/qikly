@@ -54,7 +54,10 @@ def test_the_archive_is_not_mistaken_for_a_live_suite(staged, monkeypatch):
         fh.write("def test_old():\n    assert True\n")
     files = orch.existing_stage_tests(os.path.join(orch.GENERATED_TESTS_ROOT, "T"),
                                       "integration")
-    assert all("old" not in f for f in files)
+    # Against the archive path, not the bare word: on macOS the temporary
+    # directory is /private/var/folders/..., and "folders" contains "old".
+    archive = os.path.join(orch.GENERATED_TESTS_ROOT, "T", "old")
+    assert all(archive not in f for f in files)
     assert len(files) == 1
 
 
