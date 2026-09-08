@@ -173,10 +173,9 @@ It helps, and it does not reach this. A reviewer given the same specification
 has read the same acceptance criteria, and resolves the same ambiguity the same
 way. It will catch a mistake that is visible from that context: an inconsistency,
 a requirement plainly skipped, an obvious bug. It cannot catch the case this
-tool is built for, where the code and the standard agree because both came from
-one reading of a line that could have been read two ways. Nobody in that loop
-is wrong relative to the shared interpretation, which is exactly why everybody
-agrees.
+tool is built for: a line that could be read two ways, read once, with both the
+code and the standard written from that single reading. Nobody is wrong, so
+nothing looks wrong.
 
 The problem was never that nothing was checking. It is that everything checking
 had already seen the answer key. Withholding is what makes the check structural
