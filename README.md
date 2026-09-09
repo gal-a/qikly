@@ -62,9 +62,9 @@ flowchart TD
     IMPL -. "unit stage only:<br/>written last, from the code" .-> TEST
 
     classDef codeView fill:#f3e8ff,stroke:#7e22ce,color:#4c1d95
-    classDef standardView fill:#e8f4fd,stroke:#2471a3,color:#1a5276
+    classDef standardView fill:#d9ebea,stroke:#0e6a70,color:#0b3d40
     classDef converged fill:#dcfce7,stroke:#15803d,color:#14532d
-    classDef stalled fill:#fef3c7,stroke:#b45309,color:#78350f
+    classDef stalled fill:#fdf0d5,stroke:#b45309,color:#78350f
     class CODE,IMPL,FAIL codeView
     class AC,TEST,SUITE standardView
     class OUT converged
@@ -74,7 +74,7 @@ flowchart TD
     linkStyle 13 stroke:#b45309,stroke-width:2px
 ```
 
-**Purple is what the coding agent can see. Blue is what the standard is
+**Purple is what the coding agent can see. Teal is what the standard is
 written from.** They never touch. A run that never converges is still worth having: it exits
 non-zero, names the blocking tests, and keeps the same complete record. The red arrows are the repair loop, and that is where
 almost all of a run happens: a failing suite sends the agent the failure text
@@ -908,7 +908,46 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.3.0`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.3.4`, uploading the suite, the code and the JUnit XML |
+
+## Use it in CI
+
+The Action runs one task and keeps what came out: the generated pytest suite,
+the code that satisfies it, and a JUnit XML file that CI dashboards and
+test-management tools already read.
+
+```yaml
+- uses: actions/checkout@v5
+
+- id: qikly
+  uses: gal-a/qikly@v0.3.4
+  with:
+    task: CALC_TAX
+  env:
+    GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+```
+
+Two working templates are in this repository, meant to be copied out rather
+than run here:
+[`qikly-example.yml`](https://github.com/gal-a/qikly/blob/main/.github/workflows/qikly-example.yml)
+runs on demand, and
+[`qikly-pr-example.yml`](https://github.com/gal-a/qikly/blob/main/.github/workflows/qikly-pr-example.yml)
+comments the result on a pull request.
+
+Three things worth knowing before you wire it up.
+
+**It does not fail your build by default.** A run that does not converge is a
+normal outcome, not a broken pipeline, and a tool whose first impression is a
+red X on someone's main branch does not get a second look. Set
+`fail-on-stall: true` when you want it enforcing rather than reporting.
+
+**Every trigger spends money.** Both templates are `workflow_dispatch` on
+purpose. Move to `on: pull_request` once you know what a run costs you, and
+scope it by `paths:` to the task files so an unrelated commit does not pay for
+a run.
+
+**The version is pinned deliberately.** An action that moves under you without
+warning is worse than one that is behind, so bump the pin when you choose to.
 
 ## Further reading
 

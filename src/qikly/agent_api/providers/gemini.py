@@ -27,6 +27,16 @@ def call_gemini(prompt, seed=None):
     )
 
     config_kwargs = {"max_output_tokens": MAX_OUTPUT_TOKENS}
+    # qikly sends no tools, so automatic function calling has nothing to call.
+    # The SDK still turns it on by default and warns, once per process, that
+    # using AFC through generate_content is not recommended. That warning
+    # reached every user's console and the demo recording, describing a feature
+    # this code does not use. Disabling it is the honest fix; silencing the
+    # logger would only hide it. Guarded, because the config type is not in
+    # every version the dependency range allows.
+    if hasattr(types, "AutomaticFunctionCallingConfig"):
+        config_kwargs["automatic_function_calling"] = (
+            types.AutomaticFunctionCallingConfig(disable=True))
     if seed is not None:
         # Best-effort reproducibility only -- no provider guarantees
         # bit-for-bit identical output even with temperature=0 and a fixed

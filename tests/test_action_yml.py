@@ -194,3 +194,40 @@ def test_pyproject_and_the_version_check_agree_on_the_repo():
     with open(os.path.join(ROOT, "pyproject.toml"), encoding="utf-8") as handle:
         text = handle.read()
     assert f"github.com/{GITHUB_REPO}" in text
+
+
+def test_every_pinned_use_of_our_own_action_is_the_current_version():
+    """
+    Four files tell a user to write `uses: gal-a/qikly@vX`, and nothing kept
+    them current. They all still said v0.3.0 at 0.3.4, so the template someone
+    copies pinned an action four releases old and nothing failed.
+
+    Pinning an exact version is deliberate: an action that moves under a user
+    without warning is worse than one that is behind. But then the pin has to
+    be maintained, and a pin nobody maintains is just rot with a version number
+    on it.
+    """
+    import pathlib
+    import re
+
+    import qikly
+
+    root = pathlib.Path(qikly.__file__).resolve().parents[2]
+    declared = re.search(r'^version\s*=\s*"([^"]+)"',
+                         (root / "pyproject.toml").read_text(encoding="utf-8"),
+                         re.M).group(1)
+    expected = f"gal-a/qikly@v{declared}"
+
+    stale = {}
+    for path in list(root.glob("*.md")) + list(root.glob("docs/*.md"))             + list(root.glob(".github/workflows/*.yml")):
+        if path.name == "CHANGELOG.md":
+            continue  # a changelog records what past versions said, on purpose
+        for found in re.findall(r"gal-a/qikly@v[0-9][^\s`'\"]*",
+                                path.read_text(encoding="utf-8")):
+            if found != expected:
+                stale.setdefault(path.name, set()).add(found)
+
+    assert not stale, (
+        f"these pin an old version of the action, expected {expected}: "
+        + ", ".join(f"{k} ({', '.join(sorted(v))})" for k, v in sorted(stale.items()))
+    )

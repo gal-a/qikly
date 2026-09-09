@@ -11,10 +11,10 @@
 # whose first impression is a red X on someone's main branch does not get a
 # second look. Set fail-on-stall: true when you actually want it enforcing.
 
-name: qikly
+name: Qikly Test Generation
 description: >-
-  Run a qikly task: generate a test suite from acceptance criteria the coding
-  agent never sees, then write code until that suite passes.
+  Generate a test suite from acceptance criteria the coding agent never sees,
+  then write code until it passes.
 author: qikly
 
 branding:

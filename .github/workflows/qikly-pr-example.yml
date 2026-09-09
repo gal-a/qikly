@@ -36,7 +36,7 @@ jobs:
           qikly --validate
 
       - id: qikly
-        uses: gal-a/qikly@v0.3.0
+        uses: gal-a/qikly@v0.3.4
         with:
           api-key: ${{ secrets.GEMINI_API_KEY }}
           qikly-version: "qikly==0.3.0"

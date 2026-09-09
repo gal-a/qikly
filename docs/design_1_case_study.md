@@ -65,9 +65,9 @@ flowchart TD
     IMPL -. "unit stage only:<br/>written last, from the code" .-> TEST
 
     classDef codeView fill:#f3e8ff,stroke:#7e22ce,color:#4c1d95
-    classDef standardView fill:#e8f4fd,stroke:#2471a3,color:#1a5276
+    classDef standardView fill:#d9ebea,stroke:#0e6a70,color:#0b3d40
     classDef converged fill:#dcfce7,stroke:#15803d,color:#14532d
-    classDef stalled fill:#fef3c7,stroke:#b45309,color:#78350f
+    classDef stalled fill:#fdf0d5,stroke:#b45309,color:#78350f
     class CODE,IMPL,FAIL codeView
     class AC,TEST,SUITE standardView
     class OUT converged
@@ -77,7 +77,7 @@ flowchart TD
     linkStyle 13 stroke:#b45309,stroke-width:2px
 ```
 
-**Purple is what the coding agent can see. Blue is what the standard is
+**Purple is what the coding agent can see. Teal is what the standard is
 written from.** They never touch. The purple arrows are the repair loop, and
 that is where almost all of a run happens. A run that never converges is still worth having: it exits
 non-zero, names the blocking tests, and keeps the same complete record. A failing suite sends the coding agent the failure text and nothing

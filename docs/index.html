@@ -38,8 +38,14 @@
   --rule: #d2dbd9;
   --accent: #0e6a70;
   --accent-soft: #d9ebea;
-  --warn: #8a5c04;
-  --warn-bg: #f6ebd4;
+  --warn: #b45309;
+  --warn-bg: #fdf0d5;
+  /* The coding agent. Its own colour, because --warn was doing two jobs: a
+     caveat box and "the side the criteria are kept from". They are now
+     separate tokens carrying the same amber, so the meaning is declared once
+     here rather than inferred from a shared variable name. */
+  --code: #7e22ce;
+  --code-soft: #f3e8ff;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -54,6 +60,8 @@
     --accent-soft: #112f2e;
     --warn: #d9a743;
     --warn-bg: #2f2411;
+    --code: #a855f7;
+    --code-soft: #1e1729;
   }
 }
 :root[data-theme="dark"] {
@@ -68,6 +76,8 @@
   --accent-soft: #112f2e;
   --warn: #d9a743;
   --warn-bg: #2f2411;
+  --code: #a855f7;
+  --code-soft: #1e1729;
 }
 
 * { box-sizing: border-box; }
@@ -100,15 +110,17 @@ a { color: var(--accent); }
   border-bottom: 1px solid var(--rule);
 }
 
-.wordmark {
-  font-family: Archivo, sans-serif;
-  font-weight: 700;
-  font-size: 1.15rem;
-  letter-spacing: -.02em;
-  margin: 0;
+/* The mark itself, inlined rather than loaded as an image, because its
+   gradient is built from --ink and --accent and CSS custom properties do not
+   cross an <img> boundary. The letterforms are outlines, not text, so it does
+   not depend on Segoe UI being installed on the reader's machine. */
+.wordmark { margin: 0; }
+.wordmark .qmark {
+  height: 30px;
+  width: auto;
+  display: block;
+  overflow: visible;
 }
-
-.wordmark span { color: var(--accent); }
 
 h1 {
   font-family: Archivo, sans-serif;
@@ -129,6 +141,42 @@ h1 {
 }
 
 .lede strong { color: var(--ink); font-weight: 600; }
+
+/* The header image, above the fold. It is the only thing up here that shows
+   the two agents side by side rather than describing them in a sentence. */
+.shot { margin: 26px 0 0; }
+.shot img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+}
+
+/* The demo, directly under the command that produces it. A still image here
+   would repeat the sentence above it; a recording of a real run is the only
+   thing on this page that shows the loop actually working. Width and height
+   are declared so a 1 MB GIF arriving late does not shove the page down, and
+   loading is deferred because it now sits well below the fold. */
+.demo {
+  margin: 22px 0 0;
+  max-width: 520px;
+}
+.demo img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: #0a1112;
+}
+.demo figcaption {
+  margin-top: 8px;
+  font-size: .82rem;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+.demo figcaption b { color: var(--ink-soft); font-weight: 600; }
 
 .install {
   font-family: "IBM Plex Mono", monospace;
@@ -334,16 +382,17 @@ footer {
   color: var(--ink-soft);
 }
 /* The two panels below use the diagram's own colours, so a reader connects
-   them without being told: accent for the side that sees the criteria, warn
-   for the side the criteria are kept from. */
+   them without being told: accent for the side that sees the criteria, and
+   --code for the side the criteria are kept from. The same two colours carry
+   the same two meanings in every brand image. */
 .half.sees-all .tag { color: var(--accent); }
 /* The same accent, so the claim reads as belonging to the green side. */
 .says-all { color: var(--accent); }
 /* An example under a placeholder command, quieter than the command. */
 .uses .eg { display: block; margin-top: 4px; font-size: .82em; color: var(--ink-soft); }
 .half.sees-all { border-top: 2px solid var(--accent); }
-.half.sees-spec .tag { color: var(--warn); }
-.half.sees-spec { border-top: 2px solid var(--warn); }
+.half.sees-spec .tag { color: var(--code); }
+.half.sees-spec { border-top: 2px solid var(--code); }
 
 /* The obvious objection, answered inline. Set apart from the argument it
    answers so a reader can see it is being met rather than glossed. */
@@ -364,7 +413,7 @@ footer {
 .n-b { font-family: "IBM Plex Mono", monospace; font-size: 11px; fill: var(--ink-soft); }
 .n-key { fill: var(--accent); font-weight: 500; }
 .n-e { font-family: "IBM Plex Mono", monospace; font-size: 10px; fill: var(--ink-faint); }
-.n-strip { fill: var(--warn); }
+.n-strip { fill: var(--code); }
 .n-acc { fill: var(--accent); }
 .n-mid { text-anchor: middle; }
 .flow figcaption {
@@ -425,7 +474,27 @@ footer {
 <div class="wrap">
 
   <header class="hero">
-    <p class="wordmark">qikly<span>.</span></p>
+    <div class="wordmark">
+      <svg xmlns="http://www.w3.org/2000/svg" class="qmark" viewBox="-14.7 -151.4 635.7 205.5"
+           role="img" aria-label="qikly">
+        <title>qikly</title>
+        <defs>
+          <linearGradient id="qw" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="var(--ink)"/>
+            <stop offset="1" stop-color="var(--accent)"/>
+          </linearGradient>
+          <linearGradient id="qt" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="var(--accent)"/>
+            <stop offset="1" stop-color="var(--ink)"/>
+          </linearGradient>
+        </defs>
+        <g transform="skewX(-4)">
+          <path d="M72.15234375 43.236328125V-10.740234375H71.78515625Q67.37890625 -4.865234375 59.8974609375 -1.28515625Q52.416015625 2.294921875 44.521484375 2.294921875Q32.86328125 2.294921875 24.0048828125 -3.212890625Q15.146484375 -8.720703125 10.189453125 -19.2314453125Q5.232421875 -29.7421875 5.232421875 -45.1640625Q5.232421875 -60.40234375 10.740234375 -72.060546875Q16.248046875 -83.71875 26.0703125 -90.0068359375Q35.892578125 -96.294921875 47.734375 -96.294921875Q63.798828125 -96.294921875 71.78515625 -84.26953125H72.15234375V-94.0H111.2578125V43.236328125ZM72.978515625 -49.478515625Q72.978515625 -58.015625 69.2607421875 -62.8349609375Q65.54296875 -67.654296875 59.392578125 -67.654296875Q52.966796875 -67.654296875 48.927734375 -61.779296875Q44.888671875 -55.904296875 44.888671875 -46.08203125Q44.888671875 -36.994140625 48.28515625 -31.669921875Q51.681640625 -26.345703125 58.474609375 -26.345703125Q65.267578125 -26.345703125 69.123046875 -31.669921875Q72.978515625 -36.994140625 72.978515625 -46.44921875Z M125.076171875 0.0V-94.0H164.181640625V0.0Z M238.40234375 0.0 217.47265625 -48.28515625H217.10546875V0.0H178.0V-139.1640625H217.10546875V-49.845703125H217.47265625L236.474609375 -94.0H280.537109375L255.109375 -50.947265625L282.005859375 0.0Z M284.44140625 0.0V-139.1640625H323.546875V0.0Z M355.6328125 44.154296875Q350.125 44.154296875 343.791015625 43.1904296875Q337.45703125 42.2265625 332.5 40.390625V10.923828125Q334.794921875 12.66796875 339.3388671875 14.13671875Q343.8828125 15.60546875 347.921875 15.60546875Q358.845703125 15.60546875 362.42578125 6.9765625L365.455078125 -0.3671875L326.166015625 -94.0H369.40234375L380.78515625 -48.65234375Q384.08984375 -35.984375 384.365234375 -31.578125H384.732421875Q385.0078125 -33.59765625 385.5126953125 -36.076171875Q386.017578125 -38.5546875 399.787109375 -94.0H437.791015625L403.18359375 2.662109375Q395.380859375 24.876953125 383.8603515625 34.515625Q372.33984375 44.154296875 355.6328125 44.154296875Z" fill="url(#qw)"/>
+          <circle cx="142.2" cy="-127.8" r="13.5" fill="url(#qt)"/>
+          <g transform="translate(462.0,0)" opacity="0.95"><path d="M22.55859375 -71.671875 66.0 -35.126953125 22.55859375 1.482421875 12.568359375 -8.701171875 44.47265625 -34.998046875 12.568359375 -61.48828125Z" fill="var(--accent)"/></g><g transform="translate(502.0,0)" opacity="0.6"><path d="M22.55859375 -71.671875 66.0 -35.126953125 22.55859375 1.482421875 12.568359375 -8.701171875 44.47265625 -34.998046875 12.568359375 -61.48828125Z" fill="var(--accent)"/></g><g transform="translate(542.0,0)" opacity="0.3"><path d="M22.55859375 -71.671875 66.0 -35.126953125 22.55859375 1.482421875 12.568359375 -8.701171875 44.47265625 -34.998046875 12.568359375 -61.48828125Z" fill="var(--accent)"/></g>
+        </g>
+      </svg>
+    </div>
     <h1>Your AI writes both the code and its tests. How do you know the tests are really valid?</h1>
     <p class="answer"><strong>The solution: two agents. One turns the acceptance criteria into tests. The other writes the code and never sees the acceptance criteria.</strong></p>
     <p class="lede">
@@ -440,6 +509,10 @@ footer {
       <span><span class="prompt">$</span> export GEMINI_API_KEY=...</span>
       <span><span class="prompt">$</span> qikly --demo</span>
     </div>
+    <figure class="shot">
+      <img src="images/qikly_hero.png" width="3200" height="1680"
+           alt="Two code panels kept apart: calc.py written by the coding agent, test_calc.py written by the test agent from acceptance criteria the coding agent never saw. The suite passes 9 of 9.">
+    </figure>
     <div class="links">
       <a class="btn btn-primary" href="https://github.com/gal-a/qikly">Source on GitHub</a>
       <a class="btn" href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md">How it works, with one repair end to end</a>
@@ -474,7 +547,7 @@ footer {
           </marker>
           <marker id="ar-w" viewBox="0 0 10 10" refX="9" refY="5"
                   markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--warn)"/>
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--code)"/>
           </marker>
           <marker id="ar-a" viewBox="0 0 10 10" refX="9" refY="5"
                   markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
@@ -506,7 +579,7 @@ footer {
 
         <!-- coding agent -->
         <rect x="278" y="294" width="184" height="64" rx="7"
-              fill="var(--surface)" stroke="var(--warn)" stroke-dasharray="5 3"/>
+              fill="var(--surface)" stroke="var(--code)" stroke-dasharray="5 3"/>
         <text x="370" y="318" class="n-h">coding agent</text>
         <text x="370" y="338" class="n-s n-strip">sees 1 and 2, never 3</text>
 
@@ -535,7 +608,7 @@ footer {
 
         <!-- fail, back to the coding agent -->
         <path d="M 610 228 L 610 380 L 370 380 L 370 360" fill="none"
-              stroke="var(--warn)" stroke-width="1.4" stroke-dasharray="5 3"
+              stroke="var(--code)" stroke-width="1.4" stroke-dasharray="5 3"
               marker-end="url(#ar-w)"/>
         <text x="490" y="374" class="n-e n-strip n-mid">fail: the error text, never the rule</text>
 
@@ -605,6 +678,13 @@ footer {
     <pre><code>pip install qikly
 export GEMINI_API_KEY=...
 qikly --demo</code></pre>
+    <figure class="demo">
+      <img src="images/qikly_demo.gif" width="811" height="820" loading="lazy"
+           alt="A qikly --demo run: the acceptance criteria are withheld from the coding agent, three test suites are generated, a test fails, a patch is applied, and the suite goes green.">
+      <figcaption><b>One <code>qikly --demo</code> run, unedited.</b> The criteria
+        are withheld, the suites are generated, a test fails, a patch lands, and
+        it goes green. 38 seconds on gemini-3.5-flash-lite, not sped up.</figcaption>
+    </figure>
     <p>
       The demo runs one task end to end in a throwaway directory and prints
       where the code, the tests, and the full record of every FIX and PATCH

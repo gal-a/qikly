@@ -8,6 +8,35 @@ packaging tools would read as `1.1`.
 
 Nothing yet.
 
+## 0.3.4
+
+### Fixed
+- **Every Gemini run printed a warning about a feature qikly does not use.**
+  The SDK enables automatic function calling by default and warns, once per
+  process, that using it through `generate_content` is not recommended. qikly
+  passes no tools, so AFC had nothing to call and the warning reached every
+  user's console and any recorded demo. It is now switched off in the request
+  rather than filtered out of the log, since silencing a logger hides a message
+  instead of answering it. Guarded on the config type, which is not present
+  across the whole supported SDK range.
+
+### Added
+- **An offline request-shape test for Gemini.** OpenAI and Anthropic were
+  covered against fake SDKs and Gemini was not, because its SDK is a hard
+  dependency rather than an optional one. The effect was that the default
+  provider, the one every first run uses, had nothing checking what it
+  actually sent. Seven tests now pin the model, the output budget, the seed and
+  temperature pairing, the refusal when no key is set, and that AFC stays off.
+
+### Changed
+- **The Action's Marketplace name and description.** GitHub rejects a name
+  matching any existing action, user or organisation, and a dormant
+  organisation already holds `qikly`. The Action is now `Qikly Test
+  Generation`, which is also what someone browsing the Actions picker searches
+  for; the mechanism stays in the description, which was over the 125
+  character limit and is now 108. Nothing about `uses: gal-a/qikly@v0.3.4`
+  changes.
+
 ## 0.3.3
 
 ### Fixed
