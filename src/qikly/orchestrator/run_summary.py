@@ -59,8 +59,23 @@ def _provenance():
         settings = load_settings() or {}
         agents = settings.get("agents") or {}
         default = agents.get("default") or {}
-        out["provider"] = os.environ.get("LLM_PROVIDER") or default.get("provider")
-        out["model"] = os.environ.get("LLM_MODEL") or default.get("model")
+        # settings.yaml pairs a provider with a model, so the default model
+        # belongs to the default provider. Overriding only LLM_PROVIDER used to
+        # record e.g. provider=openai with model=gemini-3.5-flash-lite, which
+        # is not a configuration that can exist. A rate belongs to a model as
+        # much as to a tool, so a summary naming the wrong one is worse than
+        # one naming none.
+        env_provider = os.environ.get("LLM_PROVIDER")
+        out["provider"] = env_provider or default.get("provider")
+        model = os.environ.get("LLM_MODEL")
+        if not model:
+            switched = (env_provider and default.get("provider")
+                        and env_provider != default.get("provider"))
+            model = None if switched else default.get("model")
+        if not model:
+            from qikly.agent_api.providers.router import default_model_for
+            model = default_model_for(out["provider"])
+        out["model"] = model
         out["criteria_per_batch"] = criteria_per_batch()
         out["max_retries_per_stage"] = (settings.get("orchestrator") or {}).get(
             "max_retries_per_stage")

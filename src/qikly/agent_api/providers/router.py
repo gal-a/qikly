@@ -36,6 +36,28 @@ _KEY_VARS = {
 }
 
 
+def default_model_for(provider):
+    """
+    The model this provider uses when nothing overrides it.
+
+    Each provider module owns its own DEFAULT_MODEL, and nothing outside the
+    providers package could see it. run_summary needs it: settings.yaml pairs
+    a provider with a model, so overriding only LLM_PROVIDER used to record the
+    previous provider's model against the new provider's run.
+
+    Never raises. Importing a provider imports its SDK, which is optional for
+    two of the three, and a summary must not fail while describing a run that
+    already happened.
+    """
+    entry = _PROVIDERS.get(provider)
+    if not entry:
+        return None
+    try:
+        return getattr(importlib.import_module(entry[0]), "DEFAULT_MODEL", None)
+    except Exception:
+        return None
+
+
 def accepted_key_vars(provider):
     """Every environment variable this provider will take a key from."""
     return ["API_KEY", *_KEY_VARS.get(provider, [])]

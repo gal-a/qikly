@@ -165,6 +165,27 @@ def test_every_shipped_provider_has_a_shape_to_offer(provider):
     assert provider in keys._SHAPES
 
 
+@pytest.mark.parametrize("provider", ["gemini", "openai", "anthropic"])
+def test_the_shape_clause_is_grammatical_for_every_provider(monkeypatch, provider):
+    """
+    0.3.1 shipped "a openai key is normally starting sk- or sk-proj-", two
+    errors in six words. The clause was written to read well after "normally
+    39 characters", which is true for exactly one of the three providers.
+
+    Plural subject, so no article has to agree with a provider name nobody can
+    predict, and the shape supplies its own verb.
+    """
+    monkeypatch.setenv("API_KEY", "some-key-value")
+    keys.remember_source("API_KEY")
+    hint = keys.auth_hint(provider)
+    assert f"({provider} keys normally " in hint
+    assert f"a {provider} key" not in hint, "singular needs an article that may not agree"
+    assert "normally starting" not in hint, "the shape must supply a finite verb"
+    # The clause has to parse as a sentence, so the verb agrees with the plural.
+    clause = hint.split(f"({provider} keys normally ", 1)[1].split(")", 1)[0]
+    assert clause.split()[0] in ("have", "start"), clause
+
+
 def test_no_provider_still_mentions_the_wrong_variable():
     """
     Every provider's auth error used to hardcode "check API_KEY". Any new

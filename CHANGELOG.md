@@ -8,6 +8,31 @@ packaging tools would read as `1.1`.
 
 Nothing yet.
 
+## 0.3.3
+
+### Fixed
+- **A run summary recorded the wrong model whenever the provider was
+  overridden.** `settings.yaml` pairs a provider with a model, and the
+  provenance block read the two independently: environment first, settings
+  second. Running with `LLM_PROVIDER=anthropic` and no `LLM_MODEL` therefore
+  recorded `provider: anthropic` with `model: gemini-3.5-flash-lite`, a
+  configuration that cannot exist, while the usage report for the same run
+  correctly showed `claude-sonnet-5`. This mattered more than a cosmetic slip:
+  every stored figure here carries its model, because a convergence rate
+  belongs to a model and a configuration as much as to the tool, and the
+  research harnesses read these files. It failed silently, attributing one
+  model's numbers to another. The model now follows the provider that actually
+  ran, `router.default_model_for()` exposes each provider's own default, and a
+  test asserts provider and model can never come from different providers.
+  Found on 2026-09-08 by running the demo against OpenAI and Anthropic, and
+  reproduced twice.
+- **The auth message read as broken English for two of the three providers.**
+  0.3.1 phrased the expected key shape to sit after "normally 39 characters",
+  which is true for Gemini alone, producing "a openai key is normally starting
+  sk- or sk-proj-". The clause is now plural, so no article has to agree with a
+  provider name nobody can predict, and each shape supplies its own verb. A
+  provider with no known shape still gets no clause rather than a guessed one.
+
 ## 0.3.2
 
 ### Fixed

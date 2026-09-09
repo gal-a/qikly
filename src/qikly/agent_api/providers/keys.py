@@ -82,9 +82,9 @@ def defect(value):
 # formats without notice, and a hint that has aged badly costs a sentence
 # whereas a refusal that has aged badly costs the user the whole run.
 _SHAPES = {
-    "gemini": "39 characters starting AIza, or 53 starting AQ.",
-    "openai": "starting sk- or sk-proj-",
-    "anthropic": "starting sk-ant-",
+    "gemini": "have 39 characters starting AIza, or 53 starting AQ.",
+    "openai": "start sk- or sk-proj-",
+    "anthropic": "start sk-ant-",
 }
 
 
@@ -113,5 +113,5 @@ def auth_hint(provider=None):
         hint += f", and it {problem}"
     shape = _SHAPES.get(provider)
     if shape:
-        hint += f" (a {provider} key is normally {shape})"
+        hint += f" ({provider} keys normally {shape})"
     return hint + f". Check {var} rather than any other variable."
