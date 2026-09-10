@@ -40,6 +40,15 @@ Nothing yet.
 - **`qikly --explain` no longer prints a release title that repeats the
   version.** Releases here are titled `v0.3.4`, so the update notice rendered
   as "qikly 0.3.4 is available + v0.3.4".
+- **The GitHub Release is now built by the workflow, with the artefacts
+  attached.** The wheel and the sdist were only ever a workflow artifact, which
+  expires, so the release page offered no way to install the exact thing that
+  was published. They are now attached to the release, and the notes are read
+  out of this file instead of pasted: three releases were written by hand and
+  one of them was copied from GitHub's rendered page rather than the raw file,
+  which silently dropped 22 bold markers and 64 code spans. The job creates the
+  release if it is absent and updates it if it is not, so re-running is safe.
+  Ticking the Marketplace box stays manual.
 - **The release workflow no longer fires on the major alias it pushes.** It
   triggered on `v*`, which matches `v0` as well as `v0.3.5`, so moving the
   alias re-ran the release and failed four seconds later comparing tag `v0`

@@ -129,6 +129,61 @@ jobs:
 
       - uses: pypa/gh-action-pypi-publish@release/v1
 
+  # The GitHub Release: the wheel and the sdist attached to it, and the notes
+  # taken from CHANGELOG.md rather than pasted by hand.
+  #
+  # Two problems this solves. PyPI is the canonical source, but a release page
+  # with only an auto-generated source archive gives no way to install the exact
+  # artefact that was published, and the workflow artifact holding it expires.
+  # And the notes were pasted by hand three times, once from GitHub's rendered
+  # page rather than the raw file, which silently dropped 22 bold markers and 64
+  # code spans from v0.3.0.
+  #
+  # It creates the release if it does not exist and updates it if it does, so
+  # running it twice is safe. The Marketplace checkbox is still a manual edit;
+  # nothing here can tick it.
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Take the notes from the changelog, not from a paste
+        run: |
+          python - "${GITHUB_REF_NAME#v}" <<'PY' > notes.md
+          import io, re, sys
+          version = sys.argv[1]
+          text = io.open("CHANGELOG.md", encoding="utf-8").read()
+          m = re.search(r"^## %s\s*$(.*?)(?=^## )" % re.escape(version),
+                        text, re.M | re.S)
+          if not m:
+              sys.exit("no '## %s' section in CHANGELOG.md" % version)
+          body = m.group(1).strip()
+          if not body:
+              sys.exit("the '## %s' section is empty" % version)
+          print(body)
+          PY
+          echo "--- notes ---" && head -5 notes.md
+
+      - name: Create or update the release, with the dists attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file notes.md --title "$TAG"
+          else
+            gh release create "$TAG" --notes-file notes.md --title "$TAG" --latest
+          fi
+          gh release upload "$TAG" dist/* --clobber
+
   # The major alias, so a user can write `uses: gal-a/qikly@v0` and receive
   # patches without receiving a breaking change. Exact pins are still supported
   # and still documented; this only gives people the other option.
