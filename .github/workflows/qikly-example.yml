@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - id: qikly
-        uses: gal-a/qikly@v0.3.4
+        uses: gal-a/qikly@v0
         with:
           task: ${{ inputs.task }}
           api-key: ${{ secrets.GEMINI_API_KEY }}

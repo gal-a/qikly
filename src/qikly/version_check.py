@@ -94,7 +94,14 @@ def check_for_update():
 
     # Only now is there something to announce, so only now is the second
     # request worth making.
+    #
+    # The title only earns its place if it says something the version has not.
+    # Releases here are titled "v0.3.4", so the suffix rendered as
+    # "qikly 0.3.4 is available + v0.3.4", repeating itself. A title that is
+    # just the version, with or without the v, adds nothing and is dropped.
     title = _release_title()
+    if title and title.lstrip("vV").strip() == latest:
+        title = None
     suffix = f" + {title}" if title else ""
     message = f"{DIST_NAME} {latest} is available{suffix} (you have {__version__})"
     print(message)

@@ -8,6 +8,45 @@ packaging tools would read as `1.1`.
 
 Nothing yet.
 
+## 0.3.5
+
+### Changed
+- **The provenance line is first person and carries a byline.** "This library's
+  author worked in that setting" named nobody while speaking about them in the
+  third person, which reads oddly for a claim about the writer's own
+  experience. It now says "I worked in that setting", with
+  `Built by Gal Arav` under it, and the landing page footer carries the same.
+  For a tool whose whole argument is a methodological claim about test
+  validity, a named person standing behind it is evidence rather than
+  decoration.
+- **The one-line summary no longer calls qikly a coding agent.** PyPI, the
+  package docstring and the README's opening all described the whole tool as
+  "an autonomous coding agent", while everywhere else in the project "coding
+  agent" names the half that is deliberately denied the acceptance criteria.
+  The summary therefore introduced the product as the exact thing the product
+  argues you should not trust on its own. It now reads "Generates a test suite
+  from acceptance criteria, then converges code against it with an agent that
+  never sees those criteria", which keeps the mechanism and uses "agent" the
+  way the other 106 occurrences do.
+- **The Action can be pinned to a moving major tag.** Everything told a user
+  `uses: gal-a/qikly@v0.3.4`, an exact patch, so nobody who copied a template
+  ever received a fix: five patch releases shipped in two days and reached no
+  existing user. `release.yml` now repoints `v0` after a successful publish,
+  the two copyable templates use it, and the README explains both forms and
+  why you would choose each. Exact pins remain supported.
+- **The Marketplace listing is linked** from a README badge, the CI section and
+  the landing page footer. Being listed and not saying so is a credibility
+  signal left on the floor.
+- **`qikly --explain` no longer prints a release title that repeats the
+  version.** Releases here are titled `v0.3.4`, so the update notice rendered
+  as "qikly 0.3.4 is available + v0.3.4".
+- **The release workflow no longer fires on the major alias it pushes.** It
+  triggered on `v*`, which matches `v0` as well as `v0.3.5`, so moving the
+  alias re-ran the release and failed four seconds later comparing tag `v0`
+  against version `0.3.5`. Nothing could have been published, the guard is the
+  step that stopped it, but it put a red X on the repository for something that
+  had worked. The filter is now `v*.*.*`.
+
 ## 0.3.4
 
 ### Fixed

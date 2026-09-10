@@ -173,9 +173,17 @@ def test_every_documented_repo_url_points_at_the_real_one():
         # project's. A `uses:` line may legitimately name somebody else's
         # action, so only one naming a repo called qikly under the wrong owner
         # is a mistake.
+        #
+        # GitHub's own paths are not owner/repo pairs and must not be read as
+        # one: github.com/marketplace/actions/... is the Marketplace listing,
+        # not a user called "marketplace". Without this the guard rejects the
+        # project's own listing, which is how it was found.
+        reserved = {"marketplace", "features", "sponsors", "orgs", "topics",
+                    "settings", "apps", "collections", "about", "pricing",
+                    "security", "enterprise", "login", "join", "site"}
         wrong = sorted(
             {m for m in re.findall(r"github\.com/([\w.-]+/[\w.-]+)", text)
-             if not m.startswith(owner + "/")}
+             if not m.startswith(owner + "/") and m.split("/")[0] not in reserved}
             | {m for m in re.findall(r"uses:\s*([\w.-]+/[\w.-]+)", text)
                if m.split("/")[-1] == "qikly" and not m.startswith(owner + "/")})
         if wrong:
@@ -216,7 +224,11 @@ def test_every_pinned_use_of_our_own_action_is_the_current_version():
     declared = re.search(r'^version\s*=\s*"([^"]+)"',
                          (root / "pyproject.toml").read_text(encoding="utf-8"),
                          re.M).group(1)
-    expected = f"gal-a/qikly@v{declared}"
+    # Two forms are correct: the exact current version, and the moving
+    # major alias that release.yml repoints on every publish. Anything
+    # else is a pin that has gone stale.
+    expected = {f"gal-a/qikly@v{declared}",
+                f"gal-a/qikly@v{declared.split(chr(46))[0]}"}
 
     stale = {}
     for path in list(root.glob("*.md")) + list(root.glob("docs/*.md"))             + list(root.glob(".github/workflows/*.yml")):
@@ -224,10 +236,10 @@ def test_every_pinned_use_of_our_own_action_is_the_current_version():
             continue  # a changelog records what past versions said, on purpose
         for found in re.findall(r"gal-a/qikly@v[0-9][^\s`'\"]*",
                                 path.read_text(encoding="utf-8")):
-            if found != expected:
+            if found not in expected:
                 stale.setdefault(path.name, set()).add(found)
 
     assert not stale, (
-        f"these pin an old version of the action, expected {expected}: "
+        f"these pin an old version of the action, expected one of {sorted(expected)}: "
         + ", ".join(f"{k} ({', '.join(sorted(v))})" for k, v in sorted(stale.items()))
     )

@@ -29,7 +29,13 @@ name: release
 
 on:
   push:
-    tags: ["v*"]
+    # Full versions only. "v*" also matched the moving major alias this
+    # workflow itself pushes, so every alias move re-triggered the release and
+    # failed four seconds later on the tag-versus-pyproject check: tag "v0"
+    # against version 0.3.5. Harmless, since nothing can publish without
+    # passing that check, but it puts a red X on the repository for something
+    # that worked. Found on 2026-09-10 by bootstrapping v0.
+    tags: ["v*.*.*"]
 
 jobs:
   build:
@@ -122,3 +128,30 @@ jobs:
           path: dist/
 
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  # The major alias, so a user can write `uses: gal-a/qikly@v0` and receive
+  # patches without receiving a breaking change. Exact pins are still supported
+  # and still documented; this only gives people the other option.
+  #
+  # It runs after publish and only on success, so the alias never points at a
+  # release that failed to reach PyPI. Force-moving a tag is normally something
+  # to avoid, and is correct here: that is the entire contract of a major alias,
+  # and it is stated in the README so nobody is surprised by it.
+  major-alias:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Move v<major> to this release
+        run: |
+          set -euo pipefail
+          MAJOR="v$(echo "${GITHUB_REF_NAME#v}" | cut -d. -f1)"
+          echo "moving $MAJOR to ${GITHUB_REF_NAME}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f "$MAJOR" "${GITHUB_REF_NAME}"
+          git push origin "$MAJOR" --force

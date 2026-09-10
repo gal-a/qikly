@@ -3,6 +3,7 @@
 [![tests](https://github.com/gal-a/qikly/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/gal-a/qikly/blob/main/LICENSE)
+[![marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Qikly%20Test%20Generation-2b8f95)](https://github.com/marketplace/actions/qikly-test-generation)
 
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
 
@@ -19,9 +20,10 @@ and the green means nothing.
 
 qikly takes the answer key away from the student.
 
-It is an autonomous coding agent that writes an implementation from a
-specification, then verifies and repairs it against tests it generated itself,
-until they all pass or a retry budget runs out. Every failure, every piece of
+It generates a test suite from the acceptance criteria in a specification,
+then writes an implementation and repairs it against that suite until every
+test passes or a retry budget runs out. The agent doing the writing and
+repairing never sees the criteria. Every failure, every piece of
 reasoning and every diff is recorded.
 
 **The part that makes the result mean something:** the coding agent never sees
@@ -908,9 +910,12 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.3.4`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.3.5`, uploading the suite, the code and the JUnit XML |
 
 ## Use it in CI
+
+Listed on the GitHub Marketplace as
+**[Qikly Test Generation](https://github.com/marketplace/actions/qikly-test-generation)**.
 
 The Action runs one task and keeps what came out: the generated pytest suite,
 the code that satisfies it, and a JUnit XML file that CI dashboards and
@@ -920,7 +925,7 @@ test-management tools already read.
 - uses: actions/checkout@v5
 
 - id: qikly
-  uses: gal-a/qikly@v0.3.4
+  uses: gal-a/qikly@v0
   with:
     task: CALC_TAX
   env:
@@ -946,8 +951,12 @@ purpose. Move to `on: pull_request` once you know what a run costs you, and
 scope it by `paths:` to the task files so an unrelated commit does not pay for
 a run.
 
-**The version is pinned deliberately.** An action that moves under you without
-warning is worse than one that is behind, so bump the pin when you choose to.
+**Two ways to pin, and the choice is yours.** `@v0` is a moving alias that
+this project repoints at every release, so you receive fixes without receiving
+a breaking change. `@v0.3.4` is an exact pin that never moves, so nothing
+changes under you and nothing reaches you either. The templates use `@v0`
+because most people want the fixes; use the exact form if your policy requires
+it.
 
 ## Further reading
 
@@ -961,7 +970,9 @@ The design write-up is in three parts, and each stands on its own.
 
 ## Where this came from
 
-The separation this tool enforces is ordinary practice in safety-critical engineering, where verification is required to be independent of implementation as part of a V&V methodology for testing. This library's author worked in that setting before building this toolset.
+The separation this tool enforces is ordinary practice in safety-critical engineering, where verification is required to be independent of implementation as part of a V&V methodology for testing. I worked in that setting before building this toolset.
+
+Built by [Gal Arav](https://www.linkedin.com/in/galarav/).
 
 ## License
 

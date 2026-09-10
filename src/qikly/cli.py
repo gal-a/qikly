@@ -1262,12 +1262,18 @@ def main():
 
     args = _parse_args()
 
-    # Once per invocation, before any work, and before the early returns below
-    # so that "every invocation checks" is actually true. It sat after them,
-    # which quietly exempted --scaffold and --check-criteria: two commands
-    # someone uses repeatedly, and therefore two of the better moments to
-    # mention a new release. Safe here because it needs no provider key, times
-    # out in 1.5 seconds, and is silent on every failure path.
+    # Once per invocation, before any work, and before the early returns below.
+    # It sat after them, which quietly exempted --scaffold and --check-criteria:
+    # two commands someone uses repeatedly, and therefore two of the better
+    # moments to mention a new release. Safe here because it needs no provider
+    # key, times out in 1.5 seconds, and is silent on every failure path.
+    #
+    # Not literally every invocation: --version and --help are argparse actions
+    # that print and exit inside _parse_args() on the line above, so they never
+    # reach this. That is deliberate rather than an oversight. The notice goes
+    # to stdout, and `qikly --version` is the one command a script is likely to
+    # parse, so adding a second line to it would break callers to tell them
+    # something they did not ask for.
     try:
         from qikly.version_check import check_for_update
         check_for_update()
