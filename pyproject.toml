@@ -13,7 +13,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qikly"
-version = "0.4.0"
+version = "0.4.1"
 description = "Generates a test suite from acceptance criteria, then converges code against it with an agent that never sees those criteria."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -115,6 +115,10 @@ packages = [
     "inputs_public/reference/*/*.py",
     "inputs_public/agent_defs/*.md",
     "inputs_public/data/**/*",
+    # The MCP server's icon. Shipped rather than read out of docs/, which is
+    # not in the wheel, and embedded as a data URI at runtime so no host has
+    # to resolve a path on the reader's filesystem.
+    "assets/*.svg",
 ]
 
 [tool.pytest.ini_options]

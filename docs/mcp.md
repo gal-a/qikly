@@ -28,6 +28,73 @@ Other hosts take the same two facts in their own config file: the command is
 Run it from the project directory, the one holding `inputs_private/`. That is
 how it finds your tasks, and it is the same rule the CLI follows.
 
+## One-click install, and which editors have it
+
+The README badge installs into **VS Code**. The same redirect serves Insiders
+from its own host:
+
+```markdown
+[![VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_qikly_MCP-24bfa5?logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22qikly-mcp%22%7D)
+```
+
+A common mistake in other projects' READMEs is pointing both buttons at
+`insiders.vscode.dev`. Stable is `vscode.dev`, Insiders is
+`insiders.vscode.dev`, and the payload is identical.
+
+**Other editors have their own deeplink schemes**, and qikly does not yet ship
+buttons for them because none has been tested against a real install here:
+
+| Editor | Scheme |
+| --- | --- |
+| Visual Studio | `vs-open.link/mcp-install` |
+| Cursor | `cursor://anysphere.cursor-deeplink/mcp/install` |
+| Goose | `goose://install-mcp` |
+| LM Studio | `lmstudio://add_mcp` |
+
+They differ in how the config is encoded, and at least one uses base64 where
+VS Code uses URL-encoded JSON. A button that writes a malformed config is worse
+than no button, because the reader blames the tool rather than the link. Until
+each is tried, use the plain configuration above: **every one of these editors
+accepts a hand-written config**, and the button only ever saves you a paste.
+
+## Two things that will bite you on Windows
+
+Both were hit on a real machine before anyone else saw them, and neither
+announces itself clearly, so they are worth reading before you debug.
+
+**`qikly-mcp` has to be on `PATH`.** Every config above, and the one-click
+install button in the README, names the bare command. On Windows, `pip` often
+installs console scripts into a `Scripts` directory that is not on `PATH`, and
+the host then reports only that the command was not found. Check it:
+
+```powershell
+Get-Command qikly-mcp
+```
+
+If that finds nothing, either add that `Scripts` directory to `PATH`, or give
+the config an absolute path to the executable instead of the bare name.
+
+**The host starts the server in the folder your editor has open**, which is
+often the parent of your qikly project rather than the project itself. The
+server starts, and every task looks absent. Name the project explicitly:
+
+```json
+{
+  "servers": {
+    "qikly": {
+      "type": "stdio",
+      "command": "qikly-mcp",
+      "env": { "QIKLY_PROJECT_ROOT": "C:\\path\\to\\your\\project" }
+    }
+  }
+}
+```
+
+The tools detect this case rather than reporting an empty project: if the
+resolved root has no `inputs_private/`, they say so and name the directory they
+resolved, because that one fact is the difference between a misconfiguration
+and an apparently broken tool.
+
 ## The four tools
 
 | Tool | What it does |

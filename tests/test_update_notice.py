@@ -84,3 +84,43 @@ def test_an_equal_or_older_release_says_nothing(notice):
 def test_the_opt_out_wins_over_everything(notice, monkeypatch):
     monkeypatch.setenv(vc.NO_CHECK_ENV, "1")
     assert vc.check_for_update() is None
+
+
+# ------------------------------------------- and again on the way out -------
+
+def test_the_notice_is_repeated_at_the_end(monkeypatch, capsys):
+    """
+    A run prints for minutes, so the opening line has scrolled off by the time
+    anyone reads the result. The closing line is the same line.
+    """
+    from qikly import version_check as vc
+
+    monkeypatch.setattr(vc, "_ANNOUNCED", "qikly 9.9.9 is available (you have 0.0.1)")
+    assert vc.repeat_notice() == "qikly 9.9.9 is available (you have 0.0.1)"
+    captured = capsys.readouterr()
+    assert "9.9.9" in captured.err
+    assert captured.out == "", "stdout stays parseable, see --json"
+
+
+def test_nothing_is_repeated_when_nothing_was_announced(monkeypatch, capsys):
+    """The normal case: you are on the current version and it says nothing."""
+    from qikly import version_check as vc
+
+    monkeypatch.setattr(vc, "_ANNOUNCED", None)
+    assert vc.repeat_notice() is None
+    assert capsys.readouterr().err == ""
+
+
+def test_the_repeat_makes_no_second_request(monkeypatch):
+    """
+    It reprints what the first line computed. A second call to a remote API to
+    say a thing already said would double the cost of the cheapest feature here.
+    """
+    from qikly import version_check as vc
+
+    def boom(*a, **k):
+        raise AssertionError("repeat_notice must not fetch anything")
+
+    monkeypatch.setattr(vc, "_get_json", boom)
+    monkeypatch.setattr(vc, "_ANNOUNCED", "qikly 9.9.9 is available (you have 0.0.1)")
+    assert vc.repeat_notice() is not None

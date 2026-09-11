@@ -26,6 +26,7 @@ and a failure mode in exchange for saving something that costs nothing.
 """
 import json
 import os
+import sys
 import urllib.request
 
 from qikly import __version__
@@ -119,4 +120,32 @@ def check_for_update():
     suffix = f" + {title}" if title else ""
     message = f"{DIST_NAME} {latest} is available{suffix} (you have {__version__})"
     print(message)
+    global _ANNOUNCED
+    _ANNOUNCED = message
     return message
+
+
+# What the opening line said, so the closing one can repeat it without a second
+# request. None when there was nothing to announce, which is the normal case.
+_ANNOUNCED = None
+
+
+def repeat_notice(stream=None):
+    """
+    Say it again at the end, because the beginning has scrolled off by then.
+
+    A run prints for minutes and the notice is the first line of it, so by the
+    time anyone is looking at the result the thing they were told is gone. This
+    repeats the line already computed: no second network call, and nothing at
+    all when the first line was not printed.
+
+    To stderr, not stdout, and that is the whole reason this is safe to add.
+    `--json` exists so a caller can parse stdout, and a trailing line appended
+    after the JSON would break exactly the callers most likely to be reading
+    it. Human-facing chatter belongs on stderr in this tool, which is the rule
+    `--json` already follows.
+    """
+    if not _ANNOUNCED:
+        return None
+    print(_ANNOUNCED, file=stream if stream is not None else sys.stderr)
+    return _ANNOUNCED

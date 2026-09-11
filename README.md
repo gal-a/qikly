@@ -940,7 +940,7 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.4.0`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.4.1`, uploading the suite, the code and the JUnit XML |
 
 ## Use it in CI
 
@@ -1001,10 +1001,17 @@ claude mcp add qikly -- qikly-mcp
 
 In VS Code, the **Install qikly MCP** badge at the top of this page writes the
 configuration for you. It writes the configuration and nothing else, so the
-`pip install` above still comes first, and it deliberately sets no
-`QIKLY_PROJECT_ROOT`: VS Code starts the server in the workspace folder, and
-qikly resolves its project from the working directory when that variable is
-unset. Open the project holding `inputs_private/` and it finds your tasks.
+`pip install` above still comes first.
+
+Two checks before you conclude it is broken, both of which cost a real
+afternoon before they were written down. The badge names the bare command, so
+**`qikly-mcp` must be on your `PATH`** (`Get-Command qikly-mcp` on Windows,
+`which qikly-mcp` elsewhere); pip frequently installs console scripts somewhere
+that is not. And the host starts the server in **the folder your editor has
+open**, which is often the parent of your project rather than the project, so
+if that is not the directory holding `inputs_private/`, set
+`QIKLY_PROJECT_ROOT` in the server's `env`. [`docs/mcp.md`](docs/mcp.md) has
+both fixes in full.
 
 Four tools: `qikly_run`, `qikly_status`, `qikly_check_criteria`,
 `qikly_scaffold`. A run takes minutes to hours and no host will hold a tool call

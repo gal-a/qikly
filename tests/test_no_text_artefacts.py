@@ -214,3 +214,33 @@ def test_no_filing_references_in_the_documentation(path, text):
     lowered = text.lower()
     found = [w for w in _FILING_WORDS if w.lower() in lowered]
     assert not found, f"{path} mentions {found}"
+
+
+# ------------------------------------- a config example has to be a config ---
+
+def test_every_json_block_in_the_docs_parses():
+    """
+    A snippet a reader pastes into a config file has one job. This one had a
+    Windows path with single backslashes, in the section about Windows, which
+    is invalid JSON: the readers most likely to copy it were the ones it would
+    fail for. Prose gets proofread and fenced blocks do not, so they get a
+    parser instead.
+    """
+    import json
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    files = [root / "README.md"] + sorted((root / "docs").glob("*.md"))
+    checked = 0
+    for path in files:
+        text = path.read_text(encoding="utf-8")
+        for block in re.findall(r"```json\n(.*?)```", text, re.S):
+            try:
+                json.loads(block)
+            except ValueError as exc:
+                raise AssertionError(
+                    "%s has a ```json block that does not parse: %s -- %r"
+                    % (path.name, exc, block)) from None
+            checked += 1
+    assert checked, "no json blocks found, so this guard is checking nothing"

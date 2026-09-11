@@ -54,6 +54,51 @@ def _error(message, **extra):
     return out
 
 
+def where_we_looked(task_id):
+    """
+    Why this task could not be found, or None if it can.
+
+    The failure this exists for is quiet and therefore expensive. An MCP host
+    starts the server in *its* working directory, which is the folder the
+    editor has open, and that is routinely the parent of the qikly project or
+    an unrelated workspace. The task then looks absent, and "no such task" is
+    true, useless, and reads as "qikly is broken" rather than "qikly is pointed
+    at the wrong folder". Naming the directory we resolved is most of the fix.
+
+    **Keyed on whether the task resolves, not on whether `inputs_private/`
+    exists**, and that distinction is the whole reason this is written twice.
+    Bundled tasks ship inside the package and work with no `inputs_private/`
+    at all, so a precondition on that directory declares every fresh install
+    broken. That is the same false alarm `validate._input_exists` was written
+    to undo, and it is worth not reintroducing through a different door.
+    """
+    # The shape check comes first and its refusal is returned unchanged. A
+    # traversing id like "../../evil" is a security answer, not a lookup
+    # answer, and a friendly "we could not find that, check your project root"
+    # would both bury it and invite the caller to go looking for the path.
+    try:
+        runs.check_task_id(task_id)
+    except Exception as exc:                         # noqa: BLE001
+        return str(exc)
+    try:
+        from qikly.agent_api.agent_interface import task_config_path
+        # It returns where the file *would* be and does not check, so the
+        # existence test has to happen here or every id looks findable.
+        if os.path.isfile(task_config_path(task_id)):
+            return None
+    except Exception:                                # noqa: BLE001
+        pass
+    try:
+        from qikly import paths
+        root = paths.project_root()
+    except Exception:                                # noqa: BLE001
+        root = "(could not be resolved)"
+    return ("no task %r under %s. An MCP host starts the server in the folder "
+            "your editor has open, which is often not the qikly project: if "
+            "that is the wrong directory, set QIKLY_PROJECT_ROOT in the "
+            "server's env to the one holding your tasks." % (task_id, root))
+
+
 def qikly_run(task_id, provider=None, model=None):
     """
     Start a run and return its id immediately.
@@ -68,6 +113,12 @@ def qikly_run(task_id, provider=None, model=None):
     """
     if not task_id or not isinstance(task_id, str):
         return _error("task_id is required")
+    # Before spending anything. A run started against the wrong root fails
+    # minutes later with a message about a missing task, which is true and
+    # useless.
+    problem = where_we_looked(task_id)
+    if problem:
+        return _error(problem)
 
     env = None
     if provider or model:
@@ -121,6 +172,13 @@ def qikly_check_criteria(task_id):
     """
     if not task_id or not isinstance(task_id, str):
         return _error("task_id is required")
+    problem = where_we_looked(task_id)
+    if problem:
+        # Not an _error: the verdict is still "this bar is unusable", which is
+        # what the caller asked. The detail says why without quoting anything.
+        return _redact({"ok": True, "task_id": task_id, "valid": False,
+                        "error_count": 1, "warning_count": 0,
+                        "detail": problem})
     try:
         from qikly import validate
         results = validate.check_all([task_id])
@@ -152,11 +210,34 @@ def qikly_scaffold(file_path):
     """
     if not file_path or not isinstance(file_path, str):
         return _error("file_path is required")
-    if not os.path.isfile(file_path):
-        return _error("no such file: %s" % file_path)
     try:
         from qikly import paths, scaffold
-        yaml_text, problem = scaffold.build_task(file_path, paths.project_root())
+        root = paths.project_root()
+    except Exception as exc:                         # noqa: BLE001
+        return _error("could not resolve a project root: %s" % exc)
+
+    # A relative path used to be resolved against the process's own working
+    # directory, which under an MCP host is the folder the *editor* has open,
+    # not the project. So a caller who correctly set QIKLY_PROJECT_ROOT and
+    # then passed a project-relative path got "no such file" and no hint that
+    # two different directories were in play. Resolve against the project
+    # first, since that is the one the caller named, and fall back to the
+    # working directory so an absolute or genuinely cwd-relative path still
+    # works.
+    candidates = [file_path] if os.path.isabs(file_path) else [
+        os.path.join(root, file_path), os.path.abspath(file_path)]
+    found = next((c for c in candidates if os.path.isfile(c)), None)
+    if found is None:
+        return _error(
+            "no such file: %s. Looked under the project root %s and under the "
+            "server's working directory %s, which an MCP host sets to the "
+            "folder your editor has open. Pass an absolute path, or set "
+            "QIKLY_PROJECT_ROOT to the project this file belongs to."
+            % (file_path, root, os.getcwd()))
+    file_path = found
+    try:
+        from qikly import scaffold
+        yaml_text, problem = scaffold.build_task(file_path, root)
     except Exception as exc:                       # noqa: BLE001
         return _error("could not scaffold that file: %s" % exc)
     if problem:

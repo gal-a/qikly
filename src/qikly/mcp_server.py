@@ -20,11 +20,73 @@ a tool call cannot block for that long, so `qikly_run` starts a run and returns
 an id, and `qikly_status` is how the caller learns what happened. That split is
 the whole reason this needed designing rather than wrapping.
 """
+import base64
 import json
+import os
 
-from qikly import mcp_tools
+from qikly import __version__, mcp_tools
 
 SERVER_NAME = "qikly"
+SERVER_TITLE = "qikly"
+SERVER_SITE = "https://test.qikly.com/"
+
+# Shipped inside the package rather than referenced from docs/, because docs/
+# is not in the wheel: a `file://` URI into the source tree resolves on the
+# machine this was built on and nowhere else.
+_ICON_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+_ICON_FILE = os.path.join(_ICON_DIR, "qikly_icon.svg")
+
+# One gradient cannot serve both grounds. The wordmark runs pale to teal, which
+# is right on a dark UI and all but vanishes on a light one: rendered at 16 px
+# on Light Modern, the pale end of the bowl disappeared into the background.
+# The spec's `theme` means "the theme this icon is designed for", so each file
+# is tagged with the ground it was drawn for. Dark first, because it is VS
+# Code's default, and a client that ignores `theme` will usually take the
+# first entry.
+#
+# What VS Code does with these, measured rather than assumed: nothing visible.
+# On 2026-09-11 its MCP Servers list and the server's details page showed the
+# generic MCP mark for this locally configured server whether it was sent SVG
+# or PNG, each confirmed on the wire and each after a window reload. So the
+# icons are here for hosts that do draw them, and nothing should claim VS Code
+# is one. PNGs were tried and removed rather than shipped for no effect. Each
+# entry: file, theme, sizes.
+_ICONS = (("qikly_icon.svg", "dark", "any"),
+          ("qikly_icon_light.svg", "light", "any"))
+
+_MIME = {".svg": "image/svg+xml", ".png": "image/png"}
+
+
+def icon_data_uri(path=_ICON_FILE):
+    """
+    The server's icon as a self-contained `data:` URI, or None.
+
+    A `data:` URI rather than a `file://` one on purpose. The host resolves
+    whatever we hand it, and a path is a promise about the reader's filesystem
+    that an editor sandbox, a container or a remote window will not keep. The
+    mark is 1.5 KB of SVG, so embedding it costs nothing worth counting.
+
+    Returns None rather than raising: an icon is decoration, and a server that
+    refused to start because a picture was missing would be a poor trade.
+    """
+    try:
+        with open(path, "rb") as handle:
+            raw = handle.read()
+    except OSError:
+        return None
+    mime = _MIME.get(os.path.splitext(path)[1].lower(), "image/svg+xml")
+    return "data:%s;base64,%s" % (mime, base64.b64encode(raw).decode("ascii"))
+
+
+def server_icons():
+    """Every icon variant present, as (data URI, mime type, sizes, theme)."""
+    found = []
+    for name, theme, sizes in _ICONS:
+        uri = icon_data_uri(os.path.join(_ICON_DIR, name))
+        if uri:
+            found.append((uri, _MIME[os.path.splitext(name)[1].lower()],
+                          sizes, theme))
+    return found
 
 # The descriptions a host's agent reads to decide whether to call something.
 # They say what comes back as well as what it does, because an agent that
@@ -133,7 +195,25 @@ def build_server():
                 "the MCP server needs the protocol SDK, which is an optional "
                 "extra:\n    pip install \"qikly[mcp]\"\n(%s)" % exc)
 
-    server = server_class(SERVER_NAME)
+    # Identity, so a host shows a name and a mark rather than a bare command.
+    # Passed through a try, because these arguments arrived with the 2.x SDK
+    # and the FastMCP fallback above predates them: an older SDK must still get
+    # a working server, just a plainer looking one.
+    identity = {"title": SERVER_TITLE, "website_url": SERVER_SITE,
+                "version": __version__}
+    icons = server_icons()
+    if icons:
+        try:
+            from mcp.types import Icon
+            identity["icons"] = [Icon(src=uri, mime_type=mime,
+                                      sizes=[sizes], theme=theme)
+                                 for uri, mime, sizes, theme in icons]
+        except Exception:                            # pragma: no cover
+            pass
+    try:
+        server = server_class(SERVER_NAME, **identity)
+    except TypeError:                                # pragma: no cover
+        server = server_class(SERVER_NAME)
 
     @server.tool(name="qikly_run", description=TOOL_SPECS[0]["description"])
     def _run(task_id: str, provider: str = None, model: str = None) -> str:

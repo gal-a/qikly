@@ -1,4 +1,5 @@
 import argparse
+import atexit
 import multiprocessing
 import os
 import contextlib
@@ -1358,8 +1359,13 @@ def main():
     # parse, so adding a second line to it would break callers to tell them
     # something they did not ask for.
     try:
-        from qikly.version_check import check_for_update
+        from qikly.version_check import check_for_update, repeat_notice
         check_for_update()
+        # And again on the way out. A run prints for minutes, so the opening
+        # line has scrolled away by the time anyone reads the result. atexit
+        # rather than a wrapper around the body below, because main() returns
+        # from a dozen places and one of them would eventually be missed.
+        atexit.register(repeat_notice)
     except Exception:
         pass
 

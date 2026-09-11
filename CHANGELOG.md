@@ -8,6 +8,81 @@ packaging tools would read as `1.1`.
 
 Nothing yet.
 
+## 0.4.1
+
+> The MCP tools now say where they looked
+
+### Fixed
+- **The one-click install button produced a server that could not start.** It
+  writes `"command": "qikly-mcp"`, and on Windows pip routinely installs
+  console scripts into a `Scripts` directory that is not on `PATH`, so the host
+  reported only that the command was not found. Shipped in 0.4.0 and found by
+  the first person to click it. Both the README and
+  [`docs/mcp.md`](docs/mcp.md) now say the command has to be on `PATH`, how to
+  check, and what to write instead when it is not.
+- **A server pointed at the wrong folder said the task was missing and not
+  where it had looked.** An MCP host starts the server in the directory the
+  editor has open, which is routinely the parent of the qikly project rather
+  than the project. "No such task" is then true, useless, and reads as qikly
+  being broken rather than misdirected. `qikly_check_criteria` and `qikly_run`
+  now name the directory they resolved and the variable that changes it, and
+  `qikly_run` refuses instead of starting a run that will spend minutes to
+  reach the same answer.
+
+  **Keyed on whether the task resolves, not on whether `inputs_private/`
+  exists.** The first attempt used the directory, which declared every fresh
+  install broken: bundled tasks ship inside the package and need no
+  `inputs_private/` at all. That is the same false alarm
+  `validate._input_exists` was written to undo, reintroduced through a
+  different door and caught before release. The shape check on the task id
+  still runs first, so a traversing id is refused as a security answer rather
+  than softened into a lookup one.
+
+### Added
+- **The MCP server carries an icon, a title and a link.** Hosts that render
+  MCP server icons show a mark rather than a bare command. The icon is the `q` lifted
+  out of `docs/images/qikly_wordmark.svg`, the same subpath and the same
+  gradient, so it cannot drift from the wordmark. It ships inside the package
+  and is embedded as a `data:` URI at runtime, because `docs/` is not in the
+  wheel and a `file://` path is a promise about the reader's filesystem that a
+  sandbox, a container or a remote window will not keep. A missing icon is not
+  an error: a server that refused to start over a picture would be a poor
+  trade.
+
+  **Two variants, because one gradient cannot serve both grounds.** Rendered
+  at 16 px against VS Code's Light Modern background colours, the wordmark's
+  pale-to-teal gradient all but vanished, and measuring it explained why: 1.22:1 and 2.33:1
+  against white, where WCAG asks 3:1 of a graphic. On dark grounds the same
+  stops measure 7 to 14:1 and are kept. The light variant swaps only the two
+  stops, to `#112f2e` and `#2b8f95`, both already in the palette, and measures
+  14.29:1 and 3.84:1. Each is tagged with the spec's `theme` field, and a test
+  now holds every stop of every variant to 3:1 against the backgrounds it is
+  tagged for, so a palette change cannot quietly undo this.
+
+  **VS Code does not show it, and that was measured rather than assumed.** Its
+  MCP Servers list and the server's details page kept the generic MCP mark for
+  a locally configured server, sent SVG and then PNG, each confirmed on the
+  wire and each after a window reload. The PNGs were removed rather than
+  shipped for no effect. The icons stay for hosts that draw them, and nothing
+  here should be read as a claim about VS Code.
+- **`docs/mcp.md` lists the other editors' install schemes** for Visual Studio,
+  Cursor, Goose and LM Studio, and says plainly that qikly ships no buttons for
+  them because none has been tested here. They differ in how the config is
+  encoded, and a button that writes a malformed config is worse than no button,
+  because the reader blames the tool rather than the link.
+
+### Changed
+- **The update notice is printed again on the way out.** It was the first line
+  of the run, and a run prints for minutes, so by the time there is a result to
+  look at the line announcing a new release has scrolled off the top. The
+  closing line repeats what the opening one computed: no second request, and
+  nothing at all when there was no update to announce.
+
+  It goes to **stderr**, and that is what makes it safe to add rather than a
+  breaking change. `--json` exists so a caller can parse stdout, and a line
+  appended after the JSON would break exactly the callers most likely to be
+  parsing it. The opening line is unchanged.
+
 ## 0.4.0
 
 > Your document is the input, and qikly speaks MCP
