@@ -50,6 +50,18 @@ def test_entries_without_a_criterion_are_dropped():
     assert len(out) == 1
 
 
+def test_a_quoted_statement_does_not_carry_the_prompts_bullet():
+    """
+    The statements go in as "- <statement>", so a model quoting one back
+    faithfully returns the bullet too, and it reads as part of the sentence.
+    """
+    out = cc.parse_findings(
+        '[{"criterion": "- fail below 2.5 m", '
+        '"conflicts_with": "- fail below 2 m", "why": "w"}]')
+    assert out[0]["criterion"] == "fail below 2.5 m"
+    assert out[0]["conflicts_with"] == "fail below 2 m"
+
+
 # ----------------------------------------------------------------- prompt ---
 
 def test_the_prompt_carries_both_halves():
@@ -63,12 +75,61 @@ def test_the_prompt_rules_out_the_normal_relationship():
     a fault. Without saying so the check reports every criterion in the task.
     """
     p = cc.build_prompt(["r"], ["c"])
-    assert "stricter than the requirements" in p
+    assert "qualitatively stricter" in p
     assert "NO possible implementation" in p
 
 
 def test_empty_sections_still_produce_a_readable_prompt():
     assert "(none)" in cc.build_prompt([], [])
+
+
+def test_the_prompt_asks_for_criterion_against_criterion():
+    """
+    Two criteria can be unsatisfiable together with no requirement involved,
+    and the check looked only at criteria against requirements, so it could
+    not represent that finding let alone report it.
+    """
+    p = cc.build_prompt(["r"], ["c"])
+    assert "ANOTHER CRITERION" in p
+    assert "OTHER CRITERION" in p, "the output schema has to allow it too"
+
+
+def test_the_prompt_exempts_numeric_thresholds_from_the_stricter_rule():
+    """
+    The suppression that swallowed a real fault. "Fails below 2 m" against
+    "fails below 2.5 m" reads as merely stricter and is a typo: the two
+    disagree about every value in the band between them.
+    """
+    p = cc.build_prompt(["r"], ["c"])
+    assert "NUMERIC THRESHOLDS" in p
+    assert "SAME quantity" in p
+
+
+def test_the_description_reaches_the_prompt():
+    p = cc.build_prompt(["r"], ["c"], "what this task is for")
+    assert "what this task is for" in p
+
+
+def test_a_missing_description_does_not_break_the_prompt():
+    assert "(none)" in cc.build_prompt(["r"], ["c"])
+    assert "(none)" in cc.build_prompt(["r"], ["c"], None)
+
+
+def test_check_passes_the_tasks_description_through(monkeypatch):
+    """The description is read off the task file, not left behind in it."""
+    seen = {}
+    import qikly.agent_api.call_llm as m
+
+    def capture(agent, prompt, **kwargs):
+        seen["prompt"] = prompt
+        return "[]"
+
+    monkeypatch.setattr(m, "call_llm", capture)
+    from qikly.paths import chdir_to_project_root
+    chdir_to_project_root()
+    cc.check("CALC_TAX")
+    assert "DESCRIPTION:" in seen["prompt"]
+    assert "line items" in seen["prompt"], "CALC_TAX's own description"
 
 
 # ---------------------------------------------------------------- reporting -

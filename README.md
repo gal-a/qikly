@@ -1,9 +1,11 @@
 # qikly
 
 [![tests](https://github.com/gal-a/qikly/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
+[![pypi](https://img.shields.io/pypi/v/qikly?color=blue)](https://pypi.org/project/qikly/)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/gal-a/qikly/blob/main/LICENSE)
 [![marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Qikly%20Test%20Generation-2b8f95)](https://github.com/marketplace/actions/qikly-test-generation)
+[![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22qikly-mcp%22%7D)
 
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
 
@@ -78,7 +80,7 @@ flowchart TD
 
 **Purple is what the coding agent can see. Teal is what the standard is
 written from.** They never touch. A run that never converges is still worth having: it exits
-non-zero, names the blocking tests, and keeps the same complete record. The red arrows are the repair loop, and that is where
+non-zero, names the blocking tests, and keeps the same complete record. The purple arrows are the repair loop, and that is where
 almost all of a run happens: a failing suite sends the agent the failure text
 and nothing else, it produces a FIX and a PATCH, and the suite runs again,
 until the stage passes or the retry budget runs out. It never sees the rule it
@@ -142,8 +144,9 @@ against tomorrow's commit.
 **It helps you write the standard, not just check against it.** `--init` and
 `--scaffold` turn existing code into a task, `--criteria-from` lifts criteria
 out of a ticket you already wrote, `--generate-criteria` drafts a first bar from
-requirements alone, and `--check-criteria` looks for a requirement and a
-criterion that no implementation could satisfy at once.
+requirements alone, and `--check-criteria` looks for two statements anywhere
+in the specification that no implementation could satisfy at once, including
+two acceptance criteria that disagree with each other.
 
 **Every run is reproducible, and the whole trail is kept.** A run records the
 provider, the model, the settings and the version that produced it, next to
@@ -271,6 +274,32 @@ qikly --demo
 Other providers, and how to set a key so it survives a new terminal, are in
 [docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md).
 
+### You probably do not have to write the task file by hand
+
+The criteria usually exist already, in a feature page or a ticket, and the
+interface exists in the code. qikly reads both.
+
+```bash
+# a markdown page, a ticket export, or a .feature file
+qikly --criteria-from feature.md --task-id MY_TASK
+
+# straight from Jira: needs JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN
+qikly --criteria-from-jira PROJ-412 --task-id MY_TASK
+
+# both halves at once: criteria from the page, interface from the module
+qikly --scaffold src/metrics/band.py --from-doc feature.md
+```
+
+Bullet lists, a headed `Acceptance Criteria` section and Gherkin `Scenario:`
+blocks are all understood. Your page stays the source of truth and nobody
+retypes anything.
+
+**One section is never filled for you: `requirements`.** The coding agent reads
+it, and a feature page usually restates its own acceptance criteria in the
+prose above them, so lifting requirements across would hand the criteria to the
+one agent that must never see them. `qikly --validate` warns if what you write
+there restates a criterion.
+
 ### Which command depends on which parts you already have
 
 A task file is one YAML file with three parts, and the split above is a split
@@ -302,7 +331,7 @@ stages, because unit tests have to name real functions.
 | You know what it must do, not yet how to check it | Y | | | `qikly --init` | Creates the directory layout and one starter task to edit. Its criteria show the habit that matters most: name the value, not the quality. "100 is accepted and 101 is rejected" forces a test at the boundary; "amounts must be reasonable" does not. **You get:** a task file to fill in, with your fixtures where a run will look for them. |
 | Same, but you want a first draft of the bar | Y | Y | | `qikly --tasks <MY_TASKS>`<br>`--generate-criteria` | Drafts **#3** from **#1** alone, then runs. **You get:** a first draft of the bar written into your task file for you to correct, plus the implementation and suites. |
 | You have written all three | Y | Y | Y | `qikly --tasks <MY_TASKS>` | Everything you wrote is used, and nothing is drafted on your behalf. **You get:** an implementation, integration, system and unit suites, a convergence report, and a run summary recording the model and settings that produced them. |
-| You have all three but doubt they agree | Y | Y | Y | `qikly --check-criteria`<br>`--tasks <MY_TASKS>` | One model call asking whether any implementation could satisfy **#1** and **#3** at once. Advisory, and exits non-zero on a contradiction so a pipeline can gate on it. **You get:** a list of the requirement and criterion pairs that cannot both hold, before spending a stage budget on them. |
+| You have all three but doubt they agree | Y | Y | Y | `qikly --check-criteria`<br>`--tasks <MY_TASKS>` | One model call asking whether any implementation could satisfy the description, **#1** and **#3** at once, and whether any two of **#3** agree with each other. Advisory, and exits non-zero on a contradiction so a pipeline can gate on it. **You get:** a list of the pairs that cannot both hold, before spending a stage budget on them. Two criteria setting different numbers on the same quantity are always reported, since that is a typo rather than a tighter bar. |
 | A previous run stopped before finishing | Y | Y | Y | `qikly --tasks <MY_TASKS>`<br>`--resume` | Generating the tests and the first implementation already cost model calls, and they are still on disk. This keeps them and picks up where it stopped, instead of paying for them twice. **You get:** the same outputs as a full run, without paying for the parts already built. |
 
 `<MY_TASKS>` is one task_id or several separated by commas. A task_id is a
@@ -893,9 +922,10 @@ left holding afterwards.
 | **Scaffold from code** | `--scaffold FILE` reads an existing module and writes two task files: one that tests that code, one that writes a fresh implementation of the same interface |
 | **Draft criteria** | `--generate-criteria` writes a first bar from requirements alone, for a task that has none |
 | **Score a drafted bar against yours** | `--compare-criteria TASK` drafts criteria from your requirements alone, then reports what a generated bar would have missed, treating yours as ground truth |
-| **Contradiction check** | `--check-criteria` asks whether any implementation could satisfy both the requirements and the criteria, before a stage budget is spent |
+| **Contradiction check** | `--check-criteria` asks whether any implementation could satisfy the description, the requirements and the criteria at once, and whether the criteria agree with each other, before a stage budget is spent |
 | **Import criteria from a ticket** | `--criteria-from FILE` reads bullet lists, an "Acceptance Criteria" section, or Gherkin scenarios out of a ticket you paste into a file |
 | **Jira import** | `--criteria-from-jira PROJ-412` reads criteria from a named field or the issue description, through the same parser the file importer uses |
+| **Document plus code, in one command** | `--scaffold module.py --from-doc feature.md` writes the task file with the criteria taken from the document and the interface read from the module. `requirements` is left for you on purpose: the coding agent reads it, and a feature page usually restates its own criteria in the prose above them. |
 | **Fixture proposals** | A separate agent names the criteria no input row can trigger and proposes the smallest row that would. It never edits your data |
 | **Convergence trends** | `--trends` shows each task's rate over time from summaries already on disk, marking any period where the model or settings changed |
 | **Machine-readable output** | `--json` on `--explain` and `--validate` |
@@ -910,7 +940,7 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.3.5`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.4.0`, uploading the suite, the code and the JUnit XML |
 
 ## Use it in CI
 
@@ -957,6 +987,41 @@ a breaking change. `@v0.3.4` is an exact pin that never moves, so nothing
 changes under you and nothing reaches you either. The templates use `@v0`
 because most people want the fixes; use the exact form if your policy requires
 it.
+
+## Use it from your coding agent
+
+qikly runs as an [MCP](https://modelcontextprotocol.io) server, so an agent in
+Claude Code, Codex CLI or Cursor can start a run and read the result without you
+leaving the conversation.
+
+```bash
+pip install "qikly[mcp]"
+claude mcp add qikly -- qikly-mcp
+```
+
+In VS Code, the **Install qikly MCP** badge at the top of this page writes the
+configuration for you. It writes the configuration and nothing else, so the
+`pip install` above still comes first, and it deliberately sets no
+`QIKLY_PROJECT_ROOT`: VS Code starts the server in the workspace folder, and
+qikly resolves its project from the working directory when that variable is
+unset. Open the project holding `inputs_private/` and it finds your tasks.
+
+Four tools: `qikly_run`, `qikly_status`, `qikly_check_criteria`,
+`qikly_scaffold`. A run takes minutes to hours and no host will hold a tool call
+open that long, so `qikly_run` returns a run id straight away and `qikly_status`
+is how the agent finds out what happened. The run is detached, so you can close
+the editor and ask again tomorrow.
+
+**No qikly tool returns your acceptance criteria**, on success or on failure.
+Your agent sees which tests failed and the pytest output. It does not see the
+rule it broke, which is the same position a human developer is in when CI goes
+red, and the reason the code it writes next aims at the requirement rather than
+at the test.
+
+One thing that is your side of the line: the generated tests under
+`outputs/tests/` are written from your criteria, so keep them out of your
+agent's reach. [`docs/mcp.md`](https://github.com/gal-a/qikly/blob/main/docs/mcp.md)
+has the config for that and the rest of the setup.
 
 ## Further reading
 

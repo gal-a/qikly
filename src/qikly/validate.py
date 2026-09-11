@@ -38,6 +38,22 @@ import yaml
 
 REQUIRED = ("task_id", "requirements", "interface")
 
+
+class Note(str):
+    """
+    A warning that remembers what it is about.
+
+    `render` collapses the same finding repeated across many tasks, and to do
+    that it has to know which warnings are the same finding. Parsing that back
+    out of the rendered message would mean writing a regex against our own
+    prose. A str subclass carries the key instead, and stays a str for every
+    caller that only counts warnings or greps one for a substring.
+    """
+    def __new__(cls, text, group=None):
+        note = super().__new__(cls, text)
+        note.group = group
+        return note
+
 # A criterion carrying a number, a quoted literal or a comparison is naming
 # something checkable. One made only of adjectives is not.
 _CONCRETE = re.compile(r"\d|\"[^\"]+\"|'[^']+'|>=|<=|==|\bexactly\b|\bempty\b",
@@ -129,6 +145,23 @@ def check_task(path):
         if not _input_exists(relative):
             errors.append(f"{name}: input file not found: {relative}")
 
+    # A requirement that restates a criterion hands that criterion to the
+    # coding agent, which reads requirements and must never read criteria. It
+    # is the easiest leak in the whole system to create by accident: paste a
+    # paragraph from the feature page into requirements and the page usually
+    # restates its own criteria just above them. A warning rather than an
+    # error, because the overlap measure is blunt and a false positive must
+    # not stop a run, but it is worth saying loudly every time.
+    from qikly.from_doc import restated
+    for req, crit, score in restated(task.get("requirements"),
+                                     task.get("acceptance_criteria")):
+        warnings.append(Note(
+            f"{name}: a requirement restates a criterion ({int(score * 100)}% "
+            f"of its words). The coding agent reads requirements and never "
+            f"reads criteria, so this hands it the answer key. "
+            f"requirement: {req[:60]!r} criterion: {crit[:60]!r}",
+            group=("restated", crit)))
+
     return errors, warnings
 
 
@@ -148,8 +181,26 @@ def check_all(task_ids=None):
     return results
 
 
+# One finding repeated across this many tasks is a fact about the task set, not
+# about any one file. Printing it once per file buries the findings that are.
+_COLLAPSE_AT = 3
+
+
+def _repeated(results):
+    """Which warning groups appear across enough tasks to print once."""
+    tasks = {}
+    for task_id in results:
+        for note in results[task_id][1]:
+            group = getattr(note, "group", None)
+            if group is not None:
+                tasks.setdefault(group, set()).add(task_id)
+    return {g: sorted(t) for g, t in tasks.items() if len(t) >= _COLLAPSE_AT}
+
+
 def render(results):
     lines, errors, warnings = [], 0, 0
+    repeated = _repeated(results)
+    collapsed, shown = 0, set()
     for task_id in sorted(results):
         problems, notes = results[task_id]
         errors += len(problems)
@@ -159,8 +210,24 @@ def render(results):
         for item in problems:
             lines.append(f"  ERROR   {item}")
         for item in notes:
+            group = getattr(item, "group", None)
+            if group in repeated:
+                collapsed += 1
+                if group in shown:
+                    continue
+                shown.add(group)
+                where = ", ".join(repeated[group])
+                # Drop the leading "<file>: ", the one part that is not shared.
+                body = str(item).split(": ", 1)[-1]
+                lines.append(f"  warn    {len(repeated[group])} tasks: {body}")
+                lines.append(f"          in: {where}")
+                continue
             lines.append(f"  warn    {item}")
     lines.append("")
-    lines.append(f"{len(results)} task(s): {errors} error(s), {warnings} warning(s). "
-                 f"No model was called and nothing was spent.")
+    summary = f"{len(results)} task(s): {errors} error(s), {warnings} warning(s)"
+    if collapsed:
+        summary += (f", of which {collapsed} were {len(repeated)} finding(s) "
+                    f"repeated across tasks and are shown once each")
+    summary += ". No model was called and nothing was spent."
+    lines.append(summary)
     return "\n".join(lines), errors

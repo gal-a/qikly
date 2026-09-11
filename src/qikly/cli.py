@@ -677,6 +677,33 @@ def _parse_args():
              "everything rather than assuming consent."
     )
     parser.add_argument(
+        "--from-doc", metavar="DOC",
+        help="Build a task file from a document plus the code it describes. "
+             "Use with --scaffold: the acceptance criteria come from DOC (a "
+             "markdown page, a ticket export or a .feature file) and the "
+             "interface comes from the module. requirements are still left for "
+             "you, on purpose: the coding agent reads them, and a feature page "
+             "usually restates its own criteria in the prose above them."
+    )
+    parser.add_argument(
+        "--start", metavar="TASK",
+        help="Start a run in the background and print its run id, without waiting. "
+             "A run takes minutes to hours, so this is for when the terminal is not "
+             "where you want to spend them: start it, close the window, ask later "
+             "with --status. It is also the mechanism the MCP server is built on."
+    )
+    parser.add_argument(
+        "--status", metavar="RUN_ID",
+        help="What happened, or is happening, to one run started with --start. "
+             "Reads what the run itself writes, so it is accurate even if the "
+             "process died: 'stalled' means gone without a summary, which is a "
+             "crash rather than a failing suite."
+    )
+    parser.add_argument(
+        "--runs", action="store_true",
+        help="List known runs, newest first, with the state of each."
+    )
+    parser.add_argument(
         "--resume", action="store_true",
         help="Keep the suites and implementation a previous attempt left on disk instead "
              "of regenerating them. Everything already generated cost model calls, and a "
@@ -703,6 +730,24 @@ def _parse_args():
              f"--tasks to demo a different one. Writes nothing outside that directory."
     )
     return parser.parse_args()
+
+
+def _print_run(info, brief=False):
+    """
+    One run, for a human. Returns a shell exit code: 0 for a run that passed or
+    is still going, 1 for one that failed or stalled, so this composes with &&.
+    """
+    import json as _json
+
+    state = info.get("state", "unknown")
+    progress = info.get("progress") or {}
+    if brief:
+        print("%-34s %-8s %s" % (
+            info.get("run_id"), state,
+            progress.get("stage") or info.get("detail") or ""))
+    else:
+        print(_json.dumps(info, indent=2, default=str))
+    return 0 if state in ("passed", "running") else 1
 
 
 def _do_init():
@@ -1061,7 +1106,22 @@ def _append_criteria_to_task(task_id, criteria):
     return 0
 
 
-def _do_scaffold(source, task_id):
+def _fill_criteria_from(text, doc, root):
+    """Put a document's acceptance criteria into a freshly scaffolded task."""
+    from qikly import from_doc as fd
+    from qikly.criteria_import import parse_file
+
+    path = doc if os.path.isabs(doc) else os.path.join(root, doc)
+    if not os.path.isfile(path):
+        return text, f"no such document: {shown(path)}"
+    try:
+        criteria = parse_file(path)
+    except Exception as exc:                        # noqa: BLE001
+        return text, f"could not read {shown(path)}: {exc}"
+    return fd.merge(text, criteria)
+
+
+def _do_scaffold(source, task_id, doc=None):
     """
     Write task files for an existing Python module. Two of them, on purpose.
 
@@ -1096,6 +1156,11 @@ def _do_scaffold(source, task_id):
         if problem:
             print(problem)
             return 2
+        if doc:
+            text, doc_problem = _fill_criteria_from(text, doc, root)
+            if doc_problem:
+                print(doc_problem)
+                return 2
         base = re.search(r'task_id:\s*"([^"]+)"', text).group(1)
         tid = base + suffix
         text = text.replace(f'task_id: "{base}"', f'task_id: "{tid}"', 1)
@@ -1116,14 +1181,32 @@ def _do_scaffold(source, task_id):
         print(f"    {tid:28} {headline}")
         print(f"    {'':28} {shown(dest)}")
     print()
-    print("  Both need the same two sections from you, and neither can be")
-    print("  derived from the code:")
-    print("    requirements         what the code is meant to do, in your words")
-    print("    acceptance_criteria  the checkable edge cases, with boundary values")
-    print()
-    print("  Criteria read out of an implementation can only describe what it")
-    print("  already does, and a bar that agrees with the code by construction is")
-    print("  exactly what this tool exists to avoid. So those two are yours.")
+    if doc:
+        print(f"  Acceptance criteria came from {shown(doc)}.")
+        print()
+        print("  One section is still yours:")
+        print("    requirements         what the code is meant to do, in your words")
+        print()
+        print("  It is not filled from the document on purpose. The coding agent")
+        print("  reads requirements, and a feature page usually restates its own")
+        print("  acceptance criteria in the prose above them. Lifting that across")
+        print("  would hand the criteria to the one agent that must never see")
+        print("  them, by a route nobody would think to check.")
+        print()
+        print("  `qikly --validate` checks what you write there against the")
+        print("  criteria and says so if the two say the same thing.")
+    else:
+        print("  Both need the same two sections from you, and neither can be")
+        print("  derived from the code:")
+        print("    requirements         what the code is meant to do, in your words")
+        print("    acceptance_criteria  the checkable edge cases, with boundary values")
+        print()
+        print("  Criteria read out of an implementation can only describe what it")
+        print("  already does, and a bar that agrees with the code by construction is")
+        print("  exactly what this tool exists to avoid. So those two are yours.")
+        print()
+        print("  Already written them somewhere? Point at it:")
+        print("    qikly --scaffold %s --from-doc feature.md" % shown(source))
     print()
     print(f"  Then: qikly --tasks {written[0][0]}")
     return 0
@@ -1283,10 +1366,28 @@ def main():
     # These run before anything else and exit: they exist to make a project
     # runnable, so they must work when nothing is configured yet and must not
     # require a provider key.
+    if args.start:
+        from qikly import runs
+        run_id = runs.start(args.start)
+        print(run_id)
+        return 0
+    if args.status:
+        from qikly import runs
+        return _print_run(runs.status(args.status))
+    if args.runs:
+        from qikly import runs
+        found = runs.list_runs()
+        if not found:
+            print("no runs recorded in %s" % runs.runs_dir())
+            return 0
+        for item in found:
+            _print_run(item, brief=True)
+        return 0
+
     if args.init:
         return _do_init()
     if args.scaffold:
-        return _do_scaffold(args.scaffold, args.task_id)
+        return _do_scaffold(args.scaffold, args.task_id, args.from_doc)
     if args.criteria_from:
         return _do_criteria_from(args.criteria_from, args.task_id)
     if args.criteria_from_jira:

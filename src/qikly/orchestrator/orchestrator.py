@@ -107,6 +107,22 @@ TRANSACTIONS_PATH = None  # set per run in orchestrate()
 # orchestrate() returns, and re-deriving a timestamp there would produce a
 # different one and silently point at nothing.
 RUN_TIMESTAMP = None
+
+RUN_TIMESTAMP_ENV = "QIKLY_RUN_TIMESTAMP"
+
+
+def _injected_run_timestamp():
+    """
+    A run timestamp chosen by whoever started this process, or None.
+
+    Validated rather than trusted: it becomes part of several file paths, so a
+    value with a separator in it would write outside the run's directories.
+    """
+    import re
+    value = (os.environ.get(RUN_TIMESTAMP_ENV) or "").strip()
+    if not value:
+        return None
+    return value if re.fullmatch(r"\d{8}_\d{6}", value) else None
 RUN_STAGES = ()
 SAVE_TRANSACTIONS = True  # overridden per run from settings.yaml
 
@@ -842,7 +858,13 @@ def orchestrate(task_id, seed=None, resume=False):
     tests_dir = os.path.join(GENERATED_TESTS_ROOT, task_id)
     agent_src_dir = agent_src_code_path(task_id)
 
-    run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Normally generated here. QIKLY_RUN_TIMESTAMP lets a caller that started
+    # this process decide it in advance, which is what makes a detached run
+    # addressable: every artefact path below is derived from this string, so a
+    # parent that chose it already knows where the run will write before the
+    # run has written anything. Nothing else sets it, and an absent or
+    # malformed value falls back to now, so the normal path is unchanged.
+    run_timestamp = _injected_run_timestamp() or datetime.now().strftime("%Y%m%d_%H%M%S")
     # task_id is embedded in every per-run path below (transactions log,
     # patch dir, and inside run_tests()'s report filenames) so that two
     # tasks' runs -- including concurrent ones in separate processes --

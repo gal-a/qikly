@@ -13,7 +13,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qikly"
-version = "0.3.5"
+version = "0.4.0"
 description = "Generates a test suite from acceptance criteria, then converges code against it with an agent that never sees those criteria."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -58,6 +58,9 @@ dependencies = [
 openai = ["openai>=1.0,<4"]
 anthropic = ["anthropic>=0.30,<2"]
 all-providers = ["openai>=1.0,<4", "anthropic>=0.30,<2"]
+# The MCP server. Optional because it is a way in, not the tool: everything it
+# exposes works without it, and every test in this repository runs without it.
+mcp = ["mcp>=2.0,<3"]
 
 [project.urls]
 Homepage = "https://test.qikly.com/"
@@ -72,6 +75,7 @@ qikly-all = "qikly.orchestrator.run_all:main"
 qikly-report = "qikly.orchestrator.reports.report:main"
 qikly-metrics = "qikly.orchestrator.reports.metrics_report:main"
 qikly-diff-criteria = "qikly.orchestrator.tuning.diff_acceptance_criteria:main"
+qikly-mcp = "qikly.mcp_server:main"
 
 [tool.setuptools]
 # src layout: the package lives in src/, not at the repo root. That keeps the

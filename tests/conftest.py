@@ -19,13 +19,31 @@ for _path in (_SRC, os.path.join(_ROOT, "research")):
         sys.path.insert(0, _path)
 
 
+_LOOPBACK = ("127.0.0.1", "::1", "localhost")
+
+
 @pytest.fixture(autouse=True)
 def _no_network(monkeypatch):
-    """Fail loudly rather than silently reaching the internet."""
+    """
+    Fail loudly rather than silently reaching the internet.
+
+    Loopback is allowed. The rule this enforces is "no test needs an API key or
+    the internet", and 127.0.0.1 is neither: blocking it was incidental, and it
+    blocked a legitimate local case, because asyncio's Windows event loop builds
+    itself from a loopback socketpair. `tests/test_mcp_end_to_end.py` spawns a
+    real MCP server as a subprocess and could not run at all until this
+    distinguished the two.
+    """
     import socket
 
-    def _blocked(*a, **k):
-        raise AssertionError("a test attempted a network connection")
+    real_connect = socket.socket.connect
+
+    def _blocked(self, address, *a, **k):
+        host = address[0] if isinstance(address, tuple) and address else None
+        if host in _LOOPBACK:
+            return real_connect(self, address, *a, **k)
+        raise AssertionError(
+            "a test attempted a network connection to %r" % (address,))
 
     monkeypatch.setattr(socket.socket, "connect", _blocked)
     monkeypatch.setenv("QIKLY_NO_VERSION_CHECK", "1")

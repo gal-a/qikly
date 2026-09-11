@@ -209,6 +209,61 @@ def test_a_criterion_naming_a_boundary_is_not_warned_about(tmp_path):
     assert warnings == []
 
 
+def _restating_task(task_id):
+    """A task whose output requirement fully contains an output criterion."""
+    return chr(10).join([
+        'task_id: "%s"' % task_id,
+        'requirements:',
+        '  - "Write the result to outputs/data/%s/output.json as a single '
+        'JSON object with two keys: accepted and rejected"' % task_id,
+        'interface: {module: "m"}',
+        'acceptance_criteria:',
+        '  - "Output JSON is a single object with accepted and rejected keys"',
+        '  - "a customer identifier shorter than 3 characters raises ValueError"',
+        '  - "every log line carries the offending column"',
+        '',
+    ])
+
+
+def test_one_finding_repeated_across_tasks_is_printed_once(tmp_path):
+    """
+    Nine of the shipped tasks carry the same output-contract restatement, one
+    per file, because the agent cannot write the code without being told the
+    JSON shape and the suite should still check it. The finding is real and
+    printing it nine times buried the findings that were not boilerplate.
+    """
+    results = {t: validate.check_task(_task(tmp_path, _restating_task(t), t + ".yaml"))
+               for t in ("A", "B", "C")}
+    text, errors = validate.render(results)
+
+    assert errors == 0
+    assert text.count("restates a criterion") == 1, "collapsed to one line"
+    assert "3 tasks:" in text
+    assert "in: A, B, C" in text
+    # The count stays honest: three warnings happened, one line was printed.
+    assert "3 warning(s)" in text
+    assert "repeated across tasks" in text
+
+
+def test_a_finding_in_only_two_tasks_is_still_printed_per_task(tmp_path):
+    """Collapsing a pair hides which file it was in and saves one line."""
+    results = {t: validate.check_task(_task(tmp_path, _restating_task(t), t + ".yaml"))
+               for t in ("A", "B")}
+    text, _ = validate.render(results)
+    assert text.count("restates a criterion") == 2
+    assert "A.yaml" in text and "B.yaml" in text
+
+
+def test_a_warning_is_still_an_ordinary_string(tmp_path):
+    """
+    `Note` carries a grouping key and nothing else may notice. The MCP tool
+    counts warnings and the tests grep them, so it has to stay a `str`.
+    """
+    _, warnings = validate.check_task(_task(tmp_path, _restating_task("A"), "A.yaml"))
+    assert warnings and all(isinstance(w, str) for w in warnings)
+    assert any("restates a criterion" in w for w in warnings)
+
+
 def test_the_shipped_tasks_all_validate():
     """The examples have to survive the check they ship with."""
     from qikly.paths import chdir_to_project_root

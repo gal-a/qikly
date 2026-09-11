@@ -123,6 +123,41 @@ def test_user_visible_titles_use_the_product_name():
     assert not offenders, "\n".join(offenders)
 
 
+def _unscanned_public_files():
+    """
+    The public files the prose guard does not reach.
+
+    `test_no_filing_references_in_the_documentation` already covers the README
+    and docs/*.md. Two things slip past it: CHANGELOG.md, which _PROSE_SKIP
+    excludes for an unrelated reason (it quotes a corrupted sentence verbatim),
+    and the landing page, because _prose collects .md only. Both are read by
+    strangers, and index.html is the first thing most of them see.
+    """
+    candidates = ["CHANGELOG.md"]
+    docs = os.path.join(_ROOT, "docs")
+    if os.path.isdir(docs):
+        candidates += [os.path.join("docs", n) for n in sorted(os.listdir(docs))
+                       if n.endswith(".html")]
+    for rel in candidates:
+        full = os.path.join(_ROOT, rel)
+        if os.path.isfile(full):
+            yield rel.replace("\\", "/"), io.open(full, encoding="utf-8").read()
+
+
+@pytest.mark.parametrize("path,text", list(_unscanned_public_files()),
+                         ids=[p for p, _ in _unscanned_public_files()])
+def test_no_filing_references_in_the_other_public_files(path, text):
+    """
+    Same rule, applied to the two public files the other guards miss.
+
+    Nothing about a filing belongs in this repository at all, and a changelog
+    entry or a line on the landing page is as public as a line in the README.
+    """
+    lowered = text.lower()
+    found = [w for w in _FILING_WORDS if w.lower() in lowered]
+    assert not found, "%s mentions %s" % (path, found)
+
+
 @pytest.mark.parametrize("path,text", list(_prose()),
                          ids=[p for p, _ in _prose()])
 def test_documentation_has_no_comma_separator_artefacts(path, text):

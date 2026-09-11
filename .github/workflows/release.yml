@@ -154,7 +154,7 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Take the notes from the changelog, not from a paste
+      - name: Take the notes and the headline from the changelog, not from a paste
         run: |
           python - "${GITHUB_REF_NAME#v}" <<'PY' > notes.md
           import io, re, sys
@@ -167,9 +167,18 @@ jobs:
           body = m.group(1).strip()
           if not body:
               sys.exit("the '## %s' section is empty" % version)
+          # An optional "> one line" directly under the version heading is the
+          # release headline. It becomes the release name, which is what the
+          # update notice quotes back to a user, so a version with one says
+          # something useful instead of repeating its own number.
+          head = re.match(r"^>\s*(.+?)\s*$", body, re.M)
+          if head and body.startswith(">"):
+              io.open("headline.txt", "w", encoding="utf-8").write(head.group(1))
+              body = body[head.end():].lstrip()
           print(body)
           PY
           echo "--- notes ---" && head -5 notes.md
+          test -f headline.txt && echo "--- headline ---" && cat headline.txt ||             echo "--- no headline, the title will be the bare tag ---"
 
       - name: Create or update the release, with the dists attached
         env:
@@ -177,10 +186,13 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
+          TITLE="$TAG"
+          if [ -f headline.txt ]; then TITLE="$TAG: $(cat headline.txt)"; fi
+          echo "release title: $TITLE"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --notes-file notes.md --title "$TAG"
+            gh release edit "$TAG" --notes-file notes.md --title "$TITLE"
           else
-            gh release create "$TAG" --notes-file notes.md --title "$TAG" --latest
+            gh release create "$TAG" --notes-file notes.md --title "$TITLE" --latest
           fi
           gh release upload "$TAG" dist/* --clobber
 

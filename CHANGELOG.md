@@ -8,6 +8,197 @@ packaging tools would read as `1.1`.
 
 Nothing yet.
 
+## 0.4.0
+
+> Your document is the input, and qikly speaks MCP
+
+### Added
+- **qikly speaks MCP.** `pip install "qikly[mcp]"` and `qikly-mcp` expose four
+  tools to any MCP host, so an agent in Claude Code, Codex CLI or Cursor can
+  start a run and read the result without leaving the conversation:
+  `qikly_run`, `qikly_status`, `qikly_check_criteria`, `qikly_scaffold`.
+
+  A run takes minutes to hours, which is longer than any host will hold a tool
+  call open, so `qikly_run` starts a detached run and returns an id and
+  `qikly_status` reports on it. The run outlives the terminal that started it.
+
+  The withholding property is the reason this needed care rather than a
+  wrapper. An MCP host is usually running its own coding agent, and whatever a
+  tool returns becomes that agent's context, so no response carries acceptance
+  criteria on any path including the error paths.
+  `tests/test_mcp_withholding.py` asserts that on the serialised JSON rather
+  than on the dict, because a dict holding criteria under a key nobody prints
+  is still a leak the moment anything serialises it. Documented in
+  [`docs/mcp.md`](docs/mcp.md), including the part qikly cannot enforce: the
+  generated tests are on your disk, so keep them out of your agent's reach.
+
+  `tests/test_mcp_end_to_end.py` spawns the real server as a subprocess and
+  speaks the real protocol to it, because every other test here calls the
+  functions directly and a server that crashed on startup or registered its
+  tools under the wrong names would pass all of them. It skips when the extra
+  is not installed, so the base suite stays dependency-free. The withholding
+  test was written before the server existed and was checked by making a tool
+  leak on purpose, and a redaction pass strips the forbidden keys anyway.
+
+- **`--scaffold module.py --from-doc feature.md` builds the whole task file.**
+  Two of the first three people to try qikly asked for the same thing from
+  different angles: the artefact they already have should be the input. Both
+  halves already existed and nobody had joined them. `--criteria-from` reads a
+  markdown page, a ticket export or a `.feature` file, and `--scaffold` reads
+  the real signatures out of the module. This is the join: criteria from the
+  document, interface from the code.
+
+  **What it deliberately does not fill is `requirements`.** That is the section
+  the coding agent reads, and a feature page almost always restates its own
+  acceptance criteria in the prose above them, so lifting requirements out of
+  the document would hand the criteria to the one agent that must never see
+  them, by a route none of the withholding tests watch. It is the same refusal
+  as `--scaffold` declining to derive criteria from an implementation.
+- **`qikly --check-criteria` now reads the whole specification, and catches a
+  criterion that contradicts another criterion.** It looked only for a
+  criterion against a requirement, so the fault that is entirely inside the
+  criteria block was not merely missed, it was unrepresentable: the finding it
+  returns names the requirement a criterion conflicts with, and there was no
+  requirement involved. Two criteria that disagree make the suite
+  unsatisfiable on their own, whatever the requirements say.
+
+  **Numeric thresholds are no longer exempted as "merely stricter".** The
+  prompt tells the model not to report a criterion that is stricter than the
+  requirements, because that is the normal and intended relationship between
+  the two and without the instruction it reports every criterion in the task.
+  On numbers that instruction suppressed real faults: "fails below 2 m" and
+  "fails below 2.5 m" read as one rule and a tighter version of it while
+  actually disagreeing about every value in between, which is a typo, not a
+  design. Different numeric bounds on the same quantity are now always
+  reportable, and the finding names the disputed range.
+
+  **The `description` reaches the check.** It carries what the task is for,
+  and a criterion measuring something else is wrong in a way the requirements
+  alone cannot show.
+
+  Raised by a reader working on vehicle proximity metrics, whose example was a
+  requirement failing below 2 m against criteria failing below 2.5 m and
+  passing above 2 m. Before these changes the check reported one finding and it
+  was neither of the two real faults. It now reports both, naming 2.2 m as a
+  distance the suite demands be a pass and a failure at once.
+
+  It remains advisory, one model call, and it never edits a task or blocks a
+  run. It also has to sit here, before the run: everything inside the loop is
+  bound by the rule the tool exists for, so the one agent placed to notice that
+  a spec disagrees with itself is the one forbidden from seeing half of it. A
+  specification fault is not a bug the loop can find.
+- **`qikly --validate` now catches a requirement that restates a criterion.**
+  The refusal above is only worth anything if the leak is caught when somebody
+  pastes it in by hand, which is the obvious next move. Word overlap scored
+  against the criterion rather than the requirement, so a criterion buried in a
+  long pasted paragraph is caught rather than diluted. A warning, not an error,
+  because the measure is blunt and a false positive must not stop a run.
+- **A one-click install button for VS Code, and a live PyPI version badge.**
+  The install button writes the MCP configuration into VS Code, which is the
+  step that otherwise means finding out that your host spells the config key
+  `servers` where another spells it `mcpServers`. It sets no
+  `QIKLY_PROJECT_ROOT`, because VS Code starts the server in the workspace
+  folder and that is already where qikly looks. The version badge reads PyPI
+  rather than repeating a number written in the README, which is the kind of
+  number that goes stale the release after someone stops checking it.
+- **`--start`, `--status` and `--runs`.** The mechanism underneath the MCP
+  server, useful on its own: start a run, close the terminal, ask later. State
+  is derived from what the run writes rather than stored, so it is right even
+  after a crash, and `stalled` is reported separately from `failed` because a
+  crash and a failing suite are different things.
+
+### Fixed
+- **The restatement check counted a task's own field names as evidence.** Word
+  overlap treated every word alike, so a criterion built mostly from field
+  names scored against any requirement naming those fields. `end_date must not
+  be earlier than start_date` reduces to three scoring words, two of them field
+  names, and it produced three warnings on one shipped task, none of them a
+  restatement: the word carrying the whole criterion is "earlier" and it
+  appeared in no requirement. A word appearing in 40% or more of a task's own
+  criteria is now discounted as that task's vocabulary. Below three criteria
+  the measure is undefined rather than weak and nothing is discounted, and a
+  criterion made entirely of common vocabulary falls back to the raw score, so
+  a verbatim paste is still caught at 100%.
+- **One finding repeated across every task drowned the findings that were
+  not.** Nine of the bundled tasks carry the same output-contract restatement,
+  one per file, and it is real every time: the coding agent cannot write the
+  code without being told the JSON shape, so the contract belongs in
+  `requirements`, and the suite should still check it. Printing it nine times
+  buried the one task that had no acceptance criteria at all. A finding
+  appearing in three or more tasks is now printed once with the list of tasks
+  it applies to. The warning count is unchanged and says how many were
+  collapsed, because the check is advisory and quietly reporting fewer problems
+  than it found would be the wrong kind of quiet. Across the bundled tasks this
+  is 23 warnings on 23 lines before, 18 warnings on 8 lines after.
+- **A contradiction finding quoted the prompt's own bullet back at you.** The
+  statements reach the model as `- <statement>`, so a reply quoting one
+  faithfully carried the list marker into the report, where it read as part of
+  the requirement rather than as formatting qikly had added.
+- **Two documents described the diagram in colours it is not.** The landing
+  page called the repair cycle "the dashed orange one" long after that arrow
+  became purple, and the README called the same arrows red while
+  `design_1_case_study.md` called them purple. Found by a reader. A test now
+  checks the prose against the tokens and the mermaid `linkStyle` values, in
+  both files, because a palette change silently invalidates a sentence a
+  hundred lines away.
+- **The MCP redaction pass could not see criteria inside a text blob.** It
+  strips forbidden dict *keys*, and `qikly_scaffold` returns a whole task file
+  as one string, so the same criteria removed as a key travelled through
+  untouched as YAML. Nothing leaked: scaffold writes `TODO` placeholders and
+  refuses to derive criteria from an implementation. It is fixed because
+  `--from-doc`, added in this same release, merges real criteria into exactly
+  that YAML, which puts the two features one plausible wiring change apart from
+  a leak the guard would never have seen. Criteria in a YAML string are now
+  replaced with a `[withheld]` marker, `TODO` placeholders survive because a
+  scaffold with an empty criteria section would be useless, and
+  `qikly_scaffold` goes through the guard like every other tool.
+- **A task id can no longer escape the output tree.** It arrives straight from
+  an MCP tool call and became part of several file paths unchecked, so
+  `../../evil` normalised two levels above the project and wrote there. Task
+  ids are now matched against `[A-Za-z0-9_.-]+` before any path is built.
+- **Two runs started in the same second no longer collide.** A run id is the
+  task plus a one-second timestamp, so two starts inside one second produced
+  one id: the second record overwrote the first, both children were handed the
+  same `QIKLY_RUN_TIMESTAMP` and appended to a single transaction log, and they
+  raced to overwrite one summary. A host retrying a slow tool call was enough
+  to trigger it. Ids are now claimed with `O_CREAT|O_EXCL`, which is a real
+  reservation rather than a check followed by a write.
+- **A run that was starting is no longer reported as a crash.** The run record
+  was written only after the child process launched, so between claiming the id
+  and that write there was a window where `status` found no pid, no summary,
+  and called a perfectly healthy run `stalled`. Narrow on a local disk, wider
+  on a synced folder, and permanent if the record write itself failed. The
+  record is now written before the launch and gains its pid afterwards, through
+  `os.replace` so a reader never sees half a file.
+- **A broken process lookup no longer invents a crash either.** `_alive` shells
+  out to `tasklist` on Windows and let the exception escape when it was missing
+  or restricted, and it matched the pid as a substring of the whole line, so pid
+  42 matched the `42,168 K` memory column of an unrelated process. It now asks
+  for CSV and compares the pid as a field, and an unanswerable lookup means
+  "believed alive" rather than "dead", because a wrong "alive" is corrected by
+  the silence rule fifteen minutes later while a wrong "dead" is a false crash
+  report that nothing takes back.
+- **A reused process id no longer hides a crash.** `status` called a run
+  `running` on the strength of the pid being live, and operating systems recycle
+  pids. A crashed run whose pid had been taken by something unrelated reported
+  `running` forever. A run that has written nothing for fifteen minutes is now
+  reported `stalled` with an explanation, measured from its last transaction so
+  a long legitimate model call is not mistaken for a crash.
+
+### Changed
+- **The update notice quotes a release headline instead of the version twice.**
+  It read `qikly 0.3.5 is available + v0.3.5 (you have 0.3.4)`: the suffix is
+  the GitHub release name, and `release.yml` titled every release with the bare
+  tag, so the one line every existing user sees repeated the number it had
+  already said. A version section in this file may now open with a
+  `> one line` headline; the workflow lifts it out, titles the release
+  `vX.Y.Z: that headline`, and keeps it out of the notes body. The notice
+  strips the version prefix, drops a title that is only a version, and cuts
+  anything past 64 characters, because it prints on every invocation and the
+  title comes from a remote API. Twelve tests pin it, including that the line
+  stays ASCII: it goes to a Windows console, which has cost this project a
+  debugging session before.
+
 ## 0.3.5
 
 ### Changed

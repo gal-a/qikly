@@ -36,6 +36,7 @@ GITHUB_REPO = "gal-a/qikly"
 
 NO_CHECK_ENV = "QIKLY_NO_VERSION_CHECK"
 TIMEOUT_SECONDS = 1.5  # a slow index must not visibly delay a run
+TITLE_MAX = 64         # this line prints on every run; keep it one line
 
 
 def _get_json(url):
@@ -100,8 +101,21 @@ def check_for_update():
     # "qikly 0.3.4 is available + v0.3.4", repeating itself. A title that is
     # just the version, with or without the v, adds nothing and is dropped.
     title = _release_title()
-    if title and title.lstrip("vV").strip() == latest:
-        title = None
+    if title:
+        # Releases are titled "v0.3.6: what changed in a phrase". Strip the
+        # version prefix, which the sentence has already said, and keep the
+        # phrase. A title that is only the version says nothing and is dropped.
+        stripped = title.split(":", 1)[1].strip() if ":" in title else title
+        if stripped.lstrip("vV").strip() == latest or not stripped:
+            title = None
+        else:
+            # Capped, because this prints on every invocation and the title
+            # comes from a remote API that could return anything.
+            # Three dots rather than a Unicode ellipsis: this prints to a
+            # Windows console, and that is where this project has already been
+            # bitten once by a non-ASCII character.
+            title = stripped if len(stripped) <= TITLE_MAX else (
+                stripped[:TITLE_MAX - 3].rstrip() + "...")
     suffix = f" + {title}" if title else ""
     message = f"{DIST_NAME} {latest} is available{suffix} (you have {__version__})"
     print(message)
