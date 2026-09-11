@@ -152,7 +152,11 @@ def module_path(source_path, project_root):
 
 def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
     """The task YAML text for one Python file, or a reason it cannot be built."""
-    with open(source_path, "r", encoding="utf-8", errors="replace") as handle:
+    # utf-8-sig, not utf-8: Python runs a file that starts with a byte-order
+    # mark, and Windows tools write one routinely (PowerShell 5.1's
+    # `Set-Content -Encoding utf8`, older Notepad). Read as plain utf-8, the mark
+    # survives as U+FEFF and ast.parse rejects a file Python itself accepts.
+    with open(source_path, "r", encoding="utf-8-sig", errors="replace") as handle:
         source = handle.read()
     try:
         functions = read_functions(source)

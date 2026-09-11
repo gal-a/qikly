@@ -71,8 +71,20 @@ the host then reports only that the command was not found. Check it:
 Get-Command qikly-mcp
 ```
 
-If that finds nothing, either add that `Scripts` directory to `PATH`, or give
-the config an absolute path to the executable instead of the bare name.
+If that finds nothing, let qikly print a config that does not depend on
+`PATH`. In your project folder:
+
+```powershell
+python -m qikly --mcp-config
+```
+
+It prints a VS Code config naming the full path of the Python that has qikly,
+run as `python -m qikly.mcp_server`, and the folder you ran it from as
+`QIKLY_PROJECT_ROOT`, which also settles the folder problem below.
+`--mcp-config claude` prints the `mcpServers` shape for Claude Code, Cursor
+and most other hosts. It only prints; it never edits a config file, because
+those hold your other servers too. Use `python -m qikly` rather than `qikly`
+here: when `qikly-mcp` is not on `PATH`, neither is `qikly`.
 
 **The host starts the server in the folder your editor has open**, which is
 often the parent of your qikly project rather than the project itself. The

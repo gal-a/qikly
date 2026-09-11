@@ -13,14 +13,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qikly"
-version = "0.4.1"
+version = "0.4.2"
 description = "Generates a test suite from acceptance criteria, then converges code against it with an agent that never sees those criteria."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Gal Arav" }]
-keywords = ["llm", "agent", "testing", "qa", "acceptance-criteria", "code-generation"]
+keywords = ["llm", "agent", "testing", "qa", "acceptance-criteria", "code-generation", "mcp", "model-context-protocol"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

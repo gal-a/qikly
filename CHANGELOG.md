@@ -8,6 +8,50 @@ packaging tools would read as `1.1`.
 
 Nothing yet.
 
+## 0.4.2
+
+> One command prints an MCP config that starts on Windows
+
+### Fixed
+- **The Windows install failure has a fix now, not only an explanation.**
+  0.4.1 documented why the one-click VS Code button produced a server that
+  would not start and made the tools say where they had looked; the button
+  itself still wrote a bare `qikly-mcp`. `python -m qikly --mcp-config` prints
+  a config naming the full path of the Python that has qikly, run as
+  `python -m qikly.mcp_server`, and the folder it was run from as
+  `QIKLY_PROJECT_ROOT`. That removes both failures: nothing depends on `PATH`,
+  and the editor's open folder no longer matters. `--mcp-config claude` prints
+  the `mcpServers` shape for Claude Code, Cursor and most other hosts. It
+  prints and never writes, because a host's config file holds the user's other
+  servers, and VS Code's allows comments a JSON round-trip would delete. The
+  JSON alone goes to stdout, and it runs before the update check, so a pasted
+  "qikly X is available" line cannot end up inside mcp.json. A test runs the
+  printed command and env for real and completes an MCP handshake with it.
+  The README says so directly under the badge, where someone who just clicked
+  it will look.
+- **A Python file starting with a byte-order mark could not be scaffolded.**
+  Python runs such a file happily and Windows tools write the mark routinely,
+  PowerShell 5.1's `Set-Content -Encoding utf8` among them. qikly read Python
+  sources as plain UTF-8, so the mark arrived as U+FEFF and `ast.parse`
+  refused a file Python accepts. Scaffold and the code loader now read with
+  `utf-8-sig`. Task YAML and `--criteria-from` were checked and already
+  handled it. Found by writing a throwaway test module in PowerShell.
+- **The test suite stopped writing into the project it tests.** Two tests
+  left their output in the live `outputs/` tree on every run: 1,862 junit
+  files from the end-to-end smoke test, and 311 empty `run_all` reports from a
+  fake task, against 30 real sweeps. The smoke test already cleaned up five
+  report directories and checked that it had; `reports/junit` was missing from
+  both lists, so the check passed while the files piled up. It is now one list
+  used by both. The `run_all` tests now write to a temporary directory, as the
+  robustness test already did.
+
+### Added
+- **`python -m qikly`** runs the CLI. It exists for the users the `qikly`
+  command fails for: when `qikly-mcp` is not on `PATH`, neither is `qikly`,
+  so `--mcp-config` was unreachable by exactly the people who needed it.
+- **`mcp` and `model-context-protocol` in the PyPI keywords.** 0.4.0 shipped an
+  MCP server and neither the package metadata nor the repository said so.
+
 ## 0.4.1
 
 > The MCP tools now say where they looked

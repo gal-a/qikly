@@ -687,6 +687,19 @@ def _parse_args():
              "usually restates its own criteria in the prose above them."
     )
     parser.add_argument(
+        "--mcp-config", nargs="?", const="vscode", choices=["vscode", "claude"],
+        metavar="HOST",
+        help="Print an MCP server config that works on this machine, for pasting. "
+             "It names the full path of the Python that has qikly and the folder "
+             "you run it from as the project, which fixes both ways the one-click "
+             "install fails on Windows: qikly-mcp not on PATH, and the editor "
+             "starting the server in the wrong folder. HOST is vscode (the "
+             "default, for .vscode/mcp.json) or claude (the mcpServers shape used "
+             "by Claude Code, Cursor and most other hosts). Run it as "
+             "`python -m qikly --mcp-config` if the qikly command itself is not "
+             "found. It only prints; nothing is written."
+    )
+    parser.add_argument(
         "--start", metavar="TASK",
         help="Start a run in the background and print its run id, without waiting. "
              "A run takes minutes to hours, so this is for when the terminal is not "
@@ -774,6 +787,62 @@ def _seed():
     """The run seed, from the environment or the module default."""
     env = os.environ.get("AGENT_SEED")
     return int(env) if env else HARDCODED_SEED
+
+
+def _do_mcp_config(host):
+    """
+    Print an MCP server config that works on this machine.
+
+    The one-click install badge cannot know the two facts that make a server
+    start: where the Python that has qikly lives, and which folder holds the
+    project. It writes a bare `qikly-mcp` and trusts both to work out, and on
+    Windows neither reliably does. pip installs console scripts into a
+    `Scripts` folder that is often not on `PATH`, and a host starts the server
+    in whatever folder the editor has open. Both failures were hit on the
+    author's own machine the first time the badge was clicked.
+
+    This prints both facts in full, so neither can go wrong: `sys.executable
+    -m qikly.mcp_server` needs no `PATH` entry, and `QIKLY_PROJECT_ROOT` pins
+    the project whatever the editor opened.
+
+    It prints rather than writes. Writing means merging into a file that holds
+    the user's other servers, and VS Code's allows comments that a JSON
+    round-trip would delete; a clobbered config is worse damage than a server
+    that did not start. Only the JSON goes to stdout, so it can be piped or
+    pasted whole; the guidance goes to stderr.
+    """
+    import json
+
+    root = os.path.abspath(os.environ.get("QIKLY_PROJECT_ROOT") or INVOKED_FROM)
+    server = {"type": "stdio", "command": sys.executable,
+              "args": ["-m", "qikly.mcp_server"],
+              "env": {"QIKLY_PROJECT_ROOT": root}}
+    key, where = {
+        "vscode": ("servers", "VS Code: .vscode/mcp.json in your project, or "
+                              "the file 'MCP: Open User Configuration' opens"),
+        "claude": ("mcpServers", "Claude Code: .mcp.json in your project; "
+                                 "Cursor: ~/.cursor/mcp.json; most other hosts "
+                                 "take this shape too"),
+    }[host]
+    print(json.dumps({key: {"qikly": server}}, indent=2))
+    # stdout is buffered and stderr is not, so without this the guidance lands
+    # above the JSON whenever both streams go to one file or one pipe.
+    sys.stdout.flush()
+
+    try:
+        import mcp  # noqa: F401  the protocol SDK, an optional extra
+    except ImportError:
+        print("", file=sys.stderr)
+        print("  warning: this Python does not have the MCP extra, so the "
+              "server above will not start. Install it first:", file=sys.stderr)
+        print('    "%s" -m pip install "qikly[mcp]"' % sys.executable,
+              file=sys.stderr)
+    other = "claude" if host == "vscode" else "vscode"
+    print("", file=sys.stderr)
+    print("  Paste it into %s." % where, file=sys.stderr)
+    print("  Project folder: %s" % root, file=sys.stderr)
+    print("  For the other shape: --mcp-config %s" % other, file=sys.stderr)
+    return 0
 
 
 def _do_check_criteria(tasks):
@@ -1345,6 +1414,13 @@ def main():
     from qikly.agent_api.providers.router import validate_config
 
     args = _parse_args()
+
+    # Before the update check, on purpose. This prints a block to be pasted into
+    # a config file, and the update notice goes to stdout: a pasted "qikly X is
+    # available" line inside mcp.json is a parse error, in the one file the
+    # user was trying to fix.
+    if args.mcp_config:
+        return _do_mcp_config(args.mcp_config)
 
     # Once per invocation, before any work, and before the early returns below.
     # It sat after them, which quietly exempted --scaffold and --check-criteria:

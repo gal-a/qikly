@@ -187,7 +187,9 @@ def excerpt_source(source, wanted, path="<file>"):
 
 def excerpt_file(path, wanted, limit=None):
     """Read `path`, excerpting it if it is over the threshold."""
-    with io.open(path, "r", encoding="utf-8", errors="replace") as handle:
+    # utf-8-sig: a byte-order mark would otherwise reach ast.parse as U+FEFF,
+    # and a file Python runs happily would fail to excerpt. See scaffold.py.
+    with io.open(path, "r", encoding="utf-8-sig", errors="replace") as handle:
         source = handle.read()
     if len(source) <= (limit if limit is not None else max_chars()):
         return source

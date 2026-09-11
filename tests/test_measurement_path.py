@@ -443,3 +443,21 @@ def test_a_pooled_rate_with_no_interval_says_so():
     agg = _agg()
     agg["pooled_ci_low"] = agg["pooled_ci_high"] = None
     assert "n/a" in aggregate_report.render_aggregate_html(agg, 0)
+
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _run_all_reports_go_to_a_temp_dir(monkeypatch, tmp_path):
+    """
+    `run_all.main()` writes a sweep report into outputs/reports/run_all, and
+    these tests call it for real with a fake task named T. Nothing redirected
+    that, so every pytest run added reports to the live project: 311 of them,
+    against 30 real sweeps, before anyone looked. `test_robustness.py` already
+    redirected the equivalent directory for its own run_all test; this file
+    had simply never been told.
+    """
+    from qikly.orchestrator import run_all
+
+    monkeypatch.setattr(run_all, "LOG_DIR", str(tmp_path))

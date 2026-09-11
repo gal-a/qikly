@@ -7,6 +7,11 @@
 [![marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Qikly%20Test%20Generation-2b8f95)](https://github.com/marketplace/actions/qikly-test-generation)
 [![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22qikly-mcp%22%7D)
 
+> Installed with the VS Code button and the server will not start? Run
+> `python -m qikly --mcp-config` in your project folder and paste what it
+> prints. It names your Python and your project folder in full, which fixes
+> both ways the button fails on Windows.
+
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
 
 **The solution: two agents. One turns the acceptance criteria into tests. The other writes the code and never sees the acceptance criteria.**
@@ -940,7 +945,7 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.4.1`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.4.2`, uploading the suite, the code and the JUnit XML |
 
 ## Use it in CI
 
@@ -1003,15 +1008,20 @@ In VS Code, the **Install qikly MCP** badge at the top of this page writes the
 configuration for you. It writes the configuration and nothing else, so the
 `pip install` above still comes first.
 
-Two checks before you conclude it is broken, both of which cost a real
-afternoon before they were written down. The badge names the bare command, so
-**`qikly-mcp` must be on your `PATH`** (`Get-Command qikly-mcp` on Windows,
-`which qikly-mcp` elsewhere); pip frequently installs console scripts somewhere
-that is not. And the host starts the server in **the folder your editor has
-open**, which is often the parent of your project rather than the project, so
-if that is not the directory holding `inputs_private/`, set
-`QIKLY_PROJECT_ROOT` in the server's `env`. [`docs/mcp.md`](docs/mcp.md) has
-both fixes in full.
+If the server does not start, one command fixes both ways the badge fails.
+In your project folder:
+
+```bash
+python -m qikly --mcp-config
+```
+
+and paste what it prints over the badge's entry. The badge names a bare
+`qikly-mcp`, which pip on Windows often installs somewhere that is not on
+`PATH`, and the host starts the server in **the folder your editor has open**,
+which is often not your project. The printed config names your Python and your
+project folder in full, so neither can go wrong. `--mcp-config claude` prints
+the `mcpServers` shape that Claude Code and Cursor use.
+[`docs/mcp.md`](docs/mcp.md) has the details.
 
 Four tools: `qikly_run`, `qikly_status`, `qikly_check_criteria`,
 `qikly_scaffold`. A run takes minutes to hours and no host will hold a tool call

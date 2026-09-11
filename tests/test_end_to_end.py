@@ -20,6 +20,17 @@ from qikly.paths import chdir_to_project_root
 
 TASK = "ZZ_SMOKE_TASK"
 
+# Every shared directory a run writes into under names carrying the task id.
+# One tuple, used by both the teardown and the check that the teardown worked.
+# They used to be two tuples, and `reports/junit` was missing from both, so
+# 1,862 junit files from this test piled up in the live project while the
+# "leaves nothing behind" check kept passing: it could not see what it did not
+# list. `logs/patches` holds a directory per task rather than files.
+SHARED_DIRS = ("outputs/reports/iterations", "outputs/logs",
+               "outputs/logs/patches", "outputs/reports/junit",
+               "outputs/reports/run_summary", "outputs/reports/metrics",
+               "outputs/reports/usage")
+
 IMPL = '''"""Trivial but real: reads a CSV, filters, writes JSON."""
 import csv
 import json
@@ -182,16 +193,18 @@ def smoke_task():
     # noticed. Nothing reaches git, since outputs/ is ignored, but a developer
     # looking for a real run's output has to find it among hundreds of files
     # from a smoke test.
-    for directory in ("outputs/reports/iterations", "outputs/logs",
-                      "outputs/reports/run_summary", "outputs/reports/metrics",
-                      "outputs/reports/usage"):
+    for directory in SHARED_DIRS:
         full = os.path.join(root, directory)
         if not os.path.isdir(full):
             continue
         for name in os.listdir(full):
             if TASK in name:
+                target = os.path.join(full, name)
                 try:
-                    os.remove(os.path.join(full, name))
+                    if os.path.isdir(target):
+                        shutil.rmtree(target, ignore_errors=True)
+                    else:
+                        os.remove(target)
                 except OSError:
                     pass
 
@@ -252,9 +265,7 @@ def test_no_smoke_artefacts_survive_a_completed_run():
     """
     root = chdir_to_project_root()
     leftovers = []
-    for directory in ("outputs/reports/iterations", "outputs/logs",
-                      "outputs/reports/run_summary", "outputs/reports/metrics",
-                      "outputs/reports/usage"):
+    for directory in SHARED_DIRS:
         full = os.path.join(root, directory)
         if os.path.isdir(full):
             leftovers += [f"{directory}/{n}" for n in os.listdir(full) if TASK in n]

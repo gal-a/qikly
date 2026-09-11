@@ -26,7 +26,7 @@ def load_codebase(code_dir="outputs/agent_src/code"):
                 # The replacement character reaches the prompt, where the
                 # FIX/PATCH loop can act on it, which is the whole point of
                 # having that loop.
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                with open(path, "r", encoding="utf-8-sig", errors="replace") as f:
                     content = f.read()
                 output.append(f"\n# FILE: {path}\n{content}\n")
 
@@ -79,7 +79,7 @@ def load_target_files(code_dir, target_files, context=None):
             # No names to match on, so excerpting would collapse every
             # definition in the file. "I was not told what matters" reads as
             # load it whole.
-            with open(candidate, "r", encoding="utf-8", errors="replace") as f:
+            with open(candidate, "r", encoding="utf-8-sig", errors="replace") as f:
                 content = f.read()
         output.append(f"\n# FILE: {candidate}\n{content}\n")
 
