@@ -35,7 +35,7 @@ def test_a_venv_inside_someone_elses_repo_is_not_mistaken_for_qikly(tmp_path, mo
     assert code_identity.checkout_root(str(package)) is None
 
 
-def test_qiklys_own_checkout_is_recognised(tmp_path, monkeypatch):
+def test_the_qikly_checkout_is_recognised(tmp_path, monkeypatch):
     """The same call, with the package where qikly's own layout puts it."""
     root = tmp_path / "qikly"
     package = root / "src" / "qikly"
