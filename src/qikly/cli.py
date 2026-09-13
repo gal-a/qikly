@@ -192,7 +192,7 @@ def _run_task_process(task_id, seed, generate_criteria, resume=False):
 
 
 def _demo_root(where=None):
-    """
+    r"""
     A fresh <somewhere>/demo/<timestamp>/ for this run, and where that is.
 
     Default is the directory you invoked from, NOT the resolved project root.
@@ -578,7 +578,7 @@ def _parse_args():
         help="For any task with no acceptance_criteria yet, generate a one-shot first draft "
              "from requirements alone and write it into that task's config file before running. "
              "Explicit opt-in only -- without this flag, such a task just runs with a warning "
-             "(see README.md#auto-generating-acceptance-criteria). Never touches a task that "
+             "(see docs/USING_YOUR_OWN_DATA.md#auto-generating-acceptance-criteria). Never touches a task that "
              "already has acceptance_criteria."
     )
     parser.add_argument(

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.gal-a/qikly",
+  "title": "qikly",
+  "description": "Generates tests from acceptance criteria, then converges code with an agent that never sees them.",
+  "version": "0.4.3",
+  "websiteUrl": "https://test.qikly.com/",
+  "repository": {
+    "source": "github",
+    "url": "https://github.com/gal-a/qikly"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "qikly",
+      "version": "0.4.3",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeHint": "uvx",
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--from",
+          "value": "qikly[mcp]==0.4.3"
+        },
+        {
+          "type": "positional",
+          "value": "qikly-mcp"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "QIKLY_PROJECT_ROOT",
+          "description": "The folder holding your tasks, the one with inputs_private/. Set it when your editor has a different folder open, which is common.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ],
+  "icons": [
+    {
+      "src": "https://test.qikly.com/images/qikly_icon.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "128x128"
+      ],
+      "theme": "dark"
+    },
+    {
+      "src": "https://test.qikly.com/images/qikly_icon_light.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "128x128"
+      ],
+      "theme": "light"
+    },
+    {
+      "src": "https://test.qikly.com/images/qikly_icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ],
+      "theme": "dark"
+    },
+    {
+      "src": "https://test.qikly.com/images/qikly_icon_light.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ],
+      "theme": "light"
+    }
+  ]
+}

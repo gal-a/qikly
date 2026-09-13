@@ -8,7 +8,8 @@ all of them.
 
 **Your AI writes both the code and its tests. How do you know the tests are really valid?**
 
-**The solution: two agents. One turns the acceptance criteria into tests. The other writes the code and never sees the acceptance criteria.**
+**The solution: two agents.** One turns the acceptance criteria into tests.
+The other writes the code and **never sees the acceptance criteria.**
 
 ![Qikly: automated code and test generation, kept apart](images/qikly_hero.png)
 

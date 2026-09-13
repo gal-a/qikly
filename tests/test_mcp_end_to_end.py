@@ -54,8 +54,8 @@ def test_the_server_starts_and_advertises_exactly_its_four_tools():
         return sorted(t.name for t in listed.tools), [t.description for t in listed.tools]
 
     names, descriptions = _run(go)
-    assert names == ["qikly_check_criteria", "qikly_run",
-                     "qikly_scaffold", "qikly_status"]
+    assert names == ["qikly_run", "qikly_scaffold",
+                     "qikly_status", "qikly_validate"]
     assert all(descriptions), "a tool was advertised with no description"
 
 
@@ -91,7 +91,7 @@ def test_check_criteria_returns_counts_and_no_criterion_text():
     async def go(session):
         listed = await session.list_tools()
         assert listed.tools
-        return _text(await session.call_tool("qikly_check_criteria",
+        return _text(await session.call_tool("qikly_validate",
                                              {"task_id": "TEXT_PATCH"}))
 
     body = _run(go)

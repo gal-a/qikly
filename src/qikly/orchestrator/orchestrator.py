@@ -218,7 +218,7 @@ def _warn_if_no_acceptance_criteria(task_id):
     warning, not an error, since an empty-criteria run is still valid to
     run deliberately (e.g. orchestrator/tuning/refine_acceptance_criteria.py's
     first round starts from a freshly-generated list, not a hand-written
-    one -- see README.md#auto-generating-acceptance-criteria).
+    one -- see docs/USING_YOUR_OWN_DATA.md#auto-generating-acceptance-criteria).
     """
     with open(task_config_path(task_id), "r") as f:
         task_config = yaml.safe_load(f) or {}
@@ -227,7 +227,7 @@ def _warn_if_no_acceptance_criteria(task_id):
             f"[{task_id}] WARNING: no acceptance_criteria defined. Test generation "
             f"only has `requirements` to work with, so this run will likely converge "
             f"on the first attempt instead of exercising the FIX/PATCH loop. See "
-            f"README.md#auto-generating-acceptance-criteria. Re-run with "
+            f"docs/USING_YOUR_OWN_DATA.md#auto-generating-acceptance-criteria. Re-run with "
             f"--generate-criteria to have run.py generate and write a first draft "
             f"before this run."
         )
@@ -288,7 +288,7 @@ def generate_and_write_acceptance_criteria_if_missing(task_id, seed=None):
     print(
         f"[{task_id}] --generate-criteria: wrote {len(criteria)} auto-generated "
         f"acceptance_criteria to {out_path}. This is a first draft, not hand-tuned "
-        f"ground truth -- review it (see README.md#auto-generating-acceptance-criteria) "
+        f"ground truth -- review it (see docs/USING_YOUR_OWN_DATA.md#auto-generating-acceptance-criteria) "
         f"rather than treating it as settled."
     )
     return True
@@ -872,6 +872,11 @@ def orchestrate(task_id, seed=None, resume=False):
     TRANSACTIONS_PATH = os.path.join(LOG_DIR, f"transactions_{task_id}_{run_timestamp}.jsonl")
     RUN_TIMESTAMP = run_timestamp
     RUN_STAGES = tuple(stages)
+    # At the top of every run, because a console capture is often all anyone
+    # keeps afterwards. The version alone does not identify the code when
+    # qikly runs from a checkout.
+    from qikly.code_identity import describe
+    print(f"[{task_id}] {describe()}")
     run_patch_dir = os.path.join(PATCH_DIR, task_id, run_timestamp)
 
     ensure_dirs(run_patch_dir)

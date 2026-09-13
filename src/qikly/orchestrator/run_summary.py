@@ -88,8 +88,10 @@ def _provenance():
     except Exception:
         pass
     try:
-        from qikly import __version__
-        out["qikly_version"] = __version__
+        # Version, Python, and for a source checkout the commit: the version
+        # alone only identifies the code for an install from PyPI.
+        from qikly.code_identity import identity
+        out.update(identity())
     except Exception:
         pass
     return out

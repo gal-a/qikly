@@ -119,8 +119,8 @@ def test_check_criteria_is_advisory_and_still_does_not_echo_them(project):
     This tool is *about* the criteria, which makes it the easiest place to
     justify returning them. A verdict is not the same as the text.
     """
-    out = mcp_tools.qikly_check_criteria("MCP_SENTINEL")
-    _assert_no_criteria(_wire(out), "qikly_check_criteria")
+    out = mcp_tools.qikly_validate("MCP_SENTINEL")
+    _assert_no_criteria(_wire(out), "qikly_validate")
 
 
 def test_scaffold_never_invents_criteria(project, tmp_path):
@@ -149,7 +149,7 @@ def test_no_tool_response_may_carry_the_criteria_key(project, monkeypatch):
     calls = {
         "qikly_run": lambda: mcp_tools.qikly_run("MCP_SENTINEL"),
         "qikly_status": lambda: mcp_tools.qikly_status("MCP_SENTINEL_20260910_120000"),
-        "qikly_check_criteria": lambda: mcp_tools.qikly_check_criteria("MCP_SENTINEL"),
+        "qikly_validate": lambda: mcp_tools.qikly_validate("MCP_SENTINEL"),
     }
     for name, call in calls.items():
         _assert_no_criteria(_wire(call()), name)
@@ -160,7 +160,7 @@ def test_every_declared_tool_is_covered_here():
     The list of tools and the list of things this file checks must not drift.
     A tool added without a line here is a tool nobody proved is safe.
     """
-    covered = {"qikly_run", "qikly_status", "qikly_check_criteria", "qikly_scaffold"}
+    covered = {"qikly_run", "qikly_status", "qikly_validate", "qikly_scaffold"}
     assert set(mcp_tools.TOOLS) == covered, (
         "a tool was added or removed without updating the withholding tests: "
         f"{set(mcp_tools.TOOLS) ^ covered}")

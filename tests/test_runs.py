@@ -601,3 +601,46 @@ def test_a_record_is_never_read_half_written(project):
     assert _read(path)["pid"] == 2
     leftovers = [f for f in os.listdir(runs.runs_dir()) if f.endswith(".tmp")]
     assert not leftovers, "a temporary file was left behind: %s" % leftovers
+
+
+@pytest.fixture(autouse=True)
+def _never_the_live_project(tmp_path, monkeypatch):
+    """
+    Every test in this file, not only the ones that ask for `project`.
+
+    `runs` resolves its directories from the working directory, and
+    `project_root()` falls back to the package's own checkout when the working
+    directory has no `inputs_private` marker. So any test here that writes a
+    record, a log or a summary without the `project` fixture writes into the
+    real project instead. One did: a CALC_TAX run summary and transaction log
+    carrying this file's fixed timestamp were found in the live outputs tree,
+    describing a run that never happened, its log saying every test passed
+    while its summary said the run failed. Nothing reaches git, since
+    outputs/ is ignored, but it is indistinguishable from a real run's record
+    until you read it.
+
+    A chdir alone would not be isolation, and believing it was is how the
+    first version of this fixture went out: `project_root()` falls back to
+    walking up from `qikly.__file__`, so from an editable install it finds
+    this very checkout however the working directory is set. The
+    `inputs_private` marker is what stops that walk, so it is created here,
+    and the assertion below is what would have caught the mistake.
+    """
+    monkeypatch.chdir(tmp_path)
+    os.makedirs(tmp_path / "inputs_private", exist_ok=True)
+    assert runs.runs_dir().startswith(str(tmp_path)), runs.runs_dir()
+
+
+def test_a_test_that_forgets_the_project_fixture_still_cannot_reach_the_repo(tmp_path):
+    """
+    The autouse fixture is the only thing between a future test and the real
+    `outputs/` tree, so it gets a test of its own. This one deliberately does
+    not request `project`, which is exactly the mistake that put a run summary
+    and a transaction log for a run that never happened into the live project.
+    """
+    run_id = "CALC_TAX_20260910_120000"
+    os.makedirs(runs.runs_dir(), exist_ok=True)
+    _record(run_id, pid=1)
+    written = os.path.join(runs.runs_dir(), run_id + ".json")
+    assert os.path.isfile(written)
+    assert written.startswith(str(tmp_path)), written

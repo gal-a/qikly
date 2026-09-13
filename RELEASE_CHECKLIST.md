@@ -85,6 +85,21 @@ description, the GitHub repository name and topics, and the URLs in
 ## 6. Version and changelog
 
 - `pyproject.toml` `version` and `src/qikly/__init__.py` `__version__` agree.
+- `server.json` agrees too, in all three places the version appears there:
+  the server version, the package version, and the `qikly[mcp]==` pin inside
+  the `--from` argument. It is the MCP Registry listing, so a missed bump
+  advertises one version and installs another. A test holds them together.
+- **After the upload, republish the listing**: `mcp-publisher login github`
+  then `mcp-publisher publish`, from the repository root. Nothing in CI does
+  this and nothing can, since it needs a human GitHub login, so it is the one
+  release step with no guard behind it. Skipping it leaves the registry, and
+  therefore VS Code's MCP gallery, offering the previous version: the listing
+  names a version and installs it by pin, so a stale entry installs stale
+  software rather than merely looking out of date.
+- The Action pins written in prose bump too: `gal-a/qikly@vX.Y.Z` in
+  `README.md` and `docs/PROVIDER_KEY_SETUP.md`. Those are examples someone
+  copies, so a stale one hands out a tag predating the fix they came for. The
+  `@v0` in the workflow templates is the moving alias and stays as it is.
 - `CHANGELOG.md` has an entry for this version.
 - The git tag matches.
 - PEP 440 normalises `1.01` to `1.1`, so write `1.0.1` and mean it.

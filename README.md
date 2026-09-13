@@ -1,5 +1,11 @@
 # qikly
 
+<!-- The MCP Registry proves that whoever lists a server owns the package it
+     points at, by looking for this line in the README that PyPI serves. It is
+     a comment so it does not render, and it must match the `name` in
+     server.json exactly. -->
+<!-- mcp-name: io.github.gal-a/qikly -->
+
 [![tests](https://github.com/gal-a/qikly/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
 [![pypi](https://img.shields.io/pypi/v/qikly?color=blue)](https://pypi.org/project/qikly/)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
@@ -7,14 +13,18 @@
 [![marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Qikly%20Test%20Generation-2b8f95)](https://github.com/marketplace/actions/qikly-test-generation)
 [![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22qikly-mcp%22%7D)
 
-> Installed with the VS Code button and the server will not start? Run
-> `python -m qikly --mcp-config` in your project folder and paste what it
-> prints. It names your Python and your project folder in full, which fixes
-> both ways the button fails on Windows.
-
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
 
-**The solution: two agents. One turns the acceptance criteria into tests. The other writes the code and never sees the acceptance criteria.**
+**The solution: two agents.** One turns the acceptance criteria into tests.
+The other writes the code and **never sees the acceptance criteria.**
+
+**Who it is for:** a developer or team pointing an AI coding agent at a
+self-contained Python module that transforms data, for example an ETL step, a
+merge, a calculation or a validation routine, who does not want to trust a
+green suite when the same agent wrote both the code and the tests. It suits one
+module at a time: when a test fails, only the files that failure names are
+loaded, so runs stay small and quick. Large multi-file repositories are a
+different problem. See [What it is for](#what-it-is-for).
 
 Imagine a student who writes the exam paper, writes the answer key, and then
 sits the exam. They pass. Obviously they pass, and nobody would accept that as
@@ -115,6 +125,26 @@ functions, which makes them the only stage allowed to read the implementation.
 Re-running the earlier stages after each success is what stops a later repair
 quietly breaking something that already passed.
 
+### Two ways to get a test suite, and what each can prove
+
+| | Code-derived suite<br>*most commercial test generators, and qikly's own unit tests* | Spec-derived suite<br>*qikly's integration and system tests* |
+|---|---|---|
+| **Written from** | The code as it is today | The acceptance criteria you wrote |
+| **You supply** | Nothing but the repository | A written statement of what correct means |
+| **Catches** | Behaviour changing tomorrow | Behaviour being wrong today |
+| **Cannot catch** | The code being wrong now: today's bug becomes tomorrow's assertion | Anything nobody wrote down |
+| **A green run means** | The code still does what it did when the tests were generated | The code satisfies the criteria as written |
+| **A red run means** | Someone changed behaviour, deliberately or not | The code and your stated intent disagree |
+| **Fails you when** | The original behaviour was already wrong | The criteria are vague, missing, or wrong |
+| **Right choice when** | Nobody wrote the intent down and you need a safety net | The intent exists in a ticket, a spec page or a Gherkin file |
+
+Both are useful and they answer different questions. qikly is not purely one
+or the other: integration and system tests are written from the criteria
+before any code exists, the unit stage is written last from the code that just
+passed them, and `--refine-criteria` reads a converged implementation to
+propose criteria the first draft missed. Each of those reads the code on
+purpose, and none of them can question it.
+
 ## What makes this different
 
 **The tests come from the standard, not from the code.** This is the one
@@ -202,7 +232,7 @@ the first of three parts.
 ## What it is for
 
 Built for **self-contained Python modules that transform data, not for a large
-existing repository.**: ETL, merges, calculations, validation. That is the layer where a wrong answer looks like a
+existing repository**: ETL, merges, calculations, validation. That is the layer where a wrong answer looks like a
 right answer, and where a test written from the rule is the only thing that
 catches it.
 
@@ -217,8 +247,16 @@ Four ways in, and the table under [Quick start](#which-command-depends-on-which-
 says which command each one needs:
 
 1. **Verify code you did not write.** Supply an implementation through `seed:`
-   and the suite is written from criteria its author never saw. A suite
-   generated from the same context as the code is a model agreeing with itself.
+   and the suite is written from your acceptance criteria by an agent that
+   never reads that code. A suite generated from the same context as the code
+   is a model agreeing with itself.
+
+   **The limit is worth saying plainly: qikly cannot know what the author of
+   supplied code saw.** Withholding is a property of a run qikly performed, not
+   of a file you hand it. If the same person or model wrote that code with the
+   criteria open, this gives you an independent suite, not an independent
+   author. What it does give, always, is a suite that was not derived from the
+   code, which is the half a code-derived generator cannot give you at all.
 2. **Start from a spec.** No code yet: get a first implementation and the suite
    that justifies it, in `outputs/`, never in your source tree.
 3. **Bring your own tests.** Seed any stage and the loop becomes a repair
@@ -453,388 +491,36 @@ Everything is namespaced by `task_id` so concurrent runs never collide:
 
 ## Running it on your own data
 
-Four steps. Nothing is written into the package, and nothing is written into
+Four steps: make the two directories, drop your fixture data in, write the task
+file, run it. Nothing is written into the package, and nothing is written into
 your source tree.
 
-### 1. Make the two directories
+```bash
+qikly --init                    # creates inputs_private/ and a starter task
+qikly --tasks MY_TASK
+```
 
-Anywhere you want to work. The presence of `inputs_private/` is what marks a
-directory as your project.
+**[docs/USING_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/USING_YOUR_OWN_DATA.md)** has the
+rest: the task file field by field, getting the split between `requirements`
+and `acceptance_criteria` right (the gap between them is the whole mechanism),
+lifting criteria out of a ticket you already wrote, seeding your own
+implementation or test suites, where each file is read from, and proposing the
+fixture rows a criterion needs before any test can reach it.
+
+## Configuration and LLM provider
+
+Gemini by default; OpenAI and Anthropic are supported. One provider per run.
 
 ```bash
-mkdir -p inputs_private/config/tasks
-mkdir -p inputs_private/data/MY_TASK
-```
-
-Or let `qikly --init` create both, plus a starter task to copy.
-
-Until one of those exists, there is nothing marking your directory, and the
-fallback in [Where things live](#where-things-live) applies. From a
-`pip install -e` checkout that fallback finds the checkout itself, so a run
-started in an empty directory writes its outputs there instead of where you
-are standing. Make the directory first, or set `QIKLY_PROJECT_ROOT` to say
-exactly where you mean.
-
-### 2. Drop your fixture data in
-
-Plain input files, whatever your code should read. CSV, JSON, JSONL, anything.
-
-```bash
-cp ~/somewhere/orders_jan.csv inputs_private/data/MY_TASK/input_01.csv
-cp ~/somewhere/orders_feb.csv inputs_private/data/MY_TASK/input_02.csv
-```
-
-Names are up to you, but they must match what you write in the task's
-`inputs:` list below. The generated program opens these **by literal relative
-path from your project directory**, so the path in the task file is the path
-that gets executed. That is also why the bundled fixtures are copied into
-`inputs_private/data/` on first run rather than resolved from inside the
-package: the generated code has no way to ask where the package lives.
-
-Fixtures are never overwritten once present, so an edited file stays edited.
-
-### 3. Write the task file
-
-`inputs_private/config/tasks/MY_TASK.yaml`. The filename must match `task_id`.
-
-```yaml
-task_id: "MY_TASK"                    # letters/digits/underscore, not starting with a digit
-task_name: "Order line-item tax"
-
-description: "Read two CSV files of order line items, validate them, compute
-  tax per line, and write the result to a single JSON output alongside a
-  reason for every rejected line."
-
-inputs:                               # literal paths, opened by the generated code
-  - "inputs_private/data/MY_TASK/input_01.csv"
-  - "inputs_private/data/MY_TASK/input_02.csv"
-
-outputs:
-  - "outputs/data/MY_TASK/output.json"
-
-interface:                            # what test generation targets
-  module: "outputs.agent_src.code.MY_TASK.calc"
-  integration_functions:
-    - "extract(input_path) -> list[dict]  # reads one input file, returns raw rows"
-    - "transform(rows) -> dict  # validates and computes; returns {\"accepted\": [...], \"rejected\": [...]}"
-    - "load(data, output_path) -> None  # writes the result as JSON"
-  system_entrypoint: "run_calc(input_paths, output_path) -> None  # extract each path, then transform -> load"
-
-requirements:                         # THE VAGUE HALF. The coding agent sees only this.
-  - "Read both CSV files listed in inputs and combine their rows before validation"
-  - "Validate each row: order_id, item_price, quantity, tax_rate"
-  - "Apply strict, real-world data-quality validation; reject anything malformed or out of range"
-  - "For each valid row compute subtotal, tax owed, and line total as currency amounts"
-  - "A rejected row is not silently dropped: record it with a brief, specific reason"
-  - "Write a single JSON object with two keys, \"accepted\" and \"rejected\""
-
-acceptance_criteria:                  # THE SHARP HALF. Withheld from the coding agent.
-  - "All computed currency amounts are rounded to two decimal places using round-half-up, not banker's rounding and not truncation"
-  - "For every accepted row, the reported total equals the reported subtotal plus the reported tax, exactly, to the cent"
-  - "A tax_rate of exactly 0 is valid: the computed tax is 0.00 and the total equals the subtotal"
-  - "Each rejected row names the specific field that caused rejection, not a generic message"
-```
-
-`interface.module` is a dotted path under `outputs.agent_src.code.<task_id>.`,
-which is where the implementation gets written. Pick the final component
-freely; the rest is fixed by where outputs live.
-
-### 4. Run it
-
-```bash
-qikly --tasks <MY_TASKS>        # or: python run.py --tasks <MY_TASKS>
-```
-
-Discovery is automatic; there is no registry to update. Results land in
-`outputs/`, and `outputs/reports/iterations/MY_TASK_<timestamp>_report.html`
-is the place to start reading.
-
-### Getting the two halves right
-
-This matters more than anything else in the file. Put the real-spec-level
-statements in `requirements` and the specific, objectively checkable edge
-cases in `acceptance_criteria`. **The gap between them is the entire
-mechanism**: with nothing withheld, both sides read the spec identically and
-every test passes first try, which proves nothing.
-
-One trap. An *arbitrary* criterion, one that contradicts what the model
-correctly knows about the world, does not produce more iterations. It produces
-a stuck loop, because the model keeps "fixing" your restriction back open.
-Prefer edge cases that are objectively verifiable but do not fight reality.
-More on this in [docs/design_3_mechanism.md](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md#using-it).
-
-## Bringing acceptance criteria you have already written
-
-Most teams have not got a blank page here. If you work in Jira, Linear, Azure
-DevOps or a design doc, the rules are usually already written down, because the
-process asks for them before any code is cut. A ticket routinely looks like
-this:
-
-```
-PROJ-412  Merge overlapping sales exports
-
-Description
-  Combine two CSV exports into one file...
-
-Acceptance Criteria
-  - A transaction in both files at the same amount appears once
-  - A negative or missing amount is rejected, naming the field
-  - Dates must be YYYY-MM-DD
-```
-
-Those bullets are exactly what `acceptance_criteria` wants. Save the ticket to
-a file and read them out:
-
-```bash
-qikly --criteria-from ticket.md                    # print as YAML
-qikly --criteria-from ticket.md --task-id MY_TASK  # write into that task
-qikly --criteria-from ticket.md >> inputs_private/config/tasks/MY_TASK.yaml
-```
-
-It understands plain bullet lists, an "Acceptance Criteria" heading in a longer
-document, and Gherkin `Scenario:` blocks with Given/When/Then. Only the criteria
-section is read, so pasting a whole ticket does not turn its description into
-part of the bar. Only YAML goes to stdout, so the third form above appends a
-valid block.
-
-**It will not invent criteria from prose.** A file with no list and no scenarios
-returns nothing and says so. A rule that nobody wrote is precisely the invented
-standard this tool exists to argue against, and once it is in the file it looks
-like every other line.
-
-There is no API token and no vendor integration involved. Copying the ticket
-into a file is the whole of it.
-
-**Read what comes out before you run.** Criteria lifted from a ticket are a
-draft: tickets are written for people, who fill in gaps that a test cannot. The
-criteria are the standard everything else is judged against, so they are worth
-a minute of your attention.
-
-## Supplying your own acceptance criteria, code or tests
-
-The loop takes three inputs. **Each one can be yours or generated,
-independently and in any combination.**
-
-| Input | Default | To supply your own |
-|---|---|---|
-| **Acceptance criteria** | Yours | Already the default: write `acceptance_criteria` in the task file, as above, or lift them from a ticket with `--criteria-from` (below). Omit it and add `--generate-criteria` to have a first draft written for you instead. |
-| **Implementation** | Generated | `seed.implementation` in the task file. |
-| **Test suites** | Generated | `seed.tests`, per stage. |
-
-The optional `seed:` block:
-
-```yaml
-seed:
-  # A file or a directory, copied into outputs/agent_src/code/<task_id>/.
-  # A single file keeps its own name, which must match interface.module.
-  implementation: "seeds/MY_TASK/calc.py"
-
-  # Per stage. Seeding a stage suppresses generation for that stage only.
-  tests:
-    integration: "seeds/MY_TASK/test_integration.py"
-    unit: "seeds/MY_TASK/unit/"
-```
-
-Paths are relative to your project directory. Both keys are optional.
-
-**`seed.implementation` is how you point this at code you already have.** The
-run skips generating a first implementation and goes straight to testing and
-repairing yours. `--scaffold` writes this block for you: it produces two task
-files, one carrying `seed.implementation` and one without, so you pick by
-deleting rather than by editing. **`seed.tests` keeps a suite you already trust**, so the loop
-repairs the code against your tests rather than its own. Mixing works and is
-often what you want: seed the integration stage with your suite and let the
-tool generate unit tests against whatever code results.
-
-Three things to know:
-
-- **Seeded test suites are checked before the run starts.** Every file must
-  parse, and at least one must be named `test_*.py` and contain a `def test_*`
-  function. A problem raises immediately rather than retrying, since there is
-  no second sample to draw from a file you wrote.
-- **Seeds are installed after the workspace reset, not instead of it.** Every
-  run still begins from one declared state, so repeated runs stay comparable
-  and no run inherits the previous one's residue.
-- **A seeded run measures something different from an unseeded one.** Do not
-  pool them in a single rate. The orchestrator prints a NOTE on every seeded
-  run to keep that visible.
-
-## Where things live
-
-Task specs and shared defaults are read from `inputs_private/` in your project
-directory if present, otherwise from the copies bundled inside the package, so
-a fresh install runs immediately. Resolution is **per file**: dropping one task
-spec into `inputs_private/config/tasks/` overrides exactly that task and leaves
-everything else in place. Nothing is ever written back into the package.
-
-| Path | Contents |
-|---|---|
-| `config/tasks/<task_id>.yaml` | One task, as above. |
-| `data/<task_id>/` | That task's fixture data. |
-| `config/settings.yaml` | Retry budget, stage order, patch size limit. A private copy is overlaid section by section, so state only what you change. |
-| `agent_defs/*.md` | The prompts. `code_agent.md` and `test_agent.md` are the two system prompts; the rest are per-mode fragments. Not per-task: editing these changes every task's behaviour. |
-
-## Proposing fixture rows
-
-A criterion no input row can trigger produces a test that passes whatever the
-code does. Across this project's own measurements roughly two thirds of
-deliberately planted faults were missed by every suite for that reason: the bar
-was unmeasurable rather than wrong.
-
-```bash
-python -m qikly.orchestrator.tuning.propose_fixtures --tasks <MY_TASKS>
-```
-
-A separate agent reads your criteria and your fixture files and says, for each
-criterion, either `covered` or here is the smallest row that would reach it.
-The answer goes to `outputs/reports/fixture_proposals/`, laid out with each row
-printed under the criterion it exists to reach so you judge the two together.
-
-**It never edits a fixture.** To accept a row, paste it into the named file and
-append `  # proposed`. To reject one, do nothing. Two reasons for the gate,
-neither about the model being untrustworthy. A row is only right or wrong
-relative to its criterion, so it is harder to review than a sentence. And a
-fixture set that grows in whatever direction a model finds interesting stops
-resembling the data you actually process, at which point every rate measured on
-it describes a world that does not exist. The report is capped at eight
-proposals per round and prints what share of your rows a machine has written,
-so that drift is visible in aggregate rather than one plausible row at a time.
-
-You can of course add rows by hand at any time, and always could. This exists
-because noticing *which* criteria have no data behind them is the tedious part.
-
-## Configuration
-
-### Timeouts
-
-Every model call has a deadline of **300 seconds**, set by
-`QIKLY_REQUEST_TIMEOUT` in seconds. `0` waits forever, which is what provider
-SDKs do by default and is why the setting exists: a stalled connection blocks a
-call that never raises, so nothing downstream can react to it. With a deadline
-the same stall becomes an ordinary transient error and is retried with backoff.
-
-A task process prints `still running, N minutes elapsed` every five minutes, so
-that "not answering" is visible rather than inferred.
-
-
-`config/settings.yaml`, shared across all tasks:
-
-| Key | Meaning |
-|---|---|
-| `orchestrator.max_retries_per_stage` | Attempt budget per stage before the run raises. If you see the exact same patch content repeating verbatim, that's usually a requirement fighting the model's real-world prior (see below) rather than a budget problem. If instead each attempt is a *different* patch that never resolves the same failing test, that's a different signal: a bug that needs more than the failure text to resolve, rather than an artificial requirement; see [Where it fits today](#where-it-fits-today)'s note on `CALC_TAX`. |
-| `orchestrator.test_order` | Stage order; `unit` is always forced last (it's generated from the implementation, which doesn't exist yet during integration/system). |
-| `agent.max_patch_size` | Rejects an oversized PATCH and asks the model to retry smaller. Tune per task if a bigger implementation needs more room. |
-| `logging.save_transactions` | Turns off `transactions_*.jsonl` logging entirely; also disables the HTML report, which reads that log. |
-
-## LLM provider
-
-Every call in a run goes to one provider. One provider per run; mixing them
-per agent role is not supported.
-
-### Getting a key
-
-| Provider | Where the key comes from | Install |
-|---|---|---|
-| **Gemini** (default) | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | included |
-| **OpenAI** | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | `pip install "qikly[openai]"` |
-| **Anthropic** | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) | `pip install "qikly[anthropic]"` |
-
-Then export the key and pick the provider:
-
-```bash
-# Gemini, the default. Nothing else needed.
 export GEMINI_API_KEY=...
 qikly --demo
-
-# OpenAI
-pip install "qikly[openai]"
-export OPENAI_API_KEY=...
-export LLM_PROVIDER=openai
-qikly --demo
-
-# Anthropic
-pip install "qikly[anthropic]"
-export ANTHROPIC_API_KEY=...
-export LLM_PROVIDER=anthropic
-qikly --demo
 ```
 
-On Windows PowerShell, `$env:OPENAI_API_KEY = "..."` instead of `export`.
-
-`API_KEY` works for any of them, and each provider's own conventional variable
-is accepted too, so a machine already configured for one needs nothing extra.
-
-**A note on which provider to start with.** Every convergence figure in this
-README was measured on `gemini-3.5-flash-lite`, over hundreds of runs, and the
-bundled demo is tuned to that path. The other providers work and are far less
-travelled here, and an entry-level model on any of them may stall on tasks that
-the measured path clears. If a provider you have chosen converges poorly, reach
-for a stronger model on it before concluding anything about the tool: model
-choice moves convergence more than any setting in this file.
-
-**PowerShell, CI, persisting a key, restricting one, and what a wrong key or
-a wrong model looks like:** [docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md).
-
-### Checking a key works, for about a cent
-
-```bash
-qikly --validate                       # free: does not touch the network
-LLM_PROVIDER=openai qikly --demo       # one task, about a cent
-```
-
-`--demo` is the real test. It makes actual calls, writes to a throwaway folder,
-and reports the model, the estimated cost and whether it converged. A wrong key
-fails on the first call with a message naming what to check.
-
-`--validate` will not catch a bad key, because it never opens a socket. That is
-the point of it.
-
-### The variables
-
-| Variable | Meaning |
-|---|---|
-| `LLM_PROVIDER` | `gemini` (default), `openai` or `anthropic` |
-| `LLM_MODEL` | Overrides the provider default: `gemini-3.5-flash-lite`, `gpt-4o`, `claude-sonnet-5` |
-| `API_KEY` | The key. Provider-specific names above are accepted too |
-| `QIKLY_REQUEST_TIMEOUT` | Seconds per call, default 300. `0` waits forever |
-| `QIKLY_MAX_CALLS` | Hard stop after N model calls, for an unattended run |
-
-One provider per run. Mixing them per agent role is not supported.
-
-### Determinism is best-effort, and uneven
-
-With a seed set, Gemini and OpenAI are called at `temperature=0` and are given
-the seed itself. **Anthropic gets neither.** Its Messages API has never had a
-seed, and SDK 1.x removed `temperature` from `messages.create()` entirely, so
-there is no sampling lever left to pull.
-
-That matters if you compare rates across providers: an Anthropic figure carries
-more run-to-run variance than the others by construction. No provider promises
-identical output either way, so treat all of this as reduced drift rather than
-reproducibility.
-
-### Keeping providers working
-
-The SDKs are other people's code on other people's release schedules, and this
-is the part of qikly most likely to break without you touching it. Two habits
-cover it:
-
-```bash
-pip install "qikly[all-providers]"
-python -m pytest tests/test_provider_signatures.py -v
-```
-
-That reads the signature of every SDK you have installed and compares it
-against what qikly sends, so a removed or renamed parameter fails a test rather
-than a user's first run. It is how the Anthropic `temperature` break was found.
-
-What it cannot catch is a parameter that still exists and now means something
-different, or a model name retired server-side. **One `--demo` per provider
-before each release** covers that, costs a few cents, and is the only check
-that exercises the real API.
-
-Dependencies carry upper bounds for the same reason. Raising one after testing
-is a two-line change; not having one lets a major version arrive unannounced.
+**[docs/CONFIGURATION.md](https://github.com/gal-a/qikly/blob/main/docs/CONFIGURATION.md)** has every
+environment variable, the `settings.yaml` keys, timeouts, how much determinism
+each provider actually gives you, and how to notice an SDK changing under you.
+Keys, PowerShell, CI and what a wrong key looks like:
+**[docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md)**.
 
 ## Version check
 
@@ -880,6 +566,17 @@ cannot satisfy its own suite exits non-zero, names the blocking tests, and
 ships nothing. That is the property worth having. Three of the four causes are
 defects in the specification rather than in the model, so most stalls are fixed
 by editing text: see [the stall taxonomy](https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md#when-a-run-stalls).
+
+**Two stall signatures, and they mean opposite things.** The same patch
+repeating byte for byte is the model correctly disagreeing with an artificial
+rule. No retry budget fixes that: widen the criterion, or move the decision
+into `requirements` where the agent can read it as a given rather than as an
+error to correct. A *different* patch each attempt, never resolving the same
+test, is an ordinary bug that the failure text alone does not localise, and a
+stronger model is the first thing to try. Compare successive diffs under
+`outputs/logs/patches/<task>/<timestamp>/` to tell which one you have. Stalls
+concentrate in the unit stage, which is also the only stage written with sight
+of the code.
 
 **Test generation can miss a criterion you wrote.** A correct, hand-written
 criterion can end up with no test asserting it, so the coding agent is never
@@ -945,7 +642,7 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.4.2`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.4.3`, uploading the suite, the code and the JUnit XML |
 
 ## Use it in CI
 
@@ -1023,7 +720,7 @@ project folder in full, so neither can go wrong. `--mcp-config claude` prints
 the `mcpServers` shape that Claude Code and Cursor use.
 [`docs/mcp.md`](docs/mcp.md) has the details.
 
-Four tools: `qikly_run`, `qikly_status`, `qikly_check_criteria`,
+Four tools: `qikly_run`, `qikly_status`, `qikly_validate`,
 `qikly_scaffold`. A run takes minutes to hours and no host will hold a tool call
 open that long, so `qikly_run` returns a run id straight away and `qikly_status`
 is how the agent finds out what happened. The run is detached, so you can close
@@ -1041,6 +738,10 @@ agent's reach. [`docs/mcp.md`](https://github.com/gal-a/qikly/blob/main/docs/mcp
 has the config for that and the rest of the setup.
 
 ## Further reading
+
+Two reference pages, for looking things up rather than reading through:
+**[running it on your own data](https://github.com/gal-a/qikly/blob/main/docs/USING_YOUR_OWN_DATA.md)** and
+**[configuration and provider](https://github.com/gal-a/qikly/blob/main/docs/CONFIGURATION.md)**.
 
 The design write-up is in three parts, and each stands on its own.
 

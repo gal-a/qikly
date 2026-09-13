@@ -45,6 +45,8 @@ _OUTCOME_STATUS_VAR = {
 }
 
 
+from qikly.code_identity import describe
+
 def _classify_fix_cycle_outcome(block):
     actions = {s.get("action") for s in block["steps"]}
     if "fix_generation_failed" in actions or "patch_generation_failed" in actions:
@@ -290,7 +292,7 @@ def render_metrics_html(task_id, run_timestamp, summary, outcomes, stage_details
 <body>
 <main>
   <h1>{_esc(task_id)}{title_extra}</h1>
-  <div class="run-meta">Run {_esc(ts_display)} - <a href="{timeline_href}">view debugging timeline</a></div>
+  <div class="run-meta">Run {_esc(ts_display)} - {_esc(describe())} - <a href="{timeline_href}">view debugging timeline</a></div>
   <div class="result-banner {result_cls}">{result_text}</div>
   <p class="single-run-note"><strong>This is one run, not a measurement.</strong> Convergence is not
   deterministic: the same task, with the same inputs and the same seed, converges on some runs and

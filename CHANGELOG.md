@@ -4,9 +4,129 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
-## Unreleased
+## 0.4.3
 
-Nothing yet.
+> Listed in the MCP Registry, so VS Code's own gallery can find it
+
+### Added
+- **qikly has a listing for the MCP Registry, `server.json`.** That registry
+  is what VS Code's own gallery reads: searching `@mcp` in the Extensions view
+  shows servers from it, and only servers listed there can be added that way.
+  The listing carries the icon in four forms, PNG and SVG for a light and a
+  dark background, served from the landing page, because clients are only
+  required to support PNG and merely encouraged to support SVG.
+
+  **The install block carries the `[mcp]` extra, and that is the part worth
+  writing down.** A bare `uvx qikly` would install without the extra and
+  produce exactly the server-that-will-not-start of 0.4.1 and 0.4.2, for every
+  stranger who clicked install, and the console script is named `qikly-mcp`
+  while the package is named `qikly`. Both facts live in the arguments:
+  `--from qikly[mcp]==<version>` as a runtime argument, and `qikly-mcp` as a
+  positional, both inside `runtimeArguments`. Verified with uv 0.12.13, and it
+  is the shape the live `ai.gateco/gateco` listing uses, read from the registry
+  on 2026-09-12. The placement is not cosmetic: with the script name in
+  `packageArguments` instead, a client composing runtime arguments, then the
+  package, then package arguments produces `uvx --from qikly[mcp]==X qikly
+  qikly-mcp`, which fails with "unrecognized arguments: qikly-mcp". The
+  version therefore appears three times in `server.json`, and a test holds
+  them together.
+
+  **It was nearly built the hard way, and that is the useful part.** A first
+  pass sampled four pages of the registry, concluded that no entry can express
+  an extra, and added a second, code-free distribution whose only job was to
+  depend on `qikly[mcp]`. It worked. It also cost a second PyPI project, a
+  second pending publisher, the version pinned in a fourth file, a workflow
+  check to hold the pair together, and a shared console script that
+  `pip uninstall` could take away from the package still needing it. Reading
+  the whole registry rather than four pages of it found 1,513 package entries
+  using runtime arguments, out of 21,240, by full pagination on 2026-09-12. So
+  the extra had been expressible all along. The measurement was wrong before
+  the design was, and the registry keeps growing, so that count is a reading
+  on a date rather than a fact about the ecosystem.
+
+  The other alternative, making `mcp` a hard dependency, was rejected on
+  measurement too: 18 extra packages and about 19.5 MB on a 48 MB base, some
+  40% more, paid by every command line and every CI run that never starts a
+  server. Measured 2026-09-12 as the on-disk size of `site-packages`,
+  excluding `__pycache__`, for `qikly==0.4.2` against `qikly[mcp]==0.4.2` in
+  two fresh venvs, CPython 3.10 on Windows, where `pywin32` is the largest
+  single item and installs on Windows only. An earlier figure of 26 MB in a
+  draft of this entry counted `__pycache__`, which is bigger in the bigger
+  venv and inflated the difference. The extra resolves through `mcp>=2.0,<3`,
+  so this number drifts with its dependencies and is a measurement on a date,
+  not a property of the package.
+
+  Publishing needs the package on PyPI first, because the registry proves
+  ownership by finding `mcp-name: io.github.gal-a/qikly` in the README that
+  PyPI serves. That marker ships here as an HTML comment, so the listing can
+  only be published after this release, never before.
+- **A run records which code produced it, not just which release.** Every run
+  summary already carried `qikly_version`, which is exact for an install from
+  PyPI and misleading from a source checkout: the version only moves on
+  release day, so 420 runs in this project's own history are stamped `0.1.0`
+  across weeks of changing code. When qikly runs out of its own git checkout,
+  the provenance now also carries the commit, whether the tree had
+  uncommitted changes, whether that commit is a tag, and the Python version.
+  The same line opens the run in the console and appears in both HTML report
+  headers, because a console capture or a saved report is often all anyone
+  keeps.
+
+  The guard is the part worth reading. A virtual environment commonly sits
+  inside the user's own repository, so asking git about the package directory
+  would record *their* commit as qikly's: not a gap but a confident wrong
+  answer. A git root is believed only when it actually contains `src/qikly`.
+
+### Fixed
+- **A third test stopped writing into the live project.** `tests/test_runs.py`
+  had a `project` fixture that redirects to a temp directory, and tests that
+  did not ask for it wrote to the real one: a CALC_TAX run summary and
+  transaction log from the file's fixed timestamp were sitting in the live
+  outputs tree, describing a run that never happened, the log saying every
+  test passed while the summary said it failed. Redirecting is now automatic
+  for every test in the file rather than something each test has to remember.
+
+- **Four warnings pointed at a heading that was never written.** `cli.py` and
+  `orchestrator.py` sent anyone running without acceptance criteria to
+  `README.md#auto-generating-acceptance-criteria`, an anchor that has never
+  existed in any version of that file, so the one message a person sees at the
+  moment they need the explanation led nowhere. The section now exists, in
+  `docs/USING_YOUR_OWN_DATA.md`, and the four messages point at it.
+- **A docstring escaped nothing and warned about it.** `_demo_root` documents
+  `cd C:\Temp\scratch` in a plain string, where `\T` is not a valid escape, so
+  Python raised a DeprecationWarning whenever `cli.py` was compiled fresh. The
+  docstring is now raw. Invisible from a warm `__pycache__`, which is why it
+  survived this long.
+### Changed
+- **The MCP tool `qikly_check_criteria` is now `qikly_validate`.** It always
+  ran the offline check that `qikly --validate` runs, while the command line
+  has a separate `--check-criteria` that asks a model whether the
+  specification contradicts itself. Same name, different check, one of them
+  paid. It misled the first host that used it: asked to check CALC_TAX's
+  criteria, GitHub Copilot read `cli.py`, found `--check-criteria`, and tried
+  to run the paid checker in a terminal; and when finally pointed at the tool,
+  it reported "no contradictions found", which the tool never looks for. The
+  new name says what it does, and the description now says in as many words
+  that it is not the contradiction check. The old name is not kept as an
+  alias: the server shipped a day earlier, and a fifth tool listed under the
+  misleading name would keep misleading.
+
+- **The README is 751 lines instead of 1,099, and nothing was deleted.** It had
+  become two documents interleaved: the case for reading further, and the
+  reference you consult once you have. The reference half moved out whole, to
+  `docs/USING_YOUR_OWN_DATA.md` (the task file field by field, criteria from a
+  ticket, seeding your own code or tests, where files are read from, fixture
+  proposals) and `docs/CONFIGURATION.md` (settings, environment variables,
+  provider setup and determinism). Both are linked from where they used to sit.
+  The prose was moved as text rather than rewritten, so the two pages inherited
+  the documentation guards automatically: they are matched by the same
+  `docs/*.md` globs, and the suite grew by six cases without a test being
+  written.
+- **The comparison table on the landing page stacks on a phone.** Two prose
+  columns at 600px left a couple of words per line; each row is now its own
+  card, carrying the column name that the dropped header row used to supply.
+  The table also described its two sides as qikly's "unit stage" and
+  "integration and system stages", a word neither document defines until well
+  below it. They are tests, and now say so.
 
 ## 0.4.2
 

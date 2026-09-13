@@ -31,6 +31,8 @@ REPORT_DIR = "outputs/reports/iterations"
 STAGE_LABELS = {"bootstrap": "Bootstrap (interface discovery)"}
 
 
+from qikly.code_identity import describe
+
 def _stage_label(stage):
     return STAGE_LABELS.get(stage, stage.capitalize())
 
@@ -318,7 +320,7 @@ def _summary_html(task_id, run_timestamp, summary, task_meta):
     return f"""
 <header class="report-header">
   <h1>{_esc(task_id)}{title_extra}</h1>
-  <div class="run-meta">Run {_esc(ts_display)} - <a href="{metrics_href}">view metrics report</a></div>
+  <div class="run-meta">Run {_esc(ts_display)} - {_esc(describe())} - <a href="{metrics_href}">view metrics report</a></div>
   <div class="result-banner {result_cls}">{result_text}</div>
 </header>
 """

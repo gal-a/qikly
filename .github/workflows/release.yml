@@ -128,6 +128,12 @@ jobs:
           path: dist/
 
       - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # The wheel and the sdist go up in one call. If the second fails
+          # after the first succeeded, a re-run would otherwise die on the
+          # file PyPI already has, and PyPI never lets a version be reused, so
+          # the release would need a new version number to finish.
+          skip-existing: true
 
   # The GitHub Release: the wheel and the sdist attached to it, and the notes
   # taken from CHANGELOG.md rather than pasted by hand.

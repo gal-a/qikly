@@ -92,6 +92,14 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Defensive, and cheap. The quick-start table sets `white-space: nowrap` on
+   its headers on purpose, so its content is wider than a phone and it carries
+   its own horizontal scroller. A wide descendant can still drag a mobile
+   layout viewport past the device width, which zooms the whole page out and
+   makes every line wrap wider than the screen. `clip` where supported, since
+   it does not create a scroll container; `hidden` for anything older. */
+html, body { overflow-x: hidden; overflow-x: clip; }
+
 .wrap {
   max-width: 860px;
   margin: 0 auto;
@@ -361,9 +369,6 @@ footer {
   justify-content: space-between;
 }
 
-@media (max-width: 620px) {
-  .split { grid-template-columns: 1fr; }
-}
 
 .replication {
   margin: 10px 0 0;
@@ -381,6 +386,8 @@ footer {
   font-size: .9rem;
   color: var(--ink-soft);
 }
+.hero .eyebrow { margin-top: 28px; }
+.hero .eyebrow + .route-note { margin-top: 0; }
 /* The two panels below use the diagram's own colours, so a reader connects
    them without being told: accent for the side that sees the criteria, and
    --code for the side the criteria are kept from. The same two colours carry
@@ -467,6 +474,49 @@ footer {
   display: block;
   line-height: 1.5;
 }
+
+/* The comparison table. Same borders and spacing as .uses, but every cell
+   holds a sentence rather than a command, so nothing may be held on one line:
+   a nowrap header here overflows the page and produces a scrollbar. */
+.compare { margin: 18px 0 0; table-layout: fixed; }
+.compare th, .compare td { white-space: normal; overflow-wrap: break-word; }
+.compare thead th { white-space: normal; }
+.compare thead .eg { text-transform: none; letter-spacing: 0; }
+.compare td:first-child, .compare thead th:first-child { width: 22%; }
+
+@media (max-width: 620px) {
+  .split { grid-template-columns: 1fr; }
+
+  /* Two prose columns cannot both stay readable on a phone: at this width the
+     cells are down to a couple of words per line. Stack each row into its own
+     card instead. The header row is dropped, so every value carries the column
+     name it would otherwise have lost. */
+  .compare, .compare tbody, .compare tr, .compare td { display: block; width: auto; }
+  .compare thead { display: none; }
+  .compare tr {
+    border: 1px solid var(--rule);
+    border-radius: 9px;
+    overflow: hidden;
+    margin: 0 0 10px;
+  }
+  .compare td { border: 0; border-top: 1px solid var(--rule); }
+  .compare tbody td:first-child {
+    width: auto;
+    border-top: 0;
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+  .compare td[data-col]::before {
+    content: attr(data-col);
+    display: block;
+    margin-bottom: 3px;
+    font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+    font-size: .7rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+}
 </style>
 </head>
 <body>
@@ -496,7 +546,15 @@ footer {
       </svg>
     </div>
     <h1>Your AI writes both the code and its tests. How do you know the tests are really valid?</h1>
-    <p class="answer"><strong>The solution: two agents. One turns the acceptance criteria into tests. The other writes the code and never sees the acceptance criteria.</strong></p>
+    <p class="answer"><strong>The solution: two agents.</strong> One turns the acceptance criteria into tests. The other writes the code and <strong>never sees the acceptance criteria.</strong></p>
+    <!-- The image sits directly under the claim, before the analogy and before
+         "Who it is for", on purpose: a visual hook earns the reading that
+         follows. An audit suggested moving the audience line above it to match
+         the README's order; the order here is deliberate. -->
+    <figure class="shot">
+      <img src="images/qikly_hero.png" width="3200" height="1680"
+           alt="Two code panels kept apart: calc.py written by the coding agent, test_calc.py written by the test agent from acceptance criteria the coding agent never saw. The suite passes 9 of 9.">
+    </figure>
     <p class="lede">
       A student who writes the exam paper, writes the answer key and then sits
       the exam will pass. That is what happens when one model is given the
@@ -504,15 +562,23 @@ footer {
       suite that checks it. Everything goes green, and the green means nothing.
       <strong>qikly takes the answer key away from the student.</strong>
     </p>
+    <p class="eyebrow">Who it is for</p>
+    <p class="route-note">A developer or team pointing an AI coding agent at a self-contained
+      Python module, for example an ETL step, a merge, a calculation or a validation routine,
+      who does not want to trust a green suite when the same agent wrote both the code and the
+      tests. It suits one module at a time: when a test fails, only the files that failure
+      names are loaded, so runs stay small and quick. Large multi-file repositories are a
+      different problem.</p>
     <div class="install">
       <span><span class="prompt">$</span> pip install qikly</span>
       <span><span class="prompt">$</span> export GEMINI_API_KEY=...</span>
       <span><span class="prompt">$</span> qikly --demo</span>
     </div>
-    <figure class="shot">
-      <img src="images/qikly_hero.png" width="3200" height="1680"
-           alt="Two code panels kept apart: calc.py written by the coding agent, test_calc.py written by the test agent from acceptance criteria the coding agent never saw. The suite passes 9 of 9.">
-    </figure>
+    <p class="route-note">Already have the code? <code>qikly --scaffold your_module.py</code>
+      writes a task that tests <em>that</em> code, with the suite still written from your
+      acceptance criteria rather than from the code itself.
+      <a href="https://github.com/gal-a/qikly#which-command-depends-on-which-parts-you-already-have">Which
+      command fits what you already have</a>.</p>
     <div class="links">
       <a class="btn btn-primary" href="https://github.com/gal-a/qikly">Source on GitHub</a>
       <a class="btn" href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md">How it works, with one repair end to end</a>
@@ -627,6 +693,43 @@ footer {
         is the single point where test generation may read the implementation.
       </figcaption>
     </figure>
+
+    <table class="uses compare">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Code-derived suite<br><span class="eg">most commercial test generators,<br>and qikly's own unit tests</span></th>
+          <th>Spec-derived suite<br><span class="eg">qikly's integration and system tests</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Written from</td>
+          <td data-col="Code-derived">The code as it is today</td>
+          <td data-col="Spec-derived">The acceptance criteria you wrote</td>
+        </tr>
+        <tr>
+          <td>You supply</td>
+          <td data-col="Code-derived">Nothing but the repository</td>
+          <td data-col="Spec-derived">A written statement of what correct means</td>
+        </tr>
+        <tr>
+          <td>Catches</td>
+          <td data-col="Code-derived">Behaviour changing tomorrow</td>
+          <td data-col="Spec-derived">Behaviour being wrong today</td>
+        </tr>
+        <tr>
+          <td>Cannot catch</td>
+          <td data-col="Code-derived">The code being wrong now: today's bug becomes tomorrow's assertion</td>
+          <td data-col="Spec-derived">Anything nobody wrote down</td>
+        </tr>
+        <tr>
+          <td>Right choice when</td>
+          <td data-col="Code-derived">Nobody wrote the intent down and you need a safety net</td>
+          <td data-col="Spec-derived">The intent exists in a ticket, a spec page or a Gherkin file</td>
+        </tr>
+      </tbody>
+    </table>
 
     <div class="split">
       <div class="half sees-all">

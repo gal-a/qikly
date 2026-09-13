@@ -45,7 +45,7 @@ from qikly import runs
 # Every tool, in one place, so the withholding tests can assert the list they
 # cover matches the list that exists. A tool added without a test is a tool
 # nobody has shown is safe.
-TOOLS = ("qikly_run", "qikly_status", "qikly_check_criteria", "qikly_scaffold")
+TOOLS = ("qikly_run", "qikly_status", "qikly_validate", "qikly_scaffold")
 
 
 def _error(message, **extra):
@@ -162,7 +162,7 @@ def qikly_status(run_id):
     return _redact(info)
 
 
-def qikly_check_criteria(task_id):
+def qikly_validate(task_id):
     """
     Whether a task's criteria are usable, without quoting them.
 

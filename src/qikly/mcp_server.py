@@ -127,11 +127,14 @@ TOOL_SPECS = [
         },
     },
     {
-        "name": "qikly_check_criteria",
+        "name": "qikly_validate",
         "description": (
-            "Validate one task offline and return counts and a verdict. Free, "
-            "no model call. It returns no criterion text: validation messages "
-            "quote the criterion they are about, so read those with "
+            "Validate one task offline and return counts and a verdict: the "
+            "same check as `qikly --validate`. Free, no model call. It does NOT "
+            "look for contradictions between requirements and criteria; that is "
+            "the separate `qikly --check-criteria`, which costs a model call and "
+            "is not exposed here. It returns no criterion text: validation "
+            "messages quote the criterion they are about, so read those with "
             "`qikly --validate` in a terminal instead."),
         "inputSchema": {
             "type": "object",
@@ -224,9 +227,9 @@ def build_server():
     def _status(run_id: str) -> str:
         return call_tool("qikly_status", {"run_id": run_id})
 
-    @server.tool(name="qikly_check_criteria", description=TOOL_SPECS[2]["description"])
+    @server.tool(name="qikly_validate", description=TOOL_SPECS[2]["description"])
     def _check(task_id: str) -> str:
-        return call_tool("qikly_check_criteria", {"task_id": task_id})
+        return call_tool("qikly_validate", {"task_id": task_id})
 
     @server.tool(name="qikly_scaffold", description=TOOL_SPECS[3]["description"])
     def _scaffold(file_path: str) -> str:

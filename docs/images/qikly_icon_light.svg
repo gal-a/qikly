@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-24.6 -113.7 174.4 174.4"
+     width="170" height="170" role="img" aria-label="qikly">
+  <title>qikly</title>
+  <!-- The light-theme variant of qikly_icon.svg: same glyph, same viewBox,
+       generated from it by swapping only the two gradient stops. The originals
+       fail on a white ground (1.22:1 and 2.33:1 against WCAG's 3:1 for
+       graphics), so this one runs darkest to deep teal, both already in the
+       palette: #112f2e from the landing page, #2b8f95 from the hero and the
+       Marketplace badge. 14.29:1 and 3.84:1 on white.
+       The viewBox is the glyph's exact bounds after the skew, with 10% padding
+       on every side, computed rather than eyeballed. -->
+  <defs>
+    <linearGradient id="qw" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#112f2e"/>
+      <stop offset="1" stop-color="#2b8f95"/>
+    </linearGradient>
+  </defs>
+  <g transform="skewX(-4)">
+    <path d="M72.15234375 43.236328125V-10.740234375H71.78515625Q67.37890625 -4.865234375 59.8974609375 -1.28515625Q52.416015625 2.294921875 44.521484375 2.294921875Q32.86328125 2.294921875 24.0048828125 -3.212890625Q15.146484375 -8.720703125 10.189453125 -19.2314453125Q5.232421875 -29.7421875 5.232421875 -45.1640625Q5.232421875 -60.40234375 10.740234375 -72.060546875Q16.248046875 -83.71875 26.0703125 -90.0068359375Q35.892578125 -96.294921875 47.734375 -96.294921875Q63.798828125 -96.294921875 71.78515625 -84.26953125H72.15234375V-94.0H111.2578125V43.236328125ZM72.978515625 -49.478515625Q72.978515625 -58.015625 69.2607421875 -62.8349609375Q65.54296875 -67.654296875 59.392578125 -67.654296875Q52.966796875 -67.654296875 48.927734375 -61.779296875Q44.888671875 -55.904296875 44.888671875 -46.08203125Q44.888671875 -36.994140625 48.28515625 -31.669921875Q51.681640625 -26.345703125 58.474609375 -26.345703125Q65.267578125 -26.345703125 69.123046875 -31.669921875Q72.978515625 -36.994140625 72.978515625 -46.44921875Z" fill="url(#qw)"/>
+  </g>
+</svg>

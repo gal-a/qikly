@@ -216,7 +216,7 @@ def test_a_fresh_install_with_no_inputs_private_still_works(tmp_path, monkeypatc
 
     chdir_to_project_root()
     assert mcp_tools.where_we_looked("CALC_TAX") is None
-    payload = mcp_tools.qikly_check_criteria("CALC_TAX")
+    payload = mcp_tools.qikly_validate("CALC_TAX")
     assert payload["valid"] is True
     assert "detail" not in payload
 
@@ -242,7 +242,7 @@ def test_check_criteria_keeps_its_shape_when_the_task_is_missing():
     from qikly.paths import chdir_to_project_root
 
     chdir_to_project_root()
-    payload = mcp_tools.qikly_check_criteria("NO_SUCH_TASK_ANYWHERE")
+    payload = mcp_tools.qikly_validate("NO_SUCH_TASK_ANYWHERE")
     assert payload["ok"] is True and payload["valid"] is False
     assert payload["error_count"] == 1
     assert "QIKLY_PROJECT_ROOT" in payload["detail"]
@@ -381,3 +381,18 @@ def test_each_icon_variant_is_legible_on_the_ground_it_is_tagged_for():
                 assert contrast(stop, ground) >= 3.0, (
                     "%s (%s) stop %s is %.2f:1 on %s"
                     % (name, theme, stop, contrast(stop, ground), ground))
+
+
+def test_the_validate_tool_says_it_is_not_the_contradiction_check():
+    """
+    The tool used to be called qikly_check_criteria while `qikly
+    --check-criteria` is a different, paid check. A host's agent confused the
+    two and reported "no contradictions found" from a tool that never looks
+    for any. The description is what the agent reads, so it has to say so.
+    """
+    from qikly.mcp_server import TOOL_SPECS
+
+    spec = next(t for t in TOOL_SPECS if t["name"] == "qikly_validate")
+    assert "--validate" in spec["description"]
+    assert "contradiction" in spec["description"]
+    assert "qikly_check_criteria" not in [t["name"] for t in TOOL_SPECS]

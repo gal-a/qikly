@@ -73,7 +73,12 @@ SEED_NONE = """
 SEED_EXISTING = """
 # The code you already have is the thing under test. The suite is still written
 # from your acceptance_criteria by an agent that never reads this file, so a
-# failure here is a real finding about code you did not write.
+# failure here is a finding about the code rather than a test written to fit it.
+#
+# What this cannot tell you is what the author of that code saw. Withholding is
+# a property of a run qikly performed, not of a file you supply: if the code
+# was written with these criteria open, the suite is still independent of the
+# code, but the author was not.
 seed:
   implementation: "{source_rel}"
 """
