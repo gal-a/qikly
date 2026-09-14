@@ -6,6 +6,20 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
+### Added
+- **`qikly --explain TASK --html` writes the withholding as a page to share.**
+  Both views side by side, the task file as test generation receives it with
+  every withheld line highlighted, and the same file as the coding agent
+  receives it, in one HTML file that loads nothing from anywhere. The terminal
+  output was the most persuasive thing the tool printed and the hardest to pass
+  on. It defaults to `qikly_explain_<TASK>.html` where you ran the command, and
+  marks exactly the lines the terminal output counts.
+- **A badge for projects that use qikly**, "tested with qikly", with the
+  Markdown to paste in the README and the quick start.
+- **`CONTRIBUTING.md` and a task proposal form** for contributing example
+  tasks: what makes a good task, the files it needs, the checks to run before
+  sending it, and how it is credited.
+
 ### Fixed
 - **The diagram shows on PyPI.** PyPI prints a mermaid block as source, so the
   project page showed forty lines of flowchart code where the README's diagram

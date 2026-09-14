@@ -658,6 +658,12 @@ def _parse_args():
              "them, so the central claim can be read rather than trusted."
     )
     parser.add_argument(
+        "--html", nargs="?", const="", default=None, metavar="PATH",
+        help="With --explain, also write the two views side by side as one "
+             "self-contained HTML page to share or screenshot. Defaults to "
+             "qikly_explain_<TASK>.html where you ran the command."
+    )
+    parser.add_argument(
         "--validate", action="store_true",
         help="Check every task file offline and stop: valid YAML, required sections, "
              "acceptance_criteria a list rather than one long string, fixture paths "
@@ -1007,7 +1013,7 @@ def _do_criteria_from_jira(issue_key, task_id):
     return _append_criteria_to_task(task_id, criteria)
 
 
-def _do_explain(task_id, as_json):
+def _do_explain(task_id, as_json, html_path=None):
     """
     Show the withholding rather than asserting it.
 
@@ -1034,6 +1040,18 @@ def _do_explain(task_id, as_json):
                           indent=2))
     else:
         print(render(facts))
+
+    if html_path is not None:
+        from qikly.explain import render_html
+
+        # Relative to where the command was typed, not the project root the
+        # CLI has moved to, so the page lands where the user is looking.
+        target = html_path or f"qikly_explain_{task_id}.html"
+        if not os.path.isabs(target):
+            target = os.path.join(INVOKED_FROM, target)
+        with open(target, "w", encoding="utf-8") as handle:
+            handle.write(render_html(facts))
+        print(f"Wrote {target}", file=sys.stderr if as_json else sys.stdout)
     return 0 if facts["withheld_ok"] or not facts["criteria_count"] else 1
 
 
@@ -1505,8 +1523,12 @@ def main():
         return _do_trends(args.tasks, args.by, args.json)
     if args.pr_comment:
         return _do_pr_comment(args.tasks, args.artifacts_url)
+    if args.html is not None and not args.explain:
+        print("--html goes with --explain, as in: qikly --explain CALC_TAX --html",
+              file=sys.stderr)
+        return 2
     if args.explain:
-        return _do_explain(args.explain, args.json)
+        return _do_explain(args.explain, args.json, args.html)
     if args.validate:
         return _do_validate(args.tasks, args.json)
     if args.check_criteria:

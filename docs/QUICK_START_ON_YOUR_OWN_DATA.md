@@ -100,6 +100,13 @@ code.
 **Tried it?** [Tell us what happened](https://github.com/gal-a/qikly/discussions/6), whether it worked, stalled
 or never got past install.
 
+**Keeping the suite?** Add the badge to your project's README, so the people
+reading it know the tests were written by an agent kept apart from the code:
+
+```markdown
+[![tested with qikly](https://img.shields.io/badge/tested_with-qikly-2b8f95)](https://test.qikly.com/?ref=badge)
+```
+
 ### Step 1 from inside VS Code
 
 With the qikly MCP server connected (setup in
@@ -164,7 +171,7 @@ stages, because unit tests have to name real functions.
 
 | Where you are starting | #1 | #2 | #3 | Run | What happens |
 |---|:-:|:-:|:-:|---|---|
-| Before anything else: see what is withheld | | | | `qikly --explain <MY_TASK>`<br>e.g. `qikly --explain CALC_TAX` | Prints a task file twice, once as each agent receives it, and the difference between them. No API key, no model call, about a second. **You get:** the acceptance criteria on one side and the same file with them cut out on the other, which is the claim everything else rests on. |
+| Before anything else: see what is withheld | | | | `qikly --explain <MY_TASK>`<br>e.g. `qikly --explain CALC_TAX` | Prints a task file twice, once as each agent receives it, and the difference between them. No API key, no model call, about a second. **You get:** the acceptance criteria on one side and the same file with them cut out on the other, which is the claim everything else rests on. Add `--html` for the same as a page you can share. |
 | Just looking | | | | `qikly --demo` | A bundled task end to end in a throwaway folder. Thirty seconds, under a cent. **You get:** a working implementation, three test suites, and the full record of every FIX and PATCH, in a directory you can delete. |
 | Code someone else wrote, and you want **that code** verified | | Y | | `qikly --scaffold <MY_MODULE>.py` | Scaffold reads the real signatures out of the file you point it at and fills in **#2** for you. **#1** and **#3** stay yours to write: criteria read out of an implementation can only describe what that implementation already does, which is a bar it passes by construction. **You get:** one task file that tests the code you already have. Add `--fresh` for one that writes a fresh implementation of the same interface instead. |
 | You know what it must do, not yet how to check it | Y | | | `qikly --init` | Creates the directory layout and one starter task to edit. Its criteria show the habit that matters most: name the value, not the quality. "100 is accepted and 101 is rejected" forces a test at the boundary; "amounts must be reasonable" does not. **You get:** a task file to fill in, with your fixtures where a run will look for them. |

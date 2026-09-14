@@ -287,6 +287,7 @@ Three commands that make no model call, need no API key, and cost nothing.
 qikly --explain MERGE_SALES   # what each side is shown, and the difference
 qikly --validate              # check your task files: YAML, criteria, fixtures
 qikly --explain MERGE_SALES --json
+qikly --explain MERGE_SALES --html   # the same, as a page to share
 ```
 
 `--explain` is the one worth running first. It prints the acceptance criteria
@@ -294,6 +295,11 @@ that test generation receives, then the same task file as the coding agent
 receives it, then the diff: on `MERGE_SALES`, eleven criteria and twelve
 lines removed. It builds those strings through the same function a real run
 uses, so it shows the mechanism rather than a description of it.
+
+Add `--html` and it also writes `qikly_explain_MERGE_SALES.html`: both views
+side by side with every withheld line highlighted, in one file that loads
+nothing from anywhere. Attach it to a pull request, put it in a slide, or
+screenshot it for a post.
 
 `--validate` reads your task files and nothing else: that they parse, that
 `acceptance_criteria` is a list rather than one long string, that fixture paths
@@ -626,6 +632,28 @@ broke.
 [`docs/mcp.md`](https://github.com/gal-a/qikly/blob/main/docs/mcp.md) has the four tools, other hosts,
 installing with pip instead, what to do when the server does not start, and
 how to keep the generated tests out of your agent's reach.
+
+## Using qikly? Show it
+
+If qikly writes the tests for something you maintain, add the badge to its
+README. It tells readers the suite was written from the acceptance criteria by
+an agent kept apart from the code:
+
+[![tested with qikly](https://img.shields.io/badge/tested_with-qikly-2b8f95)](https://test.qikly.com/?ref=badge)
+
+```markdown
+[![tested with qikly](https://img.shields.io/badge/tested_with-qikly-2b8f95)](https://test.qikly.com/?ref=badge)
+```
+
+## Contributing a task
+
+The most useful contribution is a new example task, especially from a domain
+the ten bundled ones do not cover. [`CONTRIBUTING.md`](https://github.com/gal-a/qikly/blob/main/CONTRIBUTING.md)
+has what a task needs and how to check it before sending it. Every accepted
+task is credited in the changelog, and its author gets a contributor badge.
+Start with a
+[task proposal](https://github.com/gal-a/qikly/issues/new?template=task_proposal.yml),
+so two people do not write the same one.
 
 ## Further reading
 

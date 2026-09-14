@@ -1,0 +1,67 @@
+name: task contribution
+
+# A proposal or a pull request for a new example task gets one comment: thanks,
+# what happens next, and on a pull request the maintainer's checklist for
+# crediting it, so a contribution is never merged without the credit it earned.
+#
+# pull_request_target, so it can comment on pull requests from forks. It never
+# checks out or runs the contributor's code, which is what makes that safe.
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+    paths:
+      - "src/qikly/inputs_public/config/tasks/**"
+      - "src/qikly/inputs_public/data/**"
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  proposal:
+    if: github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'task proposal')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const author = context.payload.issue.user.login;
+            const body = [
+              `Thank you @${author}. A task from a domain the bundled examples do not cover is the contribution that helps this project most.`,
+              "",
+              "The maintainer will reply here about scope before you write fixtures. Everything a task needs, and the checks to run before opening a pull request, is in [CONTRIBUTING.md](https://github.com/gal-a/qikly/blob/main/CONTRIBUTING.md).",
+            ].join("\n");
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.payload.issue.number, body,
+            });
+
+  pull-request:
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const author = context.payload.pull_request.user.login;
+            const body = [
+              `Thank you @${author}, a new example task is the contribution that helps this project most.`,
+              "",
+              "Once it is merged you are credited in the changelog for the release that ships it, and you can add this badge to your profile or README:",
+              "",
+              "```markdown",
+              "[![qikly task contributor](https://img.shields.io/badge/qikly-task_contributor-2b8f95)](https://test.qikly.com/?ref=contributor)",
+              "```",
+              "",
+              "**Maintainer checklist before merging**",
+              "- [ ] `qikly --validate --tasks <TASK_ID>` is clean",
+              "- [ ] a real run converged, or the pull request explains the stall",
+              "- [ ] `tests/test_demo_claims.py` and every doc that counts the bundled tasks are updated",
+              `- [ ] @${author} credited in the CHANGELOG entry for the release, and told about the badge`,
+            ].join("\n");
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number, body,
+            });
