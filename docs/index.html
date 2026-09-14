@@ -414,6 +414,12 @@ footer {
 }
 .counter b { color: var(--ink); }
 
+/* A titled block inside a band, so the comparison table and the objections
+   each announce themselves instead of running on from what came before. */
+.band h3.sub { margin: 34px 0 0; font-size: 1.12rem; }
+.band h3.sub + .compare,
+.band h3.sub + .counter { margin-top: 12px; }
+
 .flow { margin: 24px 0 0; }
 .flow svg { width: 100%; height: auto; display: block; }
 .flow text { font-family: "IBM Plex Sans", system-ui, sans-serif; }
@@ -699,6 +705,26 @@ footer {
       </figcaption>
     </figure>
 
+    <div class="split">
+      <div class="half sees-all">
+        <span class="tag">Test generation sees</span>
+        <p>
+          The requirements, the input and output contract, and every acceptance
+          criterion in full. It writes integration, system and unit tests
+          against the standard.
+        </p>
+      </div>
+      <div class="half sees-spec">
+        <span class="tag">The coding agent sees</span>
+        <p>
+          The same specification with the criteria section removed, plus the
+          text of whatever test just failed. The same vague brief a developer
+          usually works from.
+        </p>
+      </div>
+    </div>
+
+    <h3 class="sub">Two ways to get a test suite, and what each can prove</h3>
     <table class="uses compare">
       <thead>
         <tr>
@@ -736,25 +762,7 @@ footer {
       </tbody>
     </table>
 
-    <div class="split">
-      <div class="half sees-all">
-        <span class="tag">Test generation sees</span>
-        <p>
-          The requirements, the input and output contract, and every acceptance
-          criterion in full. It writes integration, system and unit tests
-          against the standard.
-        </p>
-      </div>
-      <div class="half sees-spec">
-        <span class="tag">The coding agent sees</span>
-        <p>
-          The same specification with the criteria section removed, plus the
-          text of whatever test just failed. The same vague brief a developer
-          usually works from.
-        </p>
-      </div>
-    </div>
-
+    <h3 class="sub">Two obvious objections</h3>
     <p class="counter">
       You might argue, <b>"just use one model for the code and another for the tests."</b>
       That helps a little. It does not fix the underlying issue.

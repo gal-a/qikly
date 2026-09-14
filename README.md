@@ -97,18 +97,41 @@ functions, which makes them the only stage allowed to read the implementation.
 Re-running the earlier stages after each success is what stops a later repair
 quietly breaking something that already passed.
 
+<!-- Lists rather than tables: GitHub and PyPI cannot restack a table on a
+     phone, so a table of sentences there means scrolling sideways. -->
+**Test generation sees** the requirements, the input and output contract, and
+every acceptance criterion in full. It writes integration, system and unit
+tests against the standard.
+
+**The coding agent sees** the same specification with the criteria section
+removed, plus the text of whatever test just failed. The same vague brief a
+developer usually works from.
+
 ### Two ways to get a test suite, and what each can prove
 
-| | Code-derived suite<br>*most commercial test generators, and qikly's own unit tests* | Spec-derived suite<br>*qikly's integration and system tests* |
-|---|---|---|
-| **Written from** | The code as it is today | The acceptance criteria you wrote |
-| **You supply** | Nothing but the repository | A written statement of what correct means |
-| **Catches** | Behaviour changing tomorrow | Behaviour being wrong today |
-| **Cannot catch** | The code being wrong now: today's bug becomes tomorrow's assertion | Anything nobody wrote down |
-| **A green run means** | The code still does what it did when the tests were generated | The code satisfies the criteria as written |
-| **A red run means** | Someone changed behaviour, deliberately or not | The code and your stated intent disagree |
-| **Fails you when** | The original behaviour was already wrong | The criteria are vague, missing, or wrong |
-| **Right choice when** | Nobody wrote the intent down and you need a safety net | The intent exists in a ticket, a spec page or a Gherkin file |
+A **code-derived** suite is what most commercial test generators write, and
+what qikly's own unit tests are. A **spec-derived** suite is what qikly's
+integration and system tests are.
+
+**Written from**
+- *Code-derived:* the code as it is today
+- *Spec-derived:* the acceptance criteria you wrote
+
+**You supply**
+- *Code-derived:* nothing but the repository
+- *Spec-derived:* a written statement of what correct means
+
+**Catches**
+- *Code-derived:* behaviour changing tomorrow
+- *Spec-derived:* behaviour being wrong today
+
+**Cannot catch**
+- *Code-derived:* the code being wrong now, because today's bug becomes tomorrow's assertion
+- *Spec-derived:* anything nobody wrote down
+
+**Right choice when**
+- *Code-derived:* nobody wrote the intent down and you need a safety net
+- *Spec-derived:* the intent exists in a ticket, a spec page or a Gherkin file
 
 Both are useful and they answer different questions. qikly is not purely one
 or the other: integration and system tests are written from the criteria
