@@ -20,6 +20,15 @@ packaging tools would read as `1.1`.
   no data behind them. Like `propose_fixtures` itself, it writes a report for
   review and never a fixture.
 
+### Fixed
+- **Scaffolding a module on a different drive from the project failed on
+  Windows.** `os.path.relpath` has no answer across drives and raises, so
+  `--scaffold` and the MCP `qikly_scaffold` tool stopped with "path is on
+  mount 'D:', start on mount 'C:'". A module on another drive is now named
+  by its file, with its seed path written absolute. Found because GitHub's
+  Windows runners are laid out that way, the checkout on D: and temporary
+  folders on C:, and reproduced locally on a mapped drive.
+
 ### Changed
 - **`--scaffold` writes one task file, not two.** By default it writes
   `<NAME>_VERIFY.yaml`, the task that tests the code you already have, and

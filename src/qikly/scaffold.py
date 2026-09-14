@@ -146,13 +146,38 @@ def guess_entrypoint(functions):
     return max(functions, key=lambda f: len(f.args.args)) if functions else None
 
 
+def _relative_to(path, start):
+    """
+    `path` relative to `start`, or None when no relative path exists.
+
+    On Windows there is no relative path between two drives, and
+    os.path.relpath raises instead of answering. A module on D: scaffolded for a
+    project on C: failed with "path is on mount 'D:', start on mount 'C:'",
+    which is also how GitHub's Windows runners are laid out: the checkout on D:,
+    temporary directories on C:.
+    """
+    try:
+        return os.path.relpath(os.path.abspath(path), os.path.abspath(start))
+    except ValueError:
+        return None
+
+
 def module_path(source_path, project_root):
     """Dotted module path for a file inside the project."""
-    rel = os.path.relpath(os.path.abspath(source_path), os.path.abspath(project_root))
+    rel = _relative_to(source_path, project_root)
+    if rel is None:
+        # No dotted path reaches another drive, so name the module by its file.
+        return os.path.splitext(os.path.basename(source_path))[0]
     rel = rel.replace(os.sep, "/")
     if rel.endswith(".py"):
         rel = rel[:-3]
     return rel.replace("/", ".")
+
+
+def _source_rel(source_path, project_root):
+    """The seed path as a task records it: relative when it can be, else absolute."""
+    rel = _relative_to(source_path, project_root)
+    return (rel if rel is not None else os.path.abspath(source_path)).replace(os.sep, "/")
 
 
 def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
@@ -180,7 +205,7 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
         f'    - "{_signature(f)}  # TODO: what it does"' for f in functions)
     in_lines = "\n".join(f'  - "{p}"' for p in inputs)
 
-    source_rel = os.path.relpath(source_path, project_root).replace(os.sep, "/")
+    source_rel = _source_rel(source_path, project_root)
     seed_block = {
         None: SEED_NONE,
         "none": SEED_NONE,
@@ -196,7 +221,7 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
         module=module_path(source_path, project_root),
         functions=fn_lines,
         entrypoint=f"{_signature(entry)}  # guessed, check this",
-        source_rel=os.path.relpath(source_path, project_root).replace(os.sep, "/"),
+        source_rel=_source_rel(source_path, project_root),
     ), None
 
 

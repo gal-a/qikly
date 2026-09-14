@@ -1119,7 +1119,10 @@ def shown(path, root=None):
     A file outside the project relpaths into a wall of "..", which is worse
     than the absolute path it came from.
     """
-    rel = os.path.relpath(path, root or INVOKED_FROM)
+    try:
+        rel = os.path.relpath(path, root or INVOKED_FROM)
+    except ValueError:
+        return path          # on another drive, where no relative path exists
     return path if rel.startswith("..") else rel
 
 
@@ -1359,7 +1362,10 @@ def shown(path, root=None):
     A file outside the project relpaths into a wall of "..", which is worse
     than the absolute path it came from.
     """
-    rel = os.path.relpath(path, root or INVOKED_FROM)
+    try:
+        rel = os.path.relpath(path, root or INVOKED_FROM)
+    except ValueError:
+        return path          # on another drive, where no relative path exists
     return path if rel.startswith("..") else rel
 
 
