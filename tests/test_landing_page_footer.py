@@ -26,8 +26,9 @@ def _footer():
 
 
 def test_the_footer_links_the_books():
-    footer = _footer()
-    assert 'Also by the author: <a href="%s">Applied Statistics for Data Science</a>' % BOOKS_URL in footer
+    # Other attributes may sit beside href, such as the click counter's name.
+    pattern = r'Also by the author: <a href="%s"[^>]*>Applied Statistics for Data Science</a>'
+    assert re.search(pattern % re.escape(BOOKS_URL), _footer())
 
 
 @pytest.mark.skipif(not os.environ.get("QIKLY_CHECK_LINKS"),
