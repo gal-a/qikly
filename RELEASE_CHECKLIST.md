@@ -180,6 +180,16 @@ Install from PyPI in yet another clean environment and run the demo once more.
 That is the only check that exercises the actual published artefact rather than
 a local build of it.
 
+**Publish the release to GitHub Marketplace by hand.** The workflow creates
+the GitHub release, but the API cannot list a release on Marketplace, so the
+listing's version stays at whichever release was last published there. Open
+the release on GitHub, Edit, tick "Publish this release to the GitHub
+Marketplace", and Update release.
+
+The PyPI badge at the top of the README keeps showing the previous version for
+up to 12 hours. shields.io caches it for that long and ignores a shorter
+`cacheSeconds`, so this corrects itself and needs no action.
+
 Then check the landing page's footer links still answer. One points at the
 author's books site, which this repository does not control:
 

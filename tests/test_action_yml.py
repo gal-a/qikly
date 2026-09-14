@@ -234,8 +234,13 @@ def test_every_pinned_use_of_our_own_action_is_the_current_version():
     for path in list(root.glob("*.md")) + list(root.glob("docs/*.md"))             + list(root.glob(".github/workflows/*.yml")):
         if path.name == "CHANGELOG.md":
             continue  # a changelog records what past versions said, on purpose
-        for found in re.findall(r"gal-a/qikly@v[0-9][^\s`'\"]*",
-                                path.read_text(encoding="utf-8")):
+        text = path.read_text(encoding="utf-8")
+        # Prose also names this action's pin bare, as in "`@v0.3.4` is an exact
+        # pin", and that form went stale unnoticed for three releases. A tag
+        # after a name or a slash belongs to some other action, so it is left out.
+        bare = ["gal-a/qikly" + m for m in
+                re.findall(r"(?<![\w/.-])@v[0-9]+\.[0-9]+\.[0-9]+", text)]
+        for found in re.findall(r"gal-a/qikly@v[0-9][^\s`'\"]*", text) + bare:
             if found not in expected:
                 stale.setdefault(path.name, set()).add(found)
 

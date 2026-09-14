@@ -13,6 +13,9 @@ packaging tools would read as `1.1`.
   one in `docs/design_1_case_study.md` by `tools/render_flow_diagram.py`, and a
   test fails when the image falls behind that source. GitHub shows the same
   image.
+- **The README's example of an exact pin named `@v0.3.4`,** three releases
+  old. The check for stale pins only looked for the full `gal-a/qikly@v...`
+  form, so a bare `@v0.3.4` in a sentence slipped past it. It now catches both.
 
 ## 0.4.4
 
