@@ -1043,15 +1043,18 @@ qikly --demo</code></pre>
 <!-- GoatCounter: page views, plus clicks on links marked data-goatcounter-click.
      No cookies and no personal data. The site code is assembled from two
      pieces because CI greps the whole tree for the project's old name, which
-     the code happens to contain. GoatCounter ignores localhost and file://. -->
+     the code happens to contain. GoatCounter ignores localhost and file://.
+     Loaded only after the page has finished loading: a network that silently
+     drops gc.zgo.at otherwise held the load event, and the tab's spinner, for
+     about 26 seconds. Blocked or slow, the counter never touches the page. -->
 <script>
-  (function () {
+  window.addEventListener("load", function () {
     var s = document.createElement("script");
     s.async = true;
     s.src = "https://gc.zgo.at/count.js";
     s.setAttribute("data-goatcounter", "https://test" + "-qikly.goatcounter.com/count");
     document.body.appendChild(s);
-  })();
+  });
 </script>
 
 </body>
