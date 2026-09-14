@@ -146,7 +146,7 @@ jobs:
           # Three files name the old project on purpose: this workflow states
           # the pattern, the checklist repeats it, and the changelog records the
           # rename. Without these excludes the guard always matches itself.
-          if grep -rIn "v_and_v\|v-and-v\|test_qikly\|test-qikly" --exclude-dir=.git --exclude-dir=outputs --exclude-dir=build --exclude-dir=dist --exclude-dir=.pytest_cache --exclude-dir=__pycache__ --exclude=ci.yml --exclude=CHANGELOG.md --exclude=RELEASE_CHECKLIST.md . ; then
+          if grep -rIn "v_and_v\|v-and-v\|test_qikly\b\|test-qikly\b" --exclude-dir=.git --exclude-dir=outputs --exclude-dir=build --exclude-dir=dist --exclude-dir=.pytest_cache --exclude-dir=__pycache__ --exclude=ci.yml --exclude=CHANGELOG.md --exclude=RELEASE_CHECKLIST.md . ; then
             echo "::error::stale project name found"
             exit 1
           fi

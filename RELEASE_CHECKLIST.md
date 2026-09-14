@@ -73,7 +73,7 @@ thirty seconds and write only inside its own output directory.
 ## 5. No stale names
 
 ```bash
-grep -rIn "v_and_v\|v-and-v\|test_qikly\|test-qikly" --exclude-dir=.git --exclude-dir=outputs --exclude-dir=build --exclude-dir=dist --exclude-dir=.pytest_cache --exclude-dir=__pycache__ --exclude=ci.yml --exclude=CHANGELOG.md --exclude=RELEASE_CHECKLIST.md .
+grep -rIn "v_and_v\|v-and-v\|test_qikly\b\|test-qikly\b" --exclude-dir=.git --exclude-dir=outputs --exclude-dir=build --exclude-dir=dist --exclude-dir=.pytest_cache --exclude-dir=__pycache__ --exclude=ci.yml --exclude=CHANGELOG.md --exclude=RELEASE_CHECKLIST.md .
 ```
 
 Must return nothing. The three excluded files name the old project on
