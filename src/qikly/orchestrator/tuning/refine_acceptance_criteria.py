@@ -109,6 +109,7 @@ def refine(task_id, rounds, f, seed=None):
     _out(f, f"=== {task_id}: round 0 (initial one-shot) -- {len(criteria)} criteria ===")
     for c in criteria:
         _out(f, f"  - {c}")
+    first_new = len(criteria) + 1
 
     category_totals = {}
 
@@ -159,6 +160,23 @@ def refine(task_id, rounds, f, seed=None):
         _out(f, f"\n=== {task_id}: findings by category (all rounds) ===")
         for cat, n in sorted(category_totals.items(), key=lambda kv: -kv[1]):
             _out(f, f"  {cat}: {n}")
+
+    if len(criteria) >= first_new:
+        # A criterion about an input the fixtures lack yields a test that
+        # passes whatever the code does. Ask for rows while the added criteria
+        # are in hand, and report them for review: nothing here writes data.
+        from qikly.orchestrator.tuning.propose_fixtures import propose_for_refinement
+        try:
+            path, unreachable, added = propose_for_refinement(
+                task_id, criteria, first_new, seed=seed)
+            _out(f, f"\n=== {task_id}: fixture rows for the {added} criteria refinement added ===")
+            _out(f, f"  {unreachable} of {added} have no data that reaches them. "
+                    f"Proposals written to {path}; no fixture was changed.")
+        except Exception as e:
+            # Every convergence above went into these criteria. A failed
+            # proposal call must not cost them.
+            _out(f, f"\n  fixture proposals failed ({type(e).__name__}: {e}); "
+                    f"the refined criteria are unaffected")
 
     return criteria, category_totals
 

@@ -309,3 +309,9 @@ so that drift is visible in aggregate rather than one plausible row at a time.
 You can of course add rows by hand at any time, and always could. This exists
 because noticing *which* criteria have no data behind them is the tedious part.
 
+The refinement loop does this for you on what it adds. When
+`refine_acceptance_criteria` finishes with new criteria, it asks for rows the
+same way, lists the new criteria first in the report, and logs how many have no
+data that reaches them, so a sharper bar does not arrive partly unmeasurable.
+It still applies nothing.
+

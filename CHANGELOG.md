@@ -6,6 +6,16 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
+### Added
+- **The refinement loop proposes fixture rows for the criteria it adds.**
+  Refinement reads converged code and adds criteria about what that code could
+  still get wrong, which is often an input the fixtures do not contain, and a
+  criterion no row reaches yields a test that passes whatever the code does.
+  `refine_acceptance_criteria` now runs the fixture proposer over the refined
+  bar when it finishes, lists the added criteria first, and logs how many have
+  no data behind them. Like `propose_fixtures` itself, it writes a report for
+  review and never a fixture.
+
 ### Changed
 - **The split between `requirements` and `acceptance_criteria` now has a rule
   you can apply.** The docs said spec-level statements go in one and checkable

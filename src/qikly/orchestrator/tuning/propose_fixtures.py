@@ -165,22 +165,58 @@ def render(task_id, criteria, proposals):
     return "\n".join(lines)
 
 
+def _write(task_id, criteria, proposals, out_dir=OUT_DIR, label=""):
+    """The one place this module writes, and what it writes is a report."""
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(
+        out_dir, f"{task_id}_{label}{datetime.now().strftime('%Y%m%d_%H%M%S')}.md")
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(render(task_id, criteria, proposals))
+    return path
+
+
 def propose(task_id, seed=None):
     criteria = _criteria(task_id)
     if not criteria:
         print(f"[{task_id}] no acceptance_criteria to check.")
         return None
     proposals = agent_propose_fixture_rows(task_id, criteria, seed=seed)
-    os.makedirs(OUT_DIR, exist_ok=True)
-    path = os.path.join(
-        OUT_DIR, f"{task_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md")
-    with open(path, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(render(task_id, criteria, proposals))
+    path = _write(task_id, criteria, proposals)
     unreachable = sum(1 for p in proposals if not p.get("covered"))
     print(f"[{task_id}] {unreachable} of {len(criteria)} criteria have no data "
           f"that reaches them. Proposals written to {path}, and nothing else "
           f"was changed.")
     return path
+
+
+def propose_for_refinement(task_id, criteria, first_new, seed=None, out_dir=OUT_DIR):
+    """
+    Rows for the criteria a refinement run added, written for review.
+
+    The refinement loop reads converged code and adds criteria about what that
+    code could still get wrong, which is often an input the fixtures do not
+    contain. A criterion like that yields a test that passes whatever the code
+    does, so without this a sharper bar arrives partly unmeasurable: the gap
+    that left most planted faults in this project's own measurements caught by
+    nobody.
+
+    The proposer sees the whole refined list, because whether data already
+    reaches a criterion depends on all of it. The report lists the added
+    criteria first, numbered from `first_new` (1-based), so the per-round cap
+    is spent on them.
+
+    Returns (report path, added criteria no data reaches, criteria added).
+    Makes no model call when nothing was added, and like everything else in
+    this module it writes a report and never a fixture.
+    """
+    added = len(criteria) - (first_new - 1)
+    if added <= 0:
+        return None, 0, 0
+    proposals = agent_propose_fixture_rows(task_id, criteria, seed=seed)
+    unreachable = sum(1 for p in proposals
+                      if not p.get("covered") and p.get("criterion", 0) >= first_new)
+    ordered = sorted(proposals, key=lambda p: p.get("criterion", 0) < first_new)
+    return _write(task_id, criteria, ordered, out_dir, label="refined_"), unreachable, added
 
 
 def main():
