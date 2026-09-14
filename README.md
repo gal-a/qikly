@@ -13,6 +13,8 @@
 [![marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Qikly%20Test%20Generation-2b8f95)](https://github.com/marketplace/actions/qikly-test-generation)
 [![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22qikly%5Bmcp%5D%22%2C%22qikly-mcp%22%5D%7D)
 
+[![qikly: one spec in, code and tests out, written by a coding agent and a test agent that are kept apart](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_hero.png)](https://test.qikly.com)
+
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
 
 **The solution: two agents.** One turns the acceptance criteria into tests.
@@ -31,6 +33,8 @@ different problem. See [What it is for](#what-it-is-for).
 **Just want to see how it works, free and with no API key?** Run `pip install qikly`,
 then `qikly --explain CALC_TAX`: it prints what each agent is shown, and the
 difference. [More on the free commands](#try-it-without-spending-anything).
+
+## The idea
 
 Imagine a student who writes the exam paper, writes the answer key, and then
 sits the exam. They pass. Obviously they pass, and nobody would accept that as
