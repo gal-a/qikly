@@ -97,6 +97,9 @@ code.
 
    Start reading at `outputs/reports/iterations/<task>_<timestamp>_report.html`.
 
+**Tried it?** [Tell us what happened](https://github.com/gal-a/qikly/discussions/6), whether it worked, stalled
+or never got past install.
+
 ### Step 1 from inside VS Code
 
 With the qikly MCP server connected (setup in

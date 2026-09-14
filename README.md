@@ -11,7 +11,7 @@
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/gal-a/qikly/blob/main/LICENSE)
 [![marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Qikly%20Test%20Generation-2b8f95)](https://github.com/marketplace/actions/qikly-test-generation)
-[![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22qikly-mcp%22%7D)
+[![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22qikly%5Bmcp%5D%22%2C%22qikly-mcp%22%5D%7D)
 
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
 
@@ -27,6 +27,10 @@ loaded, so runs stay small and quick. Large multi-file repositories are a
 different problem. See [What it is for](#what-it-is-for).
 
 **Just want to try it on your own data?** [Quick start on your own data](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md), five steps from your module to a first run.
+
+**Just want to see how it works, free and with no API key?** Run `pip install qikly`,
+then `qikly --explain CALC_TAX`: it prints what each agent is shown, and the
+difference. [More on the free commands](#try-it-without-spending-anything).
 
 Imagine a student who writes the exam paper, writes the answer key, and then
 sits the exam. They pass. Obviously they pass, and nobody would accept that as
@@ -330,6 +334,9 @@ That is a real run on `gemini-3.5-flash-lite`, 38 seconds, not sped up.
 from `qikly --scaffold your_module.py` to a first run, and the table of which
 command fits what you already have.
 
+**Tried it?** [Tell us what happened](https://github.com/gal-a/qikly/discussions/6), whether it worked, stalled
+or never got past install.
+
 ## Running
 
 ```bash
@@ -561,7 +568,7 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.4.3`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.4.4`, uploading the suite, the code and the JUnit XML |
 
 ## Use it in CI
 
@@ -612,49 +619,24 @@ it.
 ## Use it from your coding agent
 
 qikly runs as an [MCP](https://modelcontextprotocol.io) server, so an agent in
-Claude Code, Codex CLI or Cursor can start a run and read the result without you
-leaving the conversation.
+any MCP host can start a run and read the result without you leaving the
+conversation. It is tested in VS Code and Claude Code so far. With [uv](https://docs.astral.sh/uv/)
+installed there is nothing else to install. In Claude Code:
 
 ```bash
-pip install "qikly[mcp]"
-claude mcp add qikly -- qikly-mcp
+claude mcp add qikly -- uvx --from "qikly[mcp]" qikly-mcp
 ```
 
 In VS Code, the **Install qikly MCP** badge at the top of this page writes the
-configuration for you. It writes the configuration and nothing else, so the
-`pip install` above still comes first.
-
-If the server does not start, one command fixes both ways the badge fails.
-In your project folder:
-
-```bash
-python -m qikly --mcp-config
-```
-
-and paste what it prints over the badge's entry. The badge names a bare
-`qikly-mcp`, which pip on Windows often installs somewhere that is not on
-`PATH`, and the host starts the server in **the folder your editor has open**,
-which is often not your project. The printed config names your Python and your
-project folder in full, so neither can go wrong. `--mcp-config claude` prints
-the `mcpServers` shape that Claude Code and Cursor use.
-[`docs/mcp.md`](docs/mcp.md) has the details.
-
-Four tools: `qikly_run`, `qikly_status`, `qikly_validate`,
-`qikly_scaffold`. A run takes minutes to hours and no host will hold a tool call
-open that long, so `qikly_run` returns a run id straight away and `qikly_status`
-is how the agent finds out what happened. The run is detached, so you can close
-the editor and ask again tomorrow.
+same command for you.
 
 **No qikly tool returns your acceptance criteria**, on success or on failure.
-Your agent sees which tests failed and the pytest output. It does not see the
-rule it broke, which is the same position a human developer is in when CI goes
-red, and the reason the code it writes next aims at the requirement rather than
-at the test.
+Your agent sees which tests failed and the pytest output, never the rule it
+broke.
 
-One thing that is your side of the line: the generated tests under
-`outputs/tests/` are written from your criteria, so keep them out of your
-agent's reach. [`docs/mcp.md`](https://github.com/gal-a/qikly/blob/main/docs/mcp.md)
-has the config for that and the rest of the setup.
+[`docs/mcp.md`](https://github.com/gal-a/qikly/blob/main/docs/mcp.md) has the four tools, other hosts,
+installing with pip instead, what to do when the server does not start, and
+how to keep the generated tests out of your agent's reach.
 
 ## Further reading
 

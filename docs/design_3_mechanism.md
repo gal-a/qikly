@@ -142,35 +142,15 @@ qikly --demo
 
 The demo runs one task end to end in an output directory and prints what it built. That takes about thirty seconds. It writes nothing outside that directory.
 
-### Which command to run
-
-A task file is one YAML file with three parts, and the split above is a split
-between them:
-
-1. **`requirements`** the decisions: what the code must do, in the words a
-   person would use, including every choice that could have gone another way.
-   The coding agent reads this.
-2. **`interface`** the contract as a description rather than code: the function
-   signatures and the dotted path where the module will live. Both agents read
-   it, and neither is handed an implementation, because when the integration
-   and system tests are written there is not one yet.
-3. **`acceptance_criteria`** the consequences: what must be true if those
-   decisions were implemented correctly, each one checkable and naming its
-   boundary value. **Only test generation reads this.**
-
-Which command you want depends on which of the three you already have, and the
-full table is in
-[QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md#which-command-depends-on-which-parts-you-already-have).
-The short version: `qikly --explain <MY_TASK>` to see the split for yourself,
-`qikly --demo` to watch a whole run, `qikly --init` to start a task from
-nothing, and `qikly --scaffold <FILE>.py` to start one from code you already
-have.
-
 ### What you already have decides how you use it
 
-A task file has three parts, and which of them you already have decides both
-what qikly does for you and which command you run. The full table, with the
-exact command for each starting point, is in
+A task file has the three parts described under [The mechanism](#the-mechanism),
+and which of them you already have decides both what qikly does for you and
+which command you run. The short version: `qikly --explain <MY_TASK>` to see the
+split for yourself, `qikly --demo` to watch a whole run, `qikly --init` to start
+a task from nothing, and `qikly --scaffold <FILE>.py` to start one from code you
+already have. The full table, with the exact command for each starting point, is
+in
 [QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md#which-command-depends-on-which-parts-you-already-have).
 The four that matter most, most valuable first:
 

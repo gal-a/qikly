@@ -179,3 +179,14 @@ only after upload, and a rejected version number cannot be reused.
 Install from PyPI in yet another clean environment and run the demo once more.
 That is the only check that exercises the actual published artefact rather than
 a local build of it.
+
+Then check the landing page's footer links still answer. One points at the
+author's books site, which this repository does not control:
+
+```bash
+QIKLY_CHECK_LINKS=1 python -m pytest -q tests/test_landing_page_footer.py
+```
+
+In PowerShell, set `$env:QIKLY_CHECK_LINKS=1` first. If the books address has
+moved, change `BOOKS_URL` in that test and the footer in `docs/index.html`
+together.

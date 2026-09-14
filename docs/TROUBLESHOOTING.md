@@ -193,12 +193,10 @@ About twenty points of the gap between "passes integration and system" and
 "passes everything" is the unit stage, consistently, across every sweep this
 project has run.
 
-The reason is structural rather than mysterious. Its suite is the largest, so
-there is more to satisfy. It runs last, when the earlier stages already pass and
-regression checks force them to keep passing, so a fix has the least room to
-move. And it is the one stage whose tests are written with sight of the
-implementation, so it can assert on incidental internal structure rather than on
-required behaviour.
+The reason is structural rather than mysterious: the unit suite is the largest,
+runs last, and is the only one written with sight of the implementation.
+[design_2_performance.md](https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md#nearly-the-whole-gap-between-those-two-numbers-is-the-unit-stage)
+has the full explanation.
 
 If behavioural verification is what you need, `orchestrator.test_order` in
 settings can leave it out.

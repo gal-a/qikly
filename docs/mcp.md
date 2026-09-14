@@ -1,40 +1,50 @@
 # qikly over MCP
 
 `qikly` runs as an [MCP](https://modelcontextprotocol.io) server, so an agent in
-Claude Code, Codex CLI, Cursor or any other MCP host can start a run and read
-its result without you leaving the conversation to type a command.
+any MCP host can start a run and read its result without you leaving the
+conversation to type a command. It is tested in VS Code and Claude Code so far;
+the setup for other hosts below follows the MCP standard but has not been
+verified end to end.
+
+With [uv](https://docs.astral.sh/uv/) installed, nothing else needs installing.
+In Claude Code:
 
 ```bash
-pip install "qikly[mcp]"
+claude mcp add qikly -- uvx --from "qikly[mcp]" qikly-mcp
 ```
 
-Then register the `qikly-mcp` command with your host. In Claude Code:
-
-```bash
-claude mcp add qikly -- qikly-mcp
-```
-
-Other hosts take the same two facts in their own config file: the command is
-`qikly-mcp`, and it speaks stdio.
+Other hosts take the same command in their own config file, and it speaks
+stdio:
 
 ```json
 {
   "mcpServers": {
-    "qikly": { "command": "qikly-mcp" }
+    "qikly": { "command": "uvx", "args": ["--from", "qikly[mcp]", "qikly-mcp"] }
   }
 }
 ```
+
+Without uv, install with pip and register the `qikly-mcp` command instead:
+
+```bash
+pip install "qikly[mcp]"
+claude mcp add qikly -- qikly-mcp
+```
+
+`uvx` keeps the version it first installed. To pick up a new release, run
+`uv cache clean qikly` and restart the host.
 
 Run it from the project directory, the one holding `inputs_private/`. That is
 how it finds your tasks, and it is the same rule the CLI follows.
 
 ## One-click install, and which editors have it
 
-The README badge installs into **VS Code**. The same redirect serves Insiders
+The README badge installs into **VS Code**. It writes the `uvx` command above,
+so it needs uv and installs nothing itself. The same redirect serves Insiders
 from its own host:
 
 ```markdown
-[![VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_qikly_MCP-24bfa5?logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22qikly-mcp%22%7D)
+[![VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-Install_qikly_MCP-24bfa5?logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22qikly%5Bmcp%5D%22%2C%22qikly-mcp%22%5D%7D)
 ```
 
 A common mistake in other projects' READMEs is pointing both buttons at
@@ -62,8 +72,10 @@ accepts a hand-written config**, and the button only ever saves you a paste.
 Both were hit on a real machine before anyone else saw them, and neither
 announces itself clearly, so they are worth reading before you debug.
 
-**`qikly-mcp` has to be on `PATH`.** Every config above, and the one-click
-install button in the README, names the bare command. On Windows, `pip` often
+**The command has to be on `PATH`.** The uv route and the one-click button run
+`uvx`, which the uv installer puts on `PATH`, though an editor opened before
+you installed uv will not see it until you restart the editor. The pip route
+names a bare `qikly-mcp`, and on Windows `pip` often
 installs console scripts into a `Scripts` directory that is not on `PATH`, and
 the host then reports only that the command was not found. Check it:
 

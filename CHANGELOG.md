@@ -4,7 +4,9 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
-## Unreleased
+## 0.4.4
+
+> Scaffolded tasks can now fix the code they test: upgrade before verifying your own module
 
 ### Added
 - **`--validate` warns about scaffold placeholders left in a task.** A file
@@ -47,6 +49,24 @@ packaging tools would read as `1.1`.
   folders on C:, and reproduced locally on a mapped drive.
 
 ### Changed
+- **The VS Code install button and the Claude Code line use `uvx`.** The
+  button wrote a bare `qikly-mcp`, which pip on Windows often installs off
+  `PATH`, so the first click frequently produced a server that would not
+  start. It now writes `uvx --from qikly[mcp] qikly-mcp`, the command the MCP
+  Registry listing already uses, which needs uv and no separate pip install.
+  In Claude Code the one line is `claude mcp add qikly -- uvx --from "qikly[mcp]" qikly-mcp`.
+  The pip route stays documented in `docs/mcp.md`.
+- **Fewer places saying the same thing.** The README's MCP section is a short
+  pointer to `docs/mcp.md` rather than a second copy of it, the troubleshooting
+  page links the explanation of why runs stall at the unit stage instead of
+  repeating it, and `design_3_mechanism.md` defines the task file's three parts
+  once. The README also gains a free first step near the top,
+  `qikly --explain CALC_TAX`, which needs no API key.
+- **A place to say how trying it went.** The README and the quick start link a
+  Discussions thread for reports, whether a run worked, stalled or never got
+  past install. The MCP docs now say what has been verified: the server is
+  tested in VS Code and in Claude Code, and the setup for other hosts follows
+  the standard but has not been checked end to end.
 - **`--scaffold` writes one task file, not two.** By default it writes
   `<NAME>_VERIFY.yaml`, the task that tests the code you already have, and
   `--fresh` writes the task for a new implementation of the same interface
