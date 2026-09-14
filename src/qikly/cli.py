@@ -1229,9 +1229,9 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
     os.makedirs(dest_dir, exist_ok=True)
 
     if fresh:
-        seed_mode, suffix, headline = None, "", "writes a fresh implementation"
+        seed_mode, headline = None, "writes a fresh implementation"
     else:
-        seed_mode, suffix, headline = "existing", "_VERIFY", "tests the code you already have"
+        seed_mode, headline = "existing", "tests the code you already have"
     text, problem = build_task(source, root, task_id=task_id, seed=seed_mode)
     if problem:
         print(problem)
@@ -1241,9 +1241,9 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
         if doc_problem:
             print(doc_problem)
             return 2
-    base = re.search(r'task_id:\s*"([^"]+)"', text).group(1)
-    tid = base + suffix
-    text = text.replace(f'task_id: "{base}"', f'task_id: "{tid}"', 1)
+    # build_task names the task, including the _VERIFY suffix, so this and the
+    # MCP tool always agree on it.
+    tid = re.search(r'task_id:\s*"([^"]+)"', text).group(1)
     dest = os.path.join(dest_dir, f"{tid}.yaml")
     if os.path.exists(dest):
         print(f"{shown(dest)} already exists. Move it aside first, or pass "
@@ -1293,7 +1293,9 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
     inputs = (yaml.safe_load(text) or {}).get("inputs") or []
     missing = [p for p in inputs if not os.path.isfile(os.path.join(root, p))]
     steps = [f"add a real sample of your input data at {p}" for p in missing]
-    steps.append("replace the TODO lines, then check it for free:  qikly --validate")
+    # Scoped to this task: unscoped, --validate also checks every bundled
+    # example, and the one line about this task gets lost among them.
+    steps.append(f"replace the TODO lines, then check it for free:  qikly --validate --tasks {tid}")
     steps.append(f"run it:  qikly --tasks {tid}")
     print()
     print("  Next:")

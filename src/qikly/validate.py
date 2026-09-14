@@ -68,10 +68,12 @@ _VAGUE = ("appropriate", "reasonable", "sensible", "properly", "correctly",
           "gracefully", "as needed", "if necessary", "valid data", "large",
           "small", "quickly", "efficiently")
 
-# What a scaffold writes where only the author can fill in. A file still carrying
+# What a scaffold writes where only the author can fill in, matched by its own
+# shape (`TODO:` and `TODO one line summary`) so a requirement that merely
+# mentions TODO comments is not flagged. A file still carrying
 # one passes every other check here, and a run would send the placeholder to the
 # agents as the specification.
-_TODO = re.compile(r"\bTODO\b")
+_TODO = re.compile(r"\bTODO(?::|\s+one line summary)")
 
 
 def _input_exists(relative):

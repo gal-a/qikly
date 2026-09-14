@@ -81,10 +81,11 @@ code.
 4. **Check it, for free.**
 
    ```bash
-   qikly --validate
+   qikly --validate --tasks <NAME>_VERIFY
    ```
 
-   No model call and no cost. It checks that the file parses, that every input
+   No model call and no cost. Without `--tasks` it also checks every bundled
+   example. It checks that the file parses, that every input
    path exists, that no `TODO` placeholder is left, that criteria name values
    rather than adjectives, and that no requirement restates a criterion.
 
@@ -423,9 +424,8 @@ Paths are relative to your project directory. Both keys are optional.
 
 **`seed.implementation` is how you point this at code you already have.** The
 run skips generating a first implementation and goes straight to testing and
-repairing yours. `--scaffold` writes this block for you: it produces two task
-files, one carrying `seed.implementation` and one without, so you pick by
-deleting rather than by editing. **`seed.tests` keeps a suite you already trust**, so the loop
+repairing yours. `--scaffold` writes this block for you by default, and `--fresh` writes a
+task without it, for a new implementation of the same interface. **`seed.tests` keeps a suite you already trust**, so the loop
 repairs the code against your tests rather than its own. Mixing works and is
 often what you want: seed the integration stage with your suite and let the
 tool generate unit tests against whatever code results.

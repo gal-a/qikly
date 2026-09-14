@@ -64,6 +64,10 @@ acceptance_criteria:
 # A scaffold writes one of two task files, because one command cannot know which
 # of two jobs you meant. The default, SEED_EXISTING, tests the code you already
 # have; `--fresh` picks SEED_NONE and a new implementation instead.
+# The task that tests existing code is <NAME>_VERIFY, so it never collides with
+# the <NAME> a `--fresh` scaffold of the same file writes.
+VERIFY_SUFFIX = "_VERIFY"
+
 SEED_NONE = """
 # No `seed:` block, so a run writes a FRESH implementation from your
 # requirements. The file you scaffolded from was read only for its signatures.
@@ -162,16 +166,19 @@ def _relative_to(path, start):
         return None
 
 
-def module_path(source_path, project_root):
-    """Dotted module path for a file inside the project."""
-    rel = _relative_to(source_path, project_root)
-    if rel is None:
-        # No dotted path reaches another drive, so name the module by its file.
-        return os.path.splitext(os.path.basename(source_path))[0]
-    rel = rel.replace(os.sep, "/")
-    if rel.endswith(".py"):
-        rel = rel[:-3]
-    return rel.replace("/", ".")
+def module_path(source_path, task_id):
+    """
+    The dotted path a run's tests import this module by.
+
+    A run installs the implementation, seeded or generated, into
+    outputs/agent_src/code/<task_id>/ under the file's own name, and runs pytest
+    from the project root. So the module is outputs.agent_src.code.<task_id>.
+    <file name>, wherever the original lives. It used to be the path relative
+    to the project root, which made every test import the original file rather
+    than the copy the coding agent patches, so no fix could ever reach a test.
+    """
+    stem = os.path.splitext(os.path.basename(source_path))[0]
+    return "outputs.agent_src.code.%s.%s" % (task_id, stem)
 
 
 def _source_rel(source_path, project_root):
@@ -197,9 +204,13 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
                       f"no interface to describe. Tests need something to call.")
 
     stem = os.path.splitext(os.path.basename(source_path))[0]
-    task_id = task_id or "".join(c if c.isalnum() else "_" for c in stem).upper()
+    base = task_id or "".join(c if c.isalnum() else "_" for c in stem).upper()
+    # Named here, not by each caller, so `--scaffold` and the MCP tool cannot
+    # disagree about what the task that tests existing code is called. Both
+    # jobs share one data folder, since they read the same inputs.
+    task_id = base + (VERIFY_SUFFIX if seed == "existing" else "")
     entry = guess_entrypoint(functions)
-    inputs = inputs or [f"inputs_private/data/{task_id}/input_01.csv"]
+    inputs = inputs or [f"inputs_private/data/{base}/input_01.csv"]
 
     fn_lines = "\n".join(
         f'    - "{_signature(f)}  # TODO: what it does"' for f in functions)
@@ -218,7 +229,7 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
         task_name=f"{task_id}: TODO one line summary",
         description="TODO: one paragraph on what this module is for",
         inputs=in_lines,
-        module=module_path(source_path, project_root),
+        module=module_path(source_path, task_id),
         functions=fn_lines,
         entrypoint=f"{_signature(entry)}  # guessed, check this",
         source_rel=_source_rel(source_path, project_root),

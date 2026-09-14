@@ -134,3 +134,21 @@ def test_the_mcp_scaffold_returns_the_task_that_tests_the_existing_code(tmp_path
     task = yaml.safe_load(payload["task_yaml"])
     assert task["seed"]["implementation"]
     assert "inputs_private/config/tasks/%s.yaml" % task["task_id"] in payload["note"]
+
+
+def test_the_todo_warning_ignores_a_requirement_about_todo_comments(tmp_path):
+    task = tmp_path / "T.yaml"
+    task.write_text(
+        'task_id: "T"\n'
+        'requirements:\n  - "Flag any line containing a TODO comment as pending work"\n'
+        'interface:\n  module: "m"\n'
+        'acceptance_criteria:\n  - "0 is rejected and 1 is accepted"\n',
+        encoding="utf-8")
+    _errors, warnings = validate.check_task(str(task))
+    assert not any("placeholders" in w for w in warnings), warnings
+
+
+def test_the_validate_step_is_scoped_to_the_new_task(tmp_path, monkeypatch, capsys):
+    _module(tmp_path, monkeypatch)
+    cli._do_scaffold("billing.py", None)
+    assert "qikly --validate --tasks BILLING_VERIFY" in capsys.readouterr().out

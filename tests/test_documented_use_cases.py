@@ -395,7 +395,7 @@ def test_scaffold_says_which_code_a_run_will_test():
     assert "{seed_block}" in scaffold.TASK_TEMPLATE, "the ending is chosen, not fixed"
 
     printed = inspect.getsource(cli._do_scaffold)
-    assert "_VERIFY" in printed, "the two jobs must be distinguishable by name"
+    assert scaffold.VERIFY_SUFFIX == "_VERIFY", "the two jobs must be distinguishable by name"
     assert "--fresh" in printed, "and the reader has to be told how to get the other"
 
 

@@ -21,6 +21,23 @@ packaging tools would read as `1.1`.
   review and never a fixture.
 
 ### Fixed
+- **A scaffolded task could never fix the code it was testing.** `--scaffold`
+  wrote `interface.module` as the file's path relative to the project, such as
+  `billing`, but a run installs the code into `outputs/agent_src/code/<task>/`
+  and runs pytest from the project root. So the tests imported the original
+  file, the coding agent patched the copy, and no fix ever reached a test. The
+  module is now `outputs.agent_src.code.<task>.<file>`, the path the bundled
+  tasks already used. Found by an audit and reproduced end to end: a patched
+  copy returning `PATCHED` against tests that saw `ORIGINAL`. A regression test
+  now runs that same check. Affects every task scaffolded with 0.4.3 or earlier;
+  change the `module:` line of one by hand to fix it.
+- **The MCP `qikly_scaffold` tool and `--scaffold` named the same task
+  differently**, `BILLING` against `BILLING_VERIFY`. The suffix is now added in
+  one place, so they agree.
+- **Scaffold's next step now runs `--validate --tasks <task>`.** Unscoped, it
+  also checked every bundled example, which buried the one result that mattered.
+- **The `TODO` warning matches only scaffold's own placeholders**, so a
+  requirement that mentions TODO comments is no longer flagged.
 - **Scaffolding a module on a different drive from the project failed on
   Windows.** `os.path.relpath` has no answer across drives and raises, so
   `--scaffold` and the MCP `qikly_scaffold` tool stopped with "path is on

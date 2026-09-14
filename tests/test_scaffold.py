@@ -79,8 +79,9 @@ def test_the_entrypoint_falls_back_to_the_widest_signature():
     assert scaffold.guess_entrypoint(fns).name == "beta"
 
 
-def test_the_module_path_is_dotted_and_relative_to_the_project(module):
-    assert scaffold.module_path(str(module), str(module.parent.parent)) == "src.billing"
+def test_the_module_path_is_where_a_run_installs_the_code(module):
+    """Not relative to the project: tests import the copy the coding agent patches."""
+    assert scaffold.module_path(str(module), "BILLING") == "outputs.agent_src.code.BILLING.billing"
 
 
 # ---------------------------------------------------------- the generated ----
@@ -90,7 +91,7 @@ def test_the_generated_task_is_valid_yaml_with_the_interface_filled_in(module):
     assert problem is None
     data = yaml.safe_load(text)
     assert data["task_id"] == "BILLING"
-    assert data["interface"]["module"] == "src.billing"
+    assert data["interface"]["module"] == "outputs.agent_src.code.BILLING.billing"
     assert len(data["interface"]["integration_functions"]) == 3
     assert data["interface"]["system_entrypoint"].startswith("run_billing")
 

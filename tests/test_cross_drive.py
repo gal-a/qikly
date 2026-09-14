@@ -28,7 +28,7 @@ def test_scaffold_builds_a_task_for_a_module_on_another_drive(tmp_path, monkeypa
                                         seed="existing")
     assert problem is None
     task = yaml.safe_load(text)
-    assert task["interface"]["module"] == "billing", "named by its file"
+    assert task["interface"]["module"] == "outputs.agent_src.code.BILLING_VERIFY.billing"
     implementation = task["seed"]["implementation"]
     assert os.path.isabs(implementation), "a seed on another drive has to be absolute"
     assert implementation.endswith("billing.py")
@@ -40,7 +40,7 @@ def test_a_module_on_the_same_drive_keeps_its_relative_paths(tmp_path):
     module = project / "src" / "billing.py"
     module.write_text(MODULE, encoding="utf-8")
     task = yaml.safe_load(scaffold.build_task(str(module), str(project), seed="existing")[0])
-    assert task["interface"]["module"] == "src.billing"
+    assert task["interface"]["module"] == "outputs.agent_src.code.BILLING_VERIFY.billing"
     assert task["seed"]["implementation"] == "src/billing.py"
 
 
