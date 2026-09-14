@@ -225,6 +225,26 @@ a test rather than by an arrangement someone has to remember to keep.
 There is a second difference, and it outlasts the run: a reviewer emits a
 verdict, and this emits a pytest suite you still have in six months.
 
+### "Doesn't a failing test give the criteria away?"
+
+It gives away one case, and that is by design. When a test fails, the coding
+agent sees the test name and the assertion error: in the case study, that a tax
+rate of 150 was accepted when it should not have been. It never sees the
+criterion behind it, and never sees the tests it has not failed yet.
+
+That does not undo the separation, because independence is a property of how
+the suite was written, not of how much feedback the code's author receives
+afterwards. The integration and system suites are generated from the criteria
+before any implementation exists, and nothing the coding agent learns later can
+reshape a test that is already written. A repair that games the one visible
+failure still has the rest of the suite in its way, and earlier stages run again
+each time a later one clears.
+
+It is the position a developer is in when CI goes red: they see what broke, not
+the test plan. The agent in the case study wrote `tax_rate > 100` only because a
+test told it 150 was wrong. Had it been handed the criteria, it would have
+written the bound first time, and the green would have proved nothing.
+
 Design rationale, and the harder problem of where `acceptance_criteria` comes
 from in the first place: **[docs/design_1_case_study.md](https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md)**,
 the first of three parts.
@@ -502,7 +522,7 @@ qikly --tasks MY_TASK
 
 **[docs/USING_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/USING_YOUR_OWN_DATA.md)** has the
 rest: the task file field by field, getting the split between `requirements`
-and `acceptance_criteria` right (the gap between them is the whole mechanism),
+and `acceptance_criteria` right (decisions in one, their consequences in the other, and the gap between them is the whole mechanism),
 lifting criteria out of a ticket you already wrote, seeding your own
 implementation or test suites, where each file is read from, and proposing the
 fixture rows a criterion needs before any test can reach it.

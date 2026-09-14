@@ -74,7 +74,7 @@ interface:                            # what test generation targets
     - "load(data, output_path) -> None  # writes the result as JSON"
   system_entrypoint: "run_calc(input_paths, output_path) -> None  # extract each path, then transform -> load"
 
-requirements:                         # THE VAGUE HALF. The coding agent sees only this.
+requirements:                         # THE DECISIONS. The coding agent sees only this.
   - "Read both CSV files listed in inputs and combine their rows before validation"
   - "Validate each row: order_id, item_price, quantity, tax_rate"
   - "Apply strict, real-world data-quality validation; reject anything malformed or out of range"
@@ -82,7 +82,7 @@ requirements:                         # THE VAGUE HALF. The coding agent sees on
   - "A rejected row is not silently dropped: record it with a brief, specific reason"
   - "Write a single JSON object with two keys, \"accepted\" and \"rejected\""
 
-acceptance_criteria:                  # THE SHARP HALF. Withheld from the coding agent.
+acceptance_criteria:                  # THE CONSEQUENCES. Withheld from the coding agent.
   - "All computed currency amounts are rounded to two decimal places using round-half-up, not banker's rounding and not truncation"
   - "For every accepted row, the reported total equals the reported subtotal plus the reported tax, exactly, to the cent"
   - "A tax_rate of exactly 0 is valid: the computed tax is 0.00 and the total equals the subtotal"
@@ -105,17 +105,48 @@ is the place to start reading.
 
 ### Getting the two halves right
 
-This matters more than anything else in the file. Put the real-spec-level
-statements in `requirements` and the specific, objectively checkable edge
-cases in `acceptance_criteria`. **The gap between them is the entire
-mechanism**: with nothing withheld, both sides read the spec identically and
-every test passes first try, which proves nothing.
+This matters more than anything else in the file, and one question settles
+most of it.
 
-One trap. An *arbitrary* criterion, one that contradicts what the model
-correctly knows about the world, does not produce more iterations. It produces
-a stuck loop, because the model keeps "fixing" your restriction back open.
-Prefer edge cases that are objectively verifiable but do not fight reality.
-More on this in [docs/design_3_mechanism.md](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md#using-it).
+**`requirements` holds the decisions.** Anything a person chose that could have
+gone another way: a threshold, a unit, a measurement convention, an exemption.
+Nobody can guess a decision, so the coding agent has to be told.
+
+**`acceptance_criteria` holds the consequences.** What must be true if those
+decisions were implemented correctly: the exact boundary, the identity that has
+to hold, the case a careless reading gets wrong. They are withheld because they
+are the exam.
+
+> **Given only the requirements, could two competent developers legitimately
+> disagree about this line?** If yes, it is a decision and belongs in
+> `requirements`. If no, it is a consequence and belongs in
+> `acceptance_criteria`.
+
+| In `requirements`, because it is a decision | In `acceptance_criteria`, because it follows |
+|---|---|
+| Keep at least 2.5 m from the vehicle ahead, measured centre to centre | At exactly 2.500 m, no violation is raised |
+| Amounts are currency, rounded to the nearest cent | For every accepted row, total equals subtotal plus tax, exactly |
+| Dates are written YYYY-MM-DD | 2026-02-30 is rejected, because it is not a real date |
+
+**The gap between them is the entire mechanism**: with nothing withheld, both
+sides read the spec identically and every test passes first try, which proves
+nothing.
+
+**Getting it wrong has a signature.** A decision placed in
+`acceptance_criteria` is withheld from the one agent that needed it. It does not
+produce a harder test, it produces a stuck loop: the same patch repeating,
+because the model keeps "fixing" a restriction it was never told about back to
+what it correctly believes. Restrict street suffixes to three valid values and
+it will keep widening them, since everything it knows says "Boulevard" is a
+suffix. Move the restriction into `requirements`, or widen the criterion to
+match reality. [TROUBLESHOOTING.md](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md#3-the-same-patch-appearing-over-and-over)
+has the diagnosis.
+
+**To see a task that follows the rule,** run `qikly --explain CALC_TAX`. Its
+requirements say amounts are "currency amounts rounded to the nearest cent",
+and the withheld criteria pin what that already means, down to a float result
+of 434.99999999999994 reporting as 435.00. More in
+[docs/design_3_mechanism.md](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md#using-it).
 
 ## Bringing acceptance criteria you have already written
 

@@ -62,9 +62,9 @@ One more difference, and it is the one that outlasts the run: a reviewer emits a
 A task file has **three** parts, and the cut runs between the third and the
 first two:
 
-1. **`requirements`** is the vague part: what a real specification looks like before anyone sharpens it.
+1. **`requirements`** is the vague part, and it holds the decisions: what a real specification says before anyone sharpens it, including every choice that could have gone another way, such as a threshold, a unit or an exemption.
 2. **`interface`** is the contract as a description rather than code, the function signatures and where the module will live. Both agents read it.
-3. **`acceptance_criteria`** is the sharp part: specific, objectively checkable rules, including the boundary values and edge cases a vague spec leaves open.
+3. **`acceptance_criteria`** is the sharp part, and it holds the consequences: specific, objectively checkable statements of what must be true if those decisions were implemented correctly, including the boundary values and edge cases a careless reading gets wrong. A decision does not belong here: withheld from the one agent that needed it, it produces a stuck loop rather than a harder test.
 
 The test generation agent receives all three. The coding agent receives the
 first two, **with the acceptance criteria removed in code before the prompt is
@@ -147,14 +147,16 @@ The demo runs one task end to end in an output directory and prints what it buil
 A task file is one YAML file with three parts, and the split above is a split
 between them:
 
-1. **`requirements`** what the code must do, in the words a person would use.
+1. **`requirements`** the decisions: what the code must do, in the words a
+   person would use, including every choice that could have gone another way.
    The coding agent reads this.
 2. **`interface`** the contract as a description rather than code: the function
    signatures and the dotted path where the module will live. Both agents read
    it, and neither is handed an implementation, because when the integration
    and system tests are written there is not one yet.
-3. **`acceptance_criteria`** what counts as correct, each one checkable and
-   naming its boundary value. **Only test generation reads this.**
+3. **`acceptance_criteria`** the consequences: what must be true if those
+   decisions were implemented correctly, each one checkable and naming its
+   boundary value. **Only test generation reads this.**
 
 Which command you want depends on which of the three you already have, and the
 full table is in

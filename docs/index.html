@@ -772,6 +772,17 @@ footer {
       see the cut rather than trust it. <em>You can also do both</em>: qikly
       picks a model per agent role.
 </p>
+    <p class="counter">
+      You might also ask, <b>"doesn't a failing test give the criteria away?"</b>
+      It gives away one case: the test name and the assertion error. Never the
+      rule behind it, and never the tests the agent has not failed yet.
+    </p>
+    <p class="counter">
+      That does not undo the separation. Independence is a property of how the
+      suite was written, not of how much feedback follows: the integration and
+      system suites are generated from the criteria before any code exists, and
+      nothing the coding agent learns later can reshape a test already written.
+    </p>
 
   </section>
 

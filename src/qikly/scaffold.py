@@ -207,6 +207,12 @@ STARTER_TASK = '''# A starter task. Replace it, or copy it and edit.
 # requirements and never reads acceptance_criteria, while test generation
 # reads both. A criterion the agent could see is a criterion it can write code
 # to satisfy without ever being tested on it.
+#
+# Decisions go in requirements: anything that could have gone another way, such
+# as a threshold, a unit or an exemption, because the agent cannot guess it.
+# Consequences go in acceptance_criteria: what must be true if those decisions
+# are implemented correctly. If two careful developers could disagree about a
+# line, it is a decision.
 task_id: "MY_FIRST_TASK"
 
 task_name: "My first task"
@@ -229,9 +235,10 @@ interface:
 
 requirements:
   - "Read the input CSV and validate each row"
-  - "Write accepted and rejected rows to the output as JSON, each rejected row keeping a reason"
+  - "A row is valid only if its identifier is non-empty and its quantity is a positive whole number"
+  - "Write the result as JSON, keeping every valid row and every invalid row, and give each invalid row the reason it failed"
 
-# Never shown to the coding agent. Write boundary values explicitly.
+# Never shown to the coding agent. The consequences, with boundary values written out.
 acceptance_criteria:
   - "A quantity of 0 is rejected and a quantity of 1 is accepted"
   - "A row with an empty identifier is rejected with a reason naming the field"

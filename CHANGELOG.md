@@ -4,6 +4,27 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## Unreleased
+
+### Changed
+- **The split between `requirements` and `acceptance_criteria` now has a rule
+  you can apply.** The docs said spec-level statements go in one and checkable
+  edge cases in the other. That sends a measurement convention or an exemption
+  into the withheld half, where it produces the stuck loop the very next
+  paragraph warned about. The rule is now decisions versus consequences, with
+  one test for any line: could two competent developers, given only the
+  requirements, legitimately disagree about it? The authoring guide, the
+  mechanism write-up, the starter task and the `--scaffold` output all say so.
+  The starter task had followed the old rule: its criterion that a quantity of
+  0 is rejected was a decision its requirements never stated, and the
+  requirement is now there.
+- **"Doesn't a failing test give the criteria away?" is answered where the
+  objection is raised**, in the README and on the landing page, rather than
+  only in the case study.
+- **The stale-name guard matches whole words**, so a test named after the
+  package, such as `test_qikly_run`, no longer fails CI. It still catches a
+  path that names the old project.
+
 ## 0.4.3
 
 > Listed in the MCP Registry, so VS Code's own gallery can find it

@@ -60,6 +60,12 @@ Then confirm the packaged data actually shipped:
 Three `True`s. A missing `package-data` entry is invisible from the source tree
 and fatal on a user's machine.
 
+**Test the wheel, never an editable install.** A venv made with `pip install -e .`
+imports the source tree, so it reports the release version while exercising
+nothing that ships. An MCP host pointed at such a venv looks verified and is
+not, which nearly happened on 0.4.3. An `__editable__.qikly-*.pth` in
+`site-packages` is the tell.
+
 ## 4. The demo runs end to end
 
 ```bash
@@ -96,6 +102,12 @@ description, the GitHub repository name and topics, and the URLs in
   therefore VS Code's MCP gallery, offering the previous version: the listing
   names a version and installs it by pin, so a stale entry installs stale
   software rather than merely looking out of date.
+- **Getting `mcp-publisher`:** it is a release binary, not a pip package.
+  Download the archive for your platform from the `modelcontextprotocol/registry`
+  releases page and unpack it with `tar -xzf`. Run `mcp-publisher validate`
+  first, which needs no login. The login token lasts about five minutes, so
+  publish straight after logging in, and read "cannot publish duplicate
+  version" as already listed rather than as a failure.
 - The Action pins written in prose bump too: `gal-a/qikly@vX.Y.Z` in
   `README.md` and `docs/PROVIDER_KEY_SETUP.md`. Those are examples someone
   copies, so a stale one hands out a tag predating the fix they came for. The
