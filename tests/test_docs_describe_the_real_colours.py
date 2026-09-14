@@ -63,16 +63,22 @@ def test_code_is_purple_and_accent_is_teal_on_the_landing_page():
     assert "--accent: #57b8bd;" in page, "dark-mode --accent is no longer teal"
 
 
+def test_the_repair_loop_links_are_purple_in_the_diagram_source():
+    """
+    The mermaid block lives in design_1 only. README.md shows an image rendered
+    from it, and a separate test keeps that image in step with the block.
+    """
+    assert "linkStyle 11,12 stroke:#7e22ce" in _read("docs/design_1_case_study.md"), (
+        "the repair-loop links are no longer purple")
+
+
 @pytest.mark.parametrize("path", ["README.md", "docs/design_1_case_study.md"])
 def test_the_diagram_prose_matches_the_mermaid_link_colours(path):
     """
-    The diagram is duplicated in both files and a separate test keeps the
-    copies identical. This checks the sentences beside them, which that test
-    does not look at.
+    Both files describe the diagram in sentences beside it, which the image
+    fingerprint does not look at.
     """
     text = _read(path)
-    assert "linkStyle 11,12 stroke:#7e22ce" in text, (
-        "the repair-loop links are no longer purple")
     assert "Purple is what the coding agent can see" in text
     assert "Teal is what the standard is" in text
     assert "purple arrows are the repair loop" in text, (

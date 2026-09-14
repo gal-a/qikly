@@ -4,6 +4,16 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## Unreleased
+
+### Fixed
+- **The diagram shows on PyPI.** PyPI prints a mermaid block as source, so the
+  project page showed forty lines of flowchart code where the README's diagram
+  should be. The README now shows an image of the diagram, rendered from the
+  one in `docs/design_1_case_study.md` by `tools/render_flow_diagram.py`, and a
+  test fails when the image falls behind that source. GitHub shows the same
+  image.
+
 ## 0.4.4
 
 > Scaffolded tasks can now fix the code they test: upgrade before verifying your own module

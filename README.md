@@ -60,48 +60,10 @@ it in full. When a test fails, the agent sees the failure message and never
 the rule it broke. Without that asymmetry both sides read the same spec
 identically and every test passes first try, which proves nothing.
 
-```mermaid
-flowchart TD
-    SPEC["<b>Full specification</b><br/>task.yaml<br/>requirements + interface<br/>acceptance_criteria"]
-    REQ["requirements<br/>+ interface"]
-    AC["acceptance_criteria"]
-    CODE["<b>Coding agent</b><br/>writes the implementation<br/>FIX then PATCH on failure"]
-    TEST["<b>Test-writing agent</b><br/>writes the suite"]
-    IMPL["Implementation"]
-    SUITE["<b>pytest suite</b><br/>Tests for:<br/>1 integration, 2 system,<br/>then 3 unit"]
-    RUN{"Run the suite"}
-    FAIL["<b>Failure errors</b> only<br/>no criteria, no test source"]
-    OUT["Converged<br/><b>outputs:</b> code + suite<br/>+ audit trail"]
-    STALL["Did not converge<br/><b>failure errors and audit trail</b><br/>exits non-zero, ships nothing"]
-
-    SPEC --> REQ
-    SPEC --> AC
-    AC -. "never reaches" .-x CODE
-    REQ --> CODE
-    REQ --> TEST
-    AC --> TEST
-    CODE --> IMPL
-    TEST --> SUITE
-    IMPL --> RUN
-    SUITE --> RUN
-    RUN -- pass --> OUT
-    RUN -- fail --> FAIL
-    FAIL -- "repair loop:<br/>FIX, then PATCH" --> CODE
-    FAIL -- "retry budget spent" --> STALL
-    IMPL -. "unit stage only:<br/>written last, from the code" .-> TEST
-
-    classDef codeView fill:#f3e8ff,stroke:#7e22ce,color:#4c1d95
-    classDef standardView fill:#d9ebea,stroke:#0e6a70,color:#0b3d40
-    classDef converged fill:#dcfce7,stroke:#15803d,color:#14532d
-    classDef stalled fill:#fdf0d5,stroke:#b45309,color:#78350f
-    class CODE,IMPL,FAIL codeView
-    class AC,TEST,SUITE standardView
-    class OUT converged
-    class STALL stalled
-    linkStyle 10 stroke:#15803d,stroke-width:2px
-    linkStyle 11,12 stroke:#7e22ce,stroke-width:2px
-    linkStyle 13 stroke:#b45309,stroke-width:2px
-```
+<!-- An image rather than a mermaid block, because PyPI prints mermaid as source.
+     It is rendered from the diagram in docs/design_1_case_study.md by
+     tools/render_flow_diagram.py, and a test fails when the two drift. -->
+<img src="https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_flow.png" width="660" alt="How a run works. The full specification splits into requirements plus interface, which both agents receive, and acceptance_criteria, which only the test-writing agent receives and which never reaches the coding agent. The coding agent writes the implementation, the test-writing agent writes the pytest suite, and the suite runs. A pass gives converged outputs: code, suite and audit trail. A fail sends failure errors only, with no criteria and no test source, back to the coding agent as the repair loop, until the retry budget is spent and the run stops without converging but keeps the audit trail. Unit tests alone are written last, from the code.">
 
 **Purple is what the coding agent can see. Teal is what the standard is
 written from.** They never touch. A run that never converges is still worth having: it exits
