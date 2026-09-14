@@ -1,7 +1,8 @@
 # Contributing to qikly
 
-The contribution that helps most is a **new example task**, especially from a
-domain the ten bundled tasks do not cover. Today they are calculations,
+**Users are encouraged to contribute their own tasks.** A new example task is
+the contribution that helps most, especially from a domain the ten bundled
+tasks do not cover. Today they are calculations,
 clean-ups and merges on CSV files, plus one log summary. A task from sensor
 data, finance, healthcare records or logistics shows the tool working
 somewhere new, which a longer list of CSV pipelines cannot.
@@ -36,11 +37,35 @@ and settles the scope before you spend time on fixtures.
 - **Data you are free to publish.** Synthetic, or openly licensed. It ships in
   the package under Apache 2.0, so no personal or company data.
 
-## 3. The files
+## 3. Name it
 
-Everything lives under `src/qikly/inputs_public/`, named by a task id in upper
-case with a family prefix: `CALC_`, `ETL_`, `MERGE_` or `AGG_`, or a new one for
-a new domain.
+The task id names its file, its data folder and every output folder a run
+writes, so it has to stay unambiguous as more tasks arrive.
+
+- **`FAMILY_SUBJECT`, in upper case.** Words joined by single underscores, at
+  least two of them, at most 32 characters: `CALC_TAX`, `ETL_NAME_SPLIT`.
+- **The family says what kind of task it is.** Use an existing one when it fits:
+  `CALC_` for calculations, `ETL_` for clean-ups and normalisation, `MERGE_` for
+  combining sources, `AGG_` for summaries. A new domain gets a new short family,
+  such as `SENSOR_` or `LEDGER_`, agreed in the proposal.
+- **The subject says what it works on**, specifically enough that nobody would
+  pick it for a different task: `MERGE_STOCK`, not `MERGE_DATA`.
+- **No clash with an existing task, even in a different case.** `Calc_Tax` and
+  `CALC_TAX` cannot both exist on Windows or macOS.
+- **Never end it in `_VERIFY`.** `qikly --scaffold` adds that suffix to the tasks
+  it writes.
+- **Claim the id in your proposal.** That is how two contributors avoid picking
+  the same one.
+
+`tests/test_bundled_task_names.py` checks every rule above, so a clash fails the
+build instead of surfacing later. One conflict it cannot see: a user's own task
+with the same id replaces the bundled one in their project, without a warning. A
+specific subject makes that unlikely.
+
+## 4. The files
+
+Everything lives under `src/qikly/inputs_public/`, named by the task id from
+step 3.
 
 | File | Contents |
 |---|---|
@@ -52,7 +77,7 @@ Two other places count the bundled tasks, so update them too:
 `tests/test_demo_claims.py` asserts how many there are, and the docs say "ten"
 in several places, including the task list in `docs/design_3_mechanism.md`.
 
-## 4. Check it, in this order
+## 5. Check it, in this order
 
 From a clone, with `pip install -e .`:
 
@@ -67,7 +92,7 @@ python -m pytest -q                        # the whole suite, offline
 A run that does not converge is still worth sending. Say so in the pull
 request: a task that stalls tells us something too.
 
-## 5. The pull request
+## 6. The pull request
 
 Include:
 

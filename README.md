@@ -647,8 +647,9 @@ an agent kept apart from the code:
 
 ## Contributing a task
 
-The most useful contribution is a new example task, especially from a domain
-the ten bundled ones do not cover. [`CONTRIBUTING.md`](https://github.com/gal-a/qikly/blob/main/CONTRIBUTING.md)
+Users are encouraged to contribute their own tasks. The most useful is a new
+example task from a domain the ten bundled ones do not cover, under a name that
+follows the naming rules so it never clashes with another. [`CONTRIBUTING.md`](https://github.com/gal-a/qikly/blob/main/CONTRIBUTING.md)
 has what a task needs and how to check it before sending it. Every accepted
 task is credited in the changelog, and its author gets a contributor badge.
 Start with a

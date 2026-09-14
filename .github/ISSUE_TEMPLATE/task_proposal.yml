@@ -5,9 +5,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for offering one. A few lines here stop two people writing the
-        same task, and let us agree on the scope before you spend time on
-        fixtures. What a task needs is in CONTRIBUTING.md.
+        Users are encouraged to contribute their own tasks, so thank you for
+        offering one. A few lines here stop two people writing the same task, and
+        let us agree on the scope and the name before you spend time on fixtures.
+        What a task needs, and the naming rules, are in CONTRIBUTING.md.
 
         Tasks from domains the ten bundled examples do not cover are the most
         useful: today they are calculations, clean-ups and merges on CSV, and
@@ -17,6 +18,14 @@ body:
     attributes:
       label: Domain
       placeholder: sensor data, finance, healthcare records, logistics
+    validations:
+      required: true
+  - type: input
+    id: task_id
+    attributes:
+      label: Proposed task id
+      description: FAMILY_SUBJECT in upper case, at most 32 characters. It must not match an existing task in any case, and must not end in _VERIFY.
+      placeholder: SENSOR_PROXIMITY
     validations:
       required: true
   - type: textarea

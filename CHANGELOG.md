@@ -6,6 +6,19 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
+These change the repository and test.qikly.com rather than the installed tool,
+except `--explain --html` and the README that PyPI shows.
+
+### Changed
+- **test.qikly.com counts visits with GoatCounter**, which sets no cookies and
+  stores no personal data: page views, the source a visitor came from, and
+  clicks on the page's outbound links. The counter loads only after the page has
+  finished, so a network that blocks it cannot slow the page down.
+- **The README and the landing page read in a clearer order**: what each agent
+  sees comes before the comparison of code-derived and spec-derived suites,
+  both under their own headings, and the README's tables are lists so they fit a
+  phone.
+
 ### Added
 - **`qikly --explain TASK --html` writes the withholding as a page to share.**
   Both views side by side, the task file as test generation receives it with
@@ -17,8 +30,11 @@ packaging tools would read as `1.1`.
 - **A badge for projects that use qikly**, "tested with qikly", with the
   Markdown to paste in the README and the quick start.
 - **`CONTRIBUTING.md` and a task proposal form** for contributing example
-  tasks: what makes a good task, the files it needs, the checks to run before
-  sending it, and how it is credited.
+  tasks, since users are encouraged to contribute their own: what makes a good
+  task, how to name it, the files it needs, the checks to run before sending
+  it, and how it is credited. `tests/test_bundled_task_names.py` fails the build
+  when a task id breaks the `FAMILY_SUBJECT` convention, ends in `_VERIFY`,
+  differs from another only in case, or leaves a data folder behind.
 
 ### Fixed
 - **The diagram shows on PyPI.** PyPI prints a mermaid block as source, so the

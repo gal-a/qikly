@@ -56,6 +56,7 @@ jobs:
               "```",
               "",
               "**Maintainer checklist before merging**",
+              "- [ ] the task id follows the naming rules in CONTRIBUTING.md, which `tests/test_bundled_task_names.py` enforces",
               "- [ ] `qikly --validate --tasks <TASK_ID>` is clean",
               "- [ ] a real run converged, or the pull request explains the stall",
               "- [ ] `tests/test_demo_claims.py` and every doc that counts the bundled tasks are updated",
