@@ -114,7 +114,7 @@ and an apparently broken tool.
 | `qikly_run` | Starts a run for one task. Returns a run id **immediately**. |
 | `qikly_status` | Reports on a run: `running`, `passed`, `failed`, `stalled`, `unknown`. |
 | `qikly_validate` | Validates a task offline, the same check as `qikly --validate`. Free, no model call. It does not look for contradictions: that is `qikly --check-criteria`, a paid model call this server does not expose. |
-| `qikly_scaffold` | Turns a Python file into a task skeleton. |
+| `qikly_scaffold` | Turns a Python file into a task that tests that code, returned as text to save under `inputs_private/config/tasks/`. |
 
 ## Why `qikly_run` does not wait
 

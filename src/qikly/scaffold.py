@@ -43,16 +43,16 @@ interface:
 {functions}
   system_entrypoint: "{entrypoint}"
 
-# TODO. What the code is supposed to do, in the words a person would use.
-# The coding agent sees this section. Keep it at the level of a specification,
-# not a checklist.
+# TODO. The decisions: what the code must do, in the words a person would use,
+# including any choice that could have gone another way, such as a threshold, a
+# unit or an exemption. The coding agent sees this section.
 requirements:
   - "TODO: describe what this module must do"
 
-# TODO. The checkable edge cases, written so each names a boundary value.
-# The coding agent NEVER sees this section; test generation sees it in full,
-# and that asymmetry is the whole point. Deriving these from the code would
-# defeat it, so they are left for you.
+# TODO. The consequences: what must be true if those decisions are implemented
+# correctly, each naming its boundary value. The coding agent NEVER sees this
+# section; test generation sees it in full, and that asymmetry is the whole
+# point. Deriving these from the code would defeat it, so they are left for you.
 #
 # Write "rejects 0 and accepts 1" rather than "must be positive": the first
 # forces a test at the boundary, the second invites a test at 5.
@@ -61,9 +61,9 @@ acceptance_criteria:
 {seed_block}'''
 
 
-# A scaffold produces two task files, because one command cannot know which of
-# two different jobs you meant. Neither is a mode of the other and neither is
-# commented out: you delete the one you are not doing.
+# A scaffold writes one of two task files, because one command cannot know which
+# of two jobs you meant. The default, SEED_EXISTING, tests the code you already
+# have; `--fresh` picks SEED_NONE and a new implementation instead.
 SEED_NONE = """
 # No `seed:` block, so a run writes a FRESH implementation from your
 # requirements. The file you scaffolded from was read only for its signatures.

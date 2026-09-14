@@ -194,7 +194,7 @@ def test_scaffold_writes_the_task_where_the_user_is_standing(tmp_path, monkeypat
     src.write_text("def run_it(a, b):\n    pass\n", encoding="utf-8")
     monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
     assert cli._do_scaffold("mod.py", None) == 0
-    assert (tmp_path / "inputs_private/config/tasks/MOD.yaml").exists()
+    assert (tmp_path / "inputs_private/config/tasks/MOD_VERIFY.yaml").exists()
     assert "acceptance_criteria" in capsys.readouterr().out
 
 
@@ -205,7 +205,7 @@ def test_scaffold_refuses_to_clobber_an_existing_task(tmp_path, monkeypatch, cap
     src.write_text("def run_it(a):\n    pass\n", encoding="utf-8")
     monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
     cli._do_scaffold("mod.py", None)
-    existing = tmp_path / "inputs_private/config/tasks/MOD.yaml"
+    existing = tmp_path / "inputs_private/config/tasks/MOD_VERIFY.yaml"
     existing.write_text("hand written\n", encoding="utf-8")
     assert cli._do_scaffold("mod.py", None) == 2
     assert existing.read_text(encoding="utf-8") == "hand written\n"

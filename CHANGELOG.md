@@ -7,6 +7,10 @@ packaging tools would read as `1.1`.
 ## Unreleased
 
 ### Added
+- **`--validate` warns about scaffold placeholders left in a task.** A file
+  still carrying `TODO` in its requirements, criteria or interface passed every
+  other check, and a run would have sent the placeholders to the agents as the
+  specification.
 - **The refinement loop proposes fixture rows for the criteria it adds.**
   Refinement reads converged code and adds criteria about what that code could
   still get wrong, which is often an input the fixtures do not contain, and a
@@ -17,6 +21,24 @@ packaging tools would read as `1.1`.
   review and never a fixture.
 
 ### Changed
+- **`--scaffold` writes one task file, not two.** By default it writes
+  `<NAME>_VERIFY.yaml`, the task that tests the code you already have, and
+  `--fresh` writes the task for a new implementation of the same interface
+  instead. It used to write both and ask you to delete one. It now ends with
+  numbered next steps that name the input file to add and put `--validate`
+  before the run: the old `Then: qikly --tasks X` failed straight away, because
+  scaffold never creates input data. Its comments use the decisions versus
+  consequences rule, and the landing page links the quick start on your own
+  data beside the install commands. The MCP `qikly_scaffold` tool returns the
+  same default task and names the file to save it as, so step 1 of the quick
+  start also works from inside VS Code.
+- **Quick start is its own page, `docs/QUICK_START_ON_YOUR_OWN_DATA.md`.**
+  The README kept its three-command demo, but everything needed to try qikly
+  on your own module sat after about 2,600 words of explanation. The new page
+  starts with the demo and five steps from `--scaffold` to a first run,
+  including the one scaffold leaves to you, adding input data, and then keeps
+  the command table and everything the old `USING_YOUR_OWN_DATA.md` had. That
+  page is removed rather than left behind as a pointer.
 - **The split between `requirements` and `acceptance_criteria` now has a rule
   you can apply.** The docs said spec-level statements go in one and checkable
   edge cases in the other. That sends a measurement convention or an exemption

@@ -145,8 +145,10 @@ TOOL_SPECS = [
     {
         "name": "qikly_scaffold",
         "description": (
-            "Read a Python file and return the task YAML for it: module path, "
-            "real signatures, a guessed entrypoint. requirements and "
+            "Read a Python file and return a task YAML that tests that code: "
+            "module path, real signatures, a guessed entrypoint, and a seed "
+            "pointing at the file. Save it under inputs_private/config/tasks/ "
+            "as <task_id>.yaml. requirements and "
             "acceptance_criteria are left as TODO on purpose and will not be "
             "filled in, because criteria derived from an implementation can "
             "only describe what that implementation already does."),

@@ -26,6 +26,8 @@ module at a time: when a test fails, only the files that failure names are
 loaded, so runs stay small and quick. Large multi-file repositories are a
 different problem. See [What it is for](#what-it-is-for).
 
+**Just want to try it on your own data?** [Quick start on your own data](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md), five steps from your module to a first run.
+
 Imagine a student who writes the exam paper, writes the answer key, and then
 sits the exam. They pass. Obviously they pass, and nobody would accept that as
 evidence the student knows the material.
@@ -263,7 +265,7 @@ than loaded whole, there is no cross-file index. See
 
 ## How to use the tools in this project
 
-Four ways in, and the table under [Quick start](#which-command-depends-on-which-parts-you-already-have)
+Four ways in, and the table under [the quick start](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md#which-command-depends-on-which-parts-you-already-have)
 says which command each one needs:
 
 1. **Verify code you did not write.** Supply an implementation through `seed:`
@@ -308,128 +310,25 @@ rather than the paid one.
 
 ## Quick start
 
-Requires **Python 3.10+** and **GNU `patch`** on `PATH`. On Windows it ships
-with Git under `usr\bin\patch.exe`, which the tool finds on its own. **On macOS
-you have to install it:** the system `patch` is Apple's BSD one, which rejects
-the options qikly sends, so no generated diff will apply.
-
-```bash
-brew install gpatch     # macOS only
-```
-
-qikly looks for `gpatch` before `patch`, so nothing else is needed afterwards
-and your system `patch` is left alone.
-
 ```bash
 pip install qikly
-export GEMINI_API_KEY=...     # or API_KEY, or your provider's own variable
+export GEMINI_API_KEY=...     # PowerShell: $env:GEMINI_API_KEY = "..."
 qikly --demo
 ```
 
-On Windows, in PowerShell, where `export` is not a command:
-
-```powershell
-pip install qikly
-$env:GEMINI_API_KEY = "..."
-qikly --demo
-```
-
-Other providers, and how to set a key so it survives a new terminal, are in
-[docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md).
-
-### You probably do not have to write the task file by hand
-
-The criteria usually exist already, in a feature page or a ticket, and the
-interface exists in the code. qikly reads both.
-
-```bash
-# a markdown page, a ticket export, or a .feature file
-qikly --criteria-from feature.md --task-id MY_TASK
-
-# straight from Jira: needs JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN
-qikly --criteria-from-jira PROJ-412 --task-id MY_TASK
-
-# both halves at once: criteria from the page, interface from the module
-qikly --scaffold src/metrics/band.py --from-doc feature.md
-```
-
-Bullet lists, a headed `Acceptance Criteria` section and Gherkin `Scenario:`
-blocks are all understood. Your page stays the source of truth and nobody
-retypes anything.
-
-**One section is never filled for you: `requirements`.** The coding agent reads
-it, and a feature page usually restates its own acceptance criteria in the
-prose above them, so lifting requirements across would hand the criteria to the
-one agent that must never see them. `qikly --validate` warns if what you write
-there restates a criterion.
-
-### Which command depends on which parts you already have
-
-A task file is one YAML file with three parts, and the split above is a split
-between them:
-
-1. **`requirements`** what the code must do, in the words a person would use.
-   The coding agent reads this.
-2. **`interface`** the contract, and a description rather than code: the
-   function signatures and the dotted path where the module will live. Both
-   agents read it, and neither is handed an implementation to read from it.
-   When the integration and system tests are written there is not one yet.
-3. **`acceptance_criteria`** what counts as correct, each one checkable and
-   naming its boundary value. **Only test generation reads this.**
-
-"Spec" below means 1 and 2 together, which is what the coding agent is given.
-A tick means you already have that part.
-
-One thing the three parts do not say, and it matters: **test generation never
-reads the implementation either.** Integration and system tests are written
-before any code exists, from the specification alone. The unit stage is the
-single exception, written last from the code that just cleared the earlier
-stages, because unit tests have to name real functions.
-
-| Where you are starting | #1 | #2 | #3 | Run | What happens |
-|---|:-:|:-:|:-:|---|---|
-| Before anything else: see what is withheld | | | | `qikly --explain <MY_TASK>`<br>e.g. `qikly --explain CALC_TAX` | Prints a task file twice, once as each agent receives it, and the difference between them. No API key, no model call, about a second. **You get:** the acceptance criteria on one side and the same file with them cut out on the other, which is the claim everything else rests on. |
-| Just looking | | | | `qikly --demo` | A bundled task end to end in a throwaway folder. Thirty seconds, under a cent. **You get:** a working implementation, three test suites, and the full record of every FIX and PATCH, in a directory you can delete. |
-| Code someone else wrote, and you want **that code** verified | | Y | | `qikly --scaffold <MY_MODULE>.py` | Scaffold reads the real signatures out of the file you point it at and fills in **#2** for you. **#1** and **#3** stay yours to write: criteria read out of an implementation can only describe what that implementation already does, which is a bar it passes by construction. **You get:** two task files. One tests the code you already have; the other writes a fresh implementation of the same interface. Keep whichever matches the job and delete the other. |
-| You know what it must do, not yet how to check it | Y | | | `qikly --init` | Creates the directory layout and one starter task to edit. Its criteria show the habit that matters most: name the value, not the quality. "100 is accepted and 101 is rejected" forces a test at the boundary; "amounts must be reasonable" does not. **You get:** a task file to fill in, with your fixtures where a run will look for them. |
-| Same, but you want a first draft of the bar | Y | Y | | `qikly --tasks <MY_TASKS>`<br>`--generate-criteria` | Drafts **#3** from **#1** alone, then runs. **You get:** a first draft of the bar written into your task file for you to correct, plus the implementation and suites. |
-| You have written all three | Y | Y | Y | `qikly --tasks <MY_TASKS>` | Everything you wrote is used, and nothing is drafted on your behalf. **You get:** an implementation, integration, system and unit suites, a convergence report, and a run summary recording the model and settings that produced them. |
-| You have all three but doubt they agree | Y | Y | Y | `qikly --check-criteria`<br>`--tasks <MY_TASKS>` | One model call asking whether any implementation could satisfy the description, **#1** and **#3** at once, and whether any two of **#3** agree with each other. Advisory, and exits non-zero on a contradiction so a pipeline can gate on it. **You get:** a list of the pairs that cannot both hold, before spending a stage budget on them. Two criteria setting different numbers on the same quantity are always reported, since that is a typo rather than a tighter bar. |
-| A previous run stopped before finishing | Y | Y | Y | `qikly --tasks <MY_TASKS>`<br>`--resume` | Generating the tests and the first implementation already cost model calls, and they are still on disk. This keeps them and picks up where it stopped, instead of paying for them twice. **You get:** the same outputs as a full run, without paying for the parts already built. |
-
-`<MY_TASKS>` is one task_id or several separated by commas. A task_id is a
-filename under `inputs_private/config/tasks/` without the `.yaml`:
-`--tasks CALC_TAX`, `--tasks CALC_TAX,MERGE_SALES`, or omit it to run every
-task found. `<MY_TASK>`, singular, takes exactly one.
-
-`QIKLY_MAX_CALLS=200 qikly` stops at a call limit rather than a bill.
-
-`--scaffold` reads the module path and the real signatures of every public
-function straight out of the file, because they are already there. It leaves
-`requirements` and `acceptance_criteria` for you, and that is deliberate:
-criteria derived from an implementation can only describe what that
-implementation already does, and a bar that agrees with the code by
-construction is the exact failure this tool exists to prevent.
-
-`--demo` runs one task end to end in a throwaway `demo/<timestamp>/` directory
-and prints what it built and where. It writes nothing outside that directory,
-so a first run leaves everything else untouched. About 30 seconds.
+Needs Python 3.10+ and GNU `patch`; on macOS run `brew install gpatch` first.
+The demo runs a bundled task end to end in a throwaway folder, in about thirty
+seconds, and writes nothing outside it.
 
 ![One `qikly --demo` run, unedited: criteria withheld, tests generated, a test
 failing, a patch, green.](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_demo.gif)
 
 That is a real run on `gemini-3.5-flash-lite`, 38 seconds, not sped up.
 
-From a clone instead:
-
-```bash
-pip install -r requirements.txt
-python run.py --demo
-```
-
-`run.py` is a shim around `src/qikly/cli.py`, the same entry point the
-installed `qikly` command calls, so a clone and an install run identical
-code.
+**To try it on your own code and data, start at
+[docs/QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md)**: five steps
+from `qikly --scaffold your_module.py` to a first run, and the table of which
+command fits what you already have.
 
 ## Running
 
@@ -520,7 +419,7 @@ qikly --init                    # creates inputs_private/ and a starter task
 qikly --tasks MY_TASK
 ```
 
-**[docs/USING_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/USING_YOUR_OWN_DATA.md)** has the
+**[docs/QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md)** has the
 rest: the task file field by field, getting the split between `requirements`
 and `acceptance_criteria` right (decisions in one, their consequences in the other, and the gap between them is the whole mechanism),
 lifting criteria out of a ticket you already wrote, seeding your own
@@ -641,7 +540,7 @@ left holding afterwards.
 |---|---|
 | **Show the withholding** | `--explain TASK` prints what each side is given and the difference. No model call, no API key |
 | **Offline validation** | `--validate` checks task files for free: valid YAML, criteria as a list, fixture paths that resolve, criteria naming values not adjectives |
-| **Scaffold from code** | `--scaffold FILE` reads an existing module and writes two task files: one that tests that code, one that writes a fresh implementation of the same interface |
+| **Scaffold from code** | `--scaffold FILE` reads an existing module and writes a task that tests that code, or with `--fresh` one that writes a fresh implementation of the same interface |
 | **Draft criteria** | `--generate-criteria` writes a first bar from requirements alone, for a task that has none |
 | **Score a drafted bar against yours** | `--compare-criteria TASK` drafts criteria from your requirements alone, then reports what a generated bar would have missed, treating yours as ground truth |
 | **Contradiction check** | `--check-criteria` asks whether any implementation could satisfy the description, the requirements and the criteria at once, and whether the criteria agree with each other, before a stage budget is spent |
@@ -760,7 +659,7 @@ has the config for that and the rest of the setup.
 ## Further reading
 
 Two reference pages, for looking things up rather than reading through:
-**[running it on your own data](https://github.com/gal-a/qikly/blob/main/docs/USING_YOUR_OWN_DATA.md)** and
+**[quick start on your own data](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md)** and
 **[configuration and provider](https://github.com/gal-a/qikly/blob/main/docs/CONFIGURATION.md)**.
 
 The design write-up is in three parts, and each stands on its own.

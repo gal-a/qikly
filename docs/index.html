@@ -574,10 +574,13 @@ footer {
       <span><span class="prompt">$</span> export GEMINI_API_KEY=...</span>
       <span><span class="prompt">$</span> qikly --demo</span>
     </div>
+    <p class="route-note"><strong>Just want to try it on your own data?</strong>
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md">Quick start on your own
+      data</a>, five steps from your module to a first run.</p>
     <p class="route-note">Already have the code? <code>qikly --scaffold your_module.py</code>
       writes a task that tests <em>that</em> code, with the suite still written from your
       acceptance criteria rather than from the code itself.
-      <a href="https://github.com/gal-a/qikly#which-command-depends-on-which-parts-you-already-have">Which
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md#which-command-depends-on-which-parts-you-already-have">Which
       command fits what you already have</a>.</p>
     <div class="links">
       <a class="btn btn-primary" href="https://github.com/gal-a/qikly">Source on GitHub</a>
@@ -883,9 +886,7 @@ qikly --demo</code></pre>
           fills in <b>#2</b> for you. <b>#1</b> and <b>#3</b> stay yours to
           write: criteria read out of an implementation can only describe what
           that implementation already does, which is a bar it passes by
-          construction. <b>You get:</b> two task files. One tests the code you
-          already have; the other writes a fresh implementation of the same
-          interface. Keep whichever matches the job and delete the other. Then
+          construction. <b>You get:</b> one task file that tests the code you already have. Add <code>--fresh</code> for one that writes a fresh implementation of the same interface instead. Then
           a suite built from a standard your code was never measured against,
           and a list of what it fails.</td>
         </tr>

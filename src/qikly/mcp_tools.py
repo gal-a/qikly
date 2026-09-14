@@ -201,7 +201,7 @@ def qikly_validate(task_id):
 
 def qikly_scaffold(file_path):
     """
-    Turn a Python file into a task skeleton.
+    Turn a Python file into a task that tests that code, returned as text.
 
     It writes `TODO` for requirements and acceptance criteria and will not fill
     them in, because criteria derived from an implementation can only describe
@@ -237,15 +237,23 @@ def qikly_scaffold(file_path):
     file_path = found
     try:
         from qikly import scaffold
-        yaml_text, problem = scaffold.build_task(file_path, root)
+        # The same task `qikly --scaffold` writes by default: one that tests the
+        # code in the file, which is why someone points a tool at a file.
+        yaml_text, problem = scaffold.build_task(file_path, root, seed="existing")
     except Exception as exc:                       # noqa: BLE001
         return _error("could not scaffold that file: %s" % exc)
     if problem:
         return _error(problem)
 
+    import re
+
+    named = re.search(r'task_id:\s*"([^"]+)"', yaml_text)
+    task_id = named.group(1) if named else "<task_id>"
     return _redact({"ok": True, "task_yaml": yaml_text,
-                    "note": "requirements and acceptance_criteria are left as TODO "
-                            "on purpose: criteria taken from code can only restate it"})
+                    "note": "This task tests the code in that file. Save it as "
+                            "inputs_private/config/tasks/%s.yaml. requirements and "
+                            "acceptance_criteria are left as TODO on purpose: criteria "
+                            "taken from code can only restate it" % task_id})
 
 
 _FORBIDDEN_KEYS = ("acceptance_criteria", "criteria", "criterion")

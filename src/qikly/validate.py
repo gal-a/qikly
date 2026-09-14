@@ -25,6 +25,10 @@ run together, which then generates one enormous test.
 **Every input file exists.** A fixture path that does not resolve fails at the
 first test run, after the suites have already been generated and paid for.
 
+**No scaffold placeholder is left.** Advisory. A file with `TODO` still in its
+requirements or criteria passes every other check, and a run would hand the
+placeholder to the agents as the specification.
+
 **The criteria name boundary values.** Advisory, not an error. A criterion
 phrased "reject large amounts" produces a test at some arbitrary large number;
 "100 is accepted and 101 is rejected" forces the boundary. This is the single
@@ -63,6 +67,11 @@ _CONCRETE = re.compile(r"\d|\"[^\"]+\"|'[^']+'|>=|<=|==|\bexactly\b|\bempty\b",
 _VAGUE = ("appropriate", "reasonable", "sensible", "properly", "correctly",
           "gracefully", "as needed", "if necessary", "valid data", "large",
           "small", "quickly", "efficiently")
+
+# What a scaffold writes where only the author can fill in. A file still carrying
+# one passes every other check here, and a run would send the placeholder to the
+# agents as the specification.
+_TODO = re.compile(r"\bTODO\b")
 
 
 def _input_exists(relative):
@@ -140,6 +149,14 @@ def check_task(path):
                         f"{name}: criterion {i} says {hit!r} without naming a "
                         f"value. A suite tests the boundary when the criterion "
                         f"names the boundary")
+
+    leftover = [field for field in ("task_name", "description", "interface",
+                                    "requirements", "acceptance_criteria")
+                if task.get(field) is not None and _TODO.search(str(task.get(field)))]
+    if leftover:
+        warnings.append(
+            f"{name}: still has TODO placeholders in {', '.join(leftover)}. A run "
+            f"sends them to the agents as written, so replace them first")
 
     for relative in (task.get("inputs") or []):
         if not _input_exists(relative):

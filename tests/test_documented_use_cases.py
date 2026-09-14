@@ -57,7 +57,7 @@ def test_scaffold_writes_the_interface_and_refuses_to_write_the_criteria(tmp_pat
     assert cli._do_scaffold("billing.py", None) == 0
 
     written = yaml.safe_load(
-        (tmp_path / "inputs_private/config/tasks/BILLING.yaml").read_text(encoding="utf-8"))
+        (tmp_path / "inputs_private/config/tasks/BILLING_VERIFY.yaml").read_text(encoding="utf-8"))
     assert written["interface"]["module"]
     assert written["interface"]["integration_functions"]
     assert "TODO" in written["acceptance_criteria"][0]
@@ -382,9 +382,9 @@ def test_scaffold_says_which_code_a_run_will_test():
 
     from qikly import cli, scaffold
 
-    # Two files now, rather than one file with the deciding line commented
-    # out. Commenting asks a reader to understand the distinction before they
-    # have run anything; two short files let them read both and delete one.
+    # One file by default, for the job most people scaffold for: testing the
+    # code they already have. The other job is a flag rather than a second
+    # file to delete, so a new user's first step is not a choice between two.
     assert "seed:" in scaffold.SEED_EXISTING
     assert "implementation:" in scaffold.SEED_EXISTING
     # On a line basis, not a substring: SEED_NONE mentions `seed:` inside a
@@ -395,8 +395,8 @@ def test_scaffold_says_which_code_a_run_will_test():
     assert "{seed_block}" in scaffold.TASK_TEMPLATE, "the ending is chosen, not fixed"
 
     printed = inspect.getsource(cli._do_scaffold)
-    assert "_VERIFY" in printed, "the two files must be distinguishable by name"
-    assert "delete the other" in printed, "and the reader has to be told to pick"
+    assert "_VERIFY" in printed, "the two jobs must be distinguishable by name"
+    assert "--fresh" in printed, "and the reader has to be told how to get the other"
 
 
 def test_the_landing_page_marks_the_three_parts_consistently():

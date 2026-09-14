@@ -160,7 +160,7 @@ between them:
 
 Which command you want depends on which of the three you already have, and the
 full table is in
-[README.md](https://github.com/gal-a/qikly#which-command-depends-on-which-parts-you-already-have).
+[QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md#which-command-depends-on-which-parts-you-already-have).
 The short version: `qikly --explain <MY_TASK>` to see the split for yourself,
 `qikly --demo` to watch a whole run, `qikly --init` to start a task from
 nothing, and `qikly --scaffold <FILE>.py` to start one from code you already
@@ -171,7 +171,7 @@ have.
 A task file has three parts, and which of them you already have decides both
 what qikly does for you and which command you run. The full table, with the
 exact command for each starting point, is in
-[README.md](https://github.com/gal-a/qikly#which-command-depends-on-which-parts-you-already-have).
+[QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md#which-command-depends-on-which-parts-you-already-have).
 The four that matter most, most valuable first:
 
 1. **You have #2 and code somebody else wrote, and you want that code

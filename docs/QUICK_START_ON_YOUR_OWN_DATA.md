@@ -1,11 +1,189 @@
-# Running qikly on your own data
+# Quick start on your own data
 
-Everything past the [quick start](https://github.com/gal-a/qikly/blob/main/README.md#quick-start): the task
-file field by field, criteria you already wrote elsewhere, seeding your own
-code or tests, and the fixture rows a criterion needs before it can be checked
-at all.
+From nothing to a first run on your own module. Try the bundled demo, then
+follow the five steps. Everything after them is reference: which command fits
+what you already have, the task file field by field, criteria you already wrote
+elsewhere, seeding your own code or tests, and the fixture rows a criterion
+needs before it can be checked at all.
 
-## The four steps
+## Try it first
+
+Requires **Python 3.10+** and **GNU `patch`** on `PATH`. On Windows it ships
+with Git under `usr\bin\patch.exe`, which the tool finds on its own. **On macOS
+you have to install it:** the system `patch` is Apple's BSD one, which rejects
+the options qikly sends, so no generated diff will apply.
+
+```bash
+brew install gpatch     # macOS only
+```
+
+qikly looks for `gpatch` before `patch`, so nothing else is needed afterwards
+and your system `patch` is left alone.
+
+```bash
+pip install qikly
+export GEMINI_API_KEY=...     # or API_KEY, or your provider's own variable
+qikly --demo
+```
+
+On Windows, in PowerShell, where `export` is not a command:
+
+```powershell
+pip install qikly
+$env:GEMINI_API_KEY = "..."
+qikly --demo
+```
+
+Other providers, and how to set a key so it survives a new terminal, are in
+[docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md).
+
+`--demo` runs one task end to end in a throwaway `demo/<timestamp>/` directory
+and prints what it built and where. It writes nothing outside that directory,
+so a first run leaves everything else untouched. About 30 seconds.
+
+From a clone instead:
+
+```bash
+pip install -r requirements.txt
+python run.py --demo
+```
+
+`run.py` is a shim around `src/qikly/cli.py`, the same entry point the
+installed `qikly` command calls, so a clone and an install run identical
+code.
+
+## Your own module, start to first run
+
+1. **Scaffold a task from the module.**
+
+   ```bash
+   qikly --scaffold your_module.py
+   ```
+
+   It reads the real function signatures and writes
+   `inputs_private/config/tasks/<NAME>_VERIFY.yaml`, a task that tests the code
+   you already have, then prints what to do next. For a fresh implementation
+   of the same interface instead, add `--fresh`.
+
+2. **Put your input data where the task says.** Its `inputs:` list names the
+   files a run reads, such as `inputs_private/data/<NAME>/input_01.csv`.
+   Scaffold does not create them, so copy a real sample of your data there.
+   Until you do, `qikly --validate` reports `input file not found`.
+
+3. **Write the two sections only you can write.** `requirements` holds the
+   decisions and `acceptance_criteria` the consequences; the rule for telling
+   them apart is under [Getting the two halves right](#getting-the-two-halves-right).
+   Already written them in a page or a ticket? This takes the criteria from it:
+   `qikly --scaffold your_module.py --from-doc feature.md`. Replace the
+   remaining `TODO` lines too, and check the entrypoint scaffold marks as
+   guessed.
+
+4. **Check it, for free.**
+
+   ```bash
+   qikly --validate
+   ```
+
+   No model call and no cost. It checks that the file parses, that every input
+   path exists, that no `TODO` placeholder is left, that criteria name values
+   rather than adjectives, and that no requirement restates a criterion.
+
+5. **Run it.**
+
+   ```bash
+   qikly --tasks <NAME>_VERIFY
+   ```
+
+   Start reading at `outputs/reports/iterations/<task>_<timestamp>_report.html`.
+
+### Step 1 from inside VS Code
+
+With the qikly MCP server connected (setup in
+[docs/mcp.md](https://github.com/gal-a/qikly/blob/main/docs/mcp.md)), ask Copilot
+in agent mode:
+
+> Use the qikly_scaffold MCP tool on `src/your_module.py`, and save the task it
+> returns under `inputs_private/config/tasks/`.
+
+It returns the same task the command writes, one that tests the code you
+already have, and says which filename to save it as. Steps 2 to 5 are the same,
+and `qikly_validate` runs step 4 from the chat at no cost.
+
+## You probably do not have to write the task file by hand
+
+The criteria usually exist already, in a feature page or a ticket, and the
+interface exists in the code. qikly reads both.
+
+```bash
+# a markdown page, a ticket export, or a .feature file
+qikly --criteria-from feature.md --task-id MY_TASK
+
+# straight from Jira: needs JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN
+qikly --criteria-from-jira PROJ-412 --task-id MY_TASK
+
+# both halves at once: criteria from the page, interface from the module
+qikly --scaffold src/metrics/band.py --from-doc feature.md
+```
+
+Bullet lists, a headed `Acceptance Criteria` section and Gherkin `Scenario:`
+blocks are all understood. Your page stays the source of truth and nobody
+retypes anything.
+
+**One section is never filled for you: `requirements`.** The coding agent reads
+it, and a feature page usually restates its own acceptance criteria in the
+prose above them, so lifting requirements across would hand the criteria to the
+one agent that must never see them. `qikly --validate` warns if what you write
+there restates a criterion.
+
+## Which command depends on which parts you already have
+
+A task file is one YAML file with three parts, and the split above is a split
+between them:
+
+1. **`requirements`** what the code must do, in the words a person would use.
+   The coding agent reads this.
+2. **`interface`** the contract, and a description rather than code: the
+   function signatures and the dotted path where the module will live. Both
+   agents read it, and neither is handed an implementation to read from it.
+   When the integration and system tests are written there is not one yet.
+3. **`acceptance_criteria`** what counts as correct, each one checkable and
+   naming its boundary value. **Only test generation reads this.**
+
+"Spec" below means 1 and 2 together, which is what the coding agent is given.
+A tick means you already have that part.
+
+One thing the three parts do not say, and it matters: **test generation never
+reads the implementation either.** Integration and system tests are written
+before any code exists, from the specification alone. The unit stage is the
+single exception, written last from the code that just cleared the earlier
+stages, because unit tests have to name real functions.
+
+| Where you are starting | #1 | #2 | #3 | Run | What happens |
+|---|:-:|:-:|:-:|---|---|
+| Before anything else: see what is withheld | | | | `qikly --explain <MY_TASK>`<br>e.g. `qikly --explain CALC_TAX` | Prints a task file twice, once as each agent receives it, and the difference between them. No API key, no model call, about a second. **You get:** the acceptance criteria on one side and the same file with them cut out on the other, which is the claim everything else rests on. |
+| Just looking | | | | `qikly --demo` | A bundled task end to end in a throwaway folder. Thirty seconds, under a cent. **You get:** a working implementation, three test suites, and the full record of every FIX and PATCH, in a directory you can delete. |
+| Code someone else wrote, and you want **that code** verified | | Y | | `qikly --scaffold <MY_MODULE>.py` | Scaffold reads the real signatures out of the file you point it at and fills in **#2** for you. **#1** and **#3** stay yours to write: criteria read out of an implementation can only describe what that implementation already does, which is a bar it passes by construction. **You get:** one task file that tests the code you already have. Add `--fresh` for one that writes a fresh implementation of the same interface instead. |
+| You know what it must do, not yet how to check it | Y | | | `qikly --init` | Creates the directory layout and one starter task to edit. Its criteria show the habit that matters most: name the value, not the quality. "100 is accepted and 101 is rejected" forces a test at the boundary; "amounts must be reasonable" does not. **You get:** a task file to fill in, with your fixtures where a run will look for them. |
+| Same, but you want a first draft of the bar | Y | Y | | `qikly --tasks <MY_TASKS>`<br>`--generate-criteria` | Drafts **#3** from **#1** alone, then runs. **You get:** a first draft of the bar written into your task file for you to correct, plus the implementation and suites. |
+| You have written all three | Y | Y | Y | `qikly --tasks <MY_TASKS>` | Everything you wrote is used, and nothing is drafted on your behalf. **You get:** an implementation, integration, system and unit suites, a convergence report, and a run summary recording the model and settings that produced them. |
+| You have all three but doubt they agree | Y | Y | Y | `qikly --check-criteria`<br>`--tasks <MY_TASKS>` | One model call asking whether any implementation could satisfy the description, **#1** and **#3** at once, and whether any two of **#3** agree with each other. Advisory, and exits non-zero on a contradiction so a pipeline can gate on it. **You get:** a list of the pairs that cannot both hold, before spending a stage budget on them. Two criteria setting different numbers on the same quantity are always reported, since that is a typo rather than a tighter bar. |
+| A previous run stopped before finishing | Y | Y | Y | `qikly --tasks <MY_TASKS>`<br>`--resume` | Generating the tests and the first implementation already cost model calls, and they are still on disk. This keeps them and picks up where it stopped, instead of paying for them twice. **You get:** the same outputs as a full run, without paying for the parts already built. |
+
+`<MY_TASKS>` is one task_id or several separated by commas. A task_id is a
+filename under `inputs_private/config/tasks/` without the `.yaml`:
+`--tasks CALC_TAX`, `--tasks CALC_TAX,MERGE_SALES`, or omit it to run every
+task found. `<MY_TASK>`, singular, takes exactly one.
+
+`QIKLY_MAX_CALLS=200 qikly` stops at a call limit rather than a bill.
+
+`--scaffold` reads the module path and the real signatures of every public
+function straight out of the file, because they are already there. It leaves
+`requirements` and `acceptance_criteria` for you, and that is deliberate:
+criteria derived from an implementation can only describe what that
+implementation already does, and a bar that agrees with the code by
+construction is the exact failure this tool exists to prevent.
+
+## Writing a task by hand
 
 Nothing is written into the package, and nothing is written into your source
 tree.

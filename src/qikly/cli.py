@@ -578,7 +578,7 @@ def _parse_args():
         help="For any task with no acceptance_criteria yet, generate a one-shot first draft "
              "from requirements alone and write it into that task's config file before running. "
              "Explicit opt-in only -- without this flag, such a task just runs with a warning "
-             "(see docs/USING_YOUR_OWN_DATA.md#auto-generating-acceptance-criteria). Never touches a task that "
+             "(see docs/QUICK_START_ON_YOUR_OWN_DATA.md#auto-generating-acceptance-criteria). Never touches a task that "
              "already has acceptance_criteria."
     )
     parser.add_argument(
@@ -593,6 +593,12 @@ def _parse_args():
              "signatures of its public functions, and a guessed entrypoint. Leaves "
              "requirements and acceptance_criteria for you, because criteria derived "
              "from an implementation can only describe what it already does."
+    )
+    parser.add_argument(
+        "--fresh", action="store_true",
+        help="With --scaffold: write a task that produces a fresh implementation of the "
+             "file's interface, instead of the default task that tests the code you "
+             "already have."
     )
     parser.add_argument(
         "--task-id", default=None,
@@ -1191,19 +1197,23 @@ def _fill_criteria_from(text, doc, root):
     return fd.merge(text, criteria)
 
 
-def _do_scaffold(source, task_id, doc=None):
+def _do_scaffold(source, task_id, doc=None, fresh=False):
     """
-    Write task files for an existing Python module. Two of them, on purpose.
+    Write the task file for an existing Python module.
 
-    Scaffolding from code means one of two different jobs, and the command line
-    cannot tell which: you either want that code tested, or you want a fresh
-    implementation of the same interface. The first version wrote one file with
-    the deciding line commented out, which asks a reader to understand the
-    distinction before they have run anything.
+    Scaffolding from code means one of two jobs, and the command line cannot
+    tell which: you want that code tested, or you want a fresh implementation
+    of the same interface. Most people scaffolding from code they already have
+    want the first, so that is the default, written as <NAME>_VERIFY.yaml, and
+    `--fresh` writes the second, as <NAME>.yaml.
 
-    So both are written. You read two short files, keep the one that matches
-    what you are doing, and delete the other.
+    It used to write both and ask you to delete one, which made the first thing
+    a new user did a choice between two files they had not read yet.
     """
+    import re
+
+    import yaml
+
     from qikly.scaffold import build_task
 
     root = INVOKED_FROM
@@ -1212,44 +1222,40 @@ def _do_scaffold(source, task_id, doc=None):
         print(f"no such file: {source}")
         return 2
 
-    import re
-
     dest_dir = os.path.join(root, "inputs_private", "config", "tasks")
     os.makedirs(dest_dir, exist_ok=True)
 
-    written = []
-    for seed_mode, suffix, headline in (
-        ("existing", "_VERIFY", "tests the code you already have"),
-        (None, "", "writes a fresh implementation"),
-    ):
-        text, problem = build_task(source, root, task_id=task_id, seed=seed_mode)
-        if problem:
-            print(problem)
+    if fresh:
+        seed_mode, suffix, headline = None, "", "writes a fresh implementation"
+    else:
+        seed_mode, suffix, headline = "existing", "_VERIFY", "tests the code you already have"
+    text, problem = build_task(source, root, task_id=task_id, seed=seed_mode)
+    if problem:
+        print(problem)
+        return 2
+    if doc:
+        text, doc_problem = _fill_criteria_from(text, doc, root)
+        if doc_problem:
+            print(doc_problem)
             return 2
-        if doc:
-            text, doc_problem = _fill_criteria_from(text, doc, root)
-            if doc_problem:
-                print(doc_problem)
-                return 2
-        base = re.search(r'task_id:\s*"([^"]+)"', text).group(1)
-        tid = base + suffix
-        text = text.replace(f'task_id: "{base}"', f'task_id: "{tid}"', 1)
-        dest = os.path.join(dest_dir, f"{tid}.yaml")
-        if os.path.exists(dest):
-            print(f"{shown(dest)} already exists. Move it aside first, or pass "
-                  f"--task-id to write a different name.")
-            return 2
-        with open(dest, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(text)
-        written.append((tid, dest, headline))
+    base = re.search(r'task_id:\s*"([^"]+)"', text).group(1)
+    tid = base + suffix
+    text = text.replace(f'task_id: "{base}"', f'task_id: "{tid}"', 1)
+    dest = os.path.join(dest_dir, f"{tid}.yaml")
+    if os.path.exists(dest):
+        print(f"{shown(dest)} already exists. Move it aside first, or pass "
+              f"--task-id to write a different name.")
+        return 2
+    with open(dest, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
 
-    print(f"Read {shown(source)} and wrote two task files.")
+    print(f"Read {shown(source)} and wrote a task that {headline}:")
+    print(f"    {shown(dest)}")
     print()
-    print("  Keep one, delete the other. They differ in one section:")
-    print()
-    for tid, dest, headline in written:
-        print(f"    {tid:28} {headline}")
-        print(f"    {'':28} {shown(dest)}")
+    if fresh:
+        print("  To test the code you already have instead, run it again without --fresh.")
+    else:
+        print("  To write a fresh implementation of the same interface instead, add --fresh.")
     print()
     if doc:
         print(f"  Acceptance criteria came from {shown(doc)}.")
@@ -1266,8 +1272,8 @@ def _do_scaffold(source, task_id, doc=None):
         print("  `qikly --validate` checks what you write there against the")
         print("  criteria and says so if the two say the same thing.")
     else:
-        print("  Both need the same two sections from you, and neither can be")
-        print("  derived from the code:")
+        print("  It needs two sections from you, and neither can be derived from")
+        print("  the code:")
         print("    requirements         the decisions: what the code must do, in your words")
         print("    acceptance_criteria  the consequences: what must hold, with boundary values")
         print()
@@ -1277,8 +1283,19 @@ def _do_scaffold(source, task_id, doc=None):
         print()
         print("  Already written them somewhere? Point at it:")
         print("    qikly --scaffold %s --from-doc feature.md" % shown(source))
+
+    # The old ending was "Then: qikly --tasks X", which failed at once: scaffold
+    # names an input file but never creates one. Say what is missing, and put
+    # the free check before the paid run.
+    inputs = (yaml.safe_load(text) or {}).get("inputs") or []
+    missing = [p for p in inputs if not os.path.isfile(os.path.join(root, p))]
+    steps = [f"add a real sample of your input data at {p}" for p in missing]
+    steps.append("replace the TODO lines, then check it for free:  qikly --validate")
+    steps.append(f"run it:  qikly --tasks {tid}")
     print()
-    print(f"  Then: qikly --tasks {written[0][0]}")
+    print("  Next:")
+    for number, step in enumerate(steps, 1):
+        print(f"    {number}. {step}")
     return 0
 
 
@@ -1469,7 +1486,7 @@ def main():
     if args.init:
         return _do_init()
     if args.scaffold:
-        return _do_scaffold(args.scaffold, args.task_id, args.from_doc)
+        return _do_scaffold(args.scaffold, args.task_id, args.from_doc, fresh=args.fresh)
     if args.criteria_from:
         return _do_criteria_from(args.criteria_from, args.task_id)
     if args.criteria_from_jira:
