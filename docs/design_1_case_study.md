@@ -19,11 +19,7 @@ That is what happens when one model is handed a specification containing the acc
 
 Run one model at temperature zero on both jobs and the two resolutions are almost identical *by construction*: the verification step burns compute and returns a tick that carries no information about whether the code is correct. That effect should get worse as models improve, since every gain in determinism tightens the agreement between the code and the tests that judge it. That last sentence is a working assumption rather than a measurement, and nothing here tests it.
 
-The fix is to take the answer key away from the student. Test generation gets the acceptance criteria in full. The coding agent gets the same specification with that section cut out, and when a test fails it sees only the failure message, never the rule it broke. Now a green suite means something happened: code written by someone who could not read the standard nevertheless satisfies it.
-
-This post is about a tool I built to do exactly that. Here in part 1: what it
-is, and one real repair followed end to end so you can judge the idea on
-something concrete rather than on a claim.
+The fix is to take the answer key away from the student. Test generation gets the acceptance criteria in full. The coding agent gets the same specification with that section cut out, and when a test fails it sees only the failure message, never the rule it broke. Now a green suite means something happened: code written by someone who could not read the standard nevertheless satisfies it. This post is about a tool I built to do exactly that, and part 1 shows what it is and one real repair followed end to end, so you can judge the idea on something concrete rather than on a claim.
 
 ---
 

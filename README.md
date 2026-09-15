@@ -6,11 +6,12 @@
      server.json exactly. -->
 <!-- mcp-name: io.github.gal-a/qikly -->
 
-[![tests](https://github.com/gal-a/qikly/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
+[![1,180 tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=1%2C180%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
 [![pypi](https://img.shields.io/pypi/v/qikly?color=blue)](https://pypi.org/project/qikly/)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/gal-a/qikly/blob/main/LICENSE)
 [![marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Qikly%20Test%20Generation-2b8f95)](https://github.com/marketplace/actions/qikly-test-generation)
+[![Claude Code](https://img.shields.io/badge/Claude_Code-one--line_setup-D97757?logo=claude&logoColor=white)](https://github.com/gal-a/qikly#use-it-from-your-coding-agent)
 [![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22qikly%5Bmcp%5D%22%2C%22qikly-mcp%22%5D%7D)
 
 [![qikly: one spec in, code and tests out, written by a coding agent and a test agent that are kept apart](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_hero.png)](https://test.qikly.com)
@@ -24,9 +25,8 @@ The other writes the code and **never sees the acceptance criteria.**
 self-contained Python module that transforms data, for example an ETL step, a
 merge, a calculation or a validation routine, who does not want to trust a
 green suite when the same agent wrote both the code and the tests. It suits one
-module at a time: when a test fails, only the files that failure names are
-loaded, so runs stay small and quick. Large multi-file repositories are a
-different problem. See [What it is for](#what-it-is-for).
+module at a time in small to mid-sized repositories: when a test fails, only
+the files that failure names are loaded, so runs stay small and quick. See [What it is for](#what-it-is-for).
 
 **Just want to try it on your own data?** [Quick start on your own data](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md), five steps from your module to a first run.
 
@@ -37,21 +37,20 @@ difference. [More on the free commands](#try-it-without-spending-anything).
 ## The idea
 
 Imagine a student who writes the exam paper, writes the answer key, and then
-sits the exam. They pass. Obviously they pass, and nobody would accept that as
-evidence the student knows the material.
+sits the exam. They pass, and nobody would accept that as evidence they know the
+material. That is what happens when one model gets a specification containing
+the acceptance criteria and writes both the code and the suite that checks it:
+everything goes green, and the green means nothing.
 
-That is what happens when one model is given a specification containing the
-acceptance criteria and asked to produce both the implementation and the suite
-that checks it. It writes tests its own code will pass. Everything goes green,
-and the green means nothing.
+qikly takes the answer key away from the student. It generates a test suite
+from the acceptance criteria, then writes an implementation and repairs it
+against that suite until every test passes or a retry budget runs out,
+recording every failure, every piece of reasoning and every diff.
 
-qikly takes the answer key away from the student.
-
-It generates a test suite from the acceptance criteria in a specification,
-then writes an implementation and repairs it against that suite until every
-test passes or a retry budget runs out. The agent doing the writing and
-repairing never sees the criteria. Every failure, every piece of
-reasoning and every diff is recorded.
+<!-- An image rather than a mermaid block, because PyPI prints mermaid as source.
+     It is rendered from the diagram in docs/design_1_case_study.md by
+     tools/render_flow_diagram.py, and a test fails when the two drift. -->
+<img src="https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_flow.png" width="660" alt="How a run works. The full specification splits into requirements plus interface, which both agents receive, and acceptance_criteria, which only the test-writing agent receives and which never reaches the coding agent. The coding agent writes the implementation, the test-writing agent writes the pytest suite, and the suite runs. A pass gives converged outputs: code, suite and audit trail. A fail sends failure errors only, with no criteria and no test source, back to the coding agent as the repair loop, until the retry budget is spent and the run stops without converging but keeps the audit trail. Unit tests alone are written last, from the code.">
 
 **The part that makes the result mean something:** the coding agent never sees
 `acceptance_criteria`. It gets the specification with that section stripped
@@ -59,11 +58,6 @@ out, the same vague brief a developer works from, while test generation gets
 it in full. When a test fails, the agent sees the failure message and never
 the rule it broke. Without that asymmetry both sides read the same spec
 identically and every test passes first try, which proves nothing.
-
-<!-- An image rather than a mermaid block, because PyPI prints mermaid as source.
-     It is rendered from the diagram in docs/design_1_case_study.md by
-     tools/render_flow_diagram.py, and a test fails when the two drift. -->
-<img src="https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_flow.png" width="660" alt="How a run works. The full specification splits into requirements plus interface, which both agents receive, and acceptance_criteria, which only the test-writing agent receives and which never reaches the coding agent. The coding agent writes the implementation, the test-writing agent writes the pytest suite, and the suite runs. A pass gives converged outputs: code, suite and audit trail. A fail sends failure errors only, with no criteria and no test source, back to the coding agent as the repair loop, until the retry budget is spent and the run stops without converging but keeps the audit trail. Unit tests alone are written last, from the code.">
 
 **Purple is what the coding agent can see. Teal is what the standard is
 written from.** They never touch. A run that never converges is still worth having: it exits
@@ -97,8 +91,6 @@ functions, which makes them the only stage allowed to read the implementation.
 Re-running the earlier stages after each success is what stops a later repair
 quietly breaking something that already passed.
 
-<!-- Lists rather than tables: GitHub and PyPI cannot restack a table on a
-     phone, so a table of sentences there means scrolling sideways. -->
 **Test generation sees** the requirements, the input and output contract, and
 every acceptance criterion in full. It writes integration, system and unit
 tests against the standard.
@@ -109,29 +101,15 @@ developer usually works from.
 
 ### Two ways to get a test suite, and what each can prove
 
-A **code-derived** suite is what most commercial test generators write, and
-what qikly's own unit tests are. A **spec-derived** suite is what qikly's
-integration and system tests are.
-
-**Written from**
-- *Code-derived:* the code as it is today
-- *Spec-derived:* the acceptance criteria you wrote
-
-**You supply**
-- *Code-derived:* nothing but the repository
-- *Spec-derived:* a written statement of what correct means
-
-**Catches**
-- *Code-derived:* behaviour changing tomorrow
-- *Spec-derived:* behaviour being wrong today
-
-**Cannot catch**
-- *Code-derived:* the code being wrong now, because today's bug becomes tomorrow's assertion
-- *Spec-derived:* anything nobody wrote down
-
-**Right choice when**
-- *Code-derived:* nobody wrote the intent down and you need a safety net
-- *Spec-derived:* the intent exists in a ticket, a spec page or a Gherkin file
+<!-- Two columns, with each row's label inside its cells, so the table stays
+     narrow enough to wrap on a phone instead of scrolling sideways. -->
+| Code-derived suite<br><sub>most commercial test generators, and qikly's own unit tests</sub> | Spec-derived suite<br><sub>qikly's integration and system tests</sub> |
+|---|---|
+| **Written from** the code as it is today | **Written from** the acceptance criteria you wrote |
+| **You supply** nothing but the repository | **You supply** a written statement of what correct means |
+| **Catches** behaviour changing tomorrow | **Catches** behaviour being wrong today |
+| **Cannot catch** the code being wrong now: today's bug becomes tomorrow's assertion | **Cannot catch** anything nobody wrote down |
+| **Right choice when** nobody wrote the intent down and you need a safety net | **Right choice when** the intent exists in a ticket, a spec page or a Gherkin file |
 
 Both are useful and they answer different questions. qikly is not purely one
 or the other: integration and system tests are written from the criteria
@@ -672,7 +650,7 @@ The design write-up is in three parts, and each stands on its own.
 
 ## Where this came from
 
-The separation this tool enforces is ordinary practice in safety-critical engineering, where verification is required to be independent of implementation as part of a V&V methodology for testing. I worked in that setting before building this toolset.
+The separation this tool enforces is ordinary practice in safety-critical engineering, where verification is required to be independent of implementation as part of a V&V (Verification & Validation) methodology for testing. I worked in that setting on General Motors' autonomous vehicle program before building this toolset.
 
 Built by [Gal Arav](https://www.linkedin.com/in/galarav/).
 

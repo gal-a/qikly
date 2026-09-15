@@ -390,6 +390,10 @@ footer {
 }
 .hero .eyebrow { margin-top: 28px; }
 .hero .eyebrow + .route-note { margin-top: 0; }
+/* The hero is a flex column with its own 22px gap, so a note's paragraph
+   margins stacked on top of it and put two blank lines between the two short
+   notes. Inside the hero the gap alone does the spacing. */
+.hero .route-note { margin-top: 0; margin-bottom: 0; }
 /* The two panels below use the diagram's own colours, so a reader connects
    them without being told: accent for the side that sees the criteria, and
    --code for the side the criteria are kept from. The same two colours carry
@@ -574,9 +578,8 @@ footer {
     <p class="route-note">A developer or team pointing an AI coding agent at a self-contained
       Python module, for example an ETL step, a merge, a calculation or a validation routine,
       who does not want to trust a green suite when the same agent wrote both the code and the
-      tests. It suits one module at a time: when a test fails, only the files that failure
-      names are loaded, so runs stay small and quick. Large multi-file repositories are a
-      different problem.</p>
+      tests. It suits one module at a time in small to mid-sized repositories: when a test
+      fails, only the files that failure names are loaded, so runs stay small and quick.</p>
     <div class="install">
       <span><span class="prompt">$</span> pip install qikly</span>
       <span><span class="prompt">$</span> export GEMINI_API_KEY=...</span>
@@ -1028,7 +1031,7 @@ qikly --demo</code></pre>
     
   </section>
 
-  <p class="origin">The separation this tool enforces is ordinary practice in safety-critical engineering, where verification is required to be independent of implementation as part of a V&V methodology for testing. This library's author worked in that setting before building this toolset.</p>
+  <p class="origin">The separation this tool enforces is ordinary practice in safety-critical engineering, where verification is required to be independent of implementation as part of a V&amp;V (Verification &amp; Validation) methodology for testing. This library's author worked in that setting on General Motors' autonomous vehicle program before building this toolset.</p>
 
   <footer>
     <span>Apache License 2.0</span>
