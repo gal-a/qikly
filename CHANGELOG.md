@@ -6,7 +6,12 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
-Nothing yet.
+### Fixed
+- **The MCP `qikly_validate` reply says it is not a contradiction check.**
+  Asked to validate CALC_TAX, GitHub Copilot relayed the counts correctly and
+  then summarised them as "no contradictions", which the tool never checks. The
+  reply's note now says it is the free offline check of the task file and that
+  contradictions are `qikly --check-criteria`. It still quotes no criterion.
 
 ## 0.4.5
 

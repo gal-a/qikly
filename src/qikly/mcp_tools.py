@@ -193,7 +193,14 @@ def qikly_validate(task_id):
                     "valid": not errors,
                     "error_count": len(errors),
                     "warning_count": len(warnings),
-                    "note": "counts and a verdict only. Validation messages can "
+                    # The first sentence travels with the data because a host
+                    # summarises the reply, not the tool description it read at
+                    # startup: Copilot relayed these counts as "no contradictions".
+                    "note": "This is the free offline check of the task file: "
+                            "structure, fixture paths, placeholders and vague "
+                            "criteria. It does not look for contradictions; "
+                            "`qikly --check-criteria` does. Counts and a verdict "
+                            "only. Validation messages can "
                             "quote the criterion they are about, so they are not "
                             "returned to an MCP host. Run `qikly --validate` in a "
                             "terminal to read them."})
