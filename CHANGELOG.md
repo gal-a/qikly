@@ -6,8 +6,14 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
-These change the repository and test.qikly.com rather than the installed tool,
-except `--explain --html` and the README that PyPI shows.
+Nothing yet.
+
+## 0.4.5
+
+> See what each agent receives as a shareable page: qikly --explain CALC_TAX --html
+
+Most of this changes the repository and test.qikly.com rather than the installed
+tool. `--explain --html` and the README that PyPI shows ship in the package.
 
 ### Changed
 - **test.qikly.com counts visits with GoatCounter**, which sets no cookies and
