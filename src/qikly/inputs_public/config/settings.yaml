@@ -45,6 +45,24 @@ test_generation:
   # be a deliberate choice rather than a silent upgrade.
   criteria_per_batch: 0
 
+  # Check the integration and system suites against the acceptance criteria
+  # and against each other, after they are written and before any code is, and
+  # write a suite once more when the check finds a test no correct
+  # implementation could pass. One extra model call per run, more on a finding.
+  #
+  # Why it exists: the test-writing agent can misread a clear criterion. On a
+  # following-distance task whose criterion said exactly 2.00 seconds of headway
+  # raises no warning, seven of ten runs generated a test that warned at 2.00
+  # anyway, and all seven failed.
+  #
+  # Why it is off: on the saved suites of those ten runs the check flagged all
+  # seven, but a ten-run sweep with it on converged 4 times in 10 against 3
+  # without, which is noise, and in one run a wrong finding led a correct suite
+  # to be rewritten wrong. On a small model it reads `<` against `<=`
+  # unreliably in both directions, and the rewrite inherits its mistakes. Turn it
+  # on to try it, ideally with `agents.review` pointed at a stronger model.
+  check_suites: false
+
 agents:
   default:
     provider: gemini

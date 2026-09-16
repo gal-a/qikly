@@ -1,0 +1,43 @@
+# Time to collision from forward-radar tracks logged by a test vehicle. The
+# second task from vehicle sensor data. Every decision is in the requirements,
+# including which side of each limit counts, so the only thing withheld is what
+# follows from those decisions.
+task_id: "ADAS_TTC"
+
+task_name: "ADAS - Time to Collision"
+
+description: "Implement a simple pipeline that reads two CSV logs of forward-radar tracks from a test vehicle, validates each track, computes the time to collision for tracks whose gap is closing, flags the ones that leave too little time to react, and writes the result to a single JSON output alongside an explanation for every track that was rejected."
+
+inputs:
+  - "inputs_private/data/ADAS_TTC/input_01.csv"
+  - "inputs_private/data/ADAS_TTC/input_02.csv"
+
+outputs:
+  - "outputs/data/ADAS_TTC/output.json"
+
+interface:
+  module: "outputs.agent_src.code.ADAS_TTC.ttc"
+  integration_functions:
+    - "extract(input_path) -> list[dict]  # reads one input file, returns its raw rows"
+    - "transform(rows) -> dict  # validates each track and computes ttc_s and the warning flag for valid ones; returns {\"accepted\": [...], \"rejected\": [...]}, where each accepted entry is the track plus its computed ttc_s and warning, and each rejected entry is the original row plus a \"reason\" field"
+    - "load(data, output_path) -> None  # writes the {\"accepted\": [...], \"rejected\": [...]} result to the output file as JSON"
+  system_entrypoint: "run_ttc(input_paths, output_path) -> None  # runs extract on each path in input_paths (a list), combines the raw rows, then transform -> load end-to-end"
+
+requirements:
+  - "Read both CSV files listed in this task's inputs (inputs_private/data/ADAS_TTC/input_01.csv and inputs_private/data/ADAS_TTC/input_02.csv), and combine their rows into a single list before validation"
+  - "Each row is one radar track: track_id (a string), gap_m (the distance to the vehicle ahead, in metres) and closing_speed_mps (how fast that gap is shrinking, in metres per second; zero or negative means the gap is not shrinking)"
+  - "Validate each track before using it: gap_m must be greater than zero and within the radar's rated range of 250 m, where exactly 250 is still in range, and closing_speed_mps must be a number no greater than 90 m/s, where exactly 90 is still valid. Reject tracks that are malformed or outside those limits"
+  - "For a track whose closing_speed_mps is above zero, time to collision is the gap divided by the closing speed, in seconds, reported as ttc_s rounded to two decimal places"
+  - "A valid track whose closing_speed_mps is zero or negative is not closing: it is accepted with ttc_s set to null and warning set to false"
+  - "Flag a track by setting its warning field to true, only when its ttc_s is strictly below 3.00 seconds; at 3.00 seconds or more the warning field is false"
+  - "A track that fails validation is not included among the accepted tracks, but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
+  - "In the accepted list, gap_m and closing_speed_mps are reported as the numbers parsed from the file rather than as the strings read from it, and ttc_s is a number or null; a rejected row keeps its fields exactly as they were read"
+  - "Write the result as JSON to outputs/data/ADAS_TTC/output.json: one object whose \"accepted\" key lists the valid tracks with their ttc_s and warning, and whose \"rejected\" key lists the original rows, each with a \"reason\""
+
+acceptance_criteria:
+  - "Every track that passes validation is listed under \"accepted\" exactly once, and no track that failed validation is listed there"
+  - "Each rejected track's reason names the specific field that caused rejection (\"gap_m\" or \"closing_speed_mps\") rather than a generic message like \"invalid track\""
+  - "A gap_m of exactly 250 is accepted and 250.01 is rejected; a gap_m of exactly 0, or a negative, non-numeric or missing gap_m, is rejected"
+  - "A closing_speed_mps of exactly 90 is accepted and 90.01 is rejected; a non-numeric or missing closing_speed_mps is rejected, while a negative one is accepted"
+  - "Track T001, a 30.0 m gap at 12.0 m/s, is a warning; track T002, a 36.0 m gap at 12.0 m/s, is not"
+  - "Track T003 reports ttc_s 10.0, and track T012 reports ttc_s null"

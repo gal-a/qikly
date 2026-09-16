@@ -260,6 +260,9 @@ _MODE_ROLE = {
     "test_unit": "test_unit",
     "acceptance_criteria": "criteria",
     "acceptance_criteria_review": "review",
+    # Checking generated suites against the criteria is reviewing, not writing
+    # tests: a separate look is the point, so it does not share the test role.
+    "suite_consistency": "review",
     "fixture_proposal": "fixtures",
 }
 

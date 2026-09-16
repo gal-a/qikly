@@ -1,10 +1,10 @@
 # Contributing to qikly
 
 **Users are encouraged to contribute their own tasks.** A new example task is
-the contribution that helps most, especially from a domain the ten bundled
+the contribution that helps most, especially from a domain the thirteen bundled
 tasks do not cover. Today they are calculations,
-clean-ups and merges on CSV files, plus one log summary. A task from sensor
-data, finance, healthcare records or logistics shows the tool working
+clean-ups and merges on CSV files, one log summary and three vehicle sensor tasks.
+A task from finance, healthcare records or logistics shows the tool working
 somewhere new, which a longer list of CSV pipelines cannot.
 
 Found a bug, or tried it and got stuck? Use the
@@ -74,7 +74,7 @@ step 3.
 | `reference/<TASK_ID>/` | Optional. A hand-written implementation known to satisfy the criteria, as `MERGE_SALES` and `MERGE_STOCK` have. If you add one, add its checks to `tests/test_reference_implementations.py`. |
 
 Two other places count the bundled tasks, so update them too:
-`tests/test_demo_claims.py` asserts how many there are, and the docs say "ten"
+`tests/test_demo_claims.py` asserts how many there are, and the docs say "thirteen"
 in several places, including the task list in `docs/design_3_mechanism.md`.
 
 ## 5. Check it, in this order

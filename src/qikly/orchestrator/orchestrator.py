@@ -543,7 +543,7 @@ def _validate_generated_tests(source, stage):
 
 GENERATE_TESTS_MAX_ATTEMPTS = 3
 
-def generate_and_write_tests(stage, tests_dir, task_id, seed=None):
+def generate_and_write_tests(stage, tests_dir, task_id, seed=None, guidance=None):
     """
     Call the LLM to generate the test file for `stage` and write it to
     <tests_dir>/<stage>/<filename>. Returns the written path.
@@ -571,7 +571,7 @@ def generate_and_write_tests(stage, tests_dir, task_id, seed=None):
     written = []
 
     for index, batch in enumerate(batches, start=1):
-        source = _generate_one(stage, generator, task_id, seed, batch, index)
+        source = _generate_one(stage, generator, task_id, seed, batch, index, guidance=guidance)
         # One file per batch rather than one merged file. Concatenating
         # generated modules looks tidier and silently loses tests: two batches
         # that both define test_rejects_empty_row leave only the second, and
@@ -590,7 +590,7 @@ def generate_and_write_tests(stage, tests_dir, task_id, seed=None):
     return written[0]
 
 
-def _generate_one(stage, generator, task_id, seed, criteria, batch_index):
+def _generate_one(stage, generator, task_id, seed, criteria, batch_index, guidance=None):
     """
     One generation call, retried on invalid output.
 
@@ -605,7 +605,10 @@ def _generate_one(stage, generator, task_id, seed, criteria, batch_index):
         attempt_seed = seed
         if seed is not None:
             attempt_seed = seed + attempt - 1 + 1000 * (batch_index - 1)
-        source = generator(task_id, seed=attempt_seed, criteria=criteria)
+        # Guidance is passed only when there is some, so a generator written
+        # before it existed, or a test's stand-in, keeps working unchanged.
+        extra = {"guidance": guidance} if guidance else {}
+        source = generator(task_id, seed=attempt_seed, criteria=criteria, **extra)
         error = _validate_generated_tests(source, stage)
         if not error:
             return source
@@ -838,6 +841,102 @@ def _stuck_reason(patch_hashes):
     return None
 
 
+def _disagreement_hint(failure_trail):
+    """
+    A sentence for the stop message when two tests are pulling in opposite
+    directions, or None.
+
+    `failure_trail` is one (suite, failing test names) pair per attempt,
+    oldest first. When the last three alternate between two different sets of
+    failing tests, each patch is fixing one test by breaking the other. Seen
+    on a real run: an integration test warned at exactly 2.00 seconds and a
+    system test did not, and the stop message said only that the patches
+    alternated, which points a reader at the code or the spec instead of at
+    the tests.
+    """
+    if len(failure_trail) < 3:
+        return None
+    (suite_a, tests_a), (suite_b, tests_b), (suite_c, tests_c) = failure_trail[-3:]
+    if not (tests_a and tests_b and tests_c) or tests_a != tests_c or tests_a == tests_b:
+        return None
+    where = (f" in the '{suite_a}' and '{suite_b}' suites" if suite_a != suite_b
+             else f" in the '{suite_a}' suite")
+    return (f"The failing tests alternate between {', '.join(tests_a)} and "
+            f"{', '.join(tests_b)}{where}: each fix for one breaks the other, which "
+            f"usually means two generated tests expect different results for the same "
+            f"case. Compare them with the acceptance criteria before changing the spec.")
+
+
+# Added to the run seed when a suite is written again after a failed check. A
+# same-seed rewrite reproduces the same file, and the finding with it.
+REGENERATION_SEED_OFFSET = 7919
+
+
+def suite_check_enabled(settings=None):
+    """
+    Whether to check the generated suites before any code is written.
+
+    Off unless `test_generation.check_suites` is true. Measured, it found the
+    wrong suites but did not raise convergence, and a wrong finding can make a
+    rewrite worse; the comment on the setting has the numbers.
+    """
+    settings = load_settings() if settings is None else settings
+    return bool((settings.get("test_generation") or {}).get("check_suites"))
+
+
+def check_and_repair_suites(task_id, tests_dir, generated_stages, seed=None,
+                            checker=None, regenerate=None, printer=print):
+    """
+    Check the suites written this run, rewrite any that fail once, and check again.
+
+    One model call when the suites agree, which is the common case. On a
+    finding, one rewrite per suite named, with the finding as guidance, and one
+    more check. Returns whatever the second check still reports, and carries on
+    either way: a judgement about whether two tests can both pass is advice,
+    not a reason to refuse a run.
+
+    `checker` and `regenerate` exist so the control flow can be tested without
+    a model.
+    """
+    from qikly.orchestrator.tuning import check_suites
+
+    checker = checker or check_suites.check
+    regenerate = regenerate or generate_and_write_tests
+    generated_stages = list(generated_stages)
+
+    findings = checker(task_id, tests_dir, generated_stages, seed=seed)
+    log_transaction({"action": "suite_check", "round": 1, "findings": findings})
+    if not findings:
+        printer("the generated suites agree with the criteria and with each other")
+        return []
+
+    for line in check_suites.report_lines(findings):
+        printer(line)
+    named = [st for st in generated_stages if any(f.get("suite") == st for f in findings)]
+    for stage in named or generated_stages:
+        replaced = check_suites.suite_sources(tests_dir, [stage])
+        printer(f"writing the {stage} tests again, with that finding as guidance ...")
+        regenerate(stage, tests_dir, task_id,
+                   seed=None if seed is None else seed + REGENERATION_SEED_OFFSET,
+                   guidance=check_suites.guidance_for(stage, findings))
+        # The replaced draft goes into the log, because a suite that vanished
+        # when it was rewritten would make this step impossible to audit.
+        log_transaction({"action": "suite_regenerated", "stage": stage,
+                         "replaced": [{"file": name, "source": source}
+                                      for _, name, source in replaced]})
+
+    remaining = checker(task_id, tests_dir, generated_stages, seed=seed)
+    log_transaction({"action": "suite_check", "round": 2, "findings": remaining})
+    if remaining:
+        printer("the suites still disagree after one rewrite; continuing, since the "
+                "check is advice rather than a verdict:")
+        for line in check_suites.report_lines(remaining):
+            printer(line)
+    else:
+        printer("the rewritten suites agree with the criteria and with each other")
+    return remaining
+
+
 def orchestrate(task_id, seed=None, resume=False):
     global TRANSACTIONS_PATH, SAVE_TRANSACTIONS, RUN_TIMESTAMP, RUN_STAGES
 
@@ -931,6 +1030,15 @@ def orchestrate(task_id, seed=None, resume=False):
         generate_and_write_tests(stage, tests_dir, task_id, seed=seed)
         print(f"{stage} tests written, before any code exists", flush=True)
 
+    # Before the first line of code: a generated test that contradicts a
+    # criterion, or another test, cannot be passed by any implementation, and
+    # the coding agent sees only failure output, so it cannot tell. Only suites
+    # written this run are checked; seeded and resumed suites are the user's.
+    if pending and suite_check_enabled(settings):
+        print("checking the generated suites against the criteria and each other "
+              "(one model call) ...", flush=True)
+        check_and_repair_suites(task_id, tests_dir, pending, seed=seed)
+
     if not reusable["implementation"]:
         backup_and_clear_agent_src(run_timestamp, agent_src_dir)
     if seed_implementation and not reusable["implementation"]:
@@ -1004,6 +1112,10 @@ def orchestrate(task_id, seed=None, resume=False):
         # unchanged. This is the counter that catches a real stall; the hashes
         # above only catch a model repeating itself word for word.
         ineffective_streak = 0
+        # (suite, failing test names) per attempt, so a stop can say when two
+        # tests are pulling in opposite directions rather than only that the
+        # patches repeated.
+        failure_trail = []
 
         while True:
             attempts += 1
@@ -1033,25 +1145,34 @@ def orchestrate(task_id, seed=None, resume=False):
             if result["status"] == "pass" and regressed_stage is None:
                 break  # move to next stage
 
+            if result["status"] != "pass":
+                failure_trail.append((stage, tuple(result.get("failed_tests") or ())))
+            else:
+                failure_trail.append((regressed_stage,
+                                      tuple((regressed_result or {}).get("failed_tests") or ())))
+            hint = _disagreement_hint(failure_trail)
+            hint_text = f" {hint}" if hint else ""
+
             if attempts > max_attempts_per_stage:
                 if regressed_stage is not None:
                     raise RuntimeError(
                         f"Exceeded {max_attempts_per_stage} attempts on stage '{stage}': "
                         f"stage '{regressed_stage}', which previously passed, keeps "
-                        f"regressing after each fix."
+                        f"regressing after each fix.{hint_text}"
                     )
                 raise RuntimeError(
-                    f"Exceeded {max_attempts_per_stage} attempts on stage '{stage}' without passing tests."
+                    f"Exceeded {max_attempts_per_stage} attempts on stage '{stage}' "
+                    f"without passing tests.{hint_text}"
                 )
 
             stuck = _stuck_reason(applied_patch_hashes)
             if stuck:
                 log_transaction({"action": "stopped_stuck", "stage": stage,
-                                 "iteration": attempts, "reason": stuck})
+                                 "iteration": attempts, "reason": stuck, "hint": hint})
                 raise RuntimeError(
                     f"Stopped on stage '{stage}' after {attempts - 1} attempts: {stuck}. "
                     f"Every further attempt would cost a model call and produce the same "
-                    f"diff. The report names the tests that never passed."
+                    f"diff. The report names the tests that never passed.{hint_text}"
                 )
 
             # Capture failure -- either this stage's own, or a regression in

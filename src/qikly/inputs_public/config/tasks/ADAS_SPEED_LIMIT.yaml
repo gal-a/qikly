@@ -1,0 +1,44 @@
+# Speed-limit compliance from logged vehicle speed against the posted limit.
+# The third task from vehicle sensor data. Every decision is in the
+# requirements, including the unit conversion, the tolerance and which side of
+# each limit counts, so the only thing withheld is what follows from them.
+task_id: "ADAS_SPEED_LIMIT"
+
+task_name: "ADAS - Speed Limit Compliance"
+
+description: "Implement a simple pipeline that reads two CSV logs of vehicle speed samples paired with the posted speed limit, validates each sample, converts the speed to km/h, flags the samples that exceed the posted limit by more than the tolerance, and writes the result to a single JSON output alongside an explanation for every sample that was rejected."
+
+inputs:
+  - "inputs_private/data/ADAS_SPEED_LIMIT/input_01.csv"
+  - "inputs_private/data/ADAS_SPEED_LIMIT/input_02.csv"
+
+outputs:
+  - "outputs/data/ADAS_SPEED_LIMIT/output.json"
+
+interface:
+  module: "outputs.agent_src.code.ADAS_SPEED_LIMIT.speed_limit"
+  integration_functions:
+    - "extract(input_path) -> list[dict]  # reads one input file, returns its raw rows"
+    - "transform(rows) -> dict  # validates each sample and computes speed_kph, the flag and over_by_kph for valid ones; returns {\"accepted\": [...], \"rejected\": [...]}, where each accepted entry is the sample plus its computed speed_kph, over_limit and over_by_kph, and each rejected entry is the original row plus a \"reason\" field"
+    - "load(data, output_path) -> None  # writes the {\"accepted\": [...], \"rejected\": [...]} result to the output file as JSON"
+  system_entrypoint: "run_speed_limit(input_paths, output_path) -> None  # runs extract on each path in input_paths (a list), combines the raw rows, then transform -> load end-to-end"
+
+requirements:
+  - "Read both CSV files listed in this task's inputs (inputs_private/data/ADAS_SPEED_LIMIT/input_01.csv and inputs_private/data/ADAS_SPEED_LIMIT/input_02.csv), and combine their rows into a single list before validation"
+  - "Each row is one speed sample: sample_id (a string), speed_mps (the vehicle's speed in metres per second) and posted_limit_kph (the speed limit in force where the sample was taken, in km/h)"
+  - "Validate each sample before using it: speed_mps must be a number from zero up to the vehicle's top speed of 90 m/s, where exactly 90 is still valid, and posted_limit_kph must be one of the limits this country posts, 30, 50, 70, 90, 110 or 130. Reject samples that are malformed or outside those limits"
+  - "Convert each valid sample's speed to km/h by multiplying by 3.6, reported as speed_kph rounded to two decimal places, and compare that rounded value with the posted limit"
+  - "The enforcement tolerance is 5 km/h. Set over_limit to true only when speed_kph is strictly greater than posted_limit_kph plus 5; at exactly the limit plus 5, or below it, over_limit is false"
+  - "For a sample that is over the limit, report over_by_kph as speed_kph minus posted_limit_kph, rounded to two decimal places; for any other accepted sample over_by_kph is null"
+  - "A sample that fails validation is not included among the accepted samples, but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
+  - "In the accepted list, speed_mps and posted_limit_kph are reported as the numbers parsed from the file rather than as the strings read from it, speed_kph is a number, and over_by_kph is a number or null; a rejected row keeps its fields exactly as they were read"
+  - "Write the result as JSON to outputs/data/ADAS_SPEED_LIMIT/output.json: one object whose \"accepted\" key lists the valid samples with their speed_kph, over_limit and over_by_kph, and whose \"rejected\" key lists the original rows, each with a \"reason\""
+
+acceptance_criteria:
+  - "Every sample that passes validation is listed under \"accepted\" exactly once, and no sample that failed validation is listed there"
+  - "Each rejected sample's reason names the specific field that caused rejection (\"speed_mps\" or \"posted_limit_kph\") rather than a generic message like \"invalid sample\""
+  - "A speed_mps of exactly 90 is accepted and 90.01 is rejected; a negative, non-numeric or missing speed_mps is rejected"
+  - "A posted_limit_kph of 130 is accepted and 55 is rejected, and so is a non-numeric or missing posted_limit_kph"
+  - "Under a posted limit of 50, a sample whose speed_kph is exactly 55.00 is not over the limit, and a sample whose speed_kph is 55.01 is over it"
+  - "Sample P001 reports speed_kph 55.01 and over_by_kph 5.01; sample P012 reports over_by_kph null"
+  - "Rejection is per field, so a rejected row can hold a valid value in the other field: sample P005 is rejected for its speed_mps while its posted_limit_kph of 130 remains one of the valid limits"

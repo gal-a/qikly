@@ -6,6 +6,44 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
+### Added
+- **An opt-in check that the generated suites can be passed at all.** With
+  `test_generation.check_suites: true`, after the integration and system tests
+  are generated one model call reads every limit the acceptance criteria state,
+  then every test's comparison at that limit, and reports a test no correct
+  implementation could pass, whether it contradicts a criterion or another
+  test. A suite with a finding is written once more and checked again. Found on
+  a following-distance task whose criterion said exactly 2.00 seconds of
+  headway raises no warning: in seven of ten runs a generated test warned at
+  2.00 anyway, and all seven failed, because the coding agent sees only failure
+  output and cannot tell a wrong test from a right one. On those saved suites
+  the check flagged all seven, but a ten-run sweep with it on converged 4 in 10
+  against 3 without, and one wrong finding led a correct suite to be rewritten
+  wrong, so it is off by default. To check suites already on disk:
+  `python -m qikly.orchestrator.tuning.check_suites --tasks <TASK>`.
+- **A stall names two tests that disagree.** When the failing tests alternate
+  between two sets, each fix breaking the other, the stop message says so and
+  names both, which points at the tests instead of at a correct spec.
+- **Three example tasks from vehicle sensor data**, the first bundled family
+  outside business data pipelines. `ADAS_HEADWAY` checks following distance
+  from forward-radar samples, `ADAS_TTC` computes time to collision from radar
+  tracks whose closing speed may be zero or negative, and `ADAS_SPEED_LIMIT`
+  checks speed against a posted limit through a unit conversion and an
+  enforcement tolerance. Each states its decisions in the requirements and
+  withholds what follows from them, including what happens exactly at every
+  limit, and what type each output field carries. They are not part of the
+  published convergence figures: on ten seeds each they converged 10, 10 and 8
+  times out of 10 on `gemini-3.5-flash-lite`, which is a first look at one task
+  apiece, not a rate.
+
+### Changed
+- **TROUBLESHOOTING.md is ordered by triage priority.** Its eleven sections now
+  run in the order to work through a stall: a stronger model first, then read
+  the report, rule out an import error or a forgotten setting, fix the task
+  file, and only then give it more attempts. The triage table lists all eleven
+  in that order, including the contradiction, adjective and fixture checks it
+  used to leave out, and a new section for two generated tests that disagree.
+
 ### Fixed
 - **The MCP `qikly_validate` reply says it is not a contradiction check.**
   Asked to validate CALC_TAX, GitHub Copilot relayed the counts correctly and

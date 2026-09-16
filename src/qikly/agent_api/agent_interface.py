@@ -427,22 +427,33 @@ def criteria_batches(task_id, per_batch):
     return [criteria[i:i + per_batch] for i in range(0, len(criteria), per_batch)]
 
 
-def agent_generate_integration_tests(task_id, seed=None, criteria=None):
+def _with_guidance(prompt, guidance):
+    """
+    Append what a suite check found in the draft this call replaces.
+
+    Test generation reads the criteria already, so quoting them here adds
+    nothing it could not see. It must never reach a FIX or PATCH prompt.
+    """
+    return f"{prompt}\n\n{guidance}" if guidance else prompt
+
+
+def agent_generate_integration_tests(task_id, seed=None, criteria=None, guidance=None):
     """
     Build the INTEGRATION test prompt (spec only, no implementation access)
     and call the LLM to generate that test file's source.
 
     `criteria` restricts the bar shown to this call. None means the whole set.
+    `guidance` is what a suite check found wrong with a previous draft.
     """
     test_agent_md = _load_test_agent_md()
     task = _task_with_criteria(task_id, criteria)
 
-    prompt = build_integration_test_prompt(test_agent_md, task)
+    prompt = _with_guidance(build_integration_test_prompt(test_agent_md, task), guidance)
     raw = call_llm("test_integration", prompt, seed=seed)
     return _extract_python(raw)
 
 
-def agent_generate_system_tests(task_id, seed=None, criteria=None):
+def agent_generate_system_tests(task_id, seed=None, criteria=None, guidance=None):
     """
     Build the SYSTEM test prompt (spec only, no implementation access) and
     call the LLM to generate that test file's source.
@@ -450,7 +461,7 @@ def agent_generate_system_tests(task_id, seed=None, criteria=None):
     test_agent_md = _load_test_agent_md()
     task = _task_with_criteria(task_id, criteria)
 
-    prompt = build_system_test_prompt(test_agent_md, task)
+    prompt = _with_guidance(build_system_test_prompt(test_agent_md, task), guidance)
     raw = call_llm("test_system", prompt, seed=seed)
     return _extract_python(raw)
 

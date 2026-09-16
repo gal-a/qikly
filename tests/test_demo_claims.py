@@ -45,7 +45,7 @@ def _bundled_task_ids():
 
 def test_the_bundled_tasks_are_discoverable():
     """Guards the guard: an empty list makes everything below vacuous."""
-    assert len(_bundled_task_ids()) == 10
+    assert len(_bundled_task_ids()) == 13
 
 
 def test_the_historical_rates_are_kept_but_never_read():

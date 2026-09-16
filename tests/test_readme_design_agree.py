@@ -115,7 +115,7 @@ def test_the_passing_path_is_drawn_in_its_own_colour():
 
 
 def _stage_list(name):
-    """The five numbered steps a run works through, as one block of text."""
+    """The numbered steps a run works through, as one block of text."""
     text = _read(name)
     start = text.index("A run works through three stages")
     start = text.index("1. **Integration and system tests", start)

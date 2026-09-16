@@ -1,0 +1,51 @@
+# Following-distance (time headway) checks on forward-radar samples logged by a
+# test vehicle: the first bundled task from vehicle sensor data rather than a
+# business data pipeline. The requirements state the limits; the criteria pin
+# what happens exactly at each one, which is where test generation has been
+# measured to misread a clear criterion (see orchestrator/tuning/check_suites.py).
+#
+# One asymmetry is deliberate. The requirements give the radar's rated range as
+# an upper limit and leave the bottom of it open, so whether a gap of exactly
+# zero is a measurement is settled only in the criteria. That is what makes this
+# task a worked example: the coding agent writes `gap_m < 0`, a test it never
+# saw rejects a zero-metre gap, and it closes the range from the failure alone.
+# ADAS_TTC states its lower bound in the requirements instead, which is the
+# usual way round.
+task_id: "ADAS_HEADWAY"
+
+task_name: "ADAS - Following-Distance Headway Check"
+
+description: "Implement a simple pipeline that reads two CSV logs of forward-radar samples from a test vehicle, validates each sample, computes the time headway to the vehicle ahead for each valid sample, flags samples where the vehicle is following too closely, and writes the result to a single JSON output alongside an explanation for every sample that was rejected."
+
+inputs:
+  - "inputs_private/data/ADAS_HEADWAY/input_01.csv"
+  - "inputs_private/data/ADAS_HEADWAY/input_02.csv"
+
+outputs:
+  - "outputs/data/ADAS_HEADWAY/output.json"
+
+interface:
+  module: "outputs.agent_src.code.ADAS_HEADWAY.headway"
+  integration_functions:
+    - "extract(input_path) -> list[dict]  # reads one input file, returns its raw rows"
+    - "transform(rows) -> dict  # validates each sample and computes the time headway and warning flag for valid ones; returns {\"accepted\": [...], \"rejected\": [...]}, where each accepted entry is the sample plus its computed headway_s and warning, and each rejected entry is the original row plus a \"reason\" field"
+    - "load(data, output_path) -> None  # writes the {\"accepted\": [...], \"rejected\": [...]} result to the output file as JSON"
+  system_entrypoint: "run_headway(input_paths, output_path) -> None  # runs extract on each path in input_paths (a list), combines the raw rows, then transform -> load end-to-end"
+
+requirements:
+  - "Read both CSV files listed in this task's inputs (inputs_private/data/ADAS_HEADWAY/input_01.csv and inputs_private/data/ADAS_HEADWAY/input_02.csv), and combine their rows into a single list before validation"
+  - "Each row is one forward-radar sample: sample_id (a string), ego_speed_mps (the test vehicle's own speed, in metres per second) and gap_m (the distance to the vehicle ahead, in metres, bumper to bumper)"
+  - "Validate each sample before using it: ego_speed_mps must be a speed the test vehicle can reach, up to its top speed of 90 m/s, and gap_m must be a distance the forward radar can measure, up to its rated range of 250 m. Reject samples that are malformed or outside those limits"
+  - "For a moving vehicle, time headway is the gap divided by the speed, in seconds, reported as headway_s rounded to two decimal places"
+  - "Flag a sample as following too closely by setting its warning field to true, only when its time headway is strictly below 2.00 seconds; at 2.00 seconds or more the warning field is false"
+  - "A valid sample whose ego_speed_mps is zero is a stationary vehicle: it is accepted with headway_s set to null and warning set to false"
+  - "A sample that fails validation is not included among the accepted samples, but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
+  - "In the accepted list, ego_speed_mps and gap_m are reported as the numbers parsed from the file rather than as the strings read from it, and headway_s is a number or null; a rejected row keeps its fields exactly as they were read"
+  - "Write the result as JSON to outputs/data/ADAS_HEADWAY/output.json: one object whose \"accepted\" key lists the valid samples with their headway_s and warning, and whose \"rejected\" key lists the original rows, each with a \"reason\""
+
+acceptance_criteria:
+  - "Every sample that passes validation is listed under \"accepted\" exactly once, and no sample that failed validation is listed there"
+  - "Each rejected sample's reason names the specific field that caused rejection (\"ego_speed_mps\" or \"gap_m\") rather than a generic message like \"invalid sample\""
+  - "An ego_speed_mps of exactly 90 is accepted and 90.01 is rejected; a negative, non-numeric or missing ego_speed_mps is rejected"
+  - "The 250 limit is inclusive: a gap_m of exactly 250 is accepted and 250.01 is rejected; a gap_m of exactly 0, or a negative, non-numeric or missing gap_m, is rejected"
+  - "A sample at 20.0 m/s with a 40.0 m gap is not flagged, and a sample at 18.0 m/s with a 35.8 m gap is flagged"

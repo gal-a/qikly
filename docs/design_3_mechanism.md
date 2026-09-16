@@ -204,7 +204,7 @@ Issues and results, welcome and wanted:
 
 ### Example tasks
 
-Ten tasks ship with the tool, in four domain families.
+Thirteen tasks ship with the tool, in five domain families.
 
 | Family | Task | What it does |
 |---|---|---|
@@ -218,6 +218,9 @@ Ten tasks ship with the tool, in four domain families.
 | | `MERGE_STOCK` | Inventory transactions into per-SKU stock; cross-file ordering |
 | | `MERGE_CONTACTS` | Contact records from two systems; conflict resolution by recency |
 | `AGG_*` event-stream aggregation | `AGG_RUNLOG` | Summarises append-only JSONL run logs |
+| `ADAS_*` vehicle sensor data | `ADAS_HEADWAY` | Following-distance warnings from forward-radar samples; inclusive limits and the two-second boundary |
+| | `ADAS_TTC` | Time to collision from radar tracks; a closing speed that can be zero or negative, and a three-second boundary |
+| | `ADAS_SPEED_LIMIT` | Speed-limit compliance; a unit conversion, an enforcement tolerance, and an enumerated set of valid limits |
 
 Every task ships with `requirements`, an `interface`, and a full set of
 `acceptance_criteria`, so each one is a worked example of the task format

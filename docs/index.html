@@ -579,7 +579,9 @@ footer {
       Python module, for example an ETL step, a merge, a calculation or a validation routine,
       who does not want to trust a green suite when the same agent wrote both the code and the
       tests. It suits one module at a time in small to mid-sized repositories: when a test
-      fails, only the files that failure names are loaded, so runs stay small and quick.</p>
+      fails, only the files that failure names are loaded, so runs stay small and quick.
+      It fits most naturally where verification already has to be independent of the people
+      who build the thing: automotive, medical devices, fintech and defence.</p>
     <div class="install">
       <span><span class="prompt">$</span> pip install qikly</span>
       <span><span class="prompt">$</span> export GEMINI_API_KEY=...</span>

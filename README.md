@@ -26,7 +26,10 @@ self-contained Python module that transforms data, for example an ETL step, a
 merge, a calculation or a validation routine, who does not want to trust a
 green suite when the same agent wrote both the code and the tests. It suits one
 module at a time in small to mid-sized repositories: when a test fails, only
-the files that failure names are loaded, so runs stay small and quick. See [What it is for](#what-it-is-for).
+the files that failure names are loaded, so runs stay small and quick. It fits
+most naturally where verification already has to be independent, such as
+automotive, medical devices, fintech and defence: `ADAS_HEADWAY`, a bundled
+example, checks following distance from forward-radar samples. See [What it is for](#what-it-is-for).
 
 **Just want to try it on your own data?** [Quick start on your own data](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md), five steps from your module to a first run.
 
@@ -340,7 +343,7 @@ A run that exhausts its budget exits non-zero, names the tests that blocked it,
 and keeps the full record. It never reports success on code its own tests
 reject.
 
-Ten example tasks ship with the tool across four domains, listed in
+Thirteen example tasks ship with the tool across five domains, listed in
 [docs/design_3_mechanism.md](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md#example-tasks).
 
 **Measuring rather than producing.** One run is an artifact, not a rate: the
@@ -362,10 +365,10 @@ the blocking tests, keeps the whole record, and ships nothing.
 
 The first thing to try is **a stronger model**, which moves convergence more
 than any setting in this file and costs one environment variable. After that,
-in order of how often each is the answer: read the timeline report, look for the
-same patch repeating (a criterion fighting the model's priors), check for a
-collection error (nothing ran at all), and run `--check-criteria`, `--validate`
-and `propose_fixtures`.
+in triage order: read the timeline report, check for a collection error
+(nothing ran at all), rule out a forgotten setting with `--trends`, look for the
+same patch repeating (a criterion fighting the model's priors), and run
+`--check-criteria`, `--validate` and `propose_fixtures`.
 
 **Each of those, with the signature to look for and the fix:**
 [docs/TROUBLESHOOTING.md](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md).
@@ -626,7 +629,7 @@ an agent kept apart from the code:
 ## Contributing a task
 
 Users are encouraged to contribute their own tasks. The most useful is a new
-example task from a domain the ten bundled ones do not cover, under a name that
+example task from a domain the thirteen bundled ones do not cover, under a name that
 follows the naming rules so it never clashes with another. [`CONTRIBUTING.md`](https://github.com/gal-a/qikly/blob/main/CONTRIBUTING.md)
 has what a task needs and how to check it before sending it. Every accepted
 task is credited in the changelog, and its author gets a contributor badge.
@@ -646,7 +649,7 @@ The design write-up is in three parts, and each stands on its own.
 |---|---|
 | **[1. The case](https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md)** | Why an agent that writes its own tests is grading its own homework, and one `CALC_TAX` repair followed end to end: what the coding agent was given, the test it failed, the reasoning it produced from the failure alone, and the one-line patch. Start here. |
 | **[2. How well it works](https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md)** | Three sweeps and 967 runs, the benchmark defect found and corrected between them, the unit-stage gap, what makes a run stall, and the results this project measured and then withdrew. |
-| **[3. How it is built](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md)** | What separates this from the alternatives, the five agents and what each may read, the FIX and PATCH separation, the ten example tasks, watching a run live, supplying your own code or tests, and the tools for generating and evaluating acceptance criteria. |
+| **[3. How it is built](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md)** | What separates this from the alternatives, the five agents and what each may read, the FIX and PATCH separation, the thirteen example tasks, watching a run live, supplying your own code or tests, and the tools for generating and evaluating acceptance criteria. |
 
 ## Where this came from
 

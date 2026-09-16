@@ -10,9 +10,9 @@ body:
         let us agree on the scope and the name before you spend time on fixtures.
         What a task needs, and the naming rules, are in CONTRIBUTING.md.
 
-        Tasks from domains the ten bundled examples do not cover are the most
-        useful: today they are calculations, clean-ups and merges on CSV, and
-        one log summary.
+        Tasks from domains the thirteen bundled examples do not cover are the most
+        useful: today they are calculations, clean-ups and merges on CSV, one
+        log summary and three vehicle sensor tasks.
   - type: input
     id: domain
     attributes:

@@ -41,6 +41,17 @@ Other providers, and how to set a key so it survives a new terminal, are in
 and prints what it built and where. It writes nothing outside that directory,
 so a first run leaves everything else untouched. About 30 seconds.
 
+For the same thing on vehicle sensor data rather than an order pipeline:
+
+```bash
+qikly --demo --tasks ADAS_HEADWAY
+```
+
+`ADAS_HEADWAY` checks following distance from forward-radar samples. Its
+requirements give the limits and the two-second rule; its withheld criteria
+pin what happens exactly at each limit, including that a gap of zero metres is
+not a measurement.
+
 From a clone instead:
 
 ```bash
@@ -328,7 +339,7 @@ because the model keeps "fixing" a restriction it was never told about back to
 what it correctly believes. Restrict street suffixes to three valid values and
 it will keep widening them, since everything it knows says "Boulevard" is a
 suffix. Move the restriction into `requirements`, or widen the criterion to
-match reality. [TROUBLESHOOTING.md](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md#3-the-same-patch-appearing-over-and-over)
+match reality. [TROUBLESHOOTING.md](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md#5-the-same-patch-appearing-over-and-over)
 has the diagnosis.
 
 **To see a task that follows the rule,** run `qikly --explain CALC_TAX`. Its
