@@ -988,6 +988,25 @@ def orchestrate(task_id, seed=None, resume=False):
             f"task's `seed:` block instead of generating them. Seeded runs measure a "
             f"different thing from unseeded ones, so don't pool them in one rate."
         )
+        # A supplied implementation is the one case where withholding cannot be
+        # enforced, only evidenced: this process did not write that code and
+        # cannot know what its author read. Version control can still say
+        # whether the criteria were settled first, which is the part a reader of
+        # the report needs. Recorded now rather than derived later, because the
+        # answer is about the repository as it stood when the run happened.
+        if seed_implementation:
+            try:
+                from qikly.independence import check as check_independence, console_lines
+                evidence = check_independence(
+                    task_config_path(task_id), seed_implementation)
+                for line in console_lines(task_id, evidence):
+                    print(line)
+                log_transaction({"action": "criteria_independence", **evidence})
+            except Exception as exc:
+                # Defence in depth. independence.py promises never to raise, and
+                # its tests hold it to that, but a note about a run must never
+                # be the thing that ends one.
+                print(f"[{task_id}] independence check skipped: {exc}")
 
     # Generate this run's pre-implementation test files from the spec alone,
     # before outputs/agent_src/code/<task_id>/ is cleared -- they don't

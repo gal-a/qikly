@@ -61,10 +61,11 @@ Z_95 = 1.959963985
 # skipped in full and the aggregate silently reported a rate computed from
 # two-week-old runs instead. Nothing failed and the number looked plausible.
 #
-# 4 adds a `provenance` block and changes no existing field, so 3 and 4 pool
-# safely. `tests/test_aggregate_schema.py` fails the build if the writer ever
-# moves ahead of this set again.
-SUPPORTED_SCHEMAS = frozenset({3, 4})
+# 4 adds a `provenance` block and 5 adds `criteria_independence`, which is
+# populated only for seeded runs. Neither changes an existing field, so 3, 4
+# and 5 pool safely. `tests/test_aggregate_schema.py` fails the build if the
+# writer ever moves ahead of this set again.
+SUPPORTED_SCHEMAS = frozenset({3, 4, 5})
 
 
 def load_summaries(task_ids=None, run_timestamps=None, last=None):

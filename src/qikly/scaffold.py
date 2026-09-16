@@ -83,6 +83,15 @@ SEED_EXISTING = """
 # a property of a run qikly performed, not of a file you supply: if the code
 # was written with these criteria open, the suite is still independent of the
 # code, but the author was not.
+#
+# What a run can do is ask git. If this task file was last changed before the
+# implementation's first commit, the criteria were not written against code
+# that was already in the repository, and the run says so as it starts and in
+# its report. Read that narrowly, because it is a narrow claim: code can have
+# existed uncommitted while the criteria were being written, and criteria
+# committed first say nothing about whether the code's author read them, which
+# no ordering of commits can show. So the run prints those bounds alongside the
+# verdict, and reports whether the two sides were committed by the same person.
 seed:
   implementation: "{source_rel}"
 """

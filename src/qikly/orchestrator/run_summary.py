@@ -123,8 +123,12 @@ def build_payload(task_id, run_timestamp=None):
     # bulk by a later script; the fields below are free to change shape, and a
     # reader needs to know which shape it got.
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "provenance": _provenance(),
+        # Seeded runs only, and None everywhere else: whether git says the
+        # criteria were settled before the supplied implementation existed.
+        # Additive, so schema 5 pools safely with 3 and 4.
+        "criteria_independence": summary.get("criteria_independence"),
         "task_id": task_id,
         "task_name": task_meta.get("task_name"),
         "run_timestamp": run_timestamp,

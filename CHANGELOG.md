@@ -35,6 +35,33 @@ packaging tools would read as `1.1`.
   published convergence figures: on ten seeds each they converged 10, 10 and 8
   times out of 10 on `gemini-3.5-flash-lite`, which is a first look at one task
   apiece, not a rate.
+- **A seeded run says whether the criteria predate the code.** Withholding is a
+  property of a run qikly performed: when it writes the implementation, the
+  coding agent provably never saw the acceptance criteria, because one process
+  controlled both sides. A run seeded with `seed.implementation`, which is what
+  `qikly --scaffold` writes for code you already have, cannot enforce that,
+  since it did not write the code and cannot know what its author read. It can
+  evidence it, within bounds it states rather than hides. If the task file was
+  last changed before the implementation's first commit, the criteria were not
+  written against code that was already in the repository. That is all it
+  means, and the finding is printed with its limit attached: git witnesses when
+  each side was committed, not when either was written, so code that sat
+  uncommitted in a working tree could still have shaped the criteria, and
+  criteria committed first say nothing about whether the code's author read
+  them, that order being exactly what reading them would require. The verdict
+  is therefore worth most when it comes out badly, in the same way a failing
+  test is worth more than a passing one. The run also reports whether the two
+  sides were committed by the same person, which is the part of separation of
+  duties version control really does know. Git is asked at
+  the start of the run, the verdict
+  opens the run on the console and sits under the result banner in the HTML
+  report, and the run summary carries it as `criteria_independence`
+  (`schema_version` 5, additive, still pools with 3 and 4). The conservative
+  reading is deliberate: the *last* change to the whole task file is compared
+  with the implementation's *first* commit, so a criterion revised after the
+  code existed loses the claim. Outside a repository, or for a file git does
+  not track, the run says the order could not be evidenced either way rather
+  than claiming anything, and no failure here can fail a run.
 
 ### Changed
 - **TROUBLESHOOTING.md is ordered by triage priority.** Its eleven sections now

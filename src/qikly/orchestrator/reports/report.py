@@ -110,6 +110,8 @@ def build_blocks(events):
         ):
             if current is not None and e.get("fix_id") == current["fix_id"]:
                 current["steps"].append(e)
+        elif action == "criteria_independence":
+            blocks.append({"type": "criteria_independence", **e})
         elif action == "all_tests_passed":
             blocks.append({"type": "all_tests_passed"})
             current = None
@@ -187,6 +189,15 @@ def compute_summary(blocks):
             continue
         key = "bootstrap" if b.get("is_bootstrap") else b["stage"]
         stage_iterations[key] = stage_iterations.get(key, 0) + 1
+    # Seeded runs log one of these at the start. Carried through the summary
+    # rather than passed as its own argument so that every consumer of a run
+    # (this report, the metrics report, run_summary.py's JSON) picks it up
+    # without a signature change.
+    independence = next(
+        (b for b in blocks if b["type"] == "criteria_independence"), None)
+    if independence is not None:
+        independence = {k: v for k, v in independence.items()
+                        if k not in ("type", "action", "ts")}
     return {
         "passed_overall": any(b["type"] == "all_tests_passed" for b in blocks),
         "total_fix_attempts": len(fix_cycles),
@@ -198,6 +209,7 @@ def compute_summary(blocks):
         ),
         "ineffective_patches": sum(1 for b in fix_cycles if b.get("repeat_failure")),
         "stage_iterations": stage_iterations,
+        "criteria_independence": independence,
     }
 
 
@@ -317,11 +329,25 @@ def _summary_html(task_id, run_timestamp, summary, task_meta):
     title_extra = f': {_esc(task_meta["task_name"])}' if task_meta.get("task_name") else ""
     metrics_href = f"../metrics/{_esc(task_id)}_{_esc(run_timestamp)}_metrics.html"
 
+    # Only a seeded run carries this. A run that wrote its own implementation
+    # says nothing here, because for those the separation is enforced rather
+    # than evidenced and a note claiming it would be noise.
+    evidence = summary.get("criteria_independence") or {}
+    independence_html = ""
+    if evidence.get("detail"):
+        cls = "evidence-ok" if evidence.get("verdict") == "criteria_first" else "evidence-open"
+        limit = evidence.get("limit")
+        limit_html = f'<div class="evidence-limit">{_esc(limit)}</div>' if limit else ""
+        independence_html = (
+            f'\n  <div class="independence {cls}"><b>{_esc(evidence.get("headline"))}</b>: '
+            f'{_esc(evidence.get("detail"))}{limit_html}</div>'
+        )
+
     return f"""
 <header class="report-header">
   <h1>{_esc(task_id)}{title_extra}</h1>
   <div class="run-meta">Run {_esc(ts_display)} - {_esc(describe())} - <a href="{metrics_href}">view metrics report</a></div>
-  <div class="result-banner {result_cls}">{result_text}</div>
+  <div class="result-banner {result_cls}">{result_text}</div>{independence_html}
 </header>
 """
 
@@ -350,6 +376,13 @@ h1 { font-size: 1.5rem; margin: 0 0 0.15rem; }
 h2 { font-size: 1.15rem; border-bottom: 1px solid var(--border); padding-bottom: 0.4rem; margin-top: 2.5rem; }
 h4 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 1rem 0 0.35rem; }
 .run-meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.9rem; }
+.independence {
+  font-size: 0.85rem; padding: 0.45rem 0.7rem; border-radius: 6px;
+  border: 1px solid var(--border); margin: 0.2rem 0 1rem; max-width: 860px;
+}
+.evidence-ok { color: var(--ok); background: var(--ok-bg); }
+.evidence-open { color: var(--warn); background: var(--warn-bg); }
+.evidence-limit { color: var(--muted); margin-top: 0.35rem; }
 .result-banner {
   display: inline-block; font-weight: 600; font-size: 0.85rem; letter-spacing: 0.03em;
   padding: 0.3rem 0.7rem; border-radius: 6px; margin-bottom: 1rem;

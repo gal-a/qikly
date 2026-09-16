@@ -290,10 +290,15 @@ def test_the_schema_version_moved_with_the_new_field():
     These files are read back in bulk. A reader that meets a summary without
     provenance has to know it is an older shape rather than assume the field
     was lost.
+
+    The same argument added `criteria_independence` at schema 5: a summary
+    without it is a run from before the evidence existed, or an unseeded run
+    that had nothing to evidence, and neither is a finding that went missing.
     """
     import inspect
 
     from qikly.orchestrator import run_summary
 
     source = inspect.getsource(run_summary.build_payload)
-    assert '"schema_version": 4' in source
+    assert '"schema_version": 5' in source
+    assert '"criteria_independence"' in source
