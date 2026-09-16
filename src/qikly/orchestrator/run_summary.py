@@ -36,6 +36,43 @@ from qikly.orchestrator.reports.metrics_report import (
 RUN_SUMMARY_DIR = "outputs/reports/run_summary"
 
 
+def _criteria_coverage(task_id):
+    """
+    How many tests named each acceptance criterion, from the suites on disk.
+
+    Self-reported by test generation and read back by `qikly.traceability`,
+    so it measures what the generator said it was covering rather than what
+    it achieved. That is still the per-criterion number six aggregate
+    experiments never had: an aggregate cannot tell a bar that adds nothing
+    from a bar the generator ignored, and 54% more criteria producing a 6%
+    smaller suite says the second happens.
+
+    Never raises, for the same reason `_provenance` does not: a run that
+    produced real output must not fail while recording what it produced.
+    Anything unavailable is simply absent.
+    """
+    try:
+        from qikly.orchestrator.orchestrator import GENERATED_TESTS_ROOT
+        from qikly.orchestrator.tuning.trace_criteria import trace
+
+        result = trace(task_id, os.path.join(GENERATED_TESTS_ROOT, task_id))
+        if not result:
+            return None
+        # The per-test lists and the criteria text are useful at the terminal
+        # and only bulk here, where these files are read back by the hundred.
+        return {
+            "criteria_count": result["criteria_count"],
+            "tests_total": result["tests_total"],
+            "tests_traced": result["tests_traced"],
+            "tests_untraced": len(result["tests_untraced"]),
+            "tests_requirements_only": len(result["tests_requirements_only"]),
+            "per_criterion": result["per_criterion"],
+            "uncovered": result["uncovered"],
+        }
+    except Exception:
+        return None
+
+
 def _provenance():
     """
     What produced these numbers: model, date, and the generation settings.
@@ -123,8 +160,11 @@ def build_payload(task_id, run_timestamp=None):
     # bulk by a later script; the fields below are free to change shape, and a
     # reader needs to know which shape it got.
     return {
-        "schema_version": 5,
+        "schema_version": 6,
         "provenance": _provenance(),
+        # How many tests named each criterion, self-reported by test
+        # generation. Additive, so schema 6 pools safely with 3, 4 and 5.
+        "criteria_coverage": _criteria_coverage(task_id),
         # Seeded runs only, and None everywhere else: whether git says the
         # criteria were settled before the supplied implementation existed.
         # Additive, so schema 5 pools safely with 3 and 4.

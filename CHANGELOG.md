@@ -4,6 +4,36 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## Unreleased
+
+### Added
+- **Each generated test names the acceptance criterion it came from.** Test
+  generation is asked to end every test's docstring with `Criteria: 3`, or
+  `Criteria: none` for a test written from the requirements, with requirement
+  indices on their own `Requirements:` line. `qikly.traceability` reads those
+  back out of the suite source with `ast`, the run summary carries
+  `criteria_coverage` (schema 6, additive, still pools with 3, 4 and 5), the
+  HTML report gains a Criteria coverage section, and
+  `python -m qikly.orchestrator.tuning.trace_criteria` reports the same for
+  suites already on disk, offline and free.
+
+  It exists because six refinement experiments compared two suites in
+  aggregate and found nothing, and an aggregate cannot tell a bar that adds
+  nothing from a bar the generator ignores; the measured 54%-more-criteria,
+  6%-smaller-suite result says the second happens. Per-criterion counts make
+  it direct: delete a criterion, regenerate, and the change in its row prices
+  that criterion with no fault model in between.
+
+  The label is self-reported. A test naming criterion 3 is evidence the
+  generator intended to cover it, not proof that it did, so read an uncovered
+  criterion as a lower bound and never a coverage guarantee. Three real runs
+  shaped the parser: models write the line in the function body as well as
+  the docstring, and they will put a requirement's index on the `Criteria:`
+  line unless requirements have a line of their own. A label that could mean
+  two things, `Criteria: 3-5`, is reported rather than guessed. Measured at
+  8/10 convergence on `ADAS_HEADWAY` against 9/10 for a matched control arm
+  on the same ten seeds, which is one run apart and not a detectable cost.
+
 ## 0.4.6
 
 > Ask it anything: docs/FAQ.md, and --explain now counts criteria rather than lines

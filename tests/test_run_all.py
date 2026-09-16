@@ -294,11 +294,17 @@ def test_the_schema_version_moved_with_the_new_field():
     The same argument added `criteria_independence` at schema 5: a summary
     without it is a run from before the evidence existed, or an unseeded run
     that had nothing to evidence, and neither is a finding that went missing.
+
+    And again at schema 6 for `criteria_coverage`. A summary without it is a
+    run from before test generation was asked to name the criterion each test
+    came from, which reads identically to a run where nothing was labelled
+    unless the version separates them. That distinction is the measurement.
     """
     import inspect
 
     from qikly.orchestrator import run_summary
 
     source = inspect.getsource(run_summary.build_payload)
-    assert '"schema_version": 5' in source
+    assert '"schema_version": 6' in source
     assert '"criteria_independence"' in source
+    assert '"criteria_coverage"' in source

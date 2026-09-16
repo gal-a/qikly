@@ -89,6 +89,23 @@ GENERAL RULES:
   digits have no case at all. Skip or specifically handle non-alphabetic
   tokens rather than applying an alphabetic-only rule to every
   whitespace-separated piece uncritically.
+- Every test has a docstring, and the LAST LINE INSIDE that docstring names
+  the acceptance criteria the test was written from, by their 1-based
+  position in the `acceptance_criteria` list: `Criteria: 3`, or
+  `Criteria: 3, 7` for a test covering two. A test written from the
+  requirements rather than from any criterion says `Criteria: none`.
+  - Write it exactly once per test, inside the docstring. A `Criteria:` line
+    placed in the function body instead is dead code and is not read.
+  - Use only positions that exist in the `acceptance_criteria` list. If the
+    task lists five criteria, then 6 and anything above it names nothing.
+  - The requirements are a separate, separately numbered list. When a test
+    comes from a requirement rather than a criterion, say so on its own line,
+    `Requirements: 9`, and do not put a requirement's number on the
+    `Criteria:` line. A test may carry both lines.
+  - It is what lets a reviewer see which line of the specification each test
+    enforces, and which criteria nothing is checking. It does not change what
+    you test or how you test it, so label what you wrote rather than letting
+    the label change your coverage.
 - Do not import anything beyond the Python standard library and the module(s)
   you are told to test.
 - For tests that produce output files, write to a tempfile.TemporaryDirectory()

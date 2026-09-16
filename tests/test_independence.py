@@ -419,7 +419,7 @@ def test_the_run_summary_json_records_it(tmp_path, monkeypatch):
 
     payload = run_summary.build_payload("T", "20260916_100000")
 
-    assert payload["schema_version"] == 5
+    assert payload["schema_version"] == 6
     assert payload["criteria_independence"]["verdict"] == "criteria_first"
     assert payload["criteria_independence"]["criteria_commit"] == "abc1234"
 
