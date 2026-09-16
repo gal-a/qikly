@@ -108,6 +108,15 @@ code.
 
    Start reading at `outputs/reports/iterations/<task>_<timestamp>_report.html`.
 
+   A `_VERIFY` task tests code you already have, which qikly did not write, so
+   it cannot enforce that the code's author never saw your acceptance criteria.
+   It evidences what it can: the run opens by asking git whether this task file
+   was last changed before that code's first commit, and prints the answer with
+   what it does not show. A commit date is not a writing date, and criteria
+   settled first is the precondition of the opposite problem, someone coding to
+   the bar. So read it as corroboration, and read the bad answer, criteria
+   revised after the code landed, as the question it is.
+
 **Tried it?** [Tell us what happened](https://github.com/gal-a/qikly/discussions/6), whether it worked, stalled
 or never got past install.
 

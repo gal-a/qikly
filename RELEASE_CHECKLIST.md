@@ -149,6 +149,26 @@ So the title has to earn its place. Say what changed and whether to hurry:
 Anyone can open the release and confirm the title matches what shipped, which
 is what makes it a claim rather than an announcement.
 
+## 7c. The landing page catches up here
+
+`docs/index.html` is served at test.qikly.com to people running the *published*
+version, so everything it names has to exist in the version they can install.
+Anything that has landed on the branch but not on PyPI waits, and this is the
+step where it goes in. Nothing tests that page, which is why it needs a line in
+the one list that gets read before every upload.
+
+Waiting for the next upload:
+
+- The `ADAS_*` tasks by name, in "Who it is for" and in the use-case table. The
+  page currently says which domains they serve without naming the tasks.
+- Independence evidence: for code you supply, a run reports whether git says
+  the criteria were settled before that code's first commit, and prints the
+  bounds of that claim beside it. The use-case row for "code someone else
+  wrote" is where it belongs.
+
+Clear an item as you add it, and add one whenever something lands on the branch
+that the page cannot honestly show yet.
+
 ## 8. Upload
 
 Do not upload by hand. Push the tag:

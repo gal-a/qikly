@@ -512,6 +512,7 @@ left holding afterwards.
 | **Regression re-checks** | Every stage that has already passed is re-run after each later fix, so a repair cannot quietly break an earlier stage |
 | **Retrieval within a file** | A module over ~16k characters contributes the definitions the failure names, in full, plus a one-line signature for everything else. Deterministic, AST-based, no index and no extra model call |
 | **Seeded inputs** | Supply your own implementation or any test stage instead of generating it |
+| **Independence evidence** | For code you supply, git is asked whether the criteria were settled before the implementation's first commit, and the answer is printed with the bounds of what it shows, because a run cannot enforce a separation it did not perform |
 | **Any provider** | Gemini, OpenAI or Anthropic, selectable per agent role |
 | **Concurrent tasks** | Each task in its own process, output prefixed `[task_id]` |
 | **Run provenance** | Every summary records the model, provider, date and generation settings, because a convergence rate belongs to a configuration as much as to a tool |

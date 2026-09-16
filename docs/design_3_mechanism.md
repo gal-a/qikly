@@ -162,6 +162,15 @@ The four that matter most, most valuable first:
    the same context as the code is a model agreeing with itself, and agreement
    is not evidence. This is the use no other tool in this space covers.
 
+   One honest caveat comes with it, and the run states it rather than leaving
+   you to find it. qikly did not write that implementation, so it cannot know
+   what its author read: the separation is evidenced here rather than enforced.
+   The run asks git whether the task file was last changed before the
+   implementation's first commit and prints the answer next to what that answer
+   does not show. A failing test is a real finding either way, since it was
+   written from the criteria without reading the code. It is the passes the
+   evidence qualifies.
+
 2. **You have #1, #2 and #3, and no code.** A specification exists and an
    implementation does not. You get a first implementation plus the suite that
    justifies it, and nothing is drafted on your behalf. Everything lands in
