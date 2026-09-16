@@ -129,17 +129,19 @@ def render(facts):
     added = [l for l in difflib.unified_diff(before, after, lineterm="", n=0)
              if l.startswith("+") and not l.startswith("+++")]
     lines.append("")
-    # Spelled out because the two numbers on this page do not obviously agree:
-    # a reader counts 11 criteria and 12 removed lines and has to work out
-    # where the extra one came from. It is the YAML key the list hangs off.
+    # Said as criteria first, because that is the unit the reader was just
+    # given and the line count is not the same number: on 11 criteria the diff
+    # removes 12 lines, and the extra one is the YAML key the list hangs off.
+    # Leading with the line count makes a reader stop and reconcile the two.
     entries = sum(1 for line in removed if line.strip().startswith("-"))
     other = len(removed) - entries
     if entries == count and other:
-        lines.append(f"  {len(removed)} lines removed: the "
-                     f"`acceptance_criteria:` key,")
-        lines.append(f"  plus all {count} criteria under it.")
+        lines.append(f"  All {count} acceptance criteria are removed, with the")
+        lines.append(f"  `acceptance_criteria:` key they hang off: "
+                     f"{len(removed)} lines removed.")
     elif entries:
-        lines.append(f"  {len(removed)} lines removed, {entries} of them criteria.")
+        lines.append(f"  {entries} acceptance criteria are removed, "
+                     f"{len(removed)} lines in all.")
     else:
         lines.append(f"  {len(removed)} line(s) removed.")
     lines.append(f"  The file shrinks from {facts['test_generation_chars']:,} "
@@ -233,6 +235,21 @@ def _removed_line_numbers(before, after):
     return removed
 
 
+def _hole_label(entries, total):
+    """
+    A removed block, named in criteria where it holds them.
+
+    `entries` is how many of the block's lines are list entries under
+    `acceptance_criteria:`, `total` how many non-blank lines it has. The
+    difference is the YAML key itself, which is not worth a number of its own.
+    """
+    if entries == 1:
+        return "1 acceptance criterion"
+    if entries:
+        return "%d acceptance criteria" % entries
+    return "%d line%s" % (total, "" if total == 1 else "s")
+
+
 def render_html(facts):
     """
     The same facts as `render`, as one self-contained page to share.
@@ -254,17 +271,24 @@ def render_html(facts):
 
     # Where each removed block used to sit in the coding agent's file, so its
     # column shows the hole rather than silently closing up around it.
+    # Each hole is counted in criteria where it holds them, for the same
+    # reason the terminal leads with criteria: the reader has just been told
+    # how many the task declares, and a line count is a different number.
     gaps = {}
     for tag, i1, i2, j1, _j2 in difflib.SequenceMatcher(None, before, after).get_opcodes():
-        if tag in ("delete", "replace"):
-            gaps[j1] = gaps.get(j1, 0) + sum(1 for line in before[i1:i2] if line.strip())
+        if tag not in ("delete", "replace"):
+            continue
+        block = [line.strip() for line in before[i1:i2] if line.strip()]
+        hole = gaps.setdefault(j1, [0, 0])
+        hole[0] += sum(1 for line in block if line.startswith("-"))
+        hole[1] += len(block)
 
     def column(cls, title, note, lines, cut, holes=None):
         spans = []
         for i, line in enumerate(lines + [None]):
-            if holes and holes.get(i):
-                spans.append('<span class="ln gap">%d line%s removed here</span>'
-                             % (holes[i], "" if holes[i] == 1 else "s"))
+            if holes and holes.get(i) and holes[i][1]:
+                spans.append('<span class="ln gap">%s removed here</span>'
+                             % _hole_label(*holes[i]))
             if line is not None:
                 spans.append('<span class="ln%s">%s</span>'
                              % (" cut" if i in cut else "", esc(line)))
@@ -277,11 +301,21 @@ def render_html(facts):
         parts.append('<p class="lede">%s declares no acceptance criteria, so there is '
                      "nothing to withhold and nothing to show.</p>" % esc(task_id))
     else:
+        # Every count on this page is in criteria. Saying "12 lines removed" one
+        # sentence after "declares 11 acceptance criteria" reads as a
+        # contradiction until the reader works out that the twelfth line is the
+        # YAML key, and most readers will not stop to do that.
+        entries = sum(1 for i in removed if before[i].strip().startswith("-"))
+        cut_phrase = ("all %d of them and the acceptance_criteria: key they hang off"
+                      % count if entries == count and removed_count > count
+                      else "%s, %d line%s in all"
+                           % (_hole_label(entries, removed_count), removed_count,
+                              "" if removed_count == 1 else "s"))
         parts.append(
             '<p class="lede">This task declares %d acceptance criteria. The agent that '
             "writes the tests receives all of them. The agent that writes the code receives "
-            "the same file with them cut out: %d line%s removed, %s characters down to %s.</p>"
-            % (count, removed_count, "" if removed_count == 1 else "s",
+            "the same file with them cut out: %s, %s characters down to %s.</p>"
+            % (count, cut_phrase,
                format(facts["test_generation_chars"], ","),
                format(facts["coding_agent_chars"], ",")))
         if facts["withheld_ok"]:

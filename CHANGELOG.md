@@ -4,9 +4,19 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
-## Unreleased
+## 0.4.6
+
+> Ask it anything: docs/FAQ.md, and --explain now counts criteria rather than lines
 
 ### Added
+- **A FAQ, from questions people actually asked.** `docs/FAQ.md` answers
+  whether qikly can use classes you already have, such as hardware drivers and
+  protocol parsers, and whether anything runs anywhere but your own machine.
+  The import answer is the one worth knowing before you start: each stage runs
+  as `python -m pytest` from the project root, so a package at the project root
+  or installed in the same virtualenv imports from generated tests and
+  generated code alike, and one in a subdirectory that is not on the path stops
+  the run with a collection error that no amount of iterating can fix.
 - **An opt-in check that the generated suites can be passed at all.** With
   `test_generation.check_suites: true`, after the integration and system tests
   are generated one model call reads every limit the acceptance criteria state,
@@ -72,6 +82,14 @@ packaging tools would read as `1.1`.
   used to leave out, and a new section for two generated tests that disagree.
 
 ### Fixed
+- **`--explain` counts criteria, not lines.** It reported "12 lines removed" one
+  sentence after "declares 11 acceptance criteria", and the two numbers are both
+  right: the twelfth line is the `acceptance_criteria:` key the list hangs off.
+  A reader who stops to reconcile two numbers is a reader who distrusts them,
+  which is the wrong reaction to the one screen that exists to demonstrate the
+  claim. The terminal and the shareable page now both lead with the criteria,
+  and the hole in the coding agent's column reads "11 acceptance criteria
+  removed here".
 - **The MCP `qikly_validate` reply says it is not a contradiction check.**
   Asked to validate CALC_TAX, GitHub Copilot relayed the counts correctly and
   then summarised them as "no contradictions", which the tool never checks. The

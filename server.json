@@ -3,7 +3,7 @@
   "name": "io.github.gal-a/qikly",
   "title": "qikly",
   "description": "Generates tests from acceptance criteria, then converges code with an agent that never sees them.",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "websiteUrl": "https://test.qikly.com/",
   "repository": {
     "source": "github",
@@ -14,7 +14,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "qikly",
-      "version": "0.4.5",
+      "version": "0.4.6",
       "transport": {
         "type": "stdio"
       },
@@ -23,7 +23,7 @@
         {
           "type": "named",
           "name": "--from",
-          "value": "qikly[mcp]==0.4.5"
+          "value": "qikly[mcp]==0.4.6"
         },
         {
           "type": "positional",

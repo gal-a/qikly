@@ -27,7 +27,12 @@ def test_the_page_marks_exactly_the_lines_the_terminal_counts():
     counted = int(re.search(r"(\d+) line(?:s|\(s\))? removed", explain.render(facts)).group(1))
     page = explain.render_html(facts)
     assert len(_marked(_column(page, "tests"))) == counted
-    assert "%d lines removed" % counted in page
+    # The page marks the same lines but counts them in criteria. A reader told
+    # the task declares 11 criteria and then shown 12 removed lines stops to
+    # reconcile two numbers that are both right, so the page names the extra
+    # line instead of leaving it to be worked out.
+    assert "all %d of them and the acceptance_criteria: key" % facts["criteria_count"] in page
+    assert "%d lines removed" % counted not in page
 
 
 def test_the_cut_lines_lead_the_page_and_leave_a_marked_hole():
@@ -42,7 +47,8 @@ def test_the_cut_lines_lead_the_page_and_leave_a_marked_hole():
     assert page.index('class="cutbox"') < page.index('class="cols"')
     box = page[page.index('class="cutbox"'):page.index('class="cols"')]
     assert len(_marked(box)) == counted
-    assert "%d lines removed here" % counted in _column(page, "code")
+    assert ("%d acceptance criteria removed here" % facts["criteria_count"]
+            in _column(page, "code"))
 
 
 def test_no_criterion_appears_in_the_coding_agent_column():

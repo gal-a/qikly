@@ -273,8 +273,9 @@ qikly --explain MERGE_SALES --html   # the same, as a page to share
 
 `--explain` is the one worth running first. It prints the acceptance criteria
 that test generation receives, then the same task file as the coding agent
-receives it, then the diff: on `MERGE_SALES`, eleven criteria and twelve
-lines removed. It builds those strings through the same function a real run
+receives it, then the diff: on `MERGE_SALES`, all eleven acceptance criteria
+are removed, along with the `acceptance_criteria:` key they hang off. It builds
+those strings through the same function a real run
 uses, so it shows the mechanism rather than a description of it.
 
 Add `--html` and it also writes `qikly_explain_MERGE_SALES.html`: both views
@@ -372,6 +373,10 @@ same patch repeating (a criterion fighting the model's priors), and run
 
 **Each of those, with the signature to look for and the fix:**
 [docs/TROUBLESHOOTING.md](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md).
+
+**Questions people ask before they start**, including whether it can use the
+classes you already have and whether anything leaves your machine:
+[docs/FAQ.md](https://github.com/gal-a/qikly/blob/main/docs/FAQ.md).
 
 ## Output
 
@@ -545,7 +550,7 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.4.5`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.4.6`, uploading the suite, the code and the JUnit XML |
 
 ## Use it in CI
 
@@ -588,7 +593,7 @@ a run.
 
 **Two ways to pin, and the choice is yours.** `@v0` is a moving alias that
 this project repoints at every release, so you receive fixes without receiving
-a breaking change. `@v0.4.5` is an exact pin that never moves, so nothing
+a breaking change. `@v0.4.6` is an exact pin that never moves, so nothing
 changes under you and nothing reaches you either. The templates use `@v0`
 because most people want the fixes; use the exact form if your policy requires
 it.

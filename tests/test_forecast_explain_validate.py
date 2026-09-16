@@ -343,7 +343,7 @@ def test_the_line_count_explains_itself():
     facts = explain.build("CALC_TAX")
     text = explain.render(facts)
     assert "`acceptance_criteria:` key" in text
-    assert f"all {facts['criteria_count']} criteria under it" in text
+    assert f"All {facts['criteria_count']} acceptance criteria are removed" in text
 
 
 def test_the_explain_output_fits_a_terminal():

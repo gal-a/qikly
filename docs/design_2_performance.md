@@ -41,7 +41,7 @@ qikly --explain CALC_TAX
 ```
 
 It prints the task file twice, once as each agent receives it, and the
-difference between them: eleven acceptance criteria on one side, twelve lines
+difference between them: all eleven acceptance criteria go to one side and are
 cut before the other side is handed the file. No API key, no model call, about
 a second, and it works from a plain `pip install`.
 
