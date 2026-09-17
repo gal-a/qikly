@@ -506,6 +506,12 @@ def _coverage_rows_html(task_id):
     if result.get("out_of_range"):
         notes.append("%d test(s) name a criterion that does not exist"
                      % len(result["out_of_range"]))
+    if result.get("tests_ambiguous"):
+        notes.append("%d label(s) could mean two things and were not read"
+                     % len(result["tests_ambiguous"]))
+    if result.get("tests_outside_supported_shape"):
+        notes.append("%d test(s) sit in a class or another function and are missing "
+                     "from these counts" % len(result["tests_outside_supported_shape"]))
     notes_html = (f'<p class="cov-notes">{_esc("; ".join(notes))}</p>' if notes else "")
 
     return f"""<section class="coverage"><h2>Criteria coverage</h2>

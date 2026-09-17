@@ -68,6 +68,9 @@ def _criteria_coverage(task_id):
             "tests_requirements_only": len(result["tests_requirements_only"]),
             "per_criterion": result["per_criterion"],
             "uncovered": result["uncovered"],
+            "tests_ambiguous": len(result.get("tests_ambiguous") or []),
+            "tests_outside_supported_shape":
+                len(result.get("tests_outside_supported_shape") or []),
         }
     except Exception:
         return None

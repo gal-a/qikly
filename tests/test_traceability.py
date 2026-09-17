@@ -386,3 +386,69 @@ def test_the_cli_returns_nothing_when_there_are_no_suites(tmp_path):
     from qikly.orchestrator.tuning import trace_criteria
 
     assert trace_criteria.trace("T", str(tmp_path)) is None
+
+
+# ------------------------- tests the reader cannot see, made visible ----
+
+CLASS_SUITE = '''
+class TestHeadway:
+    def test_in_a_class(self):
+        """Criteria: 1"""
+        assert True
+
+
+def test_top_level():
+    """Criteria: 2"""
+
+    def test_nested():
+        assert True
+
+    assert True
+'''
+
+
+def test_a_test_in_a_class_or_a_nested_function_is_named_rather_than_lost():
+    """
+    The tracer reads top-level functions only, because the generator is told
+    to write no test classes and no nested tests. That instruction is not a
+    guarantee, and the failure used to be invisible from both ends: such a
+    test was absent from tests_total, and its docstring marker counted as
+    "in a docstring" so no stray fired either.
+
+    A disobedient suite therefore reported as a suite that did not exist, and
+    an empty coverage table reads like a generator that ignored the
+    instruction rather than a reader that could not see the tests.
+    """
+    assert tr.unreachable_tests(CLASS_SUITE) == ["test_in_a_class", "test_nested"]
+
+    result = tr.coverage({"s.py": CLASS_SUITE}, criteria_count=2)
+    assert result["tests_outside_supported_shape"] == [
+        "s.py::test_in_a_class", "s.py::test_nested"]
+    # Not folded into tests_total: they were never read, so counting them
+    # among the tests would imply the rest of the table describes them.
+    assert result["tests_total"] == 1
+    assert result["per_criterion"] == {1: 0, 2: 1}
+
+
+def test_an_obedient_suite_reports_nothing_outside_the_supported_shape():
+    assert tr.unreachable_tests(SUITE) == []
+    assert tr.coverage({"s.py": SUITE}, 3)["tests_outside_supported_shape"] == []
+
+
+def test_source_that_does_not_parse_reports_no_unreachable_tests():
+    assert tr.unreachable_tests("def test_broken(:\n") == []
+
+
+def test_the_report_says_when_tests_are_missing_from_its_counts():
+    from qikly.orchestrator.reports import report
+    from qikly.orchestrator.tuning import trace_criteria
+
+    original = trace_criteria.trace
+    try:
+        trace_criteria.trace = lambda *a, **k: dict(
+            tr.coverage({"s.py": CLASS_SUITE}, criteria_count=2),
+            task_id="T", criteria=["first", "second"])
+        html = report._coverage_section_html("T")
+        assert "missing from these counts" in html
+    finally:
+        trace_criteria.trace = original

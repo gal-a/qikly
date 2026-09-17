@@ -208,6 +208,34 @@ def markers_outside_docstrings(source):
     return max(0, _count_markers(source) - in_docstrings)
 
 
+def unreachable_tests(source):
+    """
+    Test functions `trace_source` cannot see, named so they are not silent.
+
+    The tracer reads top-level functions only, because the generator is told
+    to write no test classes and no nested tests. That instruction is not a
+    guarantee, and the failure was invisible from both ends: such a test was
+    absent from `tests_total`, and its docstring marker counted as "in a
+    docstring" so no stray fired either. A suite written the disobedient way
+    would have reported as a suite that did not exist, and an empty coverage
+    table reads like a generator that ignored the instruction rather than a
+    reader that could not see the tests.
+
+    Counting them turns that into a discrepancy a person can act on. Found in
+    review, 2026-09-17.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    top_level = {id(node) for node in tree.body}
+    found = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))                 and node.name.startswith("test") and id(node) not in top_level:
+            found.append(node.name)
+    return sorted(found)
+
+
 def coverage(sources, criteria_count):
     """
     Per-criterion coverage across a stage's files.
@@ -222,11 +250,12 @@ def coverage(sources, criteria_count):
     """
     per_criterion = {index: [] for index in range(1, criteria_count + 1)}
     traced, untraced, requirements_only, out_of_range = [], [], [], {}
-    ambiguous = []
+    ambiguous, unreachable = [], []
     stray = 0
 
     for label, source in sorted(sources.items()):
         stray += markers_outside_docstrings(source)
+        unreachable.extend("%s::%s" % (label, name) for name in unreachable_tests(source))
         for name, indices in sorted(trace_source(source).items()):
             where = "%s::%s" % (label, name)
             if indices is UNTRACED:
@@ -259,5 +288,8 @@ def coverage(sources, criteria_count):
         "uncovered": [index for index, names in per_criterion.items() if not names],
         "out_of_range": out_of_range,
         "tests_ambiguous": ambiguous,
+        # Not added to tests_total: these were never read, so counting them
+        # among the tests would imply the rest of this table describes them.
+        "tests_outside_supported_shape": unreachable,
         "markers_outside_docstrings": stray,
     }

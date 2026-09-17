@@ -74,6 +74,13 @@ def report(result):
         print()
         print("  From the requirements rather than a criterion: %d"
               % len(result["tests_requirements_only"]))
+    if result.get("tests_outside_supported_shape"):
+        print()
+        print("  %d test(s) sit in a class or inside another function, which this"
+              % len(result["tests_outside_supported_shape"]))
+        print("  reader does not see, so they are missing from every count above:")
+        for where in result["tests_outside_supported_shape"][:10]:
+            print("    %s" % where)
     if result.get("markers_outside_docstrings"):
         print()
         print("  %d Criteria: line(s) sit in a function body rather than a docstring,"
