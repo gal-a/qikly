@@ -36,6 +36,17 @@ packaging tools would read as `1.1`.
   8/10 convergence on `ADAS_HEADWAY` against 9/10 for a matched control arm
   on the same ten seeds, which is one run apart and not a detectable cost.
 
+### Changed
+- **`--explain --html` puts the verdict where the evidence is.** The coding
+  agent's column now leads, since the withheld-from side is the one a reader
+  came to see, and "No criterion text reaches the coding agent" sits in that
+  column's header rather than as a banner above both. As a banner it was a
+  claim the reader had to carry down to the evidence. A FAILED verdict stays
+  at the top, because a leak is not a caption. The lede drops the character
+  count, which is still in the terminal output: it sat at the end of the one
+  sentence that has to land, and a reader who has just been told what was cut
+  does not also need to know how many bytes it was.
+
 ## 0.4.6
 
 > Ask it anything: docs/FAQ.md, and --explain now counts criteria rather than lines

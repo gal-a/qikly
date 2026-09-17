@@ -192,6 +192,9 @@ PAGE = """<!doctype html>
             letter-spacing: .12em; text-transform: uppercase; border-bottom: 1px solid #293334; }
   .col h2 span { display: block; margin-top: 5px; font: 400 .82rem/1.35 "Segoe UI", system-ui,
                  sans-serif; letter-spacing: 0; text-transform: none; color: #98a5a3; }
+  /* The verdict now lives in the coding agent's column header, so it keeps
+     the colour it had as a banner rather than fading into the subtitle. */
+  .col h2 .verdict-inline { color: #8fdcdc; font-weight: 700; }
   .col.tests { border-top: 3px solid #57b8bd; }
   .col.tests h2 { color: #57b8bd; }
   .col.code { border-top: 3px solid #a855f7; }
@@ -311,17 +314,15 @@ def render_html(facts):
                       else "%s, %d line%s in all"
                            % (_hole_label(entries, removed_count), removed_count,
                               "" if removed_count == 1 else "s"))
+        # The character count is in the terminal output and not here. On the
+        # page it sat at the end of the one sentence that has to land, and a
+        # reader who has just been told what was cut does not also need to
+        # know how many bytes it was.
         parts.append(
             '<p class="lede">This task declares %d acceptance criteria. The agent that '
             "writes the tests receives all of them. The agent that writes the code receives "
-            "the same file with them cut out: %s, %s characters down to %s.</p>"
-            % (count, cut_phrase,
-               format(facts["test_generation_chars"], ","),
-               format(facts["coding_agent_chars"], ",")))
-        if facts["withheld_ok"]:
-            parts.append('<p class="verdict ok">No criterion text reaches the coding agent. '
-                         "When a test fails, it sees the error and never the rule it broke.</p>")
-        else:
+            "the same file with them cut out: %s.</p>" % (count, cut_phrase))
+        if not facts["withheld_ok"]:
             leaked = "".join("<br>%s" % esc(item[:160]) for item in facts["leaked"][:5])
             parts.append('<p class="verdict bad">FAILED: criterion text is present in what '
                          "the coding agent receives.%s</p>" % leaked)
@@ -332,12 +333,22 @@ def render_html(facts):
                             for i in sorted(removed))
         parts.append('<section class="cutbox"><h2>Cut before the coding agent gets it</h2>'
                      "<pre>%s</pre></section>" % cut_lines)
+    # The verdict belongs in the column it is about. As a banner at the top it
+    # was a claim the reader had to carry down to the evidence; inside the
+    # coding agent's column it sits on the thing it describes. A FAILED
+    # verdict stays at the top, because a leak is not a caption.
+    code_note = "The same file, without them."
+    if facts["withheld_ok"] and count:
+        code_note = ('<b class="verdict-inline">No criterion text reaches the coding agent.</b> '
+                     "When a test fails, it sees the error and never the rule it broke.")
+
+    # The coding agent's column leads. This page exists to show what was
+    # withheld, and the withheld-from side is the one a reader came to see.
     parts.append('<main class="cols">%s%s</main>' % (
+        column("code", "The coding agent sees", code_note, after, set(), gaps),
         column("tests", "Test generation sees",
                "The whole task file. Highlighted lines are cut before the coding agent gets it.",
-               before, removed),
-        column("code", "The coding agent sees",
-               "The same file, without them.", after, set(), gaps)))
+               before, removed)))
     parts.append('<footer>%s, built by the same functions a real run uses, with no model '
                  'call. <a href="https://test.qikly.com/?ref=explain">test.qikly.com</a></footer>'
                  % esc(facts.get("task_path", task_id)))
