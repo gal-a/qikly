@@ -32,7 +32,11 @@ packaging tools would read as `1.1`.
   line unless requirements have a line of their own. A label that could mean
   two things, `Criteria: 3-5`, is reported rather than guessed, and a test in
   a class or inside another function, which the reader does not see, is named
-  rather than left out of the counts in silence. Measured at
+  rather than left out of the counts in silence. The marker is a comment,
+  `# Criteria: 3`, because the model writes it in the function body as well as
+  the docstring and `Criteria: 1, 2` there is a Python syntax error that stops
+  the file importing: on CALC_TAX, eleven criteria, that failed test
+  generation three times in a row and ended the run. Measured at
   8/10 convergence on `ADAS_HEADWAY` against 9/10 for a matched control arm
   on the same ten seeds, which is one run apart and not a detectable cost.
 

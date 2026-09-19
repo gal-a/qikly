@@ -54,7 +54,7 @@ _NONE = re.compile(r"^\s*(none|n/?a|-{1,2}|requirements?(\s+only)?)\s*\.?\s*$",
 
 UNTRACED = None  # no marker at all, as distinct from a marker saying "none"
 AMBIGUOUS = "ambiguous"  # a marker that parsed but could mean two things
-_RANGE = re.compile("\d+\s*(?:-|\u2013|to)\s*\d+", re.IGNORECASE)
+_RANGE = re.compile(r"\d+\s*(?:-|\u2013|to)\s*\d+", re.IGNORECASE)
 
 
 def _indices(text, pattern):
@@ -108,9 +108,14 @@ def requirements_in_docstring(docstring):
 # before it reached a measurement.
 #
 # As a statement, `Criteria: 3` is an annotated name with no value, and
-# `criteria: int = 5` has a value, which separates them exactly. Note that
-# `Criteria: 3, 7` is a SyntaxError as a statement, so a multi-index marker
-# can only ever live in a docstring; there is nothing to recover here.
+# `criteria: int = 5` has a value, which separates them exactly.
+#
+# The statement form is also why the prompt now requires a leading `#`.
+# `Criteria: 3, 7` written as a bare statement is a SyntaxError, so on a task
+# with enough criteria for the model to name two at once, a stray marker in a
+# function body stopped the whole generated file from importing and failed
+# the run at test generation. Found on CALC_TAX, eleven criteria, 2026-09-20.
+# A comment is legal anywhere, so the same mistake is now harmless.
 _MARKER_NAMES = ("criteria", "criterion")
 
 
@@ -151,10 +156,16 @@ def trace_source(source):
         tree = ast.parse(source)
     except SyntaxError:
         return {}
+    # A function's end_lineno is its last statement, so a trailing comment
+    # sits outside it. The marker is usually exactly that, a comment after the
+    # final assert, so each function's text runs to the next top-level node.
+    lines = source.splitlines()
+    starts = [n.lineno for n in tree.body]
     out = {}
-    for node in tree.body:
+    for position, node in enumerate(tree.body):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) \
                 and node.name.startswith("test"):
+            stop = starts[position + 1] - 1 if position + 1 < len(starts) else len(lines)
             docstring = ast.get_docstring(node)
             indices = criteria_in_docstring(docstring)
             if indices is UNTRACED and requirements_in_docstring(docstring) is not UNTRACED:
@@ -171,6 +182,14 @@ def trace_source(source):
                 # still said which criterion it meant, and dropping that
                 # reports an unlabelled suite while the labels sit right there.
                 indices = _marker_statement(node)
+            if indices is UNTRACED:
+                # And a comment line in the body, which is what the marker
+                # looks like once the `#` is required. Safe to read as text
+                # because a comment cannot be confused with real code, unlike
+                # the bare-statement form above.
+                body = [l for l in lines[node.lineno - 1:stop]
+                        if l.lstrip().startswith("#")]
+                indices = criteria_in_docstring(chr(10).join(body))
             out[node.name] = indices
     return out
 

@@ -90,12 +90,15 @@ GENERAL RULES:
   tokens rather than applying an alphabetic-only rule to every
   whitespace-separated piece uncritically.
 - Every test has a docstring, and the LAST LINE INSIDE that docstring names
-  the acceptance criteria the test was written from, by their 1-based
-  position in the `acceptance_criteria` list: `Criteria: 3`, or
-  `Criteria: 3, 7` for a test covering two. A test written from the
-  requirements rather than from any criterion says `Criteria: none`.
-  - Write it exactly once per test, inside the docstring. A `Criteria:` line
-    placed in the function body instead is dead code and is not read.
+  the acceptance criteria the test was written from, written as a comment,
+  by their 1-based position in the `acceptance_criteria` list:
+  `# Criteria: 3`, or `# Criteria: 3, 7` for a test covering two. A test
+  written from the requirements rather than from any criterion says
+  `# Criteria: none`.
+  - The leading `#` is required. Without it the line is a bare statement, and
+    `Criteria: 3, 7` without the `#` is a Python syntax error that stops the
+    whole file from importing.
+  - Write it exactly once per test, inside the docstring.
   - Use only positions that exist in the `acceptance_criteria` list. If the
     task lists five criteria, then 6 and anything above it names nothing.
   - The requirements are a separate, separately numbered list. When a test

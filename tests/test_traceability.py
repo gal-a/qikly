@@ -191,7 +191,6 @@ def test_the_prompt_says_where_the_line_goes_and_bounds_the_indices():
 
     text = load_template("test_agent.md")
     assert "LAST LINE INSIDE that docstring" in text
-    assert "dead code" in text
     assert "Use only positions that exist" in text
 
 
@@ -452,3 +451,59 @@ def test_the_report_says_when_tests_are_missing_from_its_counts():
         assert "missing from these counts" in html
     finally:
         trace_criteria.trace = original
+
+
+# ---------------------- the marker must be legal Python wherever it lands ----
+
+def test_a_multi_index_marker_in_a_body_is_a_comment_and_not_a_syntax_error():
+    """
+    The regression that made this change, found on CALC_TAX, 2026-09-20.
+
+    The model writes the marker at the end of the function body as well as in
+    the docstring, and two prompt revisions did not stop it. `Criteria: 3` as
+    a bare statement is legal Python, an annotated name. `Criteria: 1, 2` is
+    a SyntaxError, so on a task with enough criteria for the model to name
+    two at once, the whole generated file stopped importing and the run
+    failed at test generation, three attempts in a row.
+
+    A comment is legal anywhere, which is why the prompt now requires the
+    leading `#`. This pins both halves: the broken shape really is broken, and
+    the required shape really is not.
+    """
+    import ast
+
+    broken = 'def test_x():\n    """Thing."""\n    assert True\n    Criteria: 1, 2\n'
+    try:
+        ast.parse(broken)
+        raise AssertionError("expected the unguarded marker to be a syntax error")
+    except SyntaxError:
+        pass
+
+    fixed = 'def test_x():\n    """Thing."""\n    assert True\n    # Criteria: 1, 2\n'
+    ast.parse(fixed)
+    assert tr.trace_source(fixed) == {"test_x": [1, 2]}
+
+
+def test_a_comment_marker_is_read_when_the_docstring_has_none():
+    source = ('def test_x():\n'
+              '    """No marker here."""\n'
+              '    assert True\n'
+              '    # Criteria: 4\n')
+    assert tr.trace_source(source) == {"test_x": [4]}
+
+
+def test_a_commented_out_line_of_real_code_is_not_a_marker():
+    """A comment is read as text, so it has to stay narrow."""
+    source = ('def test_x():\n'
+              '    """No marker."""\n'
+              '    # criteria = compute_criteria(5)\n'
+              '    assert True\n')
+    assert tr.trace_source(source) == {"test_x": tr.UNTRACED}
+
+
+def test_the_prompt_requires_the_leading_hash():
+    from qikly.agent_api.prompts.template_loader import load_template
+
+    text = load_template("test_agent.md")
+    assert "# Criteria: 3" in text
+    assert "The leading `#` is required" in text
