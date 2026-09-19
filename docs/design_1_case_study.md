@@ -179,6 +179,44 @@ E       assert 150.0 <= 100
 
 8 of 9 integration tests pass. This one does not.
 
+Here is the whole test, not just the line that failed, because the rest of it
+is the part worth reading:
+
+```python
+def test_integration_tax_rate_bounds():
+    rows = extract(INPUT_01) + extract(INPUT_02)
+    result = transform(rows)
+    for row in result["accepted"]:
+        tr = float(row["tax_rate"])
+        assert 0 <= tr <= 100
+    for row in result["rejected"]:
+        try:
+            tr = float(row.get("tax_rate", -1))
+            is_invalid = tr < 0 or tr > 100
+        except (ValueError, TypeError):
+            is_invalid = True
+        if "tax_rate" in row["reason"].lower():
+            assert is_invalid
+    # Criteria: 7
+```
+
+**It checks the rule in both directions**, and only the first direction can
+fail here. Every accepted row must be in range, which is the assertion above.
+And every row rejected *for* `tax_rate` must actually have been out of range,
+which stops an implementation from passing by rejecting everything. A suite
+that only asserted the first half would accept a pipeline that threw away good
+data, and the criterion it came from rules both out.
+
+**It constructs no input.** It reads whatever the fixture files hold and
+asserts a property of the output. That is forced by when it was written, which
+is the next point, and it is why the failing value is 150.0 rather than
+something the test chose: the bad row was already in the data.
+
+**The trailing comment names the criterion it came from**, so a reader can
+follow any test back to the line of the specification it enforces. Test
+generation writes that; `qikly --explain CALC_TAX` prints the criteria in the
+same order.
+
 **Why an integration test and not a unit test?** Because of when it was
 written. At that point no implementation existed, so the only names the
 test-writing agent could use were the ones the `interface` section promised:
