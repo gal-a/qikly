@@ -4,6 +4,25 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## 0.4.8
+
+> Repairs the package description: 0.4.7 published with terminal output pasted into its README
+
+### Fixed
+- **The README PyPI serves.** A terminal session was pasted into `README.md`
+  while it was open in an editor, staged without the diff being read, and
+  published as the package's front page in 0.4.7, with the CI badge URL cut in
+  half and an error trace inside it. The code in 0.4.7 is unaffected and needs
+  no upgrade for its own sake; PyPI does not allow replacing a release, so the
+  description could only be corrected by publishing again.
+
+  Two guards now run over the README and every published document: one rejects
+  lines only a shell produces, the other rejects a markdown link or image whose
+  target does not close on its own line, which is what a paste into the middle
+  of one produces. The second is the general case and would have caught this
+  without recognising the text. Neither existed, and the badge test passed
+  throughout, because its regex matched the surviving fragment of the label.
+
 ## 0.4.7
 
 > Register the MCP server with one command, and every generated test names the criterion it came from
