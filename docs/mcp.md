@@ -67,6 +67,37 @@ than no button, because the reader blames the tool rather than the link. Until
 each is tried, use the plain configuration above: **every one of these editors
 accepts a hand-written config**, and the button only ever saves you a paste.
 
+## Let it register itself
+
+```bash
+qikly --install-mcp --dry-run    # what it would write, and where
+qikly --install-mcp              # write it
+```
+
+It writes **project-local files only**: `.mcp.json` for Claude Code and
+`.vscode/mcp.json` for VS Code. Never `~/.claude.json`, never the VS Code user
+profile. Those hold every other server you have, and the project file is also
+the right place on its own terms, because the setting that reliably goes wrong
+is which folder the server treats as the project.
+
+It merges rather than overwrites, so your other servers and every other key in
+the file survive, and it copies the file to a timestamped backup first. Running
+it twice changes nothing and says so.
+
+It refuses in three cases, and prints the block for you to paste instead:
+
+| It stops when | Because |
+|---|---|
+| the file holds comments | VS Code's `mcp.json` is JSONC, and writing it back as JSON would delete every comment you wrote |
+| a `qikly` entry exists and differs | you changed it on purpose. `--force` says otherwise |
+| the file is not valid JSON | guessing what you meant is how a config gets lost |
+
+Add `--install-mcp claude` or `--install-mcp vscode` to target one host.
+
+Cursor and Codex CLI are not written yet. Cursor takes the `mcpServers` shape
+below; Codex needs TOML, which the standard library cannot write on any Python
+this supports.
+
 ## Two things that will bite you on Windows
 
 Both were hit on a real machine before anyone else saw them, and neither

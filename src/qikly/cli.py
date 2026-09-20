@@ -1,5 +1,6 @@
 import argparse
 import atexit
+import json
 import multiprocessing
 import os
 import contextlib
@@ -681,7 +682,8 @@ def _parse_args():
         help="Generate every patch and apply none of them. The run cannot converge, "
              "which is the point: you get the complete set of changes the agent "
              "would have made, as diffs under outputs/logs/patches/, to read at "
-             "your own pace."
+             "your own pace. With --install-mcp it means the same thing for a "
+             "different job: show the plan and write nothing."
     )
     parser.add_argument(
         "--review-patches", action="store_true",
@@ -710,6 +712,24 @@ def _parse_args():
              "by Claude Code, Cursor and most other hosts). Run it as "
              "`python -m qikly --mcp-config` if the qikly command itself is not "
              "found. It only prints; nothing is written."
+    )
+    parser.add_argument(
+        "--install-mcp", nargs="?", const="all", choices=["all", "vscode", "claude"],
+        metavar="HOST",
+        help="Register the qikly MCP server with the hosts found in this project, "
+             "instead of printing a block to paste. It writes project-local files "
+             "only, .mcp.json for Claude Code and .vscode/mcp.json for VS Code, "
+             "never your global config, and it merges rather than overwrites: "
+             "every other server in the file is kept and the file is backed up "
+             "first. It refuses and prints instead when the file holds comments, "
+             "or when a qikly entry already exists and differs. Running it twice "
+             "changes nothing. Add --dry-run to see the plan, --force to replace "
+             "an entry that differs."
+    )
+    parser.add_argument(
+        "--force", action="store_true",
+        help="With --install-mcp, replace an existing qikly entry that differs "
+             "from the one this machine needs."
     )
     parser.add_argument(
         "--start", metavar="TASK",
@@ -854,6 +874,76 @@ def _do_mcp_config(host):
     print("  Paste it into %s." % where, file=sys.stderr)
     print("  Project folder: %s" % root, file=sys.stderr)
     print("  For the other shape: --mcp-config %s" % other, file=sys.stderr)
+    return 0
+
+
+def _do_install_mcp(host, dry_run, force):
+    """
+    Write the server into the host config files this project actually has.
+
+    Prints the same block `--mcp-config` does for anything it declines to
+    write, so a refusal still leaves the user one paste from working rather
+    than one search away from the documentation.
+    """
+    from qikly import mcp_install
+
+    root = os.path.abspath(os.environ.get("QIKLY_PROJECT_ROOT") or INVOKED_FROM)
+    hosts = None if host == "all" else [host]
+    items = mcp_install.plan(root, hosts)
+
+    print("Project: %s" % root)
+    print("")
+    declined, wrote = [], 0
+    for item in items:
+        if dry_run:
+            summary = {
+                "create": "would create %s" % item["path"],
+                "add": "would add qikly to %s" % item["path"],
+                "current": "already registered, and identical",
+                "differs": "has a different qikly entry; --force would replace it",
+                "comments": "holds comments, so it will not be written",
+                "unreadable": item.get("detail", "cannot be read"),
+            }[item["action"]]
+            print("  %-12s %s" % (item["label"], summary))
+            if item["action"] in ("comments", "unreadable", "differs"):
+                declined.append(item)
+            continue
+        changed, message = mcp_install.write(item, force=force)
+        wrote += 1 if changed else 0
+        print("  %-12s %s" % (item["label"], message))
+        if not changed and item["action"] != "current":
+            declined.append(item)
+
+    if declined:
+        print("")
+        # stdout is buffered and stderr is not, so without this the guidance
+        # lands above the plan whenever both streams go to one pipe.
+        sys.stdout.flush()
+        print("  Not written. Paste this into the file(s) above yourself:",
+              file=sys.stderr)
+        sys.stderr.flush()
+        for item in declined:
+            print("")
+            print("  %s (%s)" % (item["label"], item["path"]), file=sys.stderr)
+            sys.stderr.flush()
+            print(json.dumps({item["key"]: {"qikly": item["entry"]}}, indent=2))
+            sys.stdout.flush()
+
+    if not dry_run and wrote:
+        print("")
+        print("  Restart the host so it picks the server up.")
+    try:
+        import mcp  # noqa: F401  the protocol SDK, an optional extra
+    except ImportError:
+        print("")
+        print("  warning: this Python does not have the MCP extra, so the server "
+              "will not start. Install it first:", file=sys.stderr)
+        print('    "%s" -m pip install "qikly[mcp]"' % sys.executable, file=sys.stderr)
+
+    # A provisioning step needs to tell "nothing to do" from "refused
+    # everything", and both printed a friendly message and exited 0.
+    if not dry_run and declined and not wrote:
+        return 2
     return 0
 
 
@@ -1464,6 +1554,9 @@ def main():
     # user was trying to fix.
     if args.mcp_config:
         return _do_mcp_config(args.mcp_config)
+
+    if args.install_mcp:
+        return _do_install_mcp(args.install_mcp, args.dry_run, args.force)
 
     # Once per invocation, before any work, and before the early returns below.
     # It sat after them, which quietly exempted --scaffold and --check-criteria:

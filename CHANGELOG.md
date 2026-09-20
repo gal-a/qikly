@@ -40,6 +40,36 @@ packaging tools would read as `1.1`.
   8/10 convergence on `ADAS_HEADWAY` against 9/10 for a matched control arm
   on the same ten seeds, which is one run apart and not a detectable cost.
 
+- **`qikly --install-mcp` registers the server instead of printing a block to
+  paste.** Registering qikly with Claude Code on this machine meant finding
+  that `claude mcp add` is not on `PATH`, because the CLI is bundled inside the
+  VS Code extension, then reading `~/.claude.json` by hand to see whether the
+  server was already there. That was the author, on the machine the tool was
+  built on, with the documentation open.
+
+  It writes project-local files only, `.mcp.json` and `.vscode/mcp.json`, never
+  a global config, and the project file is also where the setting that actually
+  goes wrong belongs: which folder the server treats as the project. It merges
+  rather than overwrites, keeps every other server and key in the file, and
+  backs the file up first. Running it twice changes nothing.
+
+  It refuses three cases and prints the block instead: a file holding comments,
+  because VS Code's `mcp.json` is JSONC and a JSON round-trip would delete
+  them; an existing `qikly` entry that differs, because somebody changed it on
+  purpose, with `--force` to say otherwise; and a file that is not valid JSON.
+  `--dry-run` shows the plan, and it exits non-zero when it refused everything,
+  so a provisioning step can tell that apart from nothing to do. The write is
+  atomic, built beside the file and moved onto it, because opening the target
+  truncates it and a crash in that window would leave a config holding every
+  other server you have empty. It also refuses a symlinked config rather than
+  following it out of the project, and tolerates the byte order mark
+  PowerShell writes by default. Cursor and Codex CLI are not covered yet;
+  Codex needs a TOML writer the standard library does not have.
+
+  One thing to know: the file is re-serialised with two-space indentation, so a
+  file checked into a repository may show a whitespace diff beyond the key that
+  changed.
+
 ### Changed
 - **`--explain --html` puts the verdict where the evidence is.** The coding
   agent's column now leads, since the withheld-from side is the one a reader
