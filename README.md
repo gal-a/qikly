@@ -244,7 +244,7 @@ than loaded whole, there is no cross-file index. See
 
 ## How to use the tools in this project
 
-Four ways in, and the table under [the quick start](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md#which-command-depends-on-which-parts-you-already-have)
+Four ways in, and the table under [the quick start](https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have)
 says which command each one needs:
 
 1. **Verify code you did not write.** Supply an implementation through `seed:`

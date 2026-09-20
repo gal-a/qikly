@@ -151,7 +151,7 @@ split for yourself, `qikly --demo` to watch a whole run, `qikly --init` to start
 a task from nothing, and `qikly --scaffold <FILE>.py` to start one from code you
 already have. The full table, with the exact command for each starting point, is
 in
-[QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md#which-command-depends-on-which-parts-you-already-have).
+[QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have).
 The four that matter most, most valuable first:
 
 1. **You have #2 and code somebody else wrote, and you want that code

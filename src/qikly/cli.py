@@ -578,7 +578,7 @@ def _parse_args():
         help="For any task with no acceptance_criteria yet, generate a one-shot first draft "
              "from requirements alone and write it into that task's config file before running. "
              "Explicit opt-in only -- without this flag, such a task just runs with a warning "
-             "(see docs/QUICK_START_ON_YOUR_OWN_DATA.md#auto-generating-acceptance-criteria). Never touches a task that "
+             "(see docs/TASK_FILE_REFERENCE.md#auto-generating-acceptance-criteria). Never touches a task that "
              "already has acceptance_criteria."
     )
     parser.add_argument(
