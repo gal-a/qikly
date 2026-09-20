@@ -6,7 +6,7 @@
      server.json exactly. -->
 <!-- mcp-name: io.github.gal-a/qikly -->
 
-[![1,180 tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=1%2C180%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
+[![1,361 tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=1%2C361%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
 [![pypi](https://img.shields.io/pypi/v/qikly?color=blue)](https://pypi.org/project/qikly/)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/gal-a/qikly/blob/main/LICENSE)

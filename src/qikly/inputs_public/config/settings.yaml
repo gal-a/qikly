@@ -45,6 +45,36 @@ test_generation:
   # be a deliberate choice rather than a silent upgrade.
   criteria_per_batch: 0
 
+  # How many times each test-generation call is drawn before one is kept.
+  #
+  # 1 draws once, which is how every published number was measured. A higher
+  # value draws that many independent samples of the same stage, compares what
+  # each asserts about each acceptance criterion, keeps the draft the others
+  # most agree with, and names the criteria they read differently.
+  #
+  # Why it exists: the test-writing agent can misread a clear criterion. On a
+  # following-distance task whose criterion said exactly 2.00 seconds of
+  # headway raises no warning, seven of ten runs generated a test that warned
+  # at 2.00 anyway. A model that gets a boundary wrong seven times in ten gets
+  # it right three times in ten, and three samples make the disagreement
+  # visible before any code is written.
+  #
+  # Use 3 or more if you want it to vote. At 2 the drafts can only ever tie on
+  # a disagreement, so nothing is outvoted and the first draft is kept; you
+  # still get the contested list, which is arguably the point, but you are
+  # paying for a second call that does not change the outcome.
+  #
+  # Combining this with criteria_per_batch multiplies: the calls per stage are
+  # batches times samples.
+  #
+  # Why it is off: it multiplies the generation calls, which is most of the
+  # cost of a short run, and its effect on convergence has not been measured
+  # yet. Read the contested list as the useful output rather than the vote:
+  # agreement is not correctness, and samples drawn from one model at one
+  # temperature agree partly because they share the reading that produced
+  # them, which is the failure this whole project exists to name.
+  samples: 1
+
   # Check the integration and system suites against the acceptance criteria
   # and against each other, after they are written and before any code is, and
   # write a suite once more when the check finds a test no correct

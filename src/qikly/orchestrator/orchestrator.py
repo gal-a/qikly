@@ -61,6 +61,24 @@ def criteria_per_batch():
         return 0
 
 
+def generation_samples():
+    """
+    How many times each test-generation call is drawn before one is kept.
+
+    1, the default, means draw once, which is the behaviour every published
+    number was measured under. A higher value draws that many independent
+    samples and keeps the one the others most agree with, and reports the
+    criteria they read differently. Set under `test_generation:` in
+    settings.yaml.
+    """
+    section = load_settings().get("test_generation") or {}
+    try:
+        value = int(section.get("samples", 1) or 1)
+    except (TypeError, ValueError):
+        return 1
+    return max(1, value)
+
+
 @contextlib.contextmanager
 def criteria_batching(value):
     """
@@ -570,8 +588,10 @@ def generate_and_write_tests(stage, tests_dir, task_id, seed=None, guidance=None
     os.makedirs(stage_dir, exist_ok=True)
     written = []
 
+    samples = generation_samples()
     for index, batch in enumerate(batches, start=1):
-        source = _generate_one(stage, generator, task_id, seed, batch, index, guidance=guidance)
+        source = _generate_sampled(stage, generator, task_id, seed, batch, index,
+                                   samples, guidance=guidance)
         # One file per batch rather than one merged file. Concatenating
         # generated modules looks tidier and silently loses tests: two batches
         # that both define test_rejects_empty_row leave only the second, and
@@ -588,6 +608,45 @@ def generate_and_write_tests(stage, tests_dir, task_id, seed=None, guidance=None
                          "action": "tests_generated"})
 
     return written[0]
+
+
+def _generate_sampled(stage, generator, task_id, seed, criteria, batch_index,
+                      samples, guidance=None):
+    """
+    Draw the suite `samples` times and keep the draft the others agree with.
+
+    One sample is the default and costs nothing extra: it calls straight
+    through, so a run with the setting off is byte for byte the run it was
+    before. Above one, each draw perturbs the seed, because generation is
+    near-deterministic when a run seed is set and redrawing with the same seed
+    reproduced the identical file three times in a row on a real run. Samples
+    drawn from one seed would agree by construction and measure nothing.
+
+    The criteria the drafts read differently are logged whichever draft wins.
+    That is the part worth having: a contested criterion is one the model does
+    not reliably understand, and knowing which one is more use than the vote.
+    """
+    if samples <= 1:
+        return _generate_one(stage, generator, task_id, seed, criteria, batch_index,
+                             guidance=guidance)
+
+    from qikly import consensus
+
+    drafts = []
+    for draw in range(samples):
+        drawn = None if seed is None else seed + draw * 1000
+        drafts.append(_generate_one(stage, generator, task_id, drawn, criteria,
+                                    batch_index, guidance=guidance))
+
+    report = consensus.compare(drafts)
+    line = consensus.describe(report)
+    if line:
+        print(f"[{task_id}] {stage}: {line}")
+    log_transaction({"stage": stage, "batch": batch_index, "action": "tests_sampled",
+                     "samples": report["samples"], "chosen": report["chosen"],
+                     "contested": [str(k) for k in report["contested"]],
+                     "unanimous": report["unanimous"]})
+    return drafts[report["chosen"]]
 
 
 def _generate_one(stage, generator, task_id, seed, criteria, batch_index, guidance=None):
