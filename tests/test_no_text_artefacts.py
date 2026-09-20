@@ -244,3 +244,73 @@ def test_every_json_block_in_the_docs_parses():
                     % (path.name, exc, block)) from None
             checked += 1
     assert checked, "no json blocks found, so this guard is checking nothing"
+
+
+# ------------------------------------------- pasted terminal output, 2026-09-20 ----
+
+def _published_text_files():
+    """The files a stranger reads: the README PyPI serves, and the docs."""
+    import glob
+
+    paths = [os.path.join(_ROOT, "README.md")]
+    paths += sorted(glob.glob(os.path.join(_ROOT, "docs", "*.md")))
+    return [(os.path.relpath(p, _ROOT), io.open(p, encoding="utf-8").read())
+            for p in paths if os.path.exists(p)]
+
+
+# Lines only a shell produces. A transcript pasted into a document is somebody
+# else's session, not documentation, and it is invisible in a diff review that
+# only reads the summary.
+_TRANSCRIPT = (
+    "PS C:" + chr(92) + "Users",
+    "CategoryInfo          :",
+    "FullyQualifiedErrorId :",
+    "is not recognized as the name of a cmdlet",
+)
+
+
+@pytest.mark.parametrize("path,text", _published_text_files(),
+                         ids=[p for p, _ in _published_text_files()])
+def test_no_terminal_transcript_pasted_into_published_text(path, text):
+    """
+    Found the hard way. A PowerShell session was pasted into README.md while
+    it was open in an editor, `git add -A` swept it up, and five commits and
+    one PyPI release later it was the front page of the package: the badge URL
+    cut in half with an error trace in the middle of it.
+
+    Nothing caught it. The badge test still passed, because it reads the label
+    with a regex that matched the surviving fragment, and no human reads a
+    diff summary closely enough to notice a URL has grown twenty lines.
+    """
+    offenders = [(i, line.strip()) for i, line in enumerate(text.splitlines(), 1)
+                 for marker in _TRANSCRIPT if marker in line]
+    assert not offenders, "\n".join(
+        "%s:%d: looks like pasted terminal output: %s" % (path, i, line[:90])
+        for i, line in offenders)
+
+
+@pytest.mark.parametrize("path,text", _published_text_files(),
+                         ids=[p for p, _ in _published_text_files()])
+def test_every_markdown_link_closes_on_its_own_line(path, text):
+    """
+    The same incident, caught from the other side and more generally. A link
+    or image whose target runs past the end of its line is broken markdown,
+    and it is what any accidental paste into the middle of one produces.
+    """
+    broken = []
+    for i, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith(("|", ">")) or "```" in line:
+            continue
+        # Count only complete inline targets; an opening "](" with no closing
+        # ")" on the same line is the shape that matters.
+        depth = 0
+        for start in range(len(line)):
+            if line.startswith("](", start):
+                depth += 1
+            elif line[start] == ")" and depth:
+                depth -= 1
+        if depth:
+            broken.append((i, line.strip()))
+    assert not broken, "\n".join(
+        "%s:%d: a markdown target is not closed on this line: %s" % (path, i, line[:90])
+        for i, line in broken)
