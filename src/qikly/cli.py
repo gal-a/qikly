@@ -566,9 +566,34 @@ def _parse_args():
     # The first thing anyone types against an unfamiliar CLI, and the first
     # thing a bug report needs. Reads the installed package rather than a
     # literal, so it cannot drift from what pip actually put on disk.
+    import qikly as _qikly
     from qikly import __version__
+
+    # The version alone answered the wrong question. Every confusing session
+    # so far, a flag reported as unrecognised, a test suite exercising the
+    # released package instead of the branch, an MCP server that would not
+    # start, came down to which qikly was on PATH and which Python was
+    # running it, and the number on its own cannot tell you that. A second
+    # install shadowing the one you are editing looks identical until you
+    # print the path.
+    class _Version(argparse.Action):
+        # argparse's own "version" action sends its text through the help
+        # formatter, which reflows it onto one line. These three facts are
+        # only readable stacked, so this prints them itself.
+        def __init__(self, option_strings, dest, **kwargs):
+            super().__init__(option_strings, dest, nargs=0, **kwargs)
+
+        def __call__(self, parser_, namespace, values, option_string=None):
+            print("qikly %s" % __version__)
+            print("  package  %s"
+                  % os.path.dirname(os.path.abspath(_qikly.__file__)))
+            print("  python   %s" % sys.executable)
+            parser_.exit()
+
     parser.add_argument(
-        "--version", action="version", version=f"qikly {__version__}"
+        "--version", action=_Version,
+        help="Print the version, the package directory it was imported from, "
+             "and the Python running it."
     )
     parser.add_argument(
         "--tasks", default=None,

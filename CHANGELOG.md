@@ -76,6 +76,13 @@ packaging tools would read as `1.1`.
   changed.
 
 ### Changed
+- **`--version` says which qikly you are running.** It printed a number, and
+  the number answered the wrong question. A flag reported as unrecognised, a
+  suite exercising the released package instead of the branch, an MCP server
+  that would not start: each came down to which install was on `PATH` and
+  which Python ran it, and a second install shadowing the one you are editing
+  looks identical until the path is printed. It now prints the version, the
+  package directory and the interpreter, stacked.
 - **`--explain --html` puts the verdict where the evidence is.** The coding
   agent's column now leads, since the withheld-from side is the one a reader
   came to see, and "No criterion text reaches the coding agent" sits in that

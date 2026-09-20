@@ -228,7 +228,22 @@ def test_the_cli_reports_its_version(capsys):
     finally:
         sys.argv = argv
     assert exit_info.value.code == 0
-    assert capsys.readouterr().out.strip() == f"qikly {__version__}"
+    printed = capsys.readouterr().out
+    assert printed.splitlines()[0].strip() == f"qikly {__version__}"
+
+    # And where it came from. The number alone answered the wrong question:
+    # a flag reported as unrecognised, a suite exercising the released package
+    # instead of the branch, an MCP server that would not start, all came down
+    # to which install was on PATH and which Python ran it, and a second
+    # install shadowing the one you are editing looks identical until the path
+    # is printed.
+    import os
+    import sys as _sys
+
+    import qikly as _qikly
+
+    assert os.path.dirname(os.path.abspath(_qikly.__file__)) in printed
+    assert _sys.executable in printed
 
 
 def test_the_reported_version_comes_from_the_package_not_a_literal():
