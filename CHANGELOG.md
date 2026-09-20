@@ -57,6 +57,11 @@ packaging tools would read as `1.1`.
   because VS Code's `mcp.json` is JSONC and a JSON round-trip would delete
   them; an existing `qikly` entry that differs, because somebody changed it on
   purpose, with `--force` to say otherwise; and a file that is not valid JSON.
+  It writes into the directory you are standing in, and says so when
+  `QIKLY_PROJECT_ROOT` is set to somewhere else rather than quietly using it:
+  on the first real use of the command that variable was left in a shell from
+  an earlier session and the files landed two directories away.
+
   `--dry-run` shows the plan, and it exits non-zero when it refused everything,
   so a provisioning step can tell that apart from nothing to do. The write is
   atomic, built beside the file and moved onto it, because opening the target
@@ -69,26 +74,6 @@ packaging tools would read as `1.1`.
   One thing to know: the file is re-serialised with two-space indentation, so a
   file checked into a repository may show a whitespace diff beyond the key that
   changed.
-
-- **`test_generation.samples` draws the suite more than once and keeps the
-  draft the others agree with.** Off by default at 1, which is how every
-  published number was measured. Above 1 it draws that many independent
-  samples of a stage, reduces each test to the normalised form of its body
-  grouped by the criterion the test names, keeps the draft matching the
-  plurality on the most criteria, and logs the criteria the drafts read
-  differently.
-
-  It targets a measured failure: on a following-distance task whose criterion
-  says exactly 2.00 seconds of headway raises no warning, seven runs in ten
-  wrote a test that warns at 2.00 anyway, and the coding agent cannot recover
-  from a wrong test because it only ever sees failure output.
-
-  Read the contested list rather than the vote. Agreement is not correctness:
-  samples from one model at one temperature agree partly because they share
-  the reading that produced them, which is the failure this project exists to
-  name. At 2 samples every disagreement ties, so nothing is outvoted and you
-  get the contested list without a decision; use 3 or more to vote. Its effect
-  on convergence has not been measured.
 
 ### Changed
 - **`--explain --html` puts the verdict where the evidence is.** The coding

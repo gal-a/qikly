@@ -382,3 +382,52 @@ def test_the_cli_exits_zero_when_everything_was_already_registered(tmp_path,
     capsys.readouterr()
     assert cli._do_install_mcp("all", dry_run=False, force=False) == 0
     assert "identical" in capsys.readouterr().out
+
+
+def test_the_cli_writes_where_you_stand_not_where_the_env_var_points(tmp_path,
+                                                                     monkeypatch,
+                                                                     capsys):
+    """
+    Found on the first real use of this command. QIKLY_PROJECT_ROOT was left
+    in the shell from an earlier session, so `qikly --install-mcp` created
+    .mcp.json two directories away and the only clue was one line of output
+    that is easy to read past. Printing a path is not consent, and a command
+    that writes files has to write where the user is standing.
+    """
+    from qikly import cli
+
+    elsewhere = tmp_path / "elsewhere"
+    here = tmp_path / "here"
+    elsewhere.mkdir()
+    here.mkdir()
+
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(here))
+    monkeypatch.setenv("QIKLY_PROJECT_ROOT", str(elsewhere))
+    cli._do_install_mcp("claude", dry_run=False, force=False)
+
+    assert (here / ".mcp.json").exists()
+    assert not (elsewhere / ".mcp.json").exists()
+
+    out = capsys.readouterr().out
+    assert str(elsewhere) in out and "is not used here" in out
+
+
+def test_the_entry_points_the_server_at_the_directory_it_was_written_into(
+        tmp_path, monkeypatch, capsys):
+    """
+    A project-local file that pinned a different project would be worse than
+    no pin at all: the file says one thing and the server does another.
+    """
+    import json as _json
+
+    from qikly import cli
+
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    monkeypatch.setenv("QIKLY_PROJECT_ROOT", str(tmp_path / "somewhere-else"))
+    cli._do_install_mcp("claude", dry_run=False, force=False)
+    capsys.readouterr()
+
+    written = _json.loads(io.open(os.path.join(str(tmp_path), ".mcp.json"),
+                                  encoding="utf-8").read())
+    assert written["mcpServers"]["qikly"]["env"]["QIKLY_PROJECT_ROOT"] == \
+        os.path.abspath(str(tmp_path))

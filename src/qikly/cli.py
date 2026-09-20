@@ -887,11 +887,25 @@ def _do_install_mcp(host, dry_run, force):
     """
     from qikly import mcp_install
 
-    root = os.path.abspath(os.environ.get("QIKLY_PROJECT_ROOT") or INVOKED_FROM)
+    # The directory you are standing in, and not QIKLY_PROJECT_ROOT. That
+    # variable is how you point a run at another project, and honouring it
+    # here wrote config files into a folder the user was not in: on the first
+    # real test of this command it created .mcp.json two directories away,
+    # under a value left in the shell from an earlier session, and the only
+    # clue was one line of output that is easy to read past. Printing a path
+    # is not consent. Writing where you stand is predictable, and cd is a
+    # clearer way to mean somewhere else.
+    root = os.path.abspath(INVOKED_FROM)
+    elsewhere = os.environ.get("QIKLY_PROJECT_ROOT")
     hosts = None if host == "all" else [host]
     items = mcp_install.plan(root, hosts)
 
     print("Project: %s" % root)
+    if elsewhere and os.path.abspath(elsewhere) != root:
+        print("  note: QIKLY_PROJECT_ROOT is set to %s, and is not used here. "
+              "These files belong to the project you are in, so they are being "
+              "written to the directory above. cd there to register that one."
+              % os.path.abspath(elsewhere))
     print("")
     declined, wrote = [], 0
     for item in items:
