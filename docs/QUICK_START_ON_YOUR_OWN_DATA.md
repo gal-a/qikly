@@ -333,7 +333,7 @@ are the exam.
 
 | In `requirements`, because it is a decision | In `acceptance_criteria`, because it follows |
 |---|---|
-| Keep at least 2.5 m from the vehicle ahead, measured centre to centre | At exactly 2.500 m, no violation is raised |
+| Keep at least 2.5 m from the vehicle ahead, measured centre to centre | At exactly 2.5 m, no violation is raised |
 | Amounts are currency, rounded to the nearest cent | For every accepted row, total equals subtotal plus tax, exactly |
 | Dates are written YYYY-MM-DD | 2026-02-30 is rejected, because it is not a real date |
 
@@ -341,15 +341,34 @@ are the exam.
 sides read the spec identically and every test passes first try, which proves
 nothing.
 
-**Getting it wrong has a signature.** A decision placed in
-`acceptance_criteria` is withheld from the one agent that needed it. It does not
-produce a harder test, it produces a stuck loop: the same patch repeating,
-because the model keeps "fixing" a restriction it was never told about back to
-what it correctly believes. Restrict street suffixes to three valid values and
-it will keep widening them, since everything it knows says "Boulevard" is a
-suffix. Move the restriction into `requirements`, or widen the criterion to
-match reality. [TROUBLESHOOTING.md](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md#5-the-same-patch-appearing-over-and-over)
-has the diagnosis.
+**Both mix-ups have a signature. Learn to read them.**
+
+**A decision in `acceptance_criteria`** is withheld from the one agent that
+needed it, so the coding agent has to guess a choice nobody told it. It does
+not produce a harder test, it produces repetition, in one of two shapes. Either
+the same test fails while the FIX and PATCH come back near identical each time,
+because nothing the agent can see would lead it anywhere else, or two tests
+disagree and each patch makes one pass and the other fail. Restrict street
+suffixes to three valid values and the model keeps widening them, since
+everything it knows says "Boulevard" is a suffix.
+
+Sometimes, though, the agent simply guesses right and the run goes green. That
+is the worse outcome, because nothing then tells you a decision was in the wrong
+half. On a bundled task whose criteria alone settled whether exactly 2.00
+seconds of headway raises a warning, three runs in ten converged anyway. Do not
+rely on the loop to find these for you; apply the question above when you write
+the spec. [TROUBLESHOOTING.md](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md#5-the-same-patch-appearing-over-and-over)
+has the diagnosis for the repeating case.
+
+**A consequence in `requirements`** is the quieter mistake. Both agents read the
+same boundary value, so the test that checks it passes on the first attempt and
+proves nothing. The rest of the suite is unaffected and still bites, which is
+what makes it easy to miss: the run looks entirely normal. Nothing fails, and
+nothing was learned about that boundary.
+
+Only a person can fix either one, by moving the line into the other half. The
+loop cannot: it can tighten a bar the code already attempts, and it cannot tell
+you a line is in the wrong place.
 
 **To see a task that follows the rule,** run `qikly --explain CALC_TAX`. Its
 requirements say amounts are "currency amounts rounded to the nearest cent",
