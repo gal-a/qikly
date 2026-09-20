@@ -31,11 +31,16 @@ most naturally where verification already has to be independent, such as
 automotive, medical devices, fintech and defence: `ADAS_HEADWAY`, a bundled
 example, checks following distance from forward-radar samples. See [What it is for](#what-it-is-for).
 
-**Just want to try it on your own data?** [Quick start on your own data](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md), five steps from your module to a first run.
+**Just want to see how it works?**
 
-**Just want to see how it works, free and with no API key?** Run `pip install qikly`,
-then `qikly --explain CALC_TAX`: it prints what each agent is shown, and the
-difference. [More on the free commands](#try-it-without-spending-anything).
+- **Free, and with no API key.** Run `pip install qikly`, then
+  `qikly --explain CALC_TAX`: it prints what each agent is shown, and the
+  difference. [More on the free commands](#try-it-without-spending-anything).
+- **With an API key**, for Gemini, Claude or OpenAI:
+  [quick start on the demo task](#quick-start), which converges a real run in
+  about half a minute for well under a cent.
+
+**Just want to try it on your own data?** [Quick start on your own data](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md), five steps from your module to a first run.
 
 ## The idea
 

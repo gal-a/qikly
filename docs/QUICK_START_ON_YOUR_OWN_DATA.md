@@ -312,6 +312,67 @@ Discovery is automatic; there is no registry to update. Results land in
 `outputs/`, and `outputs/reports/iterations/MY_TASK_<timestamp>_report.html`
 is the place to start reading.
 
+### What a real run on your own code looks like
+
+Not the bundled demo. This is an ordinary module that totals invoice lines,
+scaffolded with `qikly --scaffold`, with the two human sections filled in by
+hand. The whole run cost **$0.003** and seven model calls.
+
+```
+[stage 1/3] [iteration 1] 3/4 passed | FAILED: test_quantity_boundary_zero_and_negative
+[stage 1/3] [iteration 2] 4/4 passed
+[stage 2/3] [iteration 1] 0/1 passed | FAILED: test_system_entrypoint_output_structure_and_types
+[stage 2/3] [iteration 2] 1/1 passed
+[stage 1/3] [iteration 2-regcheck] 4/4 passed
+[stage 3/3] [iteration 1] 5/5 passed
+```
+
+**Line 1 is the whole point.** The existing code validated that `qty` parsed as
+a number and stopped there, so a quantity of zero or minus one went through as
+a real order. One acceptance criterion said otherwise:
+
+```yaml
+acceptance_criteria:
+  - "A qty of 0 is rejected and a qty of 1 is accepted; a negative qty is rejected"
+```
+
+The suite was written from that criterion before the run touched the code, and
+the coding agent never saw it. All it received was the name of a failing test
+and its assertion error. From that alone it produced this patch:
+
+```diff
+         try:
+             qty = int(row["qty"])
+             unit = float(row["unit_price"])
++            if qty <= 0:
++                rejected.append(dict(row, reason="qty must be positive"))
++                continue
+         except (ValueError, TypeError, KeyError):
+```
+
+That is a real bug in code that already existed, found by a test written from a
+rule the agent repairing it could not read.
+
+**The generated tests say where they came from**, so the suite is reviewable
+rather than a black box:
+
+```python
+def test_quantity_boundary_zero_and_negative():
+    """Verify that a quantity of 0 is rejected, 1 is accepted, and negative
+    quantities are rejected.
+    # Requirements: 2, 4
+    # Criteria: 2
+    """
+```
+
+**One honest note about the other criterion.** The same task asked for
+round-half-away-from-zero on currency, and the test for it passed on the first
+attempt against code using plain `round()`. Not because the code was right in
+general, but because on this particular input the binary representation of
+10.005 lands just above the halfway point and `round()` returns 30.02 anyway.
+A criterion is only as good as the input that exercises it, which is the same
+point as [fixture coverage](#proposing-fixture-rows) further down.
+
 ### Getting the two halves right
 
 This matters more than anything else in the file, and one question settles
