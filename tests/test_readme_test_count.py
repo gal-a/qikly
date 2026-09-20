@@ -19,6 +19,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Room for growth before the badge must be updated. Past this, it undersells.
 STALE_MARGIN = 0.15
 
+# Set the badge from what CI collects, not from what your machine does. The
+# two differ: this tree collects five more tests on Windows than on the Linux
+# runner, so a badge written from a local run is above the CI count and turns
+# the release red on a number that was right where it was measured. The badge
+# links to CI, so CI's count is the one it should claim.
+
 
 def _badge_count():
     with open(os.path.join(ROOT, "README.md"), encoding="utf-8") as handle:

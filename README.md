@@ -6,7 +6,7 @@
      server.json exactly. -->
 <!-- mcp-name: io.github.gal-a/qikly -->
 
-[![1,361 tests](https://img.shields.io/github/actionsNext: edit inputs_private/config/tasks/MY_FIRST_TASK.yaml, then run
+[![1,359 tests](https://img.shields.io/github/actionsNext: edit inputs_private/config/tasks/MY_FIRST_TASK.yaml, then run
     qikly --tasks MY_FIRST_TASK
   Or point it at code you already have:
     qikly --scaffold path/to/module.py
@@ -28,7 +28,7 @@ At line:1 char:1
 + type .mcp.json
 + ~~~~~~~~~~~~~~
     + CategoryInfo          : ObjectNotFound: (C:\Users\gal_a\...check\.mcp.json:String) [Get-Content], ItemNotFoundException
-    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=1%2C361%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
+    + FullyQualifiedErrorId : PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=1%2C359%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
 [![pypi](https://img.shields.io/pypi/v/qikly?color=blue)](https://pypi.org/project/qikly/)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/gal-a/qikly/blob/main/LICENSE)
