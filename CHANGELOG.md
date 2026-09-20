@@ -4,7 +4,10 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
-## Unreleased
+## 0.4.7
+
+> Register the MCP server with one command, and every generated test names the criterion it came from
+
 
 ### Added
 - **Each generated test names the acceptance criterion it came from.** Test
