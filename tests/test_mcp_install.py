@@ -431,3 +431,23 @@ def test_the_entry_points_the_server_at_the_directory_it_was_written_into(
                                   encoding="utf-8").read())
     assert written["mcpServers"]["qikly"]["env"]["QIKLY_PROJECT_ROOT"] == \
         os.path.abspath(str(tmp_path))
+
+
+def test_the_claude_path_tells_you_it_still_needs_approval(tmp_path, monkeypatch,
+                                                           capsys):
+    """
+    Found on the first end-to-end check. The write succeeded and `claude mcp
+    list` showed qikly as "Pending approval", which is correct of Claude Code:
+    a project file must not be trusted on sight. But the command said
+    "created" and stopped, so a user following it exactly ends with a server
+    that is registered and never starts.
+    """
+    from qikly import cli
+
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    monkeypatch.delenv("QIKLY_PROJECT_ROOT", raising=False)
+    cli._do_install_mcp("claude", dry_run=False, force=False)
+
+    out = capsys.readouterr().out
+    assert "pending approval" in out.lower()
+    assert "approve" in out.lower()

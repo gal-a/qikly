@@ -971,6 +971,17 @@ def _do_install_mcp(host, dry_run, force):
     if not dry_run and wrote:
         print("")
         print("  Restart the host so it picks the server up.")
+        if any(item["host"] == mcp_install.CLAUDE for item in items):
+            # A project-scoped .mcp.json is not trusted on sight, and it
+            # should not be: cloning a repository must not silently run code
+            # it ships. Claude Code lists the server as pending until you
+            # approve it, and a user who stops at "created" has a server that
+            # is registered and never starts.
+            print("  Claude Code will list qikly as pending approval until you "
+                  "run `claude` in this")
+            print("  directory once and approve it. That is deliberate on its "
+                  "side: a project file")
+            print("  can ask a host to run anything.")
     try:
         import mcp  # noqa: F401  the protocol SDK, an optional extra
     except ImportError:

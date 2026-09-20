@@ -92,6 +92,19 @@ It refuses in three cases, and prints the block for you to paste instead:
 | a `qikly` entry exists and differs | you changed it on purpose. `--force` says otherwise |
 | the file is not valid JSON | guessing what you meant is how a config gets lost |
 
+**If `claude` is not a command**, it is bundled inside the VS Code extension
+rather than installed on `PATH`, at
+`%USERPROFILE%\.vscode\extensionsnthropic.claude-code-<version>-<platform>esources
+ative-binary\claude.exe`.
+The version is in the path, so it moves on every extension update. You do not
+need the CLI for any of this; it is only how you check the registration from a
+terminal.
+
+**Claude Code needs one approval after this.** A project-scoped `.mcp.json`
+is not trusted on sight, and it should not be: cloning a repository must not
+silently run whatever it ships. `claude mcp list` will show qikly as pending
+until you run `claude` once in that directory and approve it.
+
 Add `--install-mcp claude` or `--install-mcp vscode` to target one host.
 
 Cursor and Codex CLI are not written yet. Cursor takes the `mcpServers` shape
