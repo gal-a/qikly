@@ -1,5 +1,11 @@
 # Release checklist
 
+**Run `python tools/release_check.py` first.** It performs every check below
+that a machine can perform, and refuses to pass on a failure that has actually
+happened to this project before. This document carries the reasoning; that
+script carries the teeth. Run `--after` once the workflow finishes, to confirm
+the three places a release lands actually agree.
+
 Run this before every PyPI upload. It exists because every bug found in this
 project so far was found by someone looking, not by anything watching, and a
 checklist is the cheapest way to make looking systematic.
@@ -171,12 +177,41 @@ that the page cannot honestly show yet.
 
 ## 8. Upload
 
-Do not upload by hand. Push the tag:
+Do not upload by hand.
+
+**Check which remote you are pushing to before you push anything.** There are
+two, and only one of them is public:
+
+```bash
+git remote -v
+```
+
+`origin` is `gal-a/qikly-initial`, which is **private**. `public` is
+`gal-a/qikly`, which is the one that releases. This checklist said `origin` for
+several releases and that is wrong: a tag pushed there publishes nothing and
+fails silently, because the release workflow does not live in that repository.
+
+**Push the branch before the tag, and push it to `main`.** The working branch
+is `public-v2`; the repository's default branch is `main`. Pushing the branch
+under its own name leaves `main` behind, and the tag still releases, so
+everything looks fine while the repository every visitor sees stays on the old
+version. That happened on 0.4.9 and this paragraph is why.
+
+```bash
+git push public <sha-or-branch>:main
+git ls-remote --heads public        # main must now be the commit you are tagging
+```
+
+Only then tag, and push the tag to the same remote:
 
 ```bash
 git tag v0.3.0
-git push origin v0.3.0
+git push public v0.3.0
 ```
+
+Pushing a tag whose commit is not on the remote is the 0.4.7 failure: the tag
+names nothing, the workflow has no tree to build, and the tag then has to be
+deleted and recreated.
 
 `.github/workflows/release.yml` takes it from there. It refuses to publish
 unless the tag agrees with the version in `pyproject.toml`, runs the tests on
@@ -196,7 +231,26 @@ only after upload, and a rejected version number cannot be reused.
 
 ## After release
 
-Install from PyPI in yet another clean environment and run the demo once more.
+**First, check the three places agree.** They can disagree silently, and two of
+them are what other people actually consume:
+
+```bash
+git ls-remote --heads public | head -2   # main is the released commit
+curl -s https://pypi.org/pypi/qikly/json | grep -o '"version":"[^"]*"' | head -1
+```
+
+and the registry listing, which has no guard at all behind it:
+<https://registry.modelcontextprotocol.io/v0/servers?search=qikly> must show
+the new version as latest **and** the matching `qikly[mcp]==` pin. A stale
+entry there installs the old software rather than merely looking out of date.
+
+Why `main` matters beyond tidiness: the README's images are served from
+`raw.githubusercontent.com/gal-a/qikly/main/...`, so a stale `main` makes PyPI
+render the new README around the old diagrams, and the CI badge reads
+`?branch=main`, so it reports a run that predates the release.
+
+**Then** install from PyPI in yet another clean environment and run the demo
+once more.
 That is the only check that exercises the actual published artefact rather than
 a local build of it.
 
