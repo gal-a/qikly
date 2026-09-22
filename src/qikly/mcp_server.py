@@ -94,6 +94,12 @@ def server_icons():
 TOOL_SPECS = [
     {
         "name": "qikly_run",
+        # Writes: it clears and regenerates this task's implementation and
+        # suite, keeping a timestamped backup, and it calls a model provider
+        # over the network. Not idempotent: each call is a fresh run and the
+        # agents are not deterministic even at a fixed seed.
+        "annotations": {"readOnlyHint": False, "destructiveHint": True,
+                        "idempotentHint": False, "openWorldHint": True},
         "description": (
             "Start a qikly run for one task and return its run id immediately. "
             "This does NOT wait for the run: a run takes minutes to hours. "
@@ -115,6 +121,9 @@ TOOL_SPECS = [
     },
     {
         "name": "qikly_status",
+        # Reads this machine's run records and nothing else.
+        "annotations": {"readOnlyHint": True, "destructiveHint": False,
+                        "idempotentHint": True, "openWorldHint": False},
         "description": (
             "Report on a run started by qikly_run. States: running, passed, "
             "failed, stalled, unknown. 'stalled' means the process is gone "
@@ -128,6 +137,9 @@ TOOL_SPECS = [
     },
     {
         "name": "qikly_validate",
+        # Offline by construction: no model call, so no network and no cost.
+        "annotations": {"readOnlyHint": True, "destructiveHint": False,
+                        "idempotentHint": True, "openWorldHint": False},
         "description": (
             "Validate one task offline and return counts and a verdict: the "
             "same check as `qikly --validate`. Free, no model call. It does NOT "
@@ -144,6 +156,10 @@ TOOL_SPECS = [
     },
     {
         "name": "qikly_scaffold",
+        # Returns the task YAML as text rather than writing it. Saving it is
+        # the caller's decision, which is why this is read-only.
+        "annotations": {"readOnlyHint": True, "destructiveHint": False,
+                        "idempotentHint": True, "openWorldHint": False},
         "description": (
             "Read a Python file and return a task YAML that tests that code: "
             "module path, real signatures, a guessed entrypoint, and a seed "
@@ -220,22 +236,37 @@ def build_server():
     except TypeError:                                # pragma: no cover
         server = server_class(SERVER_NAME)
 
-    @server.tool(name="qikly_run", description=TOOL_SPECS[0]["description"])
+    # Behaviour hints, so a host can decide what may run unattended and what
+    # needs a person. Without them a client has to assume the worst of every
+    # tool, which for three of these four is wrong: only qikly_run writes
+    # anything, costs anything, or touches the network. Registered through a
+    # helper because the argument arrived with the 2.x SDK and the FastMCP
+    # fallback above predates it, so an older SDK must still get a working
+    # server, just one that says less about itself.
+    def register(index, fn):
+        spec = TOOL_SPECS[index]
+        try:
+            return server.tool(name=spec["name"], description=spec["description"],
+                               annotations=spec["annotations"])(fn)
+        except TypeError:                            # pragma: no cover
+            return server.tool(name=spec["name"],
+                               description=spec["description"])(fn)
+
     def _run(task_id: str, provider: str = None, model: str = None) -> str:
         return call_tool("qikly_run", {"task_id": task_id, "provider": provider,
                                        "model": model})
 
-    @server.tool(name="qikly_status", description=TOOL_SPECS[1]["description"])
     def _status(run_id: str) -> str:
         return call_tool("qikly_status", {"run_id": run_id})
 
-    @server.tool(name="qikly_validate", description=TOOL_SPECS[2]["description"])
     def _check(task_id: str) -> str:
         return call_tool("qikly_validate", {"task_id": task_id})
 
-    @server.tool(name="qikly_scaffold", description=TOOL_SPECS[3]["description"])
     def _scaffold(file_path: str) -> str:
         return call_tool("qikly_scaffold", {"file_path": file_path})
+
+    for index, fn in enumerate((_run, _status, _check, _scaffold)):
+        register(index, fn)
 
     return server
 

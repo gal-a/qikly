@@ -55,6 +55,16 @@ packaging tools would read as `1.1`.
   already paid for, and the sweep says how many repetitions it completed so a
   rate is not read as though it covered all of them.
 
+- **Behaviour annotations on all four MCP tools**: `readOnlyHint`,
+  `destructiveHint`, `idempotentHint` and `openWorldHint`. Only `qikly_run`
+  writes anything, spends anything or touches the network; `qikly_status`,
+  `qikly_validate` and `qikly_scaffold` read this machine and return text.
+  Without the hints a host has to assume the worst of all four, so an agent
+  either refuses to call the safe ones unattended or calls the expensive one
+  when it should have asked. Registered through a fallback, because the
+  argument arrived with the 2.x SDK and an older one must still get a working
+  server.
+
 ### Changed
 - **The landing page now describes the current tool.** It was three releases
   behind: no `--install-mcp`, no `--validate`, no mention of the three driver

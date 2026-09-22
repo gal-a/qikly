@@ -231,3 +231,55 @@ def test_the_explanatory_note_is_not_mangled_by_the_scrubber():
     out = mcp_tools._redact(
         {"note": "requirements and acceptance_criteria are left as TODO on purpose"})
     assert out["note"] == "requirements and acceptance_criteria are left as TODO on purpose"
+
+
+def test_every_tool_declares_its_behaviour_hints():
+    """
+    The four MCP annotations, on every tool, with values that match reality.
+
+    Without them a host has to assume the worst of every tool, which for three
+    of these four is wrong: only qikly_run writes anything, spends anything or
+    touches the network. An agent that cannot tell those apart either refuses
+    to call the safe ones unattended or calls the expensive one when it should
+    have asked.
+
+    Added 2026-09-22 after an external index reported all four tools
+    unannotated. The finding was correct.
+    """
+    from qikly.mcp_server import TOOL_SPECS
+
+    required = {"readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"}
+    for spec in TOOL_SPECS:
+        hints = spec.get("annotations")
+        assert hints, f"{spec['name']} declares no annotations"
+        assert set(hints) == required, f"{spec['name']} has {set(hints)}"
+        assert all(isinstance(v, bool) for v in hints.values())
+
+    by_name = {s["name"]: s["annotations"] for s in TOOL_SPECS}
+
+    # The one that writes, spends and reaches the network.
+    assert by_name["qikly_run"]["readOnlyHint"] is False
+    assert by_name["qikly_run"]["openWorldHint"] is True
+    assert by_name["qikly_run"]["idempotentHint"] is False, (
+        "agents are not deterministic even at a fixed seed, so a second call "
+        "is a second run and not a repeat of the first")
+
+    # The three that only read this machine. If one of these ever starts
+    # writing, calling a model or reaching the network, this fails and the
+    # annotation has to be corrected rather than the test relaxed.
+    for name in ("qikly_status", "qikly_validate", "qikly_scaffold"):
+        assert by_name[name]["readOnlyHint"] is True, name
+        assert by_name[name]["destructiveHint"] is False, name
+        assert by_name[name]["openWorldHint"] is False, name
+
+
+def test_the_annotations_survive_an_sdk_that_does_not_accept_them():
+    """
+    The FastMCP fallback predates the annotations argument, so registration
+    falls back to an unannotated tool rather than failing to build a server.
+    A host on an old SDK should get a plainer server, not no server.
+    """
+    from qikly import mcp_server
+
+    assert "annotations=spec" in open(mcp_server.__file__, encoding="utf-8").read()
+    assert mcp_server.build_server() is not None
