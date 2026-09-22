@@ -169,8 +169,9 @@ acceptance_criteria:
 ```
 
 The suite was written from that criterion before the run touched the code, and
-the coding agent never saw it. All it received was the name of a failing test
-and its assertion error. From that alone it produced this patch:
+the coding agent never saw the criterion itself. What it received was pytest's
+output for the failing test: the name, the test's own source and docstring, and
+the assertion error. From that it produced this patch:
 
 ```diff
          try:

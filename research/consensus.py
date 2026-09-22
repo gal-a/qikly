@@ -3,6 +3,25 @@
 Generate a stage's suite more than once, and keep the draft the others agree
 with.
 
+**WITHDRAWN from the shipped package on 2026-09-22, and kept here because the
+question is still open.** It was never advertised in settings.yaml, and the
+`samples` setting and its orchestrator wiring are now gone, so nothing can
+turn it on and be charged for it. The measurement that ended it, on 2026-09-20
+with `samples: 5` on CALC_TAX: every criterion in every stage came back
+contested, the split was even on almost all of them, so nothing was outvoted
+anywhere. Four times the price, 27 model calls against 7, and no decision.
+
+The diagnosis is in the note on granularity below, and it is a real tension
+rather than a bug: comparing whole test bodies makes drafts that differ only
+in their fixture rows read as disagreeing, and comparing only assertions was
+blind to the inputs those assertions ran on. The useful setting is somewhere
+between the two and has not been found. Finding it needs saved drafts to
+compare offline, which is the move that made the criteria research tractable,
+and that is what anyone reviving this should build first.
+
+Its tests live on in `tests/test_consensus_comparison.py` and still run, so
+the comparison can be retuned against something rather than rewritten blind.
+
 The failure this exists for is measured rather than imagined. On a bundled
 following-distance task whose criterion says a headway of exactly 2.00 seconds
 raises no warning, seven runs in ten wrote a test that warns at 2.00 anyway.

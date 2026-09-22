@@ -17,7 +17,9 @@ from qikly.agent_api.agent_interface import (
 from qikly import approval
 from qikly.agent_tools import junit
 from qikly.agent_tools.apply_patch import apply_patch
+from qikly.agent_tools import run_tests as run_tests_mod
 from qikly.agent_tools.run_tests import run_tests
+from qikly.agent_api.usage import BudgetExceeded
 from qikly.agent_tools.inspect_code import inspect_failure, failure_signature
 from qikly.paths import (
     PUBLIC_INPUTS_DIR, ensure_task_data, list_input_dir, private_input_path, private_inputs_dir,
@@ -61,22 +63,63 @@ def criteria_per_batch():
         return 0
 
 
-def generation_samples():
+def diagnostic_feedback():
     """
-    How many times each test-generation call is drawn before one is kept.
+    How much of a failure the coding agent is shown: "full" or "staged".
 
-    1, the default, means draw once, which is the behaviour every published
-    number was measured under. A higher value draws that many independent
-    samples and keeps the one the others most agree with, and reports the
-    criteria they read differently. Set under `test_generation:` in
+    "full", the default, hands over pytest's default traceback, which is what
+    every published convergence figure was measured under. "staged" starts at
+    the least detail that can still locate a fault and adds more only when a
+    patch has failed to change the outcome. Set under `agent:` in
     settings.yaml.
+
+    Off by default deliberately. The mechanism is one pytest flag and carries
+    little implementation risk, but nobody has measured what starting narrow
+    does to convergence, and ten runs per arm could not tell a small change
+    from noise. Until that measurement exists the published numbers describe
+    "full" and only "full".
     """
-    section = load_settings().get("test_generation") or {}
-    try:
-        value = int(section.get("samples", 1) or 1)
-    except (TypeError, ValueError):
-        return 1
-    return max(1, value)
+    section = load_settings().get("agent") or {}
+    value = str(section.get("diagnostic_feedback", "full") or "full").strip().lower()
+    return value if value in ("full", "staged") else "full"
+
+
+# Attempts per rung for the time-based backstop below.
+_ESCALATE_EVERY = 3
+
+
+def traceback_mode_for(ineffective_streak, mode=None, attempts=0):
+    """
+    The traceback rung to run the next attempt at.
+
+    Under "staged" the rung is the higher of two signals, and it needs both.
+
+    The first is a patch that applied cleanly and left the failure signature
+    untouched: nothing was learned, so show more next time. That is the
+    sharpest signal available and it drives escalation one rung at a time.
+
+    The second is simply how many attempts this stage has taken. Added after
+    an audit on 2026-09-22 found the first signal blind in precisely the cases
+    that need it most. `ineffective_streak` counts *identical* consecutive
+    failures, and it is reset whenever the signature changes or a patch fails
+    to apply. So the two stall patterns this codebase already has names for,
+    oscillation (two tests disagreeing, each patch fixing one and breaking the
+    other, see `_disagreement_hint`) and patches that repeatedly fail to
+    apply, both reset the streak every iteration and would have pinned the
+    agent at the narrowest rung for a whole stage. The backstop makes the
+    ladder depend on elapsed effort as well as on repetition, so a stage
+    always reaches the full traceback whatever shape its stall takes.
+
+    Either way "staged" converges on "full", which is where it and the default
+    agree. Staged can cost extra iterations; it cannot strand a run at a rung
+    that will never be enough.
+    """
+    if (mode or diagnostic_feedback()) != "staged":
+        return run_tests_mod.TB_FULL
+    by_streak = max(int(ineffective_streak or 0), 0)
+    by_attempts = max(int(attempts or 0), 0) // _ESCALATE_EVERY
+    index = min(max(by_streak, by_attempts), len(run_tests_mod.TB_LADDER) - 1)
+    return run_tests_mod.TB_LADDER[index]
 
 
 @contextlib.contextmanager
@@ -588,10 +631,9 @@ def generate_and_write_tests(stage, tests_dir, task_id, seed=None, guidance=None
     os.makedirs(stage_dir, exist_ok=True)
     written = []
 
-    samples = generation_samples()
     for index, batch in enumerate(batches, start=1):
-        source = _generate_sampled(stage, generator, task_id, seed, batch, index,
-                                   samples, guidance=guidance)
+        source = _generate_one(stage, generator, task_id, seed, batch, index,
+                               guidance=guidance)
         # One file per batch rather than one merged file. Concatenating
         # generated modules looks tidier and silently loses tests: two batches
         # that both define test_rejects_empty_row leave only the second, and
@@ -608,45 +650,6 @@ def generate_and_write_tests(stage, tests_dir, task_id, seed=None, guidance=None
                          "action": "tests_generated"})
 
     return written[0]
-
-
-def _generate_sampled(stage, generator, task_id, seed, criteria, batch_index,
-                      samples, guidance=None):
-    """
-    Draw the suite `samples` times and keep the draft the others agree with.
-
-    One sample is the default and costs nothing extra: it calls straight
-    through, so a run with the setting off is byte for byte the run it was
-    before. Above one, each draw perturbs the seed, because generation is
-    near-deterministic when a run seed is set and redrawing with the same seed
-    reproduced the identical file three times in a row on a real run. Samples
-    drawn from one seed would agree by construction and measure nothing.
-
-    The criteria the drafts read differently are logged whichever draft wins.
-    That is the part worth having: a contested criterion is one the model does
-    not reliably understand, and knowing which one is more use than the vote.
-    """
-    if samples <= 1:
-        return _generate_one(stage, generator, task_id, seed, criteria, batch_index,
-                             guidance=guidance)
-
-    from qikly import consensus
-
-    drafts = []
-    for draw in range(samples):
-        drawn = None if seed is None else seed + draw * 1000
-        drafts.append(_generate_one(stage, generator, task_id, drawn, criteria,
-                                    batch_index, guidance=guidance))
-
-    report = consensus.compare(drafts)
-    line = consensus.describe(report)
-    if line:
-        print(f"[{task_id}] {stage}: {line}")
-    log_transaction({"stage": stage, "batch": batch_index, "action": "tests_sampled",
-                     "samples": report["samples"], "chosen": report["chosen"],
-                     "contested": [str(k) for k in report["contested"]],
-                     "unanimous": report["unanimous"]})
-    return drafts[report["chosen"]]
 
 
 def _generate_one(stage, generator, task_id, seed, criteria, batch_index, guidance=None):
@@ -745,6 +748,16 @@ def run_fix_patch_cycle(task_id, stage, failure_info, run_patch_dir, iteration, 
         fix = agent_generate_fix(
             task_id, failure_info, seed=seed, previous_ineffective_patch=previous_ineffective_patch
         )
+    except BudgetExceeded:
+        # A spend ceiling is not a failed generation, and must not be handled
+        # like one. Caught here it would be logged as "fix_generation_failed",
+        # the loop would call `continue` for a fresh attempt, and every one of
+        # those attempts spends real tokens before raising again. The run would
+        # burn its whole attempt budget past the ceiling and then stop with
+        # "Exceeded N attempts without passing tests", which names the wrong
+        # cause. Found by audit 2026-09-22; it applied to QIKLY_MAX_CALLS too,
+        # so this fixes a ceiling that has never actually stopped a repair loop.
+        raise
     except Exception as e:
         log_transaction({
             "iteration": iteration,
@@ -769,6 +782,8 @@ def run_fix_patch_cycle(task_id, stage, failure_info, run_patch_dir, iteration, 
             task_id, fix, seed=seed, previous_patch=previous_patch, previous_patch_error=previous_patch_error,
             previous_patch_too_large=previous_patch_too_large
         )
+    except BudgetExceeded:
+        raise  # see the FIX call above
     except Exception as e:
         log_transaction({
             "iteration": iteration,
@@ -1163,6 +1178,15 @@ def orchestrate(task_id, seed=None, resume=False):
                 max_patch_size=max_patch_size
             )
 
+    # Read once per run rather than per iteration, so a settings file edited
+    # mid-run cannot change the rung halfway and make the transaction log
+    # describe two different experiments.
+    feedback_mode = diagnostic_feedback()
+    if feedback_mode != "full":
+        print(f"[{task_id}] diagnostic feedback: {feedback_mode}. The coding agent "
+              f"starts at pytest's '{run_tests_mod.TB_LADDER[0]}' traceback and is "
+              f"shown more only after a patch leaves the failure unchanged.")
+
     for stage_number, stage in enumerate(stages, start=1):
         if stage == "unit" and stage not in seed_tests:
             # Only generated now, from the code that just cleared the
@@ -1198,16 +1222,24 @@ def orchestrate(task_id, seed=None, resume=False):
         while True:
             attempts += 1
 
-            # Run tests for this stage
+            # Run tests for this stage. Under the default "full" this is
+            # pytest's usual traceback; under "staged" the rung comes from how
+            # many patches in a row have left the failure unchanged, so the
+            # agent is shown more only once less has demonstrably not worked.
+            tb_mode = traceback_mode_for(ineffective_streak, feedback_mode, attempts)
             result = run_tests(
                 stage, tests_dir, task_id=task_id, iteration=attempts, run_timestamp=run_timestamp,
                 stage_number=stage_number, total_stages=len(stages),
                 junit_path=junit.stage_path(task_id, run_timestamp, stage),
+                traceback_mode=tb_mode,
             )
             log_transaction({
                 "action": "test_run", "stage": stage, "iteration": attempts, "stage_number": stage_number,
                 "status": result["status"], "counts": result.get("counts"), "tests": result.get("tests"),
                 "failed_tests": result.get("failed_tests"), "is_regression_check": False,
+                # Recorded on every run, not only staged ones, so a comparison
+                # of two runs can tell which rung each attempt was shown.
+                "traceback_mode": tb_mode,
             })
 
             # A stage passing isn't enough on its own: a patch made to reach

@@ -20,6 +20,8 @@ from qikly.agent_api import usage as u
 def fresh(monkeypatch):
     monkeypatch.setattr(u, "USAGE", u.Usage())
     monkeypatch.delenv(u.MAX_CALLS_ENV, raising=False)
+    monkeypatch.delenv(u.MAX_TOKENS_ENV, raising=False)
+    monkeypatch.delenv(u.MAX_SWEEP_TOKENS_ENV, raising=False)
 
 
 class _Block:
@@ -238,3 +240,118 @@ def test_filing_a_receipt_never_costs_the_run(monkeypatch, tmp_path):
     monkeypatch.setattr(u.os, "makedirs",
                         lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
     assert u.write_record("TASK") is None
+
+
+# --- token ceilings --------------------------------------------------------
+#
+# A call ceiling already existed. It bounds how many times the loop goes
+# round, not what one trip costs, and those come apart exactly where the money
+# does: a long task file and a thirty-test suite make one call an order of
+# magnitude dearer than the call the limit was chosen against.
+
+
+def test_no_token_limit_by_default():
+    usage = u.Usage()
+    usage.record("gpt-4o", 10_000_000, 10_000_000)
+    usage.check_limit()  # must not raise
+
+
+def test_a_token_limit_stops_the_run_and_says_nothing_was_lost(monkeypatch):
+    monkeypatch.setenv(u.MAX_TOKENS_ENV, "500")
+    usage = u.Usage()
+    usage.record("gpt-4o", 300, 100)
+    usage.check_limit()  # 400, under
+
+    usage.record("gpt-4o", 100, 50)
+    with pytest.raises(u.BudgetExceeded) as caught:
+        usage.check_limit()
+
+    message = str(caught.value)
+    assert "550" in message, "the message says how many tokens were spent"
+    assert u.MAX_TOKENS_ENV in message, "and which variable stopped it"
+    assert "Nothing is lost" in message
+
+
+def test_the_token_ceiling_counts_input_and_output_together(monkeypatch):
+    """
+    Input dominates in this loop: the task, the codebase excerpt and the
+    failure all ride in on every call. A ceiling that watched output only
+    would be watching the small half.
+    """
+    monkeypatch.setenv(u.MAX_TOKENS_ENV, "1000")
+    usage = u.Usage()
+    usage.record("gpt-4o", 999, 0)
+    usage.check_limit()
+    usage.record("gpt-4o", 1, 0)
+    with pytest.raises(u.BudgetExceeded):
+        usage.check_limit()
+
+
+def test_a_malformed_token_limit_is_treated_as_no_limit(monkeypatch):
+    for bad in ("banana", "", "1.5", "-4"):
+        monkeypatch.setenv(u.MAX_TOKENS_ENV, bad)
+        usage = u.Usage()
+        usage.record("gpt-4o", 5000, 5000)
+        usage.check_limit()  # must not raise
+
+
+def test_the_two_ceilings_are_independent(monkeypatch):
+    """
+    Setting one must not quietly enable or disable the other, which is the
+    obvious way a second limit goes wrong.
+
+    Both directions, because an earlier version of this test checked only that
+    neither ceiling fires when it should not. It was also written as
+    `check_limit(), "message"`, a tuple expression rather than an assert, so
+    the messages were inert. Found by audit 2026-09-22.
+    """
+    # A call ceiling alone ignores tokens, however many.
+    monkeypatch.setenv(u.MAX_CALLS_ENV, "2")
+    usage = u.Usage()
+    usage.record("gpt-4o", 10_000_000, 0)
+    usage.check_limit()
+
+    # ... and still fires on its own terms.
+    usage.record("gpt-4o", 1, 0)
+    with pytest.raises(u.BudgetExceeded) as caught:
+        usage.check_limit()
+    assert u.MAX_CALLS_ENV in str(caught.value)
+
+    # A token ceiling alone ignores the call count, however high.
+    monkeypatch.delenv(u.MAX_CALLS_ENV)
+    monkeypatch.setenv(u.MAX_TOKENS_ENV, "100")
+    usage = u.Usage()
+    for _ in range(50):
+        usage.record("gpt-4o", 1, 0)
+    usage.check_limit()
+
+    # ... and still fires on its own terms.
+    usage.record("gpt-4o", 50, 0)
+    with pytest.raises(u.BudgetExceeded) as caught:
+        usage.check_limit()
+    assert u.MAX_TOKENS_ENV in str(caught.value)
+
+
+def test_the_sweep_ceiling_is_a_separate_variable(monkeypatch):
+    """
+    It has to be separate, and the reason is not tidiness.
+
+    QIKLY_MAX_TOKENS is inherited by every task process a sweep spawns, so
+    setting it to a sweep-sized number hands each individual task that whole
+    allowance. Only the parent reads the sweep one.
+    """
+    assert u.MAX_SWEEP_TOKENS_ENV != u.MAX_TOKENS_ENV
+    monkeypatch.setenv(u.MAX_SWEEP_TOKENS_ENV, "900")
+    assert u.sweep_token_limit() == 900
+    assert u.token_limit() == 0, "the sweep ceiling must not bound one process"
+
+    usage = u.Usage()
+    usage.record("gpt-4o", 5000, 5000)
+    usage.check_limit()  # a sweep ceiling alone stops no single run
+
+
+def test_total_tokens_is_the_sum_of_both_directions():
+    usage = u.Usage()
+    usage.record("gpt-4o", 7, 11)
+    usage.record("gpt-4o-mini", 1, 2)
+    assert usage.total_tokens() == 21

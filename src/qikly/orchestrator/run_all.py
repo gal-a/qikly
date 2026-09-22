@@ -52,6 +52,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime
 
+from qikly.agent_api import usage
 from qikly.paths import chdir_to_project_root
 
 # Resolved from $QIKLY_PROJECT_ROOT, then the working directory, then this
@@ -231,7 +232,43 @@ def main():
     rep_counts = []
 
     results = defaultdict(list)
+    # A sweep is where the money actually goes. One run is about half a cent;
+    # ten seeds across three tasks is not, and the per-process ceilings in
+    # usage.py cannot see a sweep at all, because every task is its own
+    # process and each one starts its count at zero.
+    #
+    # Repetitions are sequential, so this is the one place a cumulative total
+    # exists. It stops the sweep *between* repetitions: the tasks already
+    # running in the current one finish, which is deliberate. Killing them
+    # mid-flight would throw away work already paid for, which is the failure
+    # the whole module comments about at the top.
+    # Only meaningful with --repeat: the check runs between repetitions, so a
+    # single-repetition sweep has nothing to stop and the ceiling never fires.
+    sweep_ceiling = usage.sweep_token_limit()
+    tokens_before = usage.read_records(PROJECT_ROOT).total_tokens()
+    if sweep_ceiling and reps < 2:
+        print(f"[run_all] {usage.MAX_SWEEP_TOKENS_ENV} is set but --repeat is "
+              f"{reps}, so there is no second repetition to stop and the ceiling "
+              f"will not fire. Use QIKLY_MAX_TOKENS to bound a single run.")
+    stopped_early = None
+
     for rep in range(reps):
+        if sweep_ceiling and rep:
+            spent = usage.read_records(PROJECT_ROOT).total_tokens() - tokens_before
+            if spent >= sweep_ceiling:
+                stopped_early = (rep, spent)
+                print(f"\n{'!' * 70}")
+                print(f"! SWEEP CEILING REACHED: {spent:,} tokens across {rep} of {reps} "
+                      f"repetitions,")
+                print(f"! the limit set by {usage.MAX_SWEEP_TOKENS_ENV}. The remaining "
+                      f"{reps - rep} repetition(s) were not started.")
+                print(f"! Everything the completed repetitions produced is on disk. Any "
+                      f"rate below is")
+                print(f"! computed over {rep} repetitions, not {reps}, so do not quote it "
+                      f"as though it were.")
+                print(f"{'!' * 70}")
+                break
+
         if reps > 1:
             print(f"\n{'#' * 70}\n# Repetition {rep + 1} of {reps}\n{'#' * 70}")
         rep_label = f" [rep {rep + 1}/{reps}]" if reps > 1 else ""
@@ -310,6 +347,16 @@ def main():
         f.write(f"run_all sweep -- {run_timestamp}\n")
         f.write(f"tasks: {', '.join(task_ids)}\n")
         f.write(f"repetitions: {reps}\n")
+        if stopped_early:
+            # In the artifact, not only on the console. Someone reading this
+            # file weeks later has to be able to see that the repetition count
+            # above is not the count that ran, or they will quote a rate over
+            # a denominator that never happened.
+            done, spent = stopped_early
+            f.write(f"STOPPED EARLY: {usage.MAX_SWEEP_TOKENS_ENV} reached after "
+                    f"{spent:,} tokens. {done} of {reps} repetition(s) ran; the "
+                    f"remaining {reps - done} were never started, so any rate "
+                    f"below is over {done} repetition(s).\n")
         if not args.skip_run:
             f.write(f"runs expected: {expected_runs} ({n} task(s) x {reps} repetition(s))\n")
             f.write(f"runs with a summary: {observed_runs}\n")

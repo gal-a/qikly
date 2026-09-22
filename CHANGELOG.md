@@ -4,6 +4,128 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## 0.4.9 (in progress, not released)
+
+> Two new ceilings, a narrower failure channel you can opt into, one feature withdrawn, and documentation that now matches what the coding agent actually receives
+
+### Added
+- **`diagnostic_feedback: staged`**, under `agent:` in `settings.yaml`, and
+  **off by default.** With it on, a failing stage starts the coding agent at
+  pytest's `line` traceback, which gives the file, the line and the error but
+  not the test's source or its docstring, and escalates to `short` and then to
+  the full traceback only after a patch has applied cleanly and left the
+  failure unchanged. Two such attempts reach the full traceback, so staged can
+  cost extra iterations and cannot strand a run on too little information.
+  Frames inside your own implementation are printed at every rung, so a
+  `ValueError` raised in the module under test still names that file and line.
+
+  Escalation is driven by two signals, not one. The first is a patch that
+  applied cleanly and changed nothing. The second is simply how many attempts
+  the stage has taken, added after an audit found the first signal blind in the
+  two stall patterns this codebase already has names for: oscillation, where
+  two tests disagree and each patch fixes one by breaking the other, and
+  patches that repeatedly fail to apply. Both change the failure signature
+  every iteration, so both reset the streak, and without the second signal they
+  would have pinned the agent at the narrowest rung for a whole stage, which is
+  the opposite of what either needs.
+
+  Staged narrows ordinary stage failures only. The bootstrap attempt against an
+  empty source tree and the regression re-checks always use the full traceback.
+
+  It is off by default and will stay off until it is measured. Every
+  convergence figure this project publishes was produced under the full
+  traceback, and a ten-run comparison cannot separate a small change from
+  noise, so the honest position is that the effect on convergence is unknown
+  rather than neutral.
+
+- **`QIKLY_MAX_TOKENS`**, a per-process ceiling on input plus output tokens,
+  alongside the existing `QIKLY_MAX_CALLS`. A call ceiling bounds how many
+  times the loop goes round, not what one trip costs, and the two come apart
+  exactly where the money does: a long task file and a thirty-test suite make
+  one call an order of magnitude dearer than the call the limit was chosen
+  against. Enforced on tokens rather than on the estimated dollars, because
+  the price table drifts and a limit that depends on a stale table fails
+  quietly.
+
+- **`QIKLY_MAX_SWEEP_TOKENS`**, a ceiling for a whole `run_all` sweep. The
+  per-process ceilings cannot see a sweep, because each task it spawns starts
+  its own count at zero, and a sweep is where the money actually goes: one run
+  is about half a cent, ten seeds across three tasks is not. Checked between
+  repetitions, so the tasks already running finish rather than losing work
+  already paid for, and the sweep says how many repetitions it completed so a
+  rate is not read as though it covered all of them.
+
+### Changed
+- **The landing page now describes the current tool.** It was three releases
+  behind: no `--install-mcp`, no `--validate`, no mention of the three driver
+  assistance tasks, and nothing about the independence evidence a run reads out
+  of git. That last row said "every run" on the first pass and an audit caught
+  it: the check runs only for a seeded run, meaning one pointed at code you
+  already had. A run that writes its own implementation does not need the
+  evidence, because there the withholding is enforced rather than evidenced.
+
+### Removed
+- **Sampled test generation is withdrawn.** The `samples` setting and its
+  orchestrator wiring are gone, and `consensus.py` has moved out of the
+  installed package into `research/`. It was never advertised in
+  `settings.yaml`, so no documented behaviour changes.
+
+  It is withdrawn because it was measured and it did not work. With
+  `samples: 5` on `CALC_TAX`, every criterion in every stage came back
+  contested and the split was even on almost all of them, so nothing was
+  outvoted anywhere: four times the price, 27 model calls against 7, and no
+  decision. Comparing whole test bodies makes drafts that differ only in
+  fixture rows read as disagreeing, and comparing only assertions was blind to
+  the inputs those assertions ran on. The useful setting is somewhere between
+  and has not been found. The harness and its tests are kept so the comparison
+  can be retuned rather than rewritten blind.
+
+### Fixed
+- **A spend ceiling never actually stopped a repair loop.** `BudgetExceeded`
+  is a `RuntimeError`, and the FIX and PATCH calls in `run_fix_patch_cycle`
+  were wrapped in bare `except Exception`, so a ceiling firing mid-loop was
+  logged as an ordinary `fix_generation_failed`, the loop asked for a fresh
+  attempt, and every one of those attempts spent real tokens before raising
+  again. The run burned its whole attempt budget past the ceiling and then
+  stopped with "Exceeded N attempts without passing tests", naming the wrong
+  cause. Both calls now re-raise it.
+
+  This is not new in 0.4.9. `QIKLY_MAX_CALLS` has shipped since it was added
+  and has had this defect the whole time, which is why it is filed as a fix
+  rather than as part of the new ceilings above. Found by audit.
+
+- **The documentation overstated what is withheld from the coding agent.**
+  Four places said it receives only a test name and an assertion error, and one
+  said it never sees tests it has not failed. Neither was true. pytest runs at
+  its default traceback, so a failing test hands over its name, its source down
+  to the failing line, its docstring and the assertion, and `-v` lists every
+  collected test by name. The acceptance criteria themselves were never in the
+  prompt and still are not, which is the claim that matters, but a failing
+  test's docstring routinely paraphrases the criterion it came from, so assume
+  a failing test gives its own criterion away.
+
+  Seven places carried the claim, in four files, and the first sweep found
+  four of them. An audit found the rest: the landing page's own objections
+  section, the flow diagram's `FAIL` node and the alt text rendered from it,
+  and two statements in `docs/design_3_mechanism.md` that said in as many words
+  that the agent never reads the test source. `README.md`,
+  `docs/design_1_case_study.md`, `docs/design_3_mechanism.md`,
+  `docs/index.html` and `docs/QUICK_START_ON_YOUR_OWN_DATA.md` now describe the
+  channel as it is, and
+  `tests/test_withholding.py` pins it in both directions against captured
+  pytest output rather than against a hand-written one-line string, which is
+  what let the tests and the documentation agree with each other and not with
+  pytest.
+
+- **The worked example in the case study printed a test no run ever produced.**
+  It showed a `test_integration_tax_rate_bounds` with a second loop over the
+  rejected rows, and built a paragraph on that loop. The name appears in no run
+  artifact; the real test is `test_tax_rate_validation_rules`, it is eight
+  lines, and it checks the rule in one direction only. The document now prints
+  the real one and says what that does not cover, and
+  `tests/test_documented_use_cases.py` pins the body line by line, since
+  pinning only the name is what let it drift.
+
 ## 0.4.8
 
 > Repairs the package description: 0.4.7 published with terminal output pasted into its README

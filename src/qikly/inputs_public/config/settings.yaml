@@ -13,6 +13,34 @@ agent:
     # trying to fit, which then failed to apply. Retune per task if a larger
     # or smaller implementation pushes past this.
 
+  # How much of a failure the coding agent is shown: full | staged
+  #
+  # full (default) hands over pytest's default traceback. That includes the
+  # failing test's own source from `def` down to the failing line, and its
+  # docstring, which in a generated suite usually paraphrases the acceptance
+  # criterion the test came from. The criteria themselves are never in the
+  # prompt, but assume a failing test gives its own criterion away.
+  #
+  # staged starts at pytest's `line` traceback, which gives the file, the line
+  # and the error with no test source and no docstring, and adds detail only
+  # after a patch has applied cleanly and left the failure unchanged. Two such
+  # attempts in a row and it reaches the full traceback, so staged can cost
+  # extra iterations but cannot strand a run on too little information.
+  # Frames inside your implementation are printed at every rung.
+  #
+  # Scope: staged narrows ordinary stage failures only. The bootstrap attempt
+  # against an empty source tree, and the regression re-checks that re-run
+  # earlier stages, always use the full traceback. Both are the ceiling rather
+  # than something above it, so nothing widens, but staged does not narrow
+  # them.
+  #
+  # Leave this alone unless you are experimenting. It is off by default for
+  # one reason: every convergence figure this project publishes was measured
+  # under full, and what staged does to convergence has not been measured. A
+  # ten-run comparison could not tell a small difference from noise, so the
+  # honest position is that the effect is unknown rather than neutral.
+  diagnostic_feedback: full
+
 logging:
   save_transactions: true
 

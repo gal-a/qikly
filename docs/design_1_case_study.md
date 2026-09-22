@@ -19,7 +19,7 @@ That is what happens when one model is handed a specification containing the acc
 
 Run one model at temperature zero on both jobs and the two resolutions are almost identical *by construction*: the verification step burns compute and returns a tick that carries no information about whether the code is correct. That effect should get worse as models improve, since every gain in determinism tightens the agreement between the code and the tests that judge it. That last sentence is a working assumption rather than a measurement, and nothing here tests it.
 
-The fix is to take the answer key away from the student. Test generation gets the acceptance criteria in full. The coding agent gets the same specification with that section cut out, and when a test fails it sees only the failure message, never the rule it broke. Now a green suite means something happened: code written by someone who could not read the standard nevertheless satisfies it. This post is about a tool I built to do exactly that, and part 1 shows what it is and one real repair followed end to end, so you can judge the idea on something concrete rather than on a claim.
+The fix is to take the answer key away from the student. Test generation gets the acceptance criteria in full. The coding agent gets the same specification with that section cut out, and when a test fails it sees pytest's report of that failure, never the specification section it was cut out of. Now a green suite means something happened: code written by someone who could not read the standard nevertheless satisfies it. This post is about a tool I built to do exactly that, and part 1 shows what it is and one real repair followed end to end, so you can judge the idea on something concrete rather than on a claim.
 
 ---
 
@@ -41,7 +41,7 @@ flowchart TD
     IMPL["Implementation"]
     SUITE["<b>pytest suite</b><br/>Tests for:<br/>1 integration, 2 system,<br/>then 3 unit"]
     RUN{"Run the suite"}
-    FAIL["<b>Failure errors</b> only<br/>no criteria, no test source"]
+    FAIL["<b>pytest output</b> only<br/>no acceptance criteria"]
     OUT["Converged<br/><b>outputs:</b> code + suite<br/>+ audit trail"]
     STALL["Did not converge<br/><b>failure errors and audit trail</b><br/>exits non-zero, ships nothing"]
 
@@ -179,43 +179,41 @@ E       assert 150.0 <= 100
 
 8 of 9 integration tests pass. This one does not.
 
-Here is the whole test, not just the line that failed, because the rest of it
-is the part worth reading:
+Here is the whole test, because how little there is of it is the part worth
+reading:
 
 ```python
-def test_integration_tax_rate_bounds():
-    rows = extract(INPUT_01) + extract(INPUT_02)
-    result = transform(rows)
+def test_tax_rate_validation_rules():
+    rows_1 = extract(INPUT_01)
+    rows_2 = extract(INPUT_02)
+    result = transform(rows_1 + rows_2)
+
     for row in result["accepted"]:
-        tr = float(row["tax_rate"])
-        assert 0 <= tr <= 100
-    for row in result["rejected"]:
-        try:
-            tr = float(row.get("tax_rate", -1))
-            is_invalid = tr < 0 or tr > 100
-        except (ValueError, TypeError):
-            is_invalid = True
-        if "tax_rate" in row["reason"].lower():
-            assert is_invalid
-    # Criteria: 7
+        rate = float(row["tax_rate"])
+        assert 0 <= rate <= 100
 ```
 
-**It checks the rule in both directions**, and only the first direction can
-fail here. Every accepted row must be in range, which is the assertion above.
-And every row rejected *for* `tax_rate` must actually have been out of range,
-which stops an implementation from passing by rejecting everything. A suite
-that only asserted the first half would accept a pipeline that threw away good
-data, and the criterion it came from rules both out.
+**It checks the rule in one direction only**, and that is worth noticing rather
+than glossing. Every accepted row must be in range, which is the assertion that
+failed. Nothing here requires that a row rejected *for* `tax_rate` was actually
+out of range, so an implementation that rejected every row would satisfy this
+test. The criterion rules that out; this test does not enforce that half of it.
+
+That is the honest state of a generated suite, and it is the reason the tool
+reports which criteria a suite traces to rather than asking you to trust that
+the coverage is complete.
 
 **It constructs no input.** It reads whatever the fixture files hold and
 asserts a property of the output. That is forced by when it was written, which
 is the next point, and it is why the failing value is 150.0 rather than
 something the test chose: the bad row was already in the data.
 
-**The trailing comment names the criterion it came from**, so a reader can
-follow any test back to the line of the specification it enforces. Test
-generation writes that; `qikly --explain CALC_TAX` prints the criteria in the
-same order.
+**This run predates criterion traceability**, which is why the test above
+carries no marker. Current runs put the criteria a test came from on the last
+line inside its docstring, as `# Criteria: 7`, so a reader can follow any test
+back to the line of the specification it enforces. Test generation writes that;
+`qikly --explain CALC_TAX` prints the criteria in the same order. The quick
+start shows the current shape.
 
 **Why an integration test and not a unit test?** Because of when it was
 written. At that point no implementation existed, so the only names the
@@ -256,9 +254,26 @@ the constructed edge cases once there is code to point at.
 
 ### 4. The FIX, what goes back to the coding agent
 
-Exactly what is above: a test name and an assertion error. Not the criterion,
-not the test source, not an explanation. From that alone it produces a **FIX**,
-which is **reasoning rather than code**:
+Pytest's own output for the tests that are failing right now, and nothing else.
+Be precise about what that contains, because it is more than one line: the test
+name, its source from `def` down to the failing statement, its docstring and
+comments if it has any, the assertion that failed, and the intermediate values
+pytest prints underneath it. Source after the failing line is not shown. Tests
+that are currently passing give up their names, because pytest lists everything
+it collected, but not their bodies, docstrings or assertions.
+
+What it never contains is the specification. The acceptance criteria are
+stripped from the task before the coding agent sees it, and no part of the
+criteria text is ever placed in a FIX or PATCH prompt. So the agent can read
+the one case it just failed, in the test author's words, and cannot read the
+rule that case came from, the other criteria, or the tests it has not failed
+yet.
+
+That distinction is the whole design, and it is narrower than "the agent is
+blind". A developer handed a failing test sees the same thing. What neither of
+them can do is change a test that was written before the code existed.
+
+From that input it produces a **FIX**, which is **reasoning rather than code**:
 
 ```
 failure_summary: test_tax_rate_validation_rules failed because a tax rate

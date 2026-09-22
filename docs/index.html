@@ -764,6 +764,19 @@ footer {
           <td data-col="Code-derived">Nobody wrote the intent down and you need a safety net</td>
           <td data-col="Spec-derived">The intent exists in a ticket, a spec page or a Gherkin file</td>
         </tr>
+        <tr>
+          <td>Evidence it was independent</td>
+          <td data-col="Code-derived">None available. The suite was derived from the
+          implementation, so the question does not arise</td>
+          <td data-col="Spec-derived">Every run reports one of
+          <code>criteria_first</code>, <code>not_evidenced</code>,
+          <code>no_history</code> or <code>unavailable</code>, read from git:
+          whether your criteria file was last changed before the implementation's
+          first commit. <code>criteria_first</code> means the bar cannot have been
+          fitted to the code, because the code did not exist yet. It is not proof
+          of independence and does not claim to be, since code can sit in a working
+          tree for weeks before its first commit</td>
+        </tr>
       </tbody>
     </table>
 
@@ -957,6 +970,33 @@ qikly --demo</code></pre>
           contradiction so a pipeline can gate on it. <b>You get:</b> a list of the requirement and criterion pairs that cannot both hold, before spending a stage budget on them.</td>
         </tr>
         <tr>
+          <td>You want a task file checked before it costs anything</td>
+          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
+          <td><code>qikly --validate
+--tasks &lt;MY_TASKS&gt;</code></td>
+          <td>Reads the task file and reports what would stop a run: a missing
+          fixture, an interface that names nothing, an empty bar. No API key and
+          no model call, so it costs nothing and takes about a second. It does
+          not check whether your requirements and criteria agree, which is a
+          different question and needs <code>--check-criteria</code> above.
+          <b>You get:</b> the problems a run would have hit, before you pay for
+          the run.</td>
+        </tr>
+        <tr>
+          <td>You would rather run it from your editor than a terminal</td>
+          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
+          <td><code>qikly --install-mcp</code><br><span class="eg">add <code>vscode</code>, <code>claude</code> or <code>all</code></span></td>
+          <td>Registers qikly as an MCP server with the hosts it finds, writing
+          <code>.mcp.json</code> or <code>.vscode/mcp.json</code> in the directory
+          you are standing in. Your editor's agent can then run a task, check a
+          run's status, validate a task file or scaffold one. Add
+          <code>--dry-run</code> to see which file it would write, and whether it
+          would create or update it, before anything is written. The
+          withholding holds here too: the MCP tools never return the acceptance
+          criteria, and a test fails the build if that changes. <b>You get:</b>
+          the same four commands, reachable from whatever you already work in.</td>
+        </tr>
+        <tr>
           <td>A previous run stopped before finishing</td>
           <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
           <td><code>qikly --tasks &lt;MY_TASKS&gt;
@@ -973,8 +1013,11 @@ qikly --demo</code></pre>
       commas. A task_id is a filename under
       <code>inputs_private/config/tasks/</code> without the <code>.yaml</code>:
       <code>--tasks CALC_TAX</code>,
-      <code>--tasks CALC_TAX,MERGE_SALES</code>, or omit it to run every task
-      found. <code>&lt;MY_TASK&gt;</code>, singular, takes exactly one.
+      <code>--tasks ADAS_HEADWAY,MERGE_SALES</code>, or omit it to run every task
+      found. Thirteen ship bundled, including three from driver assistance
+      (<code>ADAS_HEADWAY</code>, <code>ADAS_TTC</code>,
+      <code>ADAS_SPEED_LIMIT</code>) whose criteria turn on the kind of boundary
+      a specification usually leaves vague. <code>&lt;MY_TASK&gt;</code>, singular, takes exactly one.
     </p>
 
   </section>

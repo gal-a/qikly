@@ -58,13 +58,13 @@ recording every failure, every piece of reasoning and every diff.
 <!-- An image rather than a mermaid block, because PyPI prints mermaid as source.
      It is rendered from the diagram in docs/design_1_case_study.md by
      tools/render_flow_diagram.py, and a test fails when the two drift. -->
-<img src="https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_flow.png" width="660" alt="How a run works. The full specification splits into requirements plus interface, which both agents receive, and acceptance_criteria, which only the test-writing agent receives and which never reaches the coding agent. The coding agent writes the implementation, the test-writing agent writes the pytest suite, and the suite runs. A pass gives converged outputs: code, suite and audit trail. A fail sends failure errors only, with no criteria and no test source, back to the coding agent as the repair loop, until the retry budget is spent and the run stops without converging but keeps the audit trail. Unit tests alone are written last, from the code.">
+<img src="https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_flow.png" width="660" alt="How a run works. The full specification splits into requirements plus interface, which both agents receive, and acceptance_criteria, which only the test-writing agent receives and which never reaches the coding agent. The coding agent writes the implementation, the test-writing agent writes the pytest suite, and the suite runs. A pass gives converged outputs: code, suite and audit trail. A fail sends pytest's output for the failing tests back to the coding agent as the repair loop, with no acceptance criteria, until the retry budget is spent and the run stops without converging but keeps the audit trail. Unit tests alone are written last, from the code.">
 
 **The part that makes the result mean something:** the coding agent never sees
 `acceptance_criteria`. It gets the specification with that section stripped
 out, the same vague brief a developer works from, while test generation gets
-it in full. When a test fails, the agent sees the failure message and never
-the rule it broke. Without that asymmetry both sides read the same spec
+it in full. When a test fails, the agent sees pytest's output for that test and never
+the acceptance criteria. Without that asymmetry both sides read the same spec
 identically and every test passes first try, which proves nothing.
 
 **Purple is what the coding agent can see. Teal is what the standard is
@@ -72,8 +72,8 @@ written from.** They never touch. A run that never converges is still worth havi
 non-zero, names the blocking tests, and keeps the same complete record. The purple arrows are the repair loop, and that is where
 almost all of a run happens: a failing suite sends the agent the failure text
 and nothing else, it produces a FIX and a PATCH, and the suite runs again,
-until the stage passes or the retry budget runs out. It never sees the rule it
-broke, so it cannot write code shaped to a criterion it was shown.
+until the stage passes or the retry budget runs out. It never sees the criteria
+themselves, so it cannot write code shaped to a bar it was handed.
 `tests/test_withholding.py` fails the build if any call site lets one through.
 
 A run works through three stages, `integration` then `system` then `unit`:
@@ -93,7 +93,8 @@ A run works through three stages, `integration` then `system` then `unit`:
    silently break something that already passed.
 
 
-Every arrow back into **FIX** carries the pytest error text and nothing else.
+Every arrow back into **FIX** carries the pytest error text and nothing else,
+which means the failing tests and not the specification they came from.
 Unit tests come last because they are the only ones that need to name real
 functions, which makes them the only stage allowed to read the implementation.
 Re-running the earlier stages after each success is what stops a later repair
@@ -209,9 +210,20 @@ verdict, and this emits a pytest suite you still have in six months.
 ### "Doesn't a failing test give the criteria away?"
 
 It gives away one case, and that is by design. When a test fails, the coding
-agent sees the test name and the assertion error: in the case study, that a tax
-rate of 150 was accepted when it should not have been. It never sees the
-criterion behind it, and never sees the tests it has not failed yet.
+agent sees pytest's output for it: the test name, its source down to the failing
+line, its docstring if it has one, and the assertion error. In the case study,
+that a tax rate of 150 was accepted when it should not have been. Since a test's
+docstring often paraphrases the rule it was written from, assume the criterion
+behind a failing test is effectively visible once it fails.
+
+Of the tests it has not failed, it sees the names and nothing else. Pytest
+lists every test it collected, so the agent knows a check called
+`test_tax_exempt_zero_rate` exists and is green; it does not see that test's
+body, docstring or assertions.
+
+What the agent never receives is the specification itself. The acceptance
+criteria are stripped from the task before it is prompted, and no criteria text
+reaches a FIX or PATCH prompt.
 
 That does not undo the separation, because independence is a property of how
 the suite was written, not of how much feedback the code's author receives

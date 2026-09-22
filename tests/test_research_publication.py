@@ -28,7 +28,11 @@ README = os.path.join(RESEARCH, "README.md")
 # Public because each backs a figure that is already published: the 38%
 # detection rate, the 950 cross-run verdicts, and the intervals under both.
 EXPECTED_PUBLIC = {"mutation_test.py", "backanalysis.py", "stats_helpers.py",
-                   "stage_breakdown.py"}
+                   "stage_breakdown.py",
+                   # Backs no published figure. Public for the reason
+                   # mutation_test.py is: its own result was withdrawn, and a
+                   # withdrawal nobody can reproduce is just an assertion.
+                   "consensus.py"}
 
 
 def _classified():

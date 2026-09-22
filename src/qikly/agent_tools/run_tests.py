@@ -92,8 +92,30 @@ def _write_summary_report(task_id, stage, iteration, counts, test_results, run_t
     print(line)
 
 
+# How much of a failure the coding agent is shown, least first.
+#
+# These are pytest's own traceback modes, and the ladder matters because of
+# what each one prints about the *test*, not about the implementation:
+#
+#   line   the failing file:line and the error. No test source, no docstring.
+#   short  adds one line of source per frame, still no docstring.
+#   auto   pytest's default: the test's whole source from `def` down to the
+#          failing statement, docstring and comments included.
+#
+# Every frame in the implementation survives all three, which is the point: a
+# ValueError raised inside the module under test still names that module and
+# line at `line`. What the lower rungs withhold is the test author's prose,
+# which routinely paraphrases the acceptance criterion the test came from.
+#
+# `auto` is the default and is what every published convergence figure was
+# measured under. See `diagnostic_feedback` in settings.yaml.
+TB_LADDER = ("line", "short", "auto")
+TB_FULL = "auto"
+
+
 def run_tests(stage, tests_dir, task_id=None, iteration=None, run_timestamp=None,
-              stage_number=None, total_stages=None, junit_path=None):
+              stage_number=None, total_stages=None, junit_path=None,
+              traceback_mode=TB_FULL):
     """
     Run pytest for the given stage's tests under <tests_dir>/<stage>/ and
     return a structured result:
@@ -129,6 +151,11 @@ def run_tests(stage, tests_dir, task_id=None, iteration=None, run_timestamp=None
         # as zero. A suite that ran and failed becomes indistinguishable from
         # one that never ran.
         "-o", "addopts=",
+        # How much of each failure to print. Never affects what this module
+        # parses: the counts come from pytest's final summary line and the
+        # per-test results from the `-v` listing, and no traceback mode
+        # touches either. It changes only what the coding agent reads.
+        f"--tb={traceback_mode}",
     ]
 
     if junit_path:

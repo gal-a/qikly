@@ -481,6 +481,25 @@ def test_the_worked_example_quotes_a_real_run():
                    "tax_rate > 100"):
         assert quoted in example, f"the worked example no longer quotes {quoted!r}"
 
+    # The test body itself, pinned line by line against the artifact, because
+    # pinning only the name did not stop it drifting. Until 2026-09-21 the
+    # document printed a `test_integration_tax_rate_bounds` with a second loop
+    # over the rejected rows, and built a paragraph on that loop. No run ever
+    # produced either. The real test is eight lines and checks one direction.
+    for line in ("def test_tax_rate_validation_rules():",
+                 "rows_1 = extract(INPUT_01)",
+                 "rows_2 = extract(INPUT_02)",
+                 'result = transform(rows_1 + rows_2)',
+                 'for row in result["accepted"]:',
+                 'rate = float(row["tax_rate"])',
+                 "assert 0 <= rate <= 100"):
+        assert line in example, (
+            f"the worked example's test body no longer matches the artifact: "
+            f"{line!r} is missing")
+
+    assert "test_integration_tax_rate_bounds" not in design, (
+        "that test name appears in no run artifact; it was an illustration")
+
     # And the criterion it never saw has to still exist in the shipped task,
     # or the example is describing a rule the reader cannot go and find.
     with open(os.path.join(root, "src", "qikly", "inputs_public", "config",

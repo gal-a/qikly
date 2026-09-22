@@ -12,8 +12,12 @@ counted, because the providers report them. Money is *estimated* from a price
 table that will drift, so it is always labelled as an estimate and never used
 for anything except showing a person roughly where they are.
 
-The cap is enforced on calls, not on the estimate, because a limit that
-depends on a price table going stale is a limit that fails quietly.
+The caps are enforced on calls and on tokens, never on the estimate, because a
+limit that depends on a price table going stale is a limit that fails quietly.
+Three exist and they bound different things: QIKLY_MAX_CALLS and
+QIKLY_MAX_TOKENS bound one process, and QIKLY_MAX_SWEEP_TOKENS bounds a
+`run_all` sweep, which the per-process ones cannot see because each task it
+spawns starts its own count at zero.
 """
 import os
 import threading
@@ -33,6 +37,22 @@ PRICES = {
 }
 
 MAX_CALLS_ENV = "QIKLY_MAX_CALLS"
+MAX_TOKENS_ENV = "QIKLY_MAX_TOKENS"
+MAX_SWEEP_TOKENS_ENV = "QIKLY_MAX_SWEEP_TOKENS"
+
+# Why a token ceiling exists when a call ceiling already did.
+#
+# Calls bound how many times the loop goes round. They do not bound what one
+# trip costs, and the two come apart precisely where the money is: a long task
+# file, a large codebase excerpt and a suite of thirty tests make a single call
+# an order of magnitude more expensive than the call the limit was chosen
+# against. A user who sets QIKLY_MAX_CALLS from experience with a small task
+# has not bounded anything on a large one.
+#
+# Enforced on tokens rather than on the estimated dollars for the reason given
+# above: the price table drifts, and a limit that depends on a stale table is
+# a limit that fails quietly. Tokens are reported by the provider and are the
+# thing the bill is actually computed from.
 
 
 class BudgetExceeded(RuntimeError):
@@ -80,6 +100,9 @@ class Usage:
         known = sum(s["calls"] for m, s in self.by_model.items() if m in PRICES)
         return known / self.calls
 
+    def total_tokens(self):
+        return self.input_tokens + self.output_tokens
+
     def check_limit(self):
         limit = call_limit()
         if limit and self.calls >= limit:
@@ -88,6 +111,21 @@ class Usage:
                 f"{MAX_CALLS_ENV}. Nothing is lost: the run's outputs, reports and "
                 f"logs are on disk up to this point. Raise or unset {MAX_CALLS_ENV} "
                 f"to continue further next time.")
+
+        # Checked after the call that crossed it rather than before, because
+        # the size of the next call is not known until it is built. So this
+        # overshoots by at most one call, which is the same contract the call
+        # limit has and is worth stating: a ceiling here is a stop, not a
+        # guarantee about the last request.
+        tokens = token_limit()
+        if tokens and self.total_tokens() >= tokens:
+            raise BudgetExceeded(
+                f"stopped after {self.total_tokens():,} tokens "
+                f"({self.input_tokens:,} in, {self.output_tokens:,} out) across "
+                f"{self.calls} model calls, the limit set by {MAX_TOKENS_ENV}. "
+                f"Nothing is lost: the run's outputs, reports and logs are on disk "
+                f"up to this point. Raise or unset {MAX_TOKENS_ENV} to continue "
+                f"further next time.")
 
     @staticmethod
     def _money(usd):
@@ -219,6 +257,39 @@ def call_limit():
     """Maximum model calls for this process, or 0 for no limit."""
     try:
         return max(0, int(os.environ.get(MAX_CALLS_ENV) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def sweep_token_limit():
+    """
+    Maximum tokens a `run_all` sweep may spend, or 0 for no limit.
+
+    Separate from `token_limit` because they bound different things and a
+    single variable could not serve both. `QIKLY_MAX_TOKENS` is inherited by
+    every task process a sweep spawns, so setting it to a sweep-sized number
+    gives each individual task that whole allowance, which is the opposite of
+    a ceiling. This one is read only by the parent.
+    """
+    try:
+        return max(0, int(os.environ.get(MAX_SWEEP_TOKENS_ENV) or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def token_limit():
+    """
+    Maximum input plus output tokens for this process, or 0 for no limit.
+
+    Unparseable reads as no limit, matching `call_limit`. That is the
+    deliberate choice and it is the less safe one: a typo silently removes the
+    ceiling. The alternative, refusing to start, turns a typo in an optional
+    variable into a failed run for people who never set it, and the ceiling is
+    a convenience rather than a safety control. The projection printed before
+    every run is what tells you the ceiling is not in force.
+    """
+    try:
+        return max(0, int(os.environ.get(MAX_TOKENS_ENV) or 0))
     except (TypeError, ValueError):
         return 0
 

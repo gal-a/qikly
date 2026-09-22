@@ -89,7 +89,7 @@ Everything else follows from that asymmetry. A run works through three stages,
 5. **Clearing a stage re-runs the earlier ones**, so a later fix cannot
    silently break something that already passed.
 
-Two things are worth noticing about step 3. The reasoning and the diff are separate LLM calls, which makes the reasoning independently auditable and restricts the diff's context to the files the reasoning identified. And the FIX is generated from the failing test's *output* alone. Not the test source, not the criteria, not a hint. The same feedback a developer sees in their terminal.
+Two things are worth noticing about step 3. The reasoning and the diff are separate LLM calls, which makes the reasoning independently auditable and restricts the diff's context to the files the reasoning identified. And the FIX is generated from pytest's output alone: the failing test's name, its source down to the failing line, its docstring and the assertion, with no acceptance criteria. The same feedback a developer sees in their terminal, and no more.
 
 There is no separate "write the initial implementation" step anywhere. The first run happens against an empty source tree, fails on a collection error, and that failure feeds the same FIX and PATCH cycle as every later repair. The first line of code and the hundredth are produced by one mechanism.
 
@@ -103,7 +103,7 @@ is the failure this project is about.
 
 | Agent | Settings key | Reads | Never reads | Produces |
 |---|---|---|---|---|
-| **Coding agent** | `code` | requirements, interface, and the text of whatever test just failed | the acceptance criteria, and the test source | a FIX, the reasoning and the files it intends to touch, then a PATCH, a unified diff of only those files |
+| **Coding agent** | `code` | requirements, interface, and pytest's output for whatever test just failed | the acceptance criteria | a FIX, the reasoning and the files it intends to touch, then a PATCH, a unified diff of only those files |
 | **Test-writing agent** | `test`, or `test_integration` / `test_system` / `test_unit` | requirements, interface, and every acceptance criterion in full | the implementation, except at the unit stage, which is written last and exists to name real functions | one pytest file per stage |
 | **Criteria drafter** | `criteria` | the requirements alone | any implementation, and any existing criteria | a first draft of the bar, only when `--generate-criteria` asks for one |
 | **Criteria reviewer** | `review` | the specification, the current criteria, and a finished implementation | nothing withheld: this is the one agent shown everything at once | proposed additional criteria, each tagged with a category, for a human to accept or reject |

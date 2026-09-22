@@ -14,8 +14,14 @@ comparison is contested and the vote is noise. Drafts that assert opposite
 things about a boundary must compare different, or the one failure this exists
 to catch passes straight through.
 """
-from qikly import consensus
-from qikly.orchestrator import orchestrator as orch
+# consensus.py left the shipped package on 2026-09-22 and lives in research/
+# now. These tests came with it, and still run in CI, because the comparison
+# is the part that has to be retuned before the idea can be revisited and a
+# retuning with no tests around it would just reproduce the 2026-09-20 result.
+#
+# research/ is already on sys.path: tests/conftest.py puts it there for the
+# whole session. An insert here as well was redundant and is gone.
+import consensus
 
 RIGHT = '''
 def test_boundary_is_not_flagged():
@@ -132,97 +138,6 @@ def test_describe_names_the_contested_criteria():
     assert "disagreed on criterion 1" in line
     line = consensus.describe(consensus.compare([RIGHT, RIGHT_RENAMED]))
     assert "agreed on every criterion" in line
-
-
-# ------------------------------------------------------------ the setting ----
-
-def test_sampling_is_off_in_the_shipped_defaults():
-    """
-    Every published number was measured with one draw. Turning this on
-    multiplies the generation calls and changes what a run produces, so it
-    must never switch itself on.
-    """
-    import io
-    import os
-
-    import yaml
-
-    from qikly import paths
-
-    bundled = os.path.join(os.path.dirname(paths.__file__),
-                           "inputs_public", "config", "settings.yaml")
-    section = (yaml.safe_load(io.open(bundled, encoding="utf-8").read())
-               or {}).get("test_generation") or {}
-    assert int(section.get("samples", 1)) == 1
-
-
-def test_a_missing_or_nonsense_setting_reads_as_one(monkeypatch):
-    for value in (None, "", "banana", 0, -3):
-        monkeypatch.setattr(orch, "load_settings",
-                            lambda v=value: {"test_generation": {"samples": v}})
-        assert orch.generation_samples() == 1
-
-
-def test_a_higher_setting_is_read(monkeypatch):
-    monkeypatch.setattr(orch, "load_settings",
-                        lambda: {"test_generation": {"samples": 3}})
-    assert orch.generation_samples() == 3
-
-
-# ------------------------------------------------------------ the wiring ----
-
-def test_one_sample_calls_generation_once_and_returns_it_unchanged(monkeypatch):
-    """
-    With the setting off a run must be exactly the run it was before, so the
-    default path may not even reach the comparison.
-    """
-    calls = []
-
-    def fake(stage, generator, task_id, seed, criteria, batch_index, guidance=None):
-        calls.append(seed)
-        return RIGHT
-
-    monkeypatch.setattr(orch, "_generate_one", fake)
-    out = orch._generate_sampled("integration", None, "T", 42, None, 1, 1)
-    assert out == RIGHT
-    assert calls == [42]
-
-
-def test_more_samples_perturb_the_seed_so_the_draws_can_differ(monkeypatch):
-    """
-    Generation is near-deterministic when a run seed is set: redrawing with
-    the same seed reproduced the identical file three times in a row on a real
-    run. Samples from one seed would agree by construction and measure nothing.
-    """
-    seeds, drafts = [], [WRONG, RIGHT, RIGHT_RENAMED]
-
-    def fake(stage, generator, task_id, seed, criteria, batch_index, guidance=None):
-        seeds.append(seed)
-        return drafts[len(seeds) - 1]
-
-    monkeypatch.setattr(orch, "_generate_one", fake)
-    monkeypatch.setattr(orch, "log_transaction", lambda *_a, **_k: None)
-    out = orch._generate_sampled("integration", None, "T", 42, None, 1, 3)
-
-    assert len(set(seeds)) == 3, "three draws must not share one seed"
-    assert out in (RIGHT, RIGHT_RENAMED), "the outvoted draft must not be kept"
-
-
-def test_the_contested_criteria_are_logged_whichever_draft_wins(monkeypatch):
-    logged = []
-    drafts = [WRONG, RIGHT, RIGHT_RENAMED]
-
-    def fake(stage, generator, task_id, seed, criteria, batch_index, guidance=None):
-        return drafts.pop(0)
-
-    monkeypatch.setattr(orch, "_generate_one", fake)
-    monkeypatch.setattr(orch, "log_transaction", lambda event: logged.append(event))
-    orch._generate_sampled("integration", None, "T", 7, None, 1, 3)
-
-    assert len(logged) == 1
-    assert logged[0]["action"] == "tests_sampled"
-    assert logged[0]["contested"] == ["1"]
-    assert logged[0]["unanimous"] is False
 
 
 # ------------------------------------------- found in review, 2026-09-20 ----
