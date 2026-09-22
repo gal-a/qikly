@@ -66,6 +66,26 @@ packaging tools would read as `1.1`.
   server.
 
 ### Changed
+- **`--start` is now `--run`**, matching the MCP tool it shares its machinery
+  with, `qikly_run`. Two names for one action was the kind of thing nobody
+  notices until they have to explain it. `--start` still works and will keep
+  working, so nothing scripted breaks.
+
+  One behaviour change worth knowing, found by audit. `--runs`, plural, lists
+  past runs and starts nothing, and before this rename bare `--run` was an
+  unambiguous abbreviation of it, so typing `--run` listed your runs. It now
+  requires a task, so `qikly --run` fails with "expected one argument" and
+  `qikly --run FOO` starts a real run for `FOO` rather than erroring. Both fail
+  loudly or do the documented thing, but anyone with `--run` in muscle memory
+  as "list my runs" should know it now means "spend money". `--ru` is refused
+  as ambiguous for the same reason. `tests/test_cli_run_flag.py` pins all of
+  it; there was no test over this wiring before.
+
+- **`docs/mcp.md`'s tool table says what each tool achieves**, not just what it
+  does, and folds "safe to call unattended" and "what it costs" into one
+  column, because for these four they are the same judgement: three are
+  read-only, free and local, and one writes, spends and reaches the network.
+
 - **The landing page now describes the current tool.** It was three releases
   behind: no `--install-mcp`, no `--validate`, no mention of the three driver
   assistance tasks, and nothing about the independence evidence a run reads out

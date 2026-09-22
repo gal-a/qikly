@@ -94,7 +94,8 @@ It refuses in three cases, and prints the block for you to paste instead:
 
 **If `claude` is not a command**, it is bundled inside the VS Code extension
 rather than installed on `PATH`, at
-`%USERPROFILE%\.vscode\extensionsnthropic.claude-code-<version>-<platform>esources
+`%USERPROFILE%\.vscode\extensionsnthropic.claude-code-<version>-<platform>
+esources
 ative-binary\claude.exe`.
 The version is in the path, so it moves on every extension update. You do not
 need the CLI for any of this; it is only how you check the registration from a
@@ -165,12 +166,17 @@ and an apparently broken tool.
 
 ## The four tools
 
-| Tool | What it does |
-| --- | --- |
-| `qikly_run` | Starts a run for one task. Returns a run id **immediately**. |
-| `qikly_status` | Reports on a run: `running`, `passed`, `failed`, `stalled`, `unknown`. |
-| `qikly_validate` | Validates a task offline, the same check as `qikly --validate`. Free, no model call. It does not look for contradictions: that is `qikly --check-criteria`, a paid model call this server does not expose. |
-| `qikly_scaffold` | Turns a Python file into a task that tests that code, returned as text to save under `inputs_private/config/tasks/`. |
+| Tool | What it achieves | Input | Returns | Safe to call unattended? | CLI equivalent |
+| --- | --- | --- | --- | --- | --- |
+| `qikly_run` | Starts a full run for one task: generates the suite from the acceptance criteria, writes an implementation from the requirements alone, and repairs it against the suite until every stage passes or the retry budget is spent. Returns **immediately**, because a run takes minutes to hours. | `task_id`, optional `provider` and `model` | A `run_id` to poll with | **No.** It writes code and tests, calls a model provider over the network, and spends real money. A second call is a second run, not a repeat: the agents are not deterministic even at a fixed seed. | `qikly --run <task>` |
+| `qikly_status` | Reports where a run got to, reading what the run itself wrote rather than watching the process. That is what lets it tell a crash from a failing suite: `stalled` means the process is gone without writing a summary. While a run is in flight it also gives the stage and iteration. | `run_id` | One of `running`, `passed`, `failed`, `stalled`, `unknown`, plus stage and iteration | **Yes.** Reads local run records only. Free, no network. | `qikly --status <run_id>` |
+| `qikly_validate` | Checks a task file offline before you spend anything on it: valid YAML, the required sections present, `acceptance_criteria` a list rather than one long string, and fixture paths that actually resolve. It does **not** look for contradictions between requirements and criteria: that is `qikly --check-criteria`, a paid model call this server deliberately does not expose. | `task_id` | Counts and a verdict | **Yes.** No model call, so no network and no cost. Returns no criterion text. | `qikly --validate --tasks <task>` |
+| `qikly_scaffold` | Turns a Python file you already have into a task that tests it: the module path, the real signatures of its public functions, a guessed entrypoint, and a seed pointing back at the file. `requirements` and `acceptance_criteria` are left as `TODO` on purpose, because criteria read out of an implementation can only describe what it already does. | `file_path` | The task YAML as text, for you to save under `inputs_private/config/tasks/` | **Yes.** Returns the YAML rather than writing it, so saving stays your decision. | `qikly --scaffold <file>` |
+
+Every tool carries the four MCP behaviour annotations, so a host can act on the
+column above rather than guess: `readOnlyHint`, `destructiveHint`,
+`idempotentHint` and `openWorldHint`. Three of the four are read-only, free and
+local. Only `qikly_run` is none of those things.
 
 ## Why `qikly_run` does not wait
 
@@ -179,7 +185,7 @@ so `qikly_run` starts the run in a detached process and hands back an id:
 
 ```
 qikly_run(task_id="CALC_TAX")
-  -> {"run_id": "CALC_TAX_20260910_113412", "state": "started"}
+  -> {"run_id": "CALC_TAX_20260910_113412", "state": "running"}
 ```
 
 The agent then polls:

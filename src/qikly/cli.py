@@ -757,15 +757,22 @@ def _parse_args():
              "from the one this machine needs."
     )
     parser.add_argument(
-        "--start", metavar="TASK",
+        # `--run` is the spelling that matches the MCP tool this shares its
+        # machinery with, `qikly_run`. `--start` was the original and still
+        # works, so nothing that already scripts it breaks. Note the neighbour:
+        # `--runs`, plural, lists past runs and starts nothing.
+        "--run", "--start", metavar="TASK", dest="run",
         help="Start a run in the background and print its run id, without waiting. "
              "A run takes minutes to hours, so this is for when the terminal is not "
              "where you want to spend them: start it, close the window, ask later "
-             "with --status. It is also the mechanism the MCP server is built on."
+             "with --status. This is the same action the MCP server exposes as "
+             "`qikly_run`, and it is the mechanism that server is built on. "
+             "(`--start` is the old spelling and still works. `--runs`, plural, is "
+             "a different flag that lists past runs.)"
     )
     parser.add_argument(
         "--status", metavar="RUN_ID",
-        help="What happened, or is happening, to one run started with --start. "
+        help="What happened, or is happening, to one run started with --run. "
              "Reads what the run itself writes, so it is accurate even if the "
              "process died: 'stalled' means gone without a summary, which is a "
              "crash rather than a failing suite."
@@ -1634,9 +1641,9 @@ def main():
     # These run before anything else and exit: they exist to make a project
     # runnable, so they must work when nothing is configured yet and must not
     # require a provider key.
-    if args.start:
+    if args.run:
         from qikly import runs
-        run_id = runs.start(args.start)
+        run_id = runs.start(args.run)
         print(run_id)
         return 0
     if args.status:

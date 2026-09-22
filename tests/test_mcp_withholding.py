@@ -273,13 +273,103 @@ def test_every_tool_declares_its_behaviour_hints():
         assert by_name[name]["openWorldHint"] is False, name
 
 
-def test_the_annotations_survive_an_sdk_that_does_not_accept_them():
+def test_an_sdk_that_rejects_annotations_still_gets_all_four_tools():
     """
-    The FastMCP fallback predates the annotations argument, so registration
-    falls back to an unannotated tool rather than failing to build a server.
-    A host on an old SDK should get a plainer server, not no server.
+    The fallback, actually exercised.
+
+    The first version of this test grepped `mcp_server.py` for the string
+    "annotations=spec" and then checked the server built. Neither assertion
+    touched the fallback: the string sits in the `try` line, so deleting the
+    `except` entirely would have left it passing, and the build only ever
+    exercised whichever branch the installed SDK takes. An audit called that
+    out on 2026-09-22 and it was right.
+
+    So this simulates the old SDK instead, by making `tool()` reject the
+    `annotations` keyword the way a pre-2.x one would, and asserts what
+    actually matters: every tool is still registered, under the right name.
     """
+    import pytest
+
+    try:
+        from mcp.server.mcpserver import MCPServer as server_class
+    except ImportError:                              # pragma: no cover
+        try:
+            from mcp.server.fastmcp import FastMCP as server_class
+        except ImportError:
+            pytest.skip("the MCP SDK is not installed")
+
     from qikly import mcp_server
 
-    assert "annotations=spec" in open(mcp_server.__file__, encoding="utf-8").read()
-    assert mcp_server.build_server() is not None
+    original = server_class.tool
+    rejected = []
+
+    def tool_without_annotations(self, *args, **kwargs):
+        if "annotations" in kwargs:
+            rejected.append(kwargs.get("name"))
+            raise TypeError("tool() got an unexpected keyword argument "
+                            "'annotations'")
+        return original(self, *args, **kwargs)
+
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        monkeypatch.setattr(server_class, "tool", tool_without_annotations)
+        server = mcp_server.build_server()
+    finally:
+        monkeypatch.undo()
+
+    assert server is not None, "an old SDK must still get a working server"
+    assert sorted(rejected) == sorted(s["name"] for s in mcp_server.TOOL_SPECS), (
+        "every tool should have tried the annotated call first and fallen back")
+
+
+def test_the_fallback_does_not_swallow_a_failure_that_is_not_about_annotations():
+    """
+    A TypeError raised for some other reason must not be quietly absorbed.
+
+    The fallback retries without `annotations`. If the cause was something
+    else, the retry raises the same error again and nothing catches it the
+    second time, so the build fails loudly rather than registering a tool that
+    does not work.
+    """
+    import pytest
+
+    try:
+        from mcp.server.mcpserver import MCPServer as server_class
+    except ImportError:                              # pragma: no cover
+        pytest.skip("the MCP SDK is not installed")
+
+    from qikly import mcp_server
+
+    def always_fails(self, *args, **kwargs):
+        raise TypeError("something else entirely")
+
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        monkeypatch.setattr(server_class, "tool", always_fails)
+        with pytest.raises(TypeError, match="something else entirely"):
+            mcp_server.build_server()
+    finally:
+        monkeypatch.undo()
+
+
+def test_the_documented_run_response_matches_what_the_tool_returns():
+    """
+    `docs/mcp.md` shows a sample `qikly_run` response. It said `"started"`
+    where the code returns `"running"`, which a reader hits the moment they
+    compare the page with real output. Found by audit 2026-09-22.
+    """
+    import os
+    import re
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, "docs", "mcp.md"), encoding="utf-8") as handle:
+        doc = handle.read()
+    with open(os.path.join(root, "src", "qikly", "mcp_tools.py"),
+              encoding="utf-8") as handle:
+        source = handle.read()
+
+    returned = set(re.findall(r'"state":\s*"(\w+)"', source))
+    documented = set(re.findall(r'"state":\s*"(\w+)"', doc))
+    unknown = documented - returned
+    assert not unknown, (
+        "docs/mcp.md shows states the tools never return: " + ", ".join(sorted(unknown)))
