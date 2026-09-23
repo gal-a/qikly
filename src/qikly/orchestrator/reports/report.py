@@ -521,14 +521,103 @@ def _coverage_rows_html(task_id):
 <tbody>{"".join(rows)}</tbody></table></section>"""
 
 
+def _final_counts(stage_groups):
+    """
+    How many tests each stage ended up running, from its last real run.
+
+    The last rather than the first: a stage's suite can be rewritten mid-run
+    by the suite check, and the number a reader wants is the one the verdict
+    was reached on. Regression re-checks are skipped, since those re-run an
+    earlier stage and would otherwise overwrite that stage's own total.
+    """
+    totals = {}
+    for stage, blocks in stage_groups.items():
+        for b in blocks:
+            if b["type"] != "test_run" or b.get("is_regression_check"):
+                continue
+            total = (b.get("counts") or {}).get("total")
+            if total:
+                totals[stage] = total
+    return totals
+
+
+def _setup_section_html(setup_blocks, stage_groups):
+    """
+    What was generated, and how much of it.
+
+    This was three file paths, which answers "where", the least interesting
+    question a reader has here. The count is what makes the next section
+    legible, because criteria coverage is a proportion of it.
+    """
+    if not setup_blocks:
+        return ""
+    totals = _final_counts(stage_groups)
+    rows = []
+    for b in setup_blocks:
+        count = totals.get(b["stage"])
+        rows.append(
+            '<tr><td>%s</td><td class="cov-n">%s</td><td><code>%s</code></td></tr>'
+            % (_esc(_stage_label(b["stage"])),
+               _esc(str(count)) if count else "&mdash;",
+               _esc(b.get("test_path", ""))))
+    return (
+        '<section class="setup"><h2>Generated test suites</h2>'
+        '<p class="cov-lead">None of these were written by hand. Counts are the '
+        'tests each suite ran on its final attempt.</p>'
+        '<table class="cov-table"><thead><tr><th>Suite</th><th>Tests</th>'
+        '<th>Written to</th></tr></thead><tbody>%s</tbody>'
+        '<tfoot><tr><td><b>Total</b></td><td class="cov-n"><b>%d</b></td>'
+        '<td></td></tr></tfoot></table></section>'
+        % ("".join(rows), sum(totals.values())))
+
+
+def _sequence_section_html(stage_groups):
+    """
+    The run at a glance, before the iteration-by-iteration detail.
+
+    That detail is long, and without a summary above it the bootstrap reads
+    as the integration stage repeating itself. This says what actually
+    happened in one table, and names the thing that makes the shape make
+    sense: there is no separate step that writes the implementation.
+    """
+    if not stage_groups:
+        return ""
+    rows = []
+    for stage, blocks in stage_groups.items():
+        runs = [b for b in blocks
+                if b["type"] == "test_run" and not b.get("is_regression_check")]
+        repairs = sum(1 for b in blocks if b["type"] == "fix_cycle")
+        last = runs[-1] if runs else None
+        counts = (last.get("counts") or {}) if last else {}
+        if last and last.get("status") == "pass":
+            outcome, cls = "passed", "pill-pass"
+        elif last:
+            outcome = "%d of %d passed" % (counts.get("passed", 0), counts.get("total", 0))
+            cls = "pill-fail"
+        else:
+            outcome, cls = "nothing ran", "pill-fail"
+        rows.append(
+            '<tr><td>%s</td><td class="cov-n">%d</td><td class="cov-n">%d</td>'
+            '<td><span class="%s">%s</span></td></tr>'
+            % (_esc(_stage_label(stage)), len(runs), repairs, cls, _esc(outcome)))
+    return (
+        '<section class="sequence"><h2>How the run went</h2>'
+        '<p class="cov-lead">Each stage runs its suite, and every failure produces '
+        'a FIX, which is reasoning, and then a PATCH, which is a diff. There is no '
+        'separate step anywhere that writes the first implementation. The bootstrap '
+        'below runs the integration suite against an empty source tree on purpose, '
+        'and the import error that raises goes through the same FIX and PATCH cycle '
+        'to create the code. The first line written and every later repair arrive '
+        'the same way, which is why the bootstrap is not the integration stage '
+        'repeating itself.</p>'
+        '<table class="cov-table"><thead><tr><th>Stage</th><th>Suite runs</th>'
+        '<th>Repairs</th><th>Ended</th></tr></thead><tbody>%s</tbody></table>'
+        '</section>' % "".join(rows))
+
+
 def render_html(task_id, run_timestamp, setup_blocks, stage_groups, summary, task_meta):
-    setup_html = ""
-    if setup_blocks:
-        items = "".join(
-            f'<li>{_esc(_stage_label(b["stage"]))} tests written to <code>{_esc(b.get("test_path", ""))}</code></li>'
-            for b in setup_blocks
-        )
-        setup_html = f'<section class="setup"><h2>Setup</h2><ul>{items}</ul></section>'
+    setup_html = _setup_section_html(setup_blocks, stage_groups)
+    sequence_html = _sequence_section_html(stage_groups)
 
     stage_html = "\n".join(_stage_section_html(stage, blocks) for stage, blocks in stage_groups.items())
 
@@ -545,6 +634,9 @@ def render_html(task_id, run_timestamp, setup_blocks, stage_groups, summary, tas
 {_summary_html(task_id, run_timestamp, summary, task_meta)}
 {setup_html}
 {_coverage_section_html(task_id)}
+{sequence_html}
+<section class="detail-head"><h2>Every attempt, in order</h2>
+<p class="cov-lead">The same run again, iteration by iteration: what ran, what failed, and the reasoning and the diff behind each repair.</p></section>
 {stage_html}
 <footer class="report-footer">Generated by orchestrator/reports/report.py from outputs/logs/transactions_{_esc(task_id)}_{_esc(run_timestamp)}.jsonl. Numbers-first view: <a href="{metrics_href}">{_esc(task_id)}_{_esc(run_timestamp)}_metrics.html</a></footer>
 </body>
