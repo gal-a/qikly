@@ -1,8 +1,9 @@
 # Short, filesystem-safe identifier (letters/digits/underscore only, must not
-# start with a digit). Must match this file's own name (inputs/config/tasks/<task_id>.yaml).
+# start with a digit). Must match this file's own name: your own tasks live in
+# inputs_private/config/tasks/<task_id>.yaml, and the bundled ones here.
 # Namespaces this task's own inputs_private/data/<task_id>/, outputs/data/<task_id>/,
 # outputs/tests/<task_id>/, and outputs/agent_src/code/<task_id>/ -- so any
-# number of V&V tasks can run in this same project, including concurrently
+# number of qikly tasks can run in this same project, including concurrently
 # in separate processes, without their files colliding.
 task_id: "CALC_DISCOUNT"
 

@@ -1,8 +1,9 @@
 # Short, filesystem-safe identifier (letters/digits/underscore only, must not
-# start with a digit). Must match this file's own name (inputs/config/tasks/<task_id>.yaml).
+# start with a digit). Must match this file's own name: your own tasks live in
+# inputs_private/config/tasks/<task_id>.yaml, and the bundled ones here.
 # Namespaces this task's own inputs_private/data/<task_id>/, outputs/data/<task_id>/,
 # outputs/tests/<task_id>/, and outputs/agent_src/code/<task_id>/ -- so any
-# number of V&V tasks can run in this same project, including concurrently
+# number of qikly tasks can run in this same project, including concurrently
 # in separate processes, without their files colliding.
 task_id: "CALC_TAX"
 
@@ -14,8 +15,48 @@ inputs:
   - "inputs_private/data/CALC_TAX/input_01.csv"
   - "inputs_private/data/CALC_TAX/input_02.csv"
 
+# What the implementation writes, not something you provide. `load()` creates
+# this file and the system stage runs the whole pipeline end to end and reads
+# it back, so it is the artefact the outermost tests are written against. It is
+# regenerated on every run and is safe to delete.
 outputs:
   - "outputs/data/CALC_TAX/output.json"
+
+# =====================================================================
+# Everything above is bookkeeping: what this task is called, what it
+# reads, and what it writes. Everything below is the specification, and
+# it has exactly three sections. They are not interchangeable, and which
+# section a line goes in decides who is allowed to read it.
+#
+#   1. interface            WHERE the code lives and WHAT it is called.
+#                           Both agents receive it. A description of
+#                           signatures, never code.
+#
+#   2. requirements         WHAT the code must do, in the words a person
+#                           would use. Both agents receive it. This is
+#                           the half the coding agent works from, so
+#                           every DECISION somebody made belongs here:
+#                           a threshold, a unit, a rounding rule. If two
+#                           competent developers could read a line two
+#                           ways, it belongs here or it is a trap.
+#
+#   3. acceptance_criteria  What must be TRUE if the requirements were
+#                           implemented correctly. The test-writing agent
+#                           receives these; the coding agent never does.
+#                           They are CONSEQUENCES, checkable statements,
+#                           exact at the boundary. Nothing here should
+#                           add information the requirements lack: if it
+#                           does, it is a decision in the wrong half and
+#                           the coding agent cannot guess it.
+#
+# The one question that sorts a line into 2 or 3: given only the
+# requirements, could two competent developers legitimately disagree
+# about it? Yes means requirements. No means acceptance criteria.
+#
+# All three are required. `qikly --validate` checks they are present and
+# well formed; `qikly --explain <task_id>` prints this file twice, once
+# as each agent receives it, so you can see the split for yourself.
+# =====================================================================
 
 # Describes the implementation's expected shape so test generation can target
 # it without the prompts hardcoding any task-specific function names. Written
