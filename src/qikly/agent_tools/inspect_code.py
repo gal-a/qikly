@@ -41,16 +41,51 @@ def _collection_summary(raw):
             "ran. Fix that first; nothing else can be assessed until it loads.")
 
 
-def inspect_failure(result):
+# `# Requirements: 2, 4` and `# Criteria: 2`, as test generation writes them
+# into a docstring and `qikly.traceability` reads them back. Tolerant about
+# spacing and about the label's plural, because a model writes the line.
+_TRACE_MARKER = re.compile(
+    r"^\s*#\s*(?:requirements?|criteri(?:on|a))\s*:.*$",
+    re.IGNORECASE | re.MULTILINE)
+
+
+def strip_traceability_markers(text):
+    """
+    Remove the criteria and requirement markers from text bound for the agent.
+
+    They exist for the person reviewing the suite and for the coverage report,
+    and they say nothing that helps a repair: a criterion's number is not a
+    rule. What they do say is how many criteria there are and which one this
+    test came from, which across iterations maps out the bar the agent is
+    being judged against. Removing them costs nothing, which is what makes
+    this the one narrowing that is on by default.
+
+    The file on disk keeps its markers. Only the agent's copy loses them, so
+    the report, `traceability.py` and anyone reading the suite are unaffected.
+    """
+    if not text:
+        return text
+    return _TRACE_MARKER.sub("", text)
+
+
+def inspect_failure(result, strip_markers=True):
     """
     Convert pytest output into a clean failure description
     that the agent can reason about.
+
+    `strip_markers` is the traceability narrowing above. It defaults to on
+    here rather than at the call site so that a future call site cannot
+    reintroduce the leak by forgetting about it.
     """
 
     raw = result.get("raw_output", "")
     failed_tests = result.get("failed_tests", [])
 
     summary = "\n".join(failed_tests) if failed_tests else _collection_summary(raw)
+
+    if strip_markers:
+        raw = strip_traceability_markers(raw)
+        summary = strip_traceability_markers(summary)
 
     return f"""
 Test Failure Summary:

@@ -84,6 +84,28 @@ def diagnostic_feedback():
     return value if value in ("full", "staged") else "full"
 
 
+def traceability_markers_visible():
+    """
+    Whether the coding agent sees `# Criteria: N` lines. Default false.
+
+    The opposite default to `diagnostic_feedback`, and for the opposite
+    reason. Withholding a docstring is a real trade, so it stays off until
+    somebody measures it. Withholding a criterion's *number* trades nothing:
+    the number is not a rule and no repair has ever turned on one. Set
+    `traceability_markers_visible: true` under `agent:` to restore the old
+    behaviour, which is what every published convergence figure was measured
+    under; the markers are not repair-relevant, so this is not expected to
+    move those figures, and "not expected to" is not a measurement.
+    """
+    section = load_settings().get("agent") or {}
+    return bool(section.get("traceability_markers_visible", False))
+
+
+def _hide_markers():
+    """One place, so a new call site cannot quietly reopen the channel."""
+    return not traceability_markers_visible()
+
+
 # Attempts per rung for the time-based backstop below.
 _ESCALATE_EVERY = 3
 
@@ -1172,7 +1194,7 @@ def orchestrate(task_id, seed=None, resume=False):
             "is_regression_check": False, "is_bootstrap": True,
         })
         if bootstrap_result["status"] != "pass":
-            failure_info = inspect_failure(bootstrap_result)
+            failure_info = inspect_failure(bootstrap_result, strip_markers=_hide_markers())
             run_fix_patch_cycle(
                 task_id, "bootstrap", failure_info, run_patch_dir, iteration=0, seed=seed,
                 max_patch_size=max_patch_size
@@ -1288,13 +1310,13 @@ def orchestrate(task_id, seed=None, resume=False):
             # Capture failure -- either this stage's own, or a regression in
             # a stage that already passed earlier in this run.
             if result["status"] != "pass":
-                failure_info = inspect_failure(result)
+                failure_info = inspect_failure(result, strip_markers=_hide_markers())
                 current_signature = failure_signature(result)
             else:
                 failure_info = (
                     f"REGRESSION: stage '{regressed_stage}' previously passed, but the "
                     f"latest change to outputs/agent_src/code/ broke it again.\n\n"
-                    + inspect_failure(regressed_result)
+                    + inspect_failure(regressed_result, strip_markers=_hide_markers())
                 )
                 current_signature = f"regression:{regressed_stage}:{failure_signature(regressed_result)}"
 

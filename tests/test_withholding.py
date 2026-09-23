@@ -18,6 +18,7 @@ from qikly.agent_api import agent_interface as ai
 from qikly.agent_api.prompts.fix_prompt import build_fix_prompt
 from qikly.agent_api.prompts.patch_prompt import build_patch_prompt
 from qikly.agent_tools.inspect_code import inspect_failure
+from qikly.agent_tools.inspect_code import inspect_failure as ai_inspect
 
 SENTINEL_A = "ZZSENTINELCRITERIONALPHA"
 SENTINEL_B = "ZZSENTINELCRITERIONBRAVO"
@@ -557,3 +558,92 @@ def test_every_bundled_task_hands_over_none_of_its_own_criteria():
         checked += 1
 
     assert checked >= 13, "expected to check every bundled task, checked %d" % checked
+
+
+# ------------------------------------------- the markers, and what remains ---
+
+MARKED_FAILURE = """
+    def test_quantity_boundary_zero_and_negative():
+        \"\"\"Verify that a quantity of 0 is rejected and 1 is accepted.
+        # Requirements: 2, 4
+        # Criteria: 2
+        \"\"\"
+        result = transform(rows)
+>       assert len(result["rejected"]) == 1
+E       assert 0 == 1
+
+tests/unit/test_unit.py:14: AssertionError
+"""
+
+
+def test_the_criteria_markers_do_not_reach_the_coding_agent():
+    """
+    The one narrowing that costs nothing.
+
+    Test generation writes `# Criteria: 2` into a docstring so a reviewer can
+    see which line of the specification a test enforces, and pytest's default
+    traceback printed the whole docstring, markers included. So the agent
+    learned how many criteria exist and which one it had just failed, and
+    across iterations that is a partial map of the bar.
+
+    A criterion's number is not a rule, so unlike the prose around it this
+    carries nothing a repair can use. That is why it is off by default while
+    the docstring itself stays under `diagnostic_feedback`.
+    """
+    text = ai_inspect({"raw_output": MARKED_FAILURE,
+                       "failed_tests": ["test_quantity_boundary_zero_and_negative"]})
+
+    assert "# Criteria" not in text, "the criterion number reached the agent"
+    assert "# Requirements" not in text, "the requirement numbers reached the agent"
+
+
+def test_everything_a_repair_needs_survives_the_strip():
+    """
+    The other half, and the reason this is not done with a bigger hammer.
+
+    Removing the markers must not remove the traceback. A repair turns on the
+    failing line, the values pytest printed and the frames in the
+    implementation; take those away and the agent is guessing.
+    """
+    text = ai_inspect({"raw_output": MARKED_FAILURE,
+                       "failed_tests": ["test_quantity_boundary_zero_and_negative"]})
+
+    assert "assert 0 == 1" in text
+    assert 'assert len(result["rejected"]) == 1' in text
+    assert "test_quantity_boundary_zero_and_negative" in text
+    assert "AssertionError" in text
+    # The docstring prose is a separate decision, under diagnostic_feedback,
+    # and stays on at the default rung. Asserted here so that changing one of
+    # these two by accident fails rather than passes quietly.
+    assert "quantity of 0 is rejected" in text
+
+
+def test_the_markers_stay_in_the_file_on_disk():
+    """
+    Only the agent's copy loses them.
+
+    `traceability.py` reads the markers back out of the suite source to say
+    which criteria no test names, and the report prints that. Stripping them
+    at the source would have made this narrowing cost the coverage report,
+    which is a trade nobody asked for.
+    """
+    from qikly.traceability import coverage
+
+    source = (
+        'def test_a():\n'
+        '    """Checks the boundary.\n'
+        '    # Criteria: 2\n'
+        '    """\n'
+        '    assert True\n'
+    )
+    result = coverage({"unit/test_unit.py": source}, 2)
+    assert result["per_criterion"][2], (
+        "traceability still has to read criterion 2's marker from the file")
+
+
+def test_restoring_the_old_behaviour_is_one_setting(monkeypatch):
+    """Escape hatch, named, so the default is a choice rather than a corner."""
+    text = ai_inspect(
+        {"raw_output": MARKED_FAILURE, "failed_tests": []}, strip_markers=False)
+    assert "# Criteria: 2" in text, (
+        "traceability_markers_visible: true must restore the old channel")

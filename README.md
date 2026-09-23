@@ -225,6 +225,18 @@ What the agent never receives is the specification itself. The acceptance
 criteria are stripped from the task before it is prompted, and no criteria text
 reaches a FIX or PATCH prompt.
 
+Three things travel through a failing test, and they are not equally costly to
+close:
+
+| What travels | What it gives away | Needed for the repair? | Default |
+|---|---|---|---|
+| The docstring prose | a paraphrase of the criterion | **yes** | **shown.** Narrow it with `diagnostic_feedback: staged`, which starts at the least detail that can locate a fault and adds more only when a patch changes nothing |
+| Test names, passing ones included | that a rule exists, often with its subject: `test_tax_exempt_zero_rate` | no | **shown.** Closing it means dropping pytest's `-v`, which is where the per-test statuses the reports are built from come from. A trade, named rather than taken |
+| `# Criteria: 2` markers | which criterion this test came from, and how many exist | no | **withheld.** A criterion's number is not a rule, so this is the one narrowing that costs nothing. `traceability_markers_visible: true` restores it |
+
+The markers stay in the suite on disk either way, so the coverage report and
+anyone reading the tests still see which criterion each one enforces.
+
 That does not undo the separation, because independence is a property of how
 the suite was written, not of how much feedback the code's author receives
 afterwards. The integration and system suites are generated from the criteria
