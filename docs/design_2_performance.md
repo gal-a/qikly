@@ -75,31 +75,46 @@ The reason those are round numbers is that they were measured three times, over
 | 14 August | 427 | 80% | 59% |
 | 30 August, same tasks and settings | 140 | 87% | 67% |
 | 31 August, after correcting the benchmark | 400 | 83% | 64% |
-| 23 September, on 0.5.1 before the one-call rule | 130 | 83% | 62% |
-| 23 September, on 0.5.1 as shipped | 130 | 80% | 60% |
+| 23 September, on 0.5.1 part way through hardening | 130 | 83% | 62% |
+| 23 September, on 0.5.1 as shipped, fully hardened | 130 | 80% | 60% |
 
-**The fourth row is not a fourth draw from the same urn, and is deliberately not
-pooled with the three above it.** 0.5.1 changed four things the agents actually
-read: ADAS_HEADWAY's header comment stopped naming which way its withheld
-boundary falls, CALC_TAX shed half its commentary, the `# Criteria: N` markers
-stopped reaching the coding agent, and integration tests are now told to name
-the seam they cross. Adding those 130 runs to the 967 would produce one number
-describing two systems, which is the single reason every positive result this
-project has withdrawn was withdrawn.
+**The last two rows are not further draws from the same urn, and are
+deliberately not pooled with the three above them.** 0.5.1 hardened the process
+itself. Six changes, every one of them either narrowing what the coding agent
+receives or removing a way a run could stall on something no implementation
+could satisfy:
 
-Reported separately it says something a larger sample could not: the rate
-survived the change. Both land inside the spread of the three earlier sweeps,
-80 to 87 and 59 to 67, so none of those changes moved convergence that a sample
-this size could detect.
+- The criteria strip stopped being a regular expression and started asking the
+  YAML parser where the section ends, closing two leaks a regex could not see:
+  a comment written between two criteria, and a criterion wrapped onto a line
+  beginning at column 0. Either handed the coding agent real criteria.
+- `ADAS_HEADWAY`'s header comment stopped naming which way its own withheld
+  boundary falls.
+- The `# Criteria: N` markers stopped reaching the coding agent.
+- `CALC_TAX` shed half its commentary, which the agents had been reading on
+  every call.
+- Integration tests are told to name the seam they cross.
+- Test generation is told to call the function under test once per scenario,
+  after a run stalled for eleven iterations against `transform(transform(rows))`,
+  a test no implementation can satisfy.
 
-The last two rows are 0.5.1 measured twice, either side of one more change: a
-rule telling test generation to call the function under test once per scenario
-and never feed its output back into itself, added after a run stalled eleven
-iterations against `transform(transform(rows))`, a test no implementation can
-satisfy. 83/62 against 80/60 is noise at this sample size and is not evidence
+**None of it makes the task easier, and two items make `ADAS_HEADWAY` strictly
+harder**, since that task had been telling the coding agent the answer it was
+about to be tested on. So the right reading of these rows is not "the rate held
+while we changed things" but "the rate held while the bar was tightened".
+
+Pooling them with the 967 would produce one number describing two systems,
+which is the single reason every positive result this project has withdrawn was
+withdrawn. Reported separately they say something a larger sample could not:
+80% and 60% land inside the spread of the three earlier sweeps, 80 to 87 and 59
+to 67, so none of this moved convergence by anything a sample this size can
+detect.
+
+The two September rows are 0.5.1 measured either side of the last item on that
+list. 83/62 against 80/60 is noise at this sample size and is not evidence
 either way about that rule, which targets a defect seen once in twenty runs and
-would not move a pooled rate if it worked perfectly. The bottom row is the one
-to quote, because it is the configuration that ships.
+could not move a pooled rate if it worked perfectly. **The bottom row is the
+one to quote, because it is the configuration that ships.**
 
 The third sweep is the interesting one, and the reason is what happened between
 the second and the third. Asking a separate agent which criteria no input row

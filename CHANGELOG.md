@@ -6,7 +6,7 @@ packaging tools would read as `1.1`.
 
 ## 0.5.1
 
-> The withheld section stops being found by a regex, one flag for the fixture gap, and a run that says why it is quiet
+> The withheld section stops being found by a regex, a worked example that arrives worked, and a run that says why it is quiet
 
 ### Fixed
 - **The acceptance criteria could reach the coding agent, twice over, and both
@@ -44,7 +44,24 @@ packaging tools would read as `1.1`.
 
 - **Ctrl+C during a run left the task processes running** and printing, so the
   console looked like it had ignored the interrupt. Reported from a Windows
-  shell, where it is worst.
+  shell, where it is worst. It now waits for each process to actually go, kills
+  anything still up after fifteen seconds, and names whatever survives instead
+  of promising nothing more will be written: `terminate()` reaches the task
+  process and not the pytest it is blocked on.
+
+- **The repeated sweep only ever ran from a git clone.** `run_all` shelled out
+  to `run.py` by bare relative path while its two sibling stages used `-m`, so
+  a sweep started from an installed copy failed once per task per repetition,
+  instantly, with no model call. The accounting is the only reason it did not
+  read as a convergence collapse: every repetition reported 0 summaries of 13
+  and the aggregate refused to quote a rate over 0 runs.
+
+- **A generated test could call the function under test twice**, as in
+  `transform(transform(rows))`, which hands a function its own output. No
+  implementation satisfies that, so the run stalls with an identical failure
+  every iteration and nothing to learn from. Test generation is now told to
+  call the function under test once per scenario, and to feed one function's
+  output to the next one rather than to itself.
 
 ### Changed
 - **The `# Criteria: 2` markers no longer reach the coding agent.** Test
@@ -93,6 +110,23 @@ packaging tools would read as `1.1`.
   the quick start almost point for point, and comments are not stripped, so
   every FIX and PATCH prompt of every run paid to read it.
 
+- **The worked example pins the shape of the record it produces.** Its
+  specification named no output fields, so test generation invented
+  `station_id`, `day`, `min_temp_c` and `mean_humidity_pct` from the prose and
+  the coding agent had to arrive at the same four names from the same prose
+  without seeing the tests. Nine times in ten they agreed. A field name is a
+  decision somebody made rather than a consequence of one, so it belongs where
+  both agents read it, which is where CALC_TAX has always put its own. Nothing
+  withheld moved: the six criteria are unchanged.
+
+- **The convergence figures were re-measured on this release**, twice, at 130
+  runs each: 83% and 62% part way through the hardening above, then 80% and 60%
+  as shipped. Both sit inside the spread of the three August sweeps, so none of
+  this moved convergence by anything a sample that size can detect, and the
+  numbers held while the bar was tightened rather than loosened. They are
+  reported beside the earlier sweeps rather than pooled with them, for the
+  reason the new aggregate guard exists.
+
 ### Added
 - **`qikly --propose-fixtures --tasks X`.** It was reachable only as `python -m
   qikly.orchestrator.tuning.propose_fixtures`, shelved with the scripts that
@@ -107,6 +141,23 @@ packaging tools would read as `1.1`.
   agent for the unit and integration stages, yours for the system stage. The
   agent never sees your fixture data, which is why a criterion no row reaches
   is checked by an invented row and never on the path the code will take.
+
+- **An aggregate says when the runs it pooled were not the same experiment.**
+  Every run summary already recorded the model, the provider, the two budgets
+  that decide how many attempts a task gets, the version, the commit and
+  whether the tree was dirty, and nothing compared them. A sweep taken before a
+  change and a sweep taken after it aggregated into one number with no sign it
+  spanned two systems, which is the failure mode every withdrawn result in this
+  project shares. Warnings rather than a refusal, printed to the terminal as
+  well as rendered.
+
+- **`PRIVACY.md`**, linked from the README and the landing page footer. A run
+  sends your specification and the code under test to the model provider you
+  configured, with your own key, from your machine; there is no qikly server to
+  send anything else to; and the only other network call is the version check
+  against two public indexes, which `QIKLY_NO_VERSION_CHECK=1` turns off. It
+  also says, before installation rather than after, that if your code may not
+  leave your network at all then this tool is not usable as it stands.
 
 ## 0.5.0
 
