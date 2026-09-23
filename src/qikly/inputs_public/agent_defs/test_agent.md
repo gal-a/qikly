@@ -8,6 +8,14 @@ GENERAL RULES:
 - The file must be valid, immediately runnable pytest source.
 - Test functions are named test_<behavior>, one behavior per function. No
   test classes, no fixtures files, no conftest.py.
+- Call the function under test ONCE per scenario, on the inputs that scenario
+  describes, and assert against what it returned. Never pass a function's own
+  return value back into itself, and never wrap one call in another
+  (`transform(transform(rows))` is always wrong: the second call receives
+  records where it expects raw rows). A test built that way cannot pass
+  whatever the implementation does, so it cannot be repaired and it stops the
+  run. Where a scenario genuinely needs two functions, feed the first's output
+  to the SECOND one, which is what an integration test is for.
 - Assertions must be black-box and property-based: derive what must be true
   from the specification's requirements and acceptance criteria, then check
   it against whatever the code under test actually returns at run time.

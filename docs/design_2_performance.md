@@ -75,7 +75,8 @@ The reason those are round numbers is that they were measured three times, over
 | 14 August | 427 | 80% | 59% |
 | 30 August, same tasks and settings | 140 | 87% | 67% |
 | 31 August, after correcting the benchmark | 400 | 83% | 64% |
-| 23 September, on 0.5.1 | 130 | 83% | 62% |
+| 23 September, on 0.5.1 before the one-call rule | 130 | 83% | 62% |
+| 23 September, on 0.5.1 as shipped | 130 | 80% | 60% |
 
 **The fourth row is not a fourth draw from the same urn, and is deliberately not
 pooled with the three above it.** 0.5.1 changed four things the agents actually
@@ -87,9 +88,18 @@ describing two systems, which is the single reason every positive result this
 project has withdrawn was withdrawn.
 
 Reported separately it says something a larger sample could not: the rate
-survived the change. 83% and 62% land inside the spread of the three earlier
-sweeps, 80 to 87 and 59 to 67, so none of those four changes moved convergence
-that this sample could detect.
+survived the change. Both land inside the spread of the three earlier sweeps,
+80 to 87 and 59 to 67, so none of those changes moved convergence that a sample
+this size could detect.
+
+The last two rows are 0.5.1 measured twice, either side of one more change: a
+rule telling test generation to call the function under test once per scenario
+and never feed its output back into itself, added after a run stalled eleven
+iterations against `transform(transform(rows))`, a test no implementation can
+satisfy. 83/62 against 80/60 is noise at this sample size and is not evidence
+either way about that rule, which targets a defect seen once in twenty runs and
+would not move a pooled rate if it worked perfectly. The bottom row is the one
+to quote, because it is the configuration that ships.
 
 The third sweep is the interesting one, and the reason is what happened between
 the second and the third. Asking a separate agent which criteria no input row
@@ -272,7 +282,7 @@ The legitimate version is different and worth building: when the review finds be
 - **An agent that writes its own tests is grading its own homework.** At temperature zero with identical inputs it is provably vacuous: the same model that wrote the bug writes the test that blesses it.
 - **The fix is structural, not procedural.** The coding agent never receives the acceptance criteria. Not "is told not to look", but never has them in its context.
 - **You can verify that in one command.** `qikly --explain <MY_TASK>` prints what each agent is given and the difference between them. No API key, no model call, no sample size. From a clone, `pytest tests/test_withholding.py` additionally proves no call site can leak one, including a call site added next year. Both are properties of the code rather than benchmark results, so neither can go stale.
-- **It converges, and the rate reproduces.** Roughly 8 runs in 10 pass every integration and system test, roughly 6 in 10 pass everything including unit tests, measured three times on a small cheap model over 967 runs, the third after correcting the benchmark itself, then re-measured on 0.5.1 over 130 runs after four changes to what the agents receive and reproduced at 83% and 62%. Every run that does not converge exits non-zero and names its blocking tests, and none has ever reported success on code its own tests rejected.
+- **It converges, and the rate reproduces.** Roughly 8 runs in 10 pass every integration and system test, roughly 6 in 10 pass everything including unit tests, measured three times on a small cheap model over 967 runs, the third after correcting the benchmark itself, then re-measured twice on 0.5.1 over 130 runs each after changes to what the agents receive, and reproduced at 83%/62% and 80%/60%. Every run that does not converge exits non-zero and names its blocking tests, and none has ever reported success on code its own tests rejected.
 - **Nearly the whole gap between those two figures is the unit stage**, which is also the only stage whose tests are written with sight of the code.
 - **How you word a criterion decides how sharp the test is, and that is yours to control.** A suite tests the boundary when the criterion names the boundary: "100 is accepted and 101 is rejected" produces the test that "reject quantities above 100" leaves to chance. This is the highest-leverage thing you can do in your own file.
 - *Whether automatic criteria refinement produces a measurably sharper bar is the open question, and an active one.* It grows the bar reliably, and the experiment design to quantify the rest is built.
