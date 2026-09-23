@@ -36,7 +36,7 @@ directory and the interpreter together.
 python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install qikly
 qikly --version                # which build, from where, on which Python
-export GEMINI_API_KEY=...      # or API_KEY, or your provider's own variable
+export GEMINI_API_KEY=...      # or OPENAI_API_KEY, or ANTHROPIC_API_KEY
 qikly --demo
 ```
 
@@ -47,7 +47,7 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install qikly
 qikly --version
-$env:GEMINI_API_KEY = "..."
+$env:GEMINI_API_KEY = "..."    # or OPENAI_API_KEY, or ANTHROPIC_API_KEY
 qikly --demo
 ```
 
@@ -56,23 +56,21 @@ dependency chain and pip installs qikly itself last, so there is a window where
 its dependencies are present and qikly is not, which looks exactly like a
 broken install.
 
-The key is an ordinary environment variable, so it belongs to the shell rather
-than to the virtual environment: set it once in that terminal and both see it,
-in either order. Only `--demo` needs it. `--version`, `--explain`, `--validate`
-and `--scaffold` make no model call and cost nothing.
+Only `--demo` needs a key. `--version`, `--explain`, `--validate` and
+`--scaffold` make no model call and cost nothing.
 
-**One key is enough, and `LLM_PROVIDER` is optional.** Gemini is the default,
-so the line above is all you need. Hold a key for a different provider and no
-`LLM_PROVIDER`, and qikly uses that one and prints that it did, because a tool
-that silently picks a provider silently picks who gets billed. Set
-`LLM_PROVIDER` when you hold more than one key and want to choose:
-`gemini`, `openai` or `anthropic`. The per-provider recipes in
-[docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md)
-set it alongside the key, which is the right habit once more than one is in
-play.
+| Provider | Key variable |
+|---|---|
+| Gemini, the default | `GEMINI_API_KEY`, or `GOOGLE_API_KEY` |
+| OpenAI | `OPENAI_API_KEY` |
+| Anthropic | `ANTHROPIC_API_KEY` |
 
-Other providers, and how to set a key so it survives a new terminal, are in
-[docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md).
+One key is enough and `LLM_PROVIDER` is optional: qikly uses the one key it
+finds and prints which. Set `LLM_PROVIDER` to `gemini`, `openai` or `anthropic`
+only when you hold more than one and want to choose. The key is a shell
+variable rather than a venv one, so set it once in the terminal and the venv
+sees it too. Full recipes, including making a key survive a new terminal, are
+in [docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md).
 
 `--demo` runs one task end to end in a throwaway `demo/<timestamp>/` directory
 and prints what it built and where. It writes nothing outside that directory,
