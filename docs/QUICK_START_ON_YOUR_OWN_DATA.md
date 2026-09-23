@@ -30,6 +30,24 @@ export GEMINI_API_KEY=...     # or API_KEY, or your provider's own variable
 qikly --demo
 ```
 
+**Worth installing into a virtual environment first**, and not only out of
+habit. Two reasons specific to this tool. qikly pulls in a provider SDK, so a
+bare install can upgrade a package your own project pinned. And qikly resolves
+where to read and write from the environment it is running in, so "which
+interpreter am I in" is a question you will want a clean answer to the first
+time something behaves oddly. `qikly --version` gives that answer, printing the
+version, the package directory and the interpreter together.
+
+```bash
+python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
+pip install qikly
+qikly --version
+```
+
+Let the install finish before running anything: the provider SDK is a long
+dependency chain and pip installs qikly itself last, so there is a window where
+its dependencies are present and qikly is not.
+
 On Windows, in PowerShell, where `export` is not a command:
 
 ```powershell
@@ -72,16 +90,27 @@ code.
 1. **Scaffold a task from the module.**
 
    ```bash
-   qikly --scaffold your_module.py
+   qikly --scaffold band_metrics.py
    ```
 
-   It reads the real function signatures and writes
-   `inputs_private/config/tasks/<NAME>_VERIFY.yaml`, a task that tests the code
-   you already have, then prints what to do next. For a fresh implementation
-   of the same interface instead, add `--fresh`.
+   It reads the real function signatures and writes a task file, then prints
+   what to do next.
+
+   The name comes from the module's own filename, upper-cased, and which of two
+   task files you get depends on the job:
+
+   | Command | Writes | What that task does |
+   |---|---|---|
+   | `qikly --scaffold band_metrics.py` | `BAND_METRICS_VERIFY.yaml` | Tests the code you already have |
+   | `qikly --scaffold band_metrics.py --fresh` | `BAND_METRICS.yaml` | Writes a fresh implementation of the same interface, and tests that |
+
+   Both land in `inputs_private/config/tasks/`. The `_VERIFY` suffix is what
+   keeps them apart, so scaffolding the same module both ways never overwrites
+   the first file with the second. The rest of this section uses
+   `BAND_METRICS_VERIFY` as the example; substitute your own.
 
 2. **Put your input data where the task says.** Its `inputs:` list names the
-   files a run reads, such as `inputs_private/data/<NAME>/input_01.csv`.
+   files a run reads, here `inputs_private/data/BAND_METRICS_VERIFY/input_01.csv`.
    Scaffold does not create them, so copy a real sample of your data there.
    Until you do, `qikly --validate` reports `input file not found`.
 
@@ -89,14 +118,14 @@ code.
    decisions and `acceptance_criteria` the consequences; the rule for telling
    them apart is under [Getting the two halves right](#getting-the-two-halves-right).
    Already written them in a page or a ticket? This takes the criteria from it:
-   `qikly --scaffold your_module.py --from-doc feature.md`. Replace the
+   `qikly --scaffold band_metrics.py --from-doc feature.md`. Replace the
    remaining `TODO` lines too, and check the entrypoint scaffold marks as
    guessed.
 
 4. **Check it, for free.**
 
    ```bash
-   qikly --validate --tasks <NAME>_VERIFY
+   qikly --validate --tasks BAND_METRICS_VERIFY
    ```
 
    No model call and no cost. Without `--tasks` it also checks every bundled
@@ -107,7 +136,7 @@ code.
 5. **Run it.**
 
    ```bash
-   qikly --tasks <NAME>_VERIFY
+   qikly --tasks BAND_METRICS_VERIFY
    ```
 
    Start reading at `outputs/reports/iterations/<task>_<timestamp>_report.html`.
@@ -137,7 +166,7 @@ With the qikly MCP server connected (setup in
 [docs/mcp.md](https://github.com/gal-a/qikly/blob/main/docs/mcp.md)), ask Copilot
 in agent mode:
 
-> Use the qikly_scaffold MCP tool on `src/your_module.py`, and save the task it
+> Use the qikly_scaffold MCP tool on `src/band_metrics.py`, and save the task it
 > returns under `inputs_private/config/tasks/`.
 
 It returns the same task the command writes, one that tests the code you
