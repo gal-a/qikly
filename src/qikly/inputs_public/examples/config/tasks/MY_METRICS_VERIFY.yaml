@@ -22,7 +22,7 @@ interface:
   module: "outputs.agent_src.code.MY_METRICS_VERIFY.my_metrics"
   integration_functions:
     - "extract(input_path)  # reads one CSV and returns its rows, every value still a string"
-    - "transform(rows)  # applies the rules below and returns one record per station per day"
+    - "transform(rows)  # applies the rules below and returns a list of records, one per station per day, each with the keys \"station_id\", \"day\" (YYYY-MM-DD), \"min_temp_c\", \"max_temp_c\", \"mean_temp_c\" and \"mean_humidity_pct\""
     - "load(data, output_path)  # writes the records to output_path as JSON"
     - "run_metrics(input_paths, output_path)  # extracts each path, transforms the rows once, loads the result"
   system_entrypoint: "run_metrics(input_paths, output_path)"
@@ -47,7 +47,8 @@ requirements:
     Celsius and the mean humidity as a percentage, each mean rounded to
     one decimal place, half away from zero"
   - "A station and day with no usable temperature still appears, with its
-    three temperature fields null, and the same for humidity"
+    three temperature fields present and set to null rather than left out,
+    and the same for mean_humidity_pct when no humidity that day is usable"
   - "Write the records to the output path as JSON, ordered by station_id
     and then by day"
 

@@ -738,6 +738,13 @@ The separation this tool enforces is ordinary practice in safety-critical engine
 
 Built by [Gal Arav](https://www.linkedin.com/in/galarav/).
 
+## Privacy
+
+qikly runs on your machine and collects nothing. Your specification and code go
+only to the model provider you configured, with your own key; the single other
+network call is a version check against two public indexes, which
+`QIKLY_NO_VERSION_CHECK=1` turns off. [PRIVACY.md](https://github.com/gal-a/qikly/blob/main/PRIVACY.md).
+
 ## License
 
 Apache License 2.0, see [LICENSE](https://github.com/gal-a/qikly/blob/main/LICENSE).
