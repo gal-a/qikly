@@ -119,9 +119,12 @@ packaging tools would read as `1.1`.
   both agents read it, which is where CALC_TAX has always put its own. Nothing
   withheld moved: the six criteria are unchanged.
 
-- **The convergence figures were re-measured on this release**, twice, at 130
-  runs each: 83% and 62% part way through the hardening above, then 80% and 60%
-  as shipped. Both sit inside the spread of the three August sweeps, so none of
+- **The convergence figures were re-measured on this release**, three times, at
+  130 runs each: 83/62, then 80/60, then 77/58, which pool to **80% and 60%
+  over 390 runs**. The three look like a decline and are not: every point
+  estimate sits inside every other interval, and the check introduced between
+  the second and third fired once in 392 generated files, so it cannot have
+  moved a rate computed over 130 runs. Both sit inside the spread of the three August sweeps, so none of
   this moved convergence by anything a sample that size can detect, and the
   numbers held while the bar was tightened rather than loosened. They are
   reported beside the earlier sweeps rather than pooled with them, for the

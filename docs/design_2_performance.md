@@ -76,7 +76,9 @@ The reason those are round numbers is that they were measured three times, over
 | 30 August, same tasks and settings | 140 | 87% | 67% |
 | 31 August, after correcting the benchmark | 400 | 83% | 64% |
 | 23 September, on 0.5.1 part way through hardening | 130 | 83% | 62% |
-| 23 September, on 0.5.1 as shipped, fully hardened | 130 | 80% | 60% |
+| 23 September, on 0.5.1 plus the one-call rule | 130 | 80% | 60% |
+| 24 September, on 0.5.1 as shipped | 130 | 77% | 58% |
+| **the three 0.5.1 sweeps together** | **390** | **80%** | **60%** |
 
 **The last two rows are not further draws from the same urn, and are
 deliberately not pooled with the three above them.** 0.5.1 hardened the process
@@ -110,11 +112,32 @@ withdrawn. Reported separately they say something a larger sample could not:
 to 67, so none of this moved convergence by anything a sample this size can
 detect.
 
-The two September rows are 0.5.1 measured either side of the last item on that
-list. 83/62 against 80/60 is noise at this sample size and is not evidence
-either way about that rule, which targets a defect seen once in twenty runs and
-could not move a pooled rate if it worked perfectly. **The bottom row is the
-one to quote, because it is the configuration that ships.**
+### Three sweeps that look like a decline, and are not
+
+The three 0.5.1 rows fall: 83, then 80, then 77. Read as a trend that is a
+release making things steadily worse, and it is worth setting out why it is
+not, because the reasoning applies to every number on this page.
+
+**The intervals.** At 130 runs each, they are 83% [76-89], 80% [72-86] and
+77% [69-83]. Every point estimate sits inside every other interval. Three
+points falling in a row catches the eye, and three draws from one distribution
+land in descending order one time in six.
+
+**The mechanism.** The two later sweeps differ from the first by a line in the
+test-generation prompt and by a check that rejects a generated test which reads
+a name before assigning it. The logs say how often that check fired across the
+whole third sweep: **once, in 392 generated files.** One regenerated file
+cannot move a rate computed over 130 runs by three points. Whatever moved
+between these sweeps, it was not the thing that changed.
+
+That second paragraph is the one that settles it. An interval says a difference
+might be chance; asking what the change actually did says it cannot be the
+cause. When those two agree, the question is closed without another sweep.
+
+**So pooled, across all 390 runs, 0.5.1 converges 80% [76-84] and 60%
+[55-65].** That is the tightest estimate this project has, it is the number to
+quote, and it is the same 8 in 10 and 6 in 10 the three August sweeps found
+before any of this hardening existed.
 
 The third sweep is the interesting one, and the reason is what happened between
 the second and the third. Asking a separate agent which criteria no input row
