@@ -301,6 +301,60 @@ def _cluster_failures(censored_runs, task_id):
     return clusters, sorted(s for s in unattributed if s)
 
 
+# What has to match before a pooled rate means anything. Model and provider
+# decide how well anything converges; the two budgets decide how many attempts
+# a task gets before it is called a failure; the version and commit decide what
+# code produced all of it.
+_COMMENSURABLE_ON = (
+    ("qikly_version", "qikly version"),
+    ("git_commit", "commit"),
+    ("provider", "provider"),
+    ("model", "model"),
+    ("max_retries_per_stage", "max_retries_per_stage"),
+    ("criteria_per_batch", "criteria_per_batch"),
+)
+
+
+def commensurability(payloads):
+    """
+    Whether these runs are the same experiment, and what differs if not.
+
+    Returns a list of warnings, empty when every run agrees on everything that
+    decides the outcome. Warnings rather than an error: pooling deliberately
+    across models is a legitimate thing to want, and a report that refuses to
+    render is a report people stop running. What is not legitimate is doing it
+    without noticing, so this makes it loud rather than impossible.
+    """
+    warnings = []
+    values = {}
+    for payload in payloads:
+        prov = payload.get("provenance") or {}
+        for key, _label in _COMMENSURABLE_ON:
+            values.setdefault(key, {}).setdefault(prov.get(key), 0)
+            values[key][prov.get(key)] += 1
+
+    for key, label in _COMMENSURABLE_ON:
+        seen = {k: v for k, v in values.get(key, {}).items() if k is not None}
+        if len(seen) > 1:
+            spread = ", ".join("%s (%d run%s)" % (k, n, "" if n == 1 else "s")
+                               for k, n in sorted(seen.items(), key=str))
+            warnings.append(
+                "these runs do not share one %s: %s. A rate pooled across them "
+                "describes no single system, and the difference between the "
+                "groups may be the %s rather than anything measured."
+                % (label, spread, label))
+
+    dirty = sum(1 for p in payloads
+                if (p.get("provenance") or {}).get("git_dirty"))
+    if dirty:
+        warnings.append(
+            "%d of %d run(s) came from a tree with uncommitted changes, so the "
+            "code that produced this rate is not in any commit and the number "
+            "cannot be reproduced or compared against a later one."
+            % (dirty, len(payloads)))
+    return warnings
+
+
 def aggregate(payloads):
     """
     Per-task and pooled statistics over the given run summaries.
@@ -313,6 +367,20 @@ def aggregate(payloads):
     by_task = defaultdict(list)
     for p in payloads:
         by_task[p["task_id"]].append(p)
+
+    incommensurable = commensurability(payloads)
+    if incommensurable:
+        # Printed, not only returned. An aggregate is usually read in the
+        # terminal on the way past, and a caveat that only exists inside the
+        # HTML is a caveat nobody reads before quoting the number.
+        print()
+        print("!" * 70)
+        print("! POOLED RUNS ARE NOT ALL THE SAME EXPERIMENT")
+        for warning in incommensurable:
+            for line in _wrap_warning(warning):
+                print("! %s" % line)
+        print("!" * 70)
+        print()
 
     tasks = {}
     for task_id, runs in sorted(by_task.items()):
@@ -359,6 +427,21 @@ def aggregate(payloads):
         "pooled_ci_high": pooled_hi,
         "tasks": tasks,
     }
+
+
+def _wrap_warning(text, width=66):
+    """Warning text as lines, so the banner does not run off the terminal."""
+    words, lines, line = text.split(), [], ""
+    for word in words:
+        candidate = (line + " " + word).strip()
+        if len(candidate) > width and line:
+            lines.append(line)
+            line = word
+        else:
+            line = candidate
+    if line:
+        lines.append(line)
+    return lines
 
 
 def _pct(x):
