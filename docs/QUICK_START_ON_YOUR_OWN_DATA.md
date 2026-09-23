@@ -24,37 +24,52 @@ brew install gpatch     # macOS only
 qikly looks for `gpatch` before `patch`, so nothing else is needed afterwards
 and your system `patch` is left alone.
 
-```bash
-pip install qikly
-export GEMINI_API_KEY=...     # or API_KEY, or your provider's own variable
-qikly --demo
-```
-
-**Worth installing into a virtual environment first**, and not only out of
-habit. Two reasons specific to this tool. qikly pulls in a provider SDK, so a
-bare install can upgrade a package your own project pinned. And qikly resolves
-where to read and write from the environment it is running in, so "which
-interpreter am I in" is a question you will want a clean answer to the first
-time something behaves oddly. `qikly --version` gives that answer, printing the
-version, the package directory and the interpreter together.
+**Install into a virtual environment**, and not only out of habit. Two reasons
+specific to this tool. qikly pulls in a provider SDK, so a bare install can
+upgrade a package your own project pinned. And qikly resolves where to read and
+write from the environment it is running in, so "which interpreter am I in" is
+a question you will want a clean answer to the first time something behaves
+oddly. `qikly --version` is that answer: it prints the version, the package
+directory and the interpreter together.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install qikly
-qikly --version
+qikly --version                # which build, from where, on which Python
+export GEMINI_API_KEY=...      # or API_KEY, or your provider's own variable
+qikly --demo
 ```
-
-Let the install finish before running anything: the provider SDK is a long
-dependency chain and pip installs qikly itself last, so there is a window where
-its dependencies are present and qikly is not.
 
 On Windows, in PowerShell, where `export` is not a command:
 
 ```powershell
+python -m venv .venv
+.venv\Scripts\activate
 pip install qikly
+qikly --version
 $env:GEMINI_API_KEY = "..."
 qikly --demo
 ```
+
+Let the install finish before running anything. The provider SDK is a long
+dependency chain and pip installs qikly itself last, so there is a window where
+its dependencies are present and qikly is not, which looks exactly like a
+broken install.
+
+The key is an ordinary environment variable, so it belongs to the shell rather
+than to the virtual environment: set it once in that terminal and both see it,
+in either order. Only `--demo` needs it. `--version`, `--explain`, `--validate`
+and `--scaffold` make no model call and cost nothing.
+
+**One key is enough, and `LLM_PROVIDER` is optional.** Gemini is the default,
+so the line above is all you need. Hold a key for a different provider and no
+`LLM_PROVIDER`, and qikly uses that one and prints that it did, because a tool
+that silently picks a provider silently picks who gets billed. Set
+`LLM_PROVIDER` when you hold more than one key and want to choose:
+`gemini`, `openai` or `anthropic`. The per-provider recipes in
+[docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md)
+set it alongside the key, which is the right habit once more than one is in
+play.
 
 Other providers, and how to set a key so it survives a new terminal, are in
 [docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md).
@@ -108,6 +123,19 @@ code.
    keeps them apart, so scaffolding the same module both ways never overwrites
    the first file with the second. The rest of this section uses
    `MY_METRICS_VERIFY` as the example; substitute your own.
+
+   **See what you get before you run it.**
+   [`docs/examples/`](https://github.com/gal-a/qikly/blob/main/docs/examples/)
+   holds the real output of both commands, run on a real module, along with
+   sample data:
+   [`my_metrics.py`](https://github.com/gal-a/qikly/blob/main/docs/examples/my_metrics.py),
+   [`MY_METRICS_VERIFY.yaml`](https://github.com/gal-a/qikly/blob/main/docs/examples/MY_METRICS_VERIFY.yaml),
+   [`MY_METRICS.yaml`](https://github.com/gal-a/qikly/blob/main/docs/examples/MY_METRICS.yaml),
+   [`input_my_metrics_01.csv`](https://github.com/gal-a/qikly/blob/main/docs/examples/input_my_metrics_01.csv)
+   and
+   [`input_my_metrics_02.csv`](https://github.com/gal-a/qikly/blob/main/docs/examples/input_my_metrics_02.csv).
+   Those two YAML files are regenerated and compared by a test, so they are
+   what scaffold writes today rather than what it wrote once.
 
 2. **Put your input data where the task says.** Its `inputs:` list names the
    files a run reads, here `inputs_private/data/MY_METRICS_VERIFY/input_01.csv`.
