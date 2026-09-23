@@ -413,6 +413,43 @@ Everything is namespaced by `task_id` so concurrent runs never collide:
 | `outputs/reports/run_summary/<task_id>_<run_timestamp>.json` | The same numbers as the metrics report, as JSON instead of HTML, so runs can be compared across time by a script. Written automatically at the end of every `run.py` invocation. Stays on your disk. The only network calls this project makes are to your configured LLM provider and, unless disabled, a check for a newer release at startup (see [Version check](#version-check)). |
 | `outputs/reports/aggregate/aggregate_<timestamp>.{html,json}` | Many runs at once, rather than one: see [Running everything at once](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md#measuring-rather-than-producing) for what it reports and why. Written by `--repeat`, or on demand: `python -m qikly.orchestrator.reports.aggregate_report [--task ID] [--last N]`. Reads the `run_summary/` JSONs only, so no LLM calls and free to re-run. |
 
+## Two kinds of test data, from two different sources
+
+Worth knowing before you prepare your fixture data, because it decides what
+your data has to contain:
+
+| | Where the rows come from | Which stages use them |
+|---|---|---|
+| **Invented** | The test-writing agent makes them up from your `acceptance_criteria`, and writes them straight into the Python | unit, integration |
+| **Yours** | Your fixture data (e.g. the CSV files named in the task's `inputs:` list) | system |
+
+The test-writing agent never sees your fixture data. It is handed the task file
+and, for unit tests, the code, and nothing else, so when it writes
+
+```python
+invalid_prices = ['0', '0.00', '-5.00', 'abc', '']
+```
+
+those five values came from reading a criterion, not from a row in your files.
+
+**Your data still decides what gets proven.** The system stage is the only one
+that runs the real pipeline over the real files. So a criterion no row reaches
+is checked in miniature by an invented row, and never checked on the path your
+code will actually take. The run goes green and one rule was never exercised
+end to end. That is why the bundled sample data carries awkward rows on purpose,
+and why there is a command for finding the gap:
+
+```bash
+qikly --propose-fixtures --tasks MY_TASK
+```
+
+It reports which criteria nothing in your data reaches and proposes a row for
+each, next to the criterion it was proposed for. It writes a file for you to
+read and copy from, and never edits your fixtures: a row is only right or wrong
+relative to the criterion it was proposed for, and fixtures that grow in
+whatever direction a model finds interesting stop resembling the data you
+actually process.
+
 ## Running it on your own data
 
 Four steps: make the two directories, drop your fixture data in, write the task

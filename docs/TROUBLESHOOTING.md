@@ -253,7 +253,7 @@ surfaces twenty minutes and several dollars into a run.
 ## 9. Check your fixtures can reach every criterion
 
 ```bash
-python -m qikly.orchestrator.tuning.propose_fixtures --tasks <MY_TASKS>
+qikly --propose-fixtures --tasks <MY_TASKS>
 ```
 
 A criterion that no input row can trigger produces a test that passes whatever

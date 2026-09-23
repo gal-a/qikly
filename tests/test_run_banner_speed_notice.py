@@ -20,8 +20,16 @@ from qikly.agent_api.providers.router import (effective_model, speed_notice,
     ("anthropic", "claude-sonnet-5", True),
     ("anthropic", "claude-opus-5", True),
     ("anthropic", "claude-haiku-4-5", False),
+    # On Gemini the flash line is the fast one and everything else reasons,
+    # pro included. Listing the reasoning models instead would go stale on the
+    # next release and call a thinking model fast, which is the wrong way to
+    # be wrong.
     ("gemini", "gemini-3.5-flash-lite", False),
+    ("gemini", "gemini-3.5-flash", False),
+    ("gemini", "gemini-3.5-pro", True),
+    ("gemini", "gemini-9-pro-whatever-comes-next", True),
     ("openai", "gpt-4o", False),
+    ("openai", "o3-mini", True),
 ])
 def test_which_models_reason_before_answering(provider, model, thinks):
     assert thinks_before_answering(provider, model) is thinks
@@ -55,11 +63,17 @@ def test_naming_a_model_overrides_the_provider_default(monkeypatch):
         "choosing the fast model should not then be told to choose it")
 
 
-def test_an_unknown_model_is_reported_quietly_rather_than_guessed():
+def test_a_pro_model_on_gemini_is_not_treated_as_the_fast_one():
     """
-    A model this does not recognise is treated as not reasoning.
+    The first version of this listed the reasoning models by name, so every
+    Gemini model except a couple was reported as fast. A release named
+    anything new would have been called fast while it reasoned.
+    """
+    notice = speed_notice("gemini", "gemini-3.5-pro")
+    assert notice, "a pro model reasons and the run should say so"
+    assert "flash" in " ".join(notice), "say which line is the fast one"
 
-    The opposite default would warn about every new release on every provider,
-    which is how a notice stops being read.
-    """
-    assert speed_notice("gemini", "gemini-9-something-new") == []
+
+def test_an_unknown_provider_says_nothing():
+    """Silence is the safe answer where there is nothing known to say."""
+    assert speed_notice("something-else", "some-model") == []

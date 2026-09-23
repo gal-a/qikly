@@ -635,6 +635,15 @@ def _parse_args():
              "runs end to end without you writing anything first. Never overwrites."
     )
     parser.add_argument(
+        "--propose-fixtures", action="store_true",
+        help="For each acceptance criterion, ask whether any row in your input "
+             "data reaches it, and propose a row for the ones nothing reaches. "
+             "A criterion no row can trigger produces a test that passes "
+             "whatever the code does. Writes a proposal file for you to read "
+             "and copy from; never edits your fixtures. One model call per "
+             "task, so this costs money."
+    )
+    parser.add_argument(
         "--scaffold", metavar="FILE", default=None,
         help="Read a Python file and write the task YAML for it: module path, the real "
              "signatures of its public functions, and a guessed entrypoint. Leaves "
@@ -1048,6 +1057,41 @@ def _do_install_mcp(host, dry_run, force):
     # everything", and both printed a friendly message and exited 0.
     if not dry_run and declined and not wrote:
         return 2
+    return 0
+
+
+def _do_propose_fixtures(tasks):
+    """
+    Which criteria no row of your data reaches, and what row would reach one.
+
+    It was reachable only as `python -m
+    qikly.orchestrator.tuning.propose_fixtures`, filed with the research
+    scripts, which is the wrong shelf: those measure this project, while this
+    one is a step in preparing your own task, named in the task file reference
+    as such. Nobody types that from memory, and a command that spends money
+    belongs in the same accounting as every other.
+    """
+    from qikly.orchestrator.orchestrator import discover_task_ids
+    from qikly.orchestrator.tuning.propose_fixtures import propose
+
+    task_ids = [t.strip() for t in tasks.split(",")] if tasks else discover_task_ids()
+    for task_id in task_ids:
+        try:
+            propose(task_id, seed=_seed())
+        except Exception as exc:                        # noqa: BLE001
+            print(f"[{task_id}] failed: {type(exc).__name__}: {exc}")
+
+    # Same reasoning as --check-criteria: one call per task is still a call,
+    # and a command that spends money quietly teaches people not to trust the
+    # accounting on the commands that spend a lot of it.
+    try:
+        from qikly.agent_api.usage import USAGE
+        print()
+        print(USAGE.summary())
+        for line in USAGE.breakdown():
+            print(line)
+    except Exception:                                   # noqa: BLE001
+        pass
     return 0
 
 
@@ -1767,6 +1811,8 @@ def main():
         return _do_validate(args.tasks, args.json)
     if args.check_criteria:
         return _do_check_criteria(args.tasks)
+    if args.propose_fixtures:
+        return _do_propose_fixtures(args.tasks)
 
     if args.demo and not args.tasks:
         task_ids = [DEMO_TASK]

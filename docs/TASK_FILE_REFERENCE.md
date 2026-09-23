@@ -315,7 +315,7 @@ deliberately planted faults were missed by every suite for that reason: the bar
 was unmeasurable rather than wrong.
 
 ```bash
-python -m qikly.orchestrator.tuning.propose_fixtures --tasks <MY_TASKS>
+qikly --propose-fixtures --tasks <MY_TASKS>
 ```
 
 A separate agent reads your criteria and your fixture files and says, for each

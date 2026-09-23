@@ -399,11 +399,19 @@ def thinks_before_answering(provider, model):
     """Whether one call to this model includes a reasoning step."""
     name = (model or "").lower()
     if provider == "anthropic":
+        # Every model here reasons when no thinking parameter is sent, which is
+        # what this project sends, except the Haiku line: that one needs an
+        # explicit budget before it will think at all.
         return "haiku" not in name
-    # Named explicitly rather than guessed. A model absent from this list is
-    # reported as not thinking, which is the quiet answer: a wrong warning
-    # teaches people to ignore the next one.
-    return name in {"gemini-3.5-pro", "o1", "o1-mini", "o3", "o3-mini"}
+    if provider == "gemini":
+        # The flash line is the fast, non-reasoning one. Everything else on
+        # this provider, pro included, reasons before it answers, so listing
+        # only the reasoning models would have gone stale on the next release
+        # and reported a thinking model as fast.
+        return "flash" not in name
+    if provider == "openai":
+        return name.startswith(("o1", "o3", "o4"))
+    return False
 
 
 def effective_model(provider):
@@ -430,8 +438,10 @@ def speed_notice(provider, model):
     """
     if not thinks_before_answering(provider, model):
         return []
-    faster = ("LLM_MODEL=claude-haiku-4-5" if provider == "anthropic"
-              else "a model with no reasoning step")
+    faster = {
+        "anthropic": "LLM_MODEL=claude-haiku-4-5",
+        "gemini": "LLM_MODEL=gemini-3.5-flash-lite, or any flash model",
+    }.get(provider, "a model with no reasoning step")
     return [
         "  Note: %s reasons before it answers, on every call, and a run" % model,
         "  makes one call per stage per iteration. Expect minutes rather than",
