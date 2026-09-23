@@ -854,7 +854,9 @@ def _do_init(with_example=False):
     from qikly.scaffold import init_project, install_example
 
     root = INVOKED_FROM
-    made, skipped = init_project(root)
+    # The example is a finished task, so it arrives on its own rather than
+    # beside a blank starter the reader never asked for.
+    made, skipped = init_project(root, starter=not with_example)
     missing = []
     if with_example:
         # After init_project, so the example's files land in a layout that
@@ -875,11 +877,14 @@ def _do_init(with_example=False):
             print(f"    missing  inputs_public/examples/{name}")
     print()
     if with_example and not missing:
-        print("  Next: the example is ready to run as it stands.")
+        print("  Next: the example is finished, data and all, so it runs as it")
+        print("  stands and needs nothing written first.")
         print("    qikly --validate --tasks MY_METRICS_VERIFY    # free, no model call")
-        print("    qikly --tasks MY_METRICS_VERIFY")
-        print("  Its requirements and acceptance_criteria are still TODO, so fill")
-        print("  those in to see it do real work. Your own code instead:")
+        print("    qikly --tasks MY_METRICS_VERIFY               # the real thing")
+        print()
+        print("  Open inputs_private/config/tasks/MY_METRICS_VERIFY.yaml while it")
+        print("  runs: requirements go to the coding agent, acceptance_criteria")
+        print("  never do. Your own code instead:")
         print("    qikly --scaffold path/to/module.py")
     else:
         print("  Next: edit inputs_private/config/tasks/MY_FIRST_TASK.yaml, then run")

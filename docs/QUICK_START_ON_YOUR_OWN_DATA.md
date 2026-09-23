@@ -56,8 +56,9 @@ dependency chain and pip installs qikly itself last, so there is a window where
 its dependencies are present and qikly is not, which looks exactly like a
 broken install.
 
-Only `--demo` needs a key. `--version`, `--explain`, `--validate` and
-`--scaffold` make no model call and cost nothing.
+Only `--demo` needs a key. `--version`, `--explain`, `--validate`,
+`--init`, `--example` and `--scaffold` make no model call and cost
+nothing.
 
 | Provider | Key variable | Install |
 |---|---|---|
@@ -106,11 +107,39 @@ Rather see it work before you point it at your own code?
 qikly --example
 ```
 
-That writes a worked example into your project, at the paths a real task uses,
-and prints what to run next. Nothing to fill in first, no model call to check
-it. [What it lays down, and what to look at in it](https://github.com/gal-a/qikly/blob/main/docs/SCAFFOLDED_TASK_EXAMPLE.md).
+**That is the five steps below, already done, on a module you do not have
+to write.** It lays down `my_metrics.py` at your project root, both task
+files a scaffold of it produces, and sample data at the paths those task
+files name. Its `requirements` and `acceptance_criteria` are written in,
+which a scaffold of your own code cannot do for you, so it runs as it
+stands:
 
-The five steps below are the same thing on your own module.
+```bash
+qikly --validate --tasks MY_METRICS_VERIFY    # free, no model call
+qikly --tasks MY_METRICS_VERIFY
+```
+
+| The five steps below, on your module | What `--example` hands you instead |
+|---|---|
+| 1. Scaffold a task from the module | `my_metrics.py`, and the two task files a scaffold of it writes |
+| 2. Put your input data where the task says | two sample CSVs, at the paths those task files name |
+| 3. Write the two sections only you can write | written already, so you can read a finished pair before writing your own |
+| 4. Check it, for free | the same command |
+| 5. Run it | the same command |
+
+So the difference is step 3, and step 3 is the part that matters: those
+two sections are the whole mechanism, and reading a worked pair is the
+fastest way to see the split. [What it lays down, and what to look at in
+it](https://github.com/gal-a/qikly/blob/main/docs/SCAFFOLDED_TASK_EXAMPLE.md).
+
+It leaves the rest of your project alone, and never overwrites, so a
+second run keeps anything you edited.
+
+**Which starter is which.** `--init` writes `MY_FIRST_TASK`, an empty form with
+`TODO` where your rules go and a stub CSV, and you bring the code. `--example`
+writes `MY_METRICS`, the same form filled in, with a module and real sample data
+behind it. Neither command writes the other's task, so whichever you ran is the
+only task in your project.
 
 > **No module to start from?** You do not need one. `qikly --init` writes a
 > starter task with `requirements` and `acceptance_criteria` and no `seed:`

@@ -92,6 +92,53 @@ def test_quotes_in_a_criterion_do_not_break_the_yaml():
     assert parsed["acceptance_criteria"] == ['it rejects "" and accepts "a"']
 
 
+def test_the_merge_runs_against_what_scaffold_actually_writes(tmp_path):
+    """
+    The stand-in above is not the file this ships against.
+
+    SCAFFOLD is hand written, and its placeholder criterion fits on one line.
+    The real template's does not: it wraps, and a wrapped item is two lines of
+    YAML where only the first opens with a dash. Matching dashes alone left the
+    second line behind, so `qikly --scaffold X --from-doc Y`, step 3 of the
+    quick start, wrote a task file that did not parse and then died inside its
+    own `yaml.safe_load`. Every assertion above passed throughout, because none
+    of them had ever seen the real thing.
+
+    So this builds the task the way the command does, and merges into that.
+    """
+    import yaml
+
+    from qikly.scaffold import build_task
+
+    module = tmp_path / "band.py"
+    module.write_text(
+        "def read_band(path):\n"
+        "    return []\n"
+        "\n"
+        "\n"
+        "def run_band(input_paths, output_path):\n"
+        "    return None\n", encoding="utf-8")
+
+    scaffolded, error = build_task(str(module), str(tmp_path), seed="existing")
+    assert error is None, error
+
+    placeholder = scaffolded.split("acceptance_criteria:")[1][:400]
+    assert "\n    " in placeholder, (
+        "the template's placeholder criterion no longer wraps, so this test is "
+        "no longer exercising the case it was written for")
+
+    merged, problem = from_doc.merge(
+        scaffolded, ["A humidity of 100 is accepted and 101 is rejected"])
+    assert problem is None
+
+    parsed = yaml.safe_load(merged)          # the step that used to raise
+    assert parsed["acceptance_criteria"] == [
+        "A humidity of 100 is accepted and 101 is rejected"]
+    assert parsed["requirements"] and "TODO" in parsed["requirements"][0], (
+        "requirements must still be the reader's to write")
+    assert parsed["interface"]["module"], "the interface was dropped"
+
+
 # --------------------------------------------------- the leak this prevents --
 
 def test_a_pasted_criterion_is_detected():

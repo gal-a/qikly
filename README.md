@@ -424,11 +424,14 @@ qikly --init                    # creates inputs_private/ and a starter task
 qikly --tasks MY_TASK
 ```
 
-Want to watch it work before writing anything, `qikly --example` adds a
+Want to watch it work before writing anything? `qikly --example` adds a
 worked example that runs as it stands: a module, the two task files a
-scaffold of it produces, and sample data, each at the path a real task uses.
-It is the one command here that puts a file in your project root,
-`my_metrics.py`, and you can delete it when you are done.
+scaffold of it produces, sample data, and the `requirements` and
+`acceptance_criteria` already written, each at the path a real task uses.
+It makes the same layout `--init` does, without the blank starter task,
+so the example is the only task in your project. It is the one command
+here that puts a file in your project root, `my_metrics.py`, and you can
+delete the lot when you are done.
 
 **[docs/QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md)** has the
 rest: the task file field by field, getting the split between `requirements`
@@ -573,7 +576,7 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.4.9`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.5.0`, uploading the suite, the code and the JUnit XML |
 
 ## Use it in CI
 
@@ -616,7 +619,7 @@ a run.
 
 **Two ways to pin, and the choice is yours.** `@v0` is a moving alias that
 this project repoints at every release, so you receive fixes without receiving
-a breaking change. `@v0.4.9` is an exact pin that never moves, so nothing
+a breaking change. `@v0.5.0` is an exact pin that never moves, so nothing
 changes under you and nothing reaches you either. The templates use `@v0`
 because most people want the fixes; use the exact form if your policy requires
 it.

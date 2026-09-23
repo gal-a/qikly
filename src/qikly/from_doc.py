@@ -112,8 +112,15 @@ def restated(requirements, criteria, threshold=0.6):
     return found
 
 
+# Everything from the heading to the blank line that ends the section: the
+# `- "..."` items, any comment among them, and the wrapped continuation
+# lines of an item too long for one line. That last case is the whole reason
+# this is not simply a dash. Scaffold's own placeholder criterion wraps, so
+# matching only lines that open with a dash left the second half of it
+# stranded below the replacement block, and the file it wrote no longer
+# parsed as YAML.
 _CRITERIA_BLOCK = re.compile(
-    r"^acceptance_criteria:\n(?:[ \t]*[#-][^\n]*\n)*", re.M)
+    r"^acceptance_criteria:[ \t]*\n(?:[ \t]+[^\n]*\n|[ \t]*#[^\n]*\n)*", re.M)
 
 
 def merge(scaffold_yaml, criteria):

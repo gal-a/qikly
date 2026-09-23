@@ -296,14 +296,22 @@ acceptance_criteria:
 '''
 
 
-def init_project(root):
-    """Create the directories and starter files a run needs. Never overwrites."""
+def init_project(root, starter=True):
+    """
+    Create the directories and starter files a run needs. Never overwrites.
+
+    `starter=False` leaves out MY_FIRST_TASK, for `--example`, which brings a
+    finished task of its own. Handing someone both meant two tasks in their
+    project on their first command, one of which nothing in the documentation
+    mentioned, and a later bare `qikly` would have run the pair.
+    """
     made, skipped = [], []
     dirs = [
         os.path.join(root, "inputs_private", "config", "tasks"),
-        os.path.join(root, "inputs_private", "data", "MY_FIRST_TASK"),
         os.path.join(root, "outputs"),
     ]
+    if starter:
+        dirs.insert(1, os.path.join(root, "inputs_private", "data", "MY_FIRST_TASK"))
     for d in dirs:
         if os.path.isdir(d):
             skipped.append(d)
@@ -312,10 +320,6 @@ def init_project(root):
             made.append(d)
 
     files = {
-        os.path.join(root, "inputs_private", "config", "tasks", "MY_FIRST_TASK.yaml"):
-            STARTER_TASK,
-        os.path.join(root, "inputs_private", "data", "MY_FIRST_TASK", "input_01.csv"):
-            "identifier,quantity\nWIDGET-1,5\n,10\nWIDGET-2,0\n",
         os.path.join(root, "inputs_private", "config", "settings.yaml"):
             textwrap.dedent("""\
                 # Your overrides. Anything absent falls back to the bundled defaults,
@@ -330,6 +334,13 @@ def init_project(root):
                 #     model: gemini-3.5-flash-lite
                 """),
     }
+    if starter:
+        files[os.path.join(root, "inputs_private", "config", "tasks",
+                           "MY_FIRST_TASK.yaml")] = STARTER_TASK
+        files[os.path.join(root, "inputs_private", "data", "MY_FIRST_TASK",
+                           "input_01.csv")] = (
+            "identifier,quantity\nWIDGET-1,5\n,10\nWIDGET-2,0\n")
+
     for path, body in files.items():
         if os.path.exists(path):
             skipped.append(path)

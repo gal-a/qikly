@@ -8,10 +8,15 @@ without, under `config/tasks/`, the sample data under `data/MY_METRICS/`, and
 the module itself under `reference/MY_METRICS/`.
 
 Under examples/ rather than beside the bundled tasks, and deliberately. A
-scaffolded pair breaks three rules bundled tasks keep: `MY_METRICS_VERIFY` ends
-in the suffix reserved for scaffolding, the pair shares one data folder where
-bundled ids map one to one, and both files still carry the `TODO`s that are the
-point of an example. Shipping it as a bundled task would have cost all three.
+scaffolded pair breaks two rules bundled tasks keep: `MY_METRICS_VERIFY` ends
+in the suffix reserved for scaffolding, and the pair shares one data folder
+where bundled ids map one to one. Shipping it as a bundled task would have cost
+both, and would have put an example in everyone's task list.
+
+What it no longer carries is scaffold's `TODO`s. The two sections a person
+writes are written here, because `--example` prints the paid `qikly --tasks`
+command as a next step and a newcomer who types it should not be paying for a
+run whose requirements say TODO.
 
 An example nobody regenerates drifts. That is not hypothetical here: the worked
 example in `docs/design_1_case_study.md` printed a test with a name and a body
@@ -56,6 +61,19 @@ def _committed(name):
         return handle.read()
 
 
+# The two sections a person writes are the two this cannot pin: they are not
+# derived from the module, and a worked example exists precisely so that they
+# are written rather than left as placeholders. Everything scaffold decides
+# mechanically is still compared, field by field.
+def _interface(task):
+    """The interface as scaffold determines it, without the prose after `#`."""
+    interface = task["interface"]
+    functions = [f.split("#")[0].strip()
+                 for f in interface.get("integration_functions") or []]
+    return (interface["module"], functions,
+            interface["system_entrypoint"].split("#")[0].strip())
+
+
 @pytest.mark.parametrize("fresh,name", [
     (False, "MY_METRICS_VERIFY.yaml"),
     (True, "MY_METRICS.yaml"),
@@ -65,11 +83,79 @@ def test_the_committed_example_is_what_scaffold_writes_today(fresh, name):
     # wrong element of build_task's (text, error) pair, got None, and skipped
     # itself quietly, which is the failure mode this whole file exists to
     # prevent: a guard that reports success while checking nothing.
-    text = _scaffold(fresh)
-    assert text.strip() == _committed(name).strip(), (
-        "inputs_public/config/tasks/%s no longer matches what `qikly --scaffold%s "
-        "my_metrics.py` writes. Regenerate it rather than editing it by hand."
-        % (name, " --fresh" if fresh else ""))
+    import yaml
+
+    written = yaml.safe_load(_scaffold(fresh))
+    committed = yaml.safe_load(_committed(name))
+    regenerate = ("Regenerate %s rather than editing it by hand." % name)
+
+    assert set(committed) == set(written), "a top level section came or went"
+    assert committed["task_id"] == written["task_id"], regenerate
+    assert committed["outputs"] == written["outputs"], regenerate
+    assert committed.get("seed") == written.get("seed"), regenerate
+    assert _interface(committed) == _interface(written), (
+        "the interface is no longer what scaffold reads out of my_metrics.py. "
+        + regenerate)
+
+    # Scaffold names one input file because it cannot know how many you have,
+    # and the example adds the second it ships. The first must still be the
+    # path scaffold derives from the task id, because that is the derivation
+    # that silently moves where a run reads from.
+    assert committed["inputs"][:1] == written["inputs"], regenerate
+
+
+@pytest.mark.parametrize("name", ["MY_METRICS_VERIFY.yaml", "MY_METRICS.yaml"])
+def test_the_worked_example_has_nothing_left_to_fill_in(name):
+    """
+    `--example` prints the paid `qikly --tasks` command as a next step.
+
+    While these two files carried scaffold's placeholders, that run went out
+    with a specification that read, literally, "TODO: describe what this module
+    must do". `--validate` warned and exited 0, so nothing stopped it. The
+    example is the one task that has to arrive finished, and this is the check
+    that keeps it that way, using validate's own placeholder pattern.
+    """
+    import yaml
+
+    from qikly.validate import _TODO
+
+    task = yaml.safe_load(_committed(name))
+    left = [field for field in ("task_name", "description", "interface",
+                                "requirements", "acceptance_criteria")
+            if _TODO.search(str(task.get(field)))]
+    assert not left, "still to fill in: %s" % ", ".join(left)
+
+
+@pytest.mark.parametrize("name", ["MY_METRICS_VERIFY.yaml", "MY_METRICS.yaml"])
+def test_every_boundary_the_criteria_name_is_reachable_in_the_sample_data(name):
+    """
+    The lesson the example teaches, applied to the example itself.
+
+    A criterion no row can trigger is a criterion nothing checks. Each value
+    below is the boundary of one written criterion, and each must appear in the
+    data the task actually reads, not merely in the folder beside it.
+    """
+    import yaml
+
+    task = yaml.safe_load(_committed(name))
+    rows = ""
+    for declared in task["inputs"]:
+        path = os.path.join(EXAMPLE, "data", os.path.basename(os.path.dirname(declared)),
+                            os.path.basename(declared))
+        with open(path, encoding="utf-8") as handle:
+            rows += handle.read()
+
+    for value, criterion in (
+            ("100", "a humidity of 100 is usable"),
+            ("101", "a humidity of 101 is not"),
+            ("0.0", "0.0 is a measurement rather than a missing value"),
+            ("4.5", "the mean of 4.5 and 11.2 rounds away from zero"),
+            ("11.2", "the mean of 4.5 and 11.2 rounds away from zero"),
+            ("-1.0", "a negative temperature is usable"),
+            ("not-a-timestamp", "a malformed timestamp contributes to no record")):
+        assert value in rows, (
+            "no row reaches %r, so nothing checks the criterion that %s"
+            % (value, criterion))
 
 
 def test_the_two_examples_differ_only_in_the_seed_block_and_the_task_id():
@@ -160,6 +246,52 @@ def test_the_example_installs_to_the_paths_its_own_task_files_name():
         assert os.path.isfile(landed), (
             "MY_METRICS_VERIFY.yaml seeds from %s, which --example does not "
             "write there" % seed["implementation"])
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_the_example_arrives_without_the_blank_starter_beside_it():
+    """
+    One command, one task.
+
+    `--example` needs the same directory layout `--init` makes, and used to get
+    the MY_FIRST_TASK starter along with it. A newcomer running the command the
+    quick start recommends first ended up with two unrelated tasks, one of them
+    described nowhere, and a later bare `qikly` with no --tasks would have run
+    both of them for real money.
+    """
+    from qikly import scaffold
+
+    workspace = tempfile.mkdtemp(prefix="qikly-example-alone-")
+    try:
+        scaffold.init_project(workspace, starter=False)
+        scaffold.install_example(workspace)
+
+        tasks = os.path.join(workspace, "inputs_private", "config", "tasks")
+        assert sorted(os.listdir(tasks)) == ["MY_METRICS.yaml",
+                                             "MY_METRICS_VERIFY.yaml"]
+        assert not os.path.exists(os.path.join(
+            workspace, "inputs_private", "data", "MY_FIRST_TASK"))
+        # The layout itself still has to be there, or the example has nowhere
+        # to land and a run has nowhere to write.
+        assert os.path.isdir(os.path.join(workspace, "outputs"))
+        assert os.path.isfile(os.path.join(
+            workspace, "inputs_private", "config", "settings.yaml"))
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_init_on_its_own_still_writes_the_starter():
+    """The other half of the same contract: --init is unchanged."""
+    from qikly import scaffold
+
+    workspace = tempfile.mkdtemp(prefix="qikly-init-starter-")
+    try:
+        scaffold.init_project(workspace)
+        assert os.path.isfile(os.path.join(
+            workspace, "inputs_private", "config", "tasks", "MY_FIRST_TASK.yaml"))
+        assert os.path.isfile(os.path.join(
+            workspace, "inputs_private", "data", "MY_FIRST_TASK", "input_01.csv"))
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
 

@@ -4,28 +4,82 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
-## 0.4.9
+## 0.5.0
 
-> Two new ceilings, a narrower failure channel you can opt into, one feature withdrawn, and documentation that now matches what the coding agent actually receives
+> A worked example that arrives finished rather than as a form to fill in, one flag to get it, and the criteria import that wrote a file it could not read back
 
 ### Added
 - **`qikly --example`** copies a worked scaffold example into your
   project, at the paths its own task files name: `my_metrics.py` at the root,
   `MY_METRICS.yaml` and `MY_METRICS_VERIFY.yaml` in
   `inputs_private/config/tasks/`, and two sample CSVs in
-  `inputs_private/data/MY_METRICS/`. It runs as it stands, so
-  `qikly --validate --tasks MY_METRICS_VERIFY` is clean and
-  `qikly --tasks MY_METRICS_VERIFY` works without writing anything first.
-  Never overwrites, so a second run keeps your edits.
+  `inputs_private/data/MY_METRICS/`. Its `requirements` and
+  `acceptance_criteria` are written in, so `qikly --validate --tasks
+  MY_METRICS_VERIFY` reports it clean and `qikly --tasks MY_METRICS_VERIFY`
+  runs it without you writing anything first. Never overwrites, so a second
+  run keeps your edits.
+
+  Filling those two sections in is the point rather than a convenience. They
+  are the only part of a scaffolded task a person has to write, and while the
+  example shipped with scaffold's `TODO` placeholders in them, the command
+  printed the paid `qikly --tasks` line as a next step and `--validate` warned
+  and exited 0, so the documented first run went out with a specification that
+  read, literally, "TODO: describe what this module must do". The pair is now
+  a worked example in both halves, and a test holds it to having nothing left
+  to fill in.
+
+  It makes the `inputs_private/` layout first, and no longer writes `--init`'s
+  blank `MY_FIRST_TASK` starter alongside it, so the example is the only task
+  in your project. Handing over two unrelated tasks, one of them documented
+  nowhere, also meant a later bare `qikly` with no `--tasks` would have run
+  both.
 
   The example files ship under `inputs_public/examples/`, laid out the way a
   real project is. They are deliberately not bundled tasks: a scaffolded pair
-  ends in the `_VERIFY` suffix reserved for scaffolding, shares one data folder
-  where bundled ids map one to one, and still carries the `TODO`s that are the
-  point of an example, which would otherwise warn on every `--validate` for
-  everyone who never asked for it. Until this flag existed there was no way to
-  get them into a project at all, which the documentation did not admit.
+  ends in the `_VERIFY` suffix reserved for scaffolding, and shares one data
+  folder where bundled ids map one to one. Until this flag existed there was
+  no way to get them into a project at all, which the documentation did not
+  admit.
 
+- **`tools/release_check.py`**, which performs every check in
+  `RELEASE_CHECKLIST.md` that a machine can perform, and refuses to pass on a
+  failure that has actually happened to this project before. `--after`
+  confirms the three places a release lands agree once the workflow finishes.
+
+- **The demo says which build produced it, and separates its own housekeeping
+  from the task's inputs.** `INPUTS` now opens with `Code version qikly X.Y.Z`,
+  because a demo transcript outlives the session it came from and the version
+  was otherwise only findable by grepping the console log. Where the demo
+  writes, and the promise that nothing outside it is touched, moved into their
+  own `DEMO FILES` block above `INPUTS`: that is a fact about the demo, not an
+  input to the task, and it is the first thing a cautious reader looks for.
+
+- **A modifier flag used on its own no longer starts a run.** `--fresh`,
+  `--from-doc`, `--task-id`, `--force` and `--demo-dir` are each read inside
+  their partner's dispatch branch, so alone they were never looked at and the
+  chain fell through to a normal run: `qikly --fresh`, meaning `qikly --scaffold
+  X --fresh` with the target forgotten, ran every task in the project and spent
+  real money on a typo. Each now prints what it goes with and exits 2, the check
+  `--html` has carried since it shipped. `--by` is deliberately exempt, since it
+  has a default and cannot be told apart from the one argparse supplies.
+
+### Fixed
+- **`qikly --scaffold X --from-doc Y` wrote a task file that did not parse.**
+  Scaffold's placeholder criterion wraps onto a second line, and the merge that
+  puts a document's criteria in its place matched only lines opening with a
+  dash, so the wrapped half was left stranded below the replacement block. The
+  command printed its whole success message, wrote the broken file, and then
+  died in the traceback of its own `yaml.safe_load`, exit 1. It is step 3 of
+  the quick start, so it was reachable by following the documentation. The
+  merge now takes the whole section, wrapped items and all, and a test runs it
+  against real scaffold output rather than the hand written stand-in whose
+  placeholder happened to fit on one line.
+
+## 0.4.9
+
+> Two new ceilings, a narrower failure channel you can opt into, one feature withdrawn, and documentation that now matches what the coding agent actually receives
+
+### Added
 - **`diagnostic_feedback: staged`**, under `agent:` in `settings.yaml`, and
   **off by default.** With it on, a failing stage starts the coding agent at
   pytest's `line` traceback, which gives the file, the line and the error but
@@ -83,14 +137,6 @@ packaging tools would read as `1.1`.
   server.
 
 ### Changed
-- **The demo says which build produced it, and separates its own housekeeping
-  from the task's inputs.** `INPUTS` now opens with `Code version qikly X.Y.Z`,
-  because a demo transcript outlives the session it came from and the version
-  was otherwise only findable by grepping the console log. Where the demo
-  writes, and the promise that nothing outside it is touched, moved into their
-  own `DEMO FILES` block above `INPUTS`: that is a fact about the demo, not an
-  input to the task, and it is the first thing a cautious reader looks for.
-
 - **`--start` is now `--run`**, matching the MCP tool it shares its machinery
   with, `qikly_run`. Two names for one action was the kind of thing nobody
   notices until they have to explain it. `--start` still works and will keep
@@ -136,15 +182,6 @@ packaging tools would read as `1.1`.
   can be retuned rather than rewritten blind.
 
 ### Fixed
-- **A modifier flag used on its own no longer starts a run.** `--fresh`,
-  `--from-doc`, `--task-id`, `--force` and `--demo-dir` are each read inside
-  their partner's dispatch branch, so alone they were never looked at and the
-  chain fell through to a normal run: `qikly --fresh`, meaning `qikly --scaffold
-  X --fresh` with the target forgotten, ran every task in the project and spent
-  real money on a typo. Each now prints what it goes with and exits 2, the check
-  `--html` has carried since it shipped. `--by` is deliberately exempt, since it
-  has a default and cannot be told apart from the one argparse supplies.
-
 - **A spend ceiling never actually stopped a repair loop.** `BudgetExceeded`
   is a `RuntimeError`, and the FIX and PATCH calls in `run_fix_patch_cycle`
   were wrapped in bare `except Exception`, so a ceiling firing mid-loop was

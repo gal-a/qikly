@@ -149,11 +149,22 @@ def check_no_experiment_leftovers():
           "a wheel built mid-sweep ships them as bundled tasks")
 
 
+# The names cannot appear here as literals. CI greps the whole tree for them
+# and does not exempt this file, so the one file whose job is to find the old
+# name became the only thing either grep found, and the public workflow failed
+# on its own checker. Assembled from halves instead, the way docs/index.html
+# splits its own copy, so no exclusion is needed for this file and a real leak
+# in it would still be caught.
+OLD_NAMES = ("v_and" + "_v", "v-and" + "-v", "test_qik" + "ly", "test-qik" + "ly")
+
+
 def check_stale_names():
-    out = run(["git", "grep", "-In", "-e", "v_and_v", "-e", "v-and-v",
-               "-e", "test_qikly", "-e", "test-qikly", "--",
-               ".", ":!CHANGELOG.md", ":!RELEASE_CHECKLIST.md",
-               ":!.github/workflows/ci.yml", ":!tools/release_check.py"]).stdout.strip()
+    patterns = []
+    for name in OLD_NAMES:
+        patterns += ["-e", name]
+    out = run(["git", "grep", "-In"] + patterns + [
+        "--", ".", ":!CHANGELOG.md", ":!RELEASE_CHECKLIST.md",
+        ":!.github/workflows/ci.yml"]).stdout.strip()
     check("no stale project names", not out, out[:400],
           "three files name the old project on purpose; everywhere else is a leak")
 
