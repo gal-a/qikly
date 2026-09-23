@@ -117,3 +117,91 @@ def test_the_sample_data_reaches_more_than_the_happy_path():
     assert "101" in joined, "no row outside a plausible range"
     assert "not-a-timestamp" in joined, "no row with a malformed timestamp"
     assert len(rows) >= 10, "too little data to be a realistic sample"
+
+
+def _install(root):
+    from qikly import scaffold
+
+    return scaffold.install_example(root)
+
+
+def test_the_example_installs_to_the_paths_its_own_task_files_name():
+    """
+    The copy map and the task files have to agree, or the example lands
+    somewhere the run does not look.
+
+    This is the failure the map exists to prevent, and it is silent: scaffold's
+    default input path is built from the task id, so a change there moves where
+    a run reads from while the CSVs keep landing where they always did. The
+    reader then gets `input file not found` on an example advertised as ready
+    to run. So this reads the destination out of the committed YAML rather than
+    restating it.
+    """
+    import yaml
+
+    workspace = tempfile.mkdtemp(prefix="qikly-install-example-")
+    try:
+        made, skipped, missing = _install(workspace)
+        assert not missing, "the example is not in the tree: %s" % missing
+        assert not skipped, "nothing existed yet, so nothing should have been kept"
+        assert len(made) == 5, "expected five files, wrote %d" % len(made)
+
+        for name in ("MY_METRICS.yaml", "MY_METRICS_VERIFY.yaml"):
+            task = yaml.safe_load(_committed(name))
+            for declared in task["inputs"]:
+                landed = os.path.join(workspace, declared.replace("/", os.sep))
+                assert os.path.isfile(landed), (
+                    "%s says it reads %s, and --with-example does not put a file "
+                    "there" % (name, declared))
+
+        # The seeded task names its implementation relative to the project root.
+        seed = yaml.safe_load(_committed("MY_METRICS_VERIFY.yaml"))["seed"]
+        landed = os.path.join(workspace, seed["implementation"].replace("/", os.sep))
+        assert os.path.isfile(landed), (
+            "MY_METRICS_VERIFY.yaml seeds from %s, which --with-example does not "
+            "write there" % seed["implementation"])
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_installing_the_example_twice_keeps_what_is_already_there():
+    """The contract --init states, held to: your edits survive a second run."""
+    workspace = tempfile.mkdtemp(prefix="qikly-install-example-")
+    try:
+        made, _, _ = _install(workspace)
+        edited = os.path.join(workspace, "my_metrics.py")
+        with open(edited, "w", encoding="utf-8") as handle:
+            handle.write("# mine now\n")
+
+        made_again, skipped, _ = _install(workspace)
+        assert not made_again, "a second install rewrote files: %s" % made_again
+        assert len(skipped) == len(made)
+        with open(edited, encoding="utf-8") as handle:
+            assert handle.read() == "# mine now\n", "the edited file was overwritten"
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_a_wheel_without_the_examples_reports_rather_than_half_installs():
+    """
+    package-data is a glob in pyproject.toml, so it can silently stop matching.
+    If that happens the command should say which files are absent, not write
+    three of five and leave the reader with a task whose data is missing.
+    """
+    from qikly import scaffold
+
+    workspace = tempfile.mkdtemp(prefix="qikly-install-example-")
+    empty = tempfile.mkdtemp(prefix="qikly-no-examples-")
+    try:
+        original = scaffold.example_source_dir
+        scaffold.example_source_dir = lambda: empty
+        try:
+            made, skipped, missing = scaffold.install_example(workspace)
+        finally:
+            scaffold.example_source_dir = original
+
+        assert not made and not skipped
+        assert len(missing) == 5, "every absent file should be named: %s" % missing
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+        shutil.rmtree(empty, ignore_errors=True)

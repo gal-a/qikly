@@ -627,6 +627,14 @@ def _parse_args():
              "until this has been run. Never overwrites an existing file."
     )
     parser.add_argument(
+        "--with-example", action="store_true",
+        help="With --init: also copy the worked scaffold example into the project, at "
+             "the paths its task files name. Lays down my_metrics.py, the two task "
+             "files a scaffold of it produces, and sample data, so `qikly --tasks "
+             "MY_METRICS_VERIFY` runs end to end without you writing anything first. "
+             "Never overwrites an existing file."
+    )
+    parser.add_argument(
         "--scaffold", metavar="FILE", default=None,
         help="Read a Python file and write the task YAML for it: module path, the real "
              "signatures of its public functions, and a guessed entrypoint. Leaves "
@@ -841,22 +849,43 @@ def _print_run(info, brief=False):
     return 0 if state in ("passed", "running") else 1
 
 
-def _do_init():
+def _do_init(with_example=False):
     """Create the project layout. Prints what it made and what to do next."""
-    from qikly.scaffold import init_project
+    from qikly.scaffold import init_project, install_example
 
     root = INVOKED_FROM
     made, skipped = init_project(root)
+    missing = []
+    if with_example:
+        # After init_project, so the example's files land in a layout that
+        # already exists and the two lists print as one story.
+        ex_made, ex_skipped, missing = install_example(root)
+        made, skipped = made + ex_made, skipped + ex_skipped
     print(f"qikly init in {root}")
     for path in made:
         print(f"  created  {os.path.relpath(path, root)}")
     for path in skipped:
         print(f"  kept     {os.path.relpath(path, root)}   (already there)")
+    if missing:
+        # Not fatal: the layout is still usable, and saying which files were
+        # absent points at the build rather than at the reader's project.
+        print()
+        print("  The example is not in this install, so it was not copied:")
+        for name in missing:
+            print(f"    missing  inputs_public/examples/{name}")
     print()
-    print("  Next: edit inputs_private/config/tasks/MY_FIRST_TASK.yaml, then run")
-    print("    qikly --tasks MY_FIRST_TASK")
-    print("  Or point it at code you already have:")
-    print("    qikly --scaffold path/to/module.py")
+    if with_example and not missing:
+        print("  Next: the example is ready to run as it stands.")
+        print("    qikly --validate --tasks MY_METRICS_VERIFY    # free, no model call")
+        print("    qikly --tasks MY_METRICS_VERIFY")
+        print("  Its requirements and acceptance_criteria are still TODO, so fill")
+        print("  those in to see it do real work. Your own code instead:")
+        print("    qikly --scaffold path/to/module.py")
+    else:
+        print("  Next: edit inputs_private/config/tasks/MY_FIRST_TASK.yaml, then run")
+        print("    qikly --tasks MY_FIRST_TASK")
+        print("  Or point it at code you already have:")
+        print("    qikly --scaffold path/to/module.py")
     return 0
 
 
@@ -1673,7 +1702,7 @@ def main():
         return 0
 
     if args.init:
-        return _do_init()
+        return _do_init(with_example=args.with_example)
     if args.scaffold:
         return _do_scaffold(args.scaffold, args.task_id, args.from_doc, fresh=args.fresh)
     if args.criteria_from:

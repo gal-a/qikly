@@ -1,29 +1,48 @@
 # A scaffolded task, start to finish
 
-Five real files, so the quick start can point at what its steps produce rather
-than describe it. Nothing here is illustrative: the two YAML files are the
-verbatim output of `qikly --scaffold` run on `my_metrics.py`, and
-`tests/test_scaffold_examples.py` regenerates them and fails if they drift.
+```bash
+qikly --init --with-example
+```
 
-They sit under `src/qikly/inputs_public/examples/`, laid out the way a real
-project is rather than as a flat folder of samples, so the paths you see are
-the paths these files take in your own project.
+That puts the whole example in your project, ready to run:
 
-| File | What it is |
+| Written to | What it is |
 |---|---|
-| [`reference/MY_METRICS/my_metrics.py`](../src/qikly/inputs_public/examples/reference/MY_METRICS/my_metrics.py) | The module you already have. Four functions, no implementation: scaffold reads signatures, never bodies. Each body carries a `TODO` saying what is expected there |
-| [`config/tasks/MY_METRICS_VERIFY.yaml`](../src/qikly/inputs_public/examples/config/tasks/MY_METRICS_VERIFY.yaml) | `qikly --scaffold my_metrics.py`. Tests the code you already have, so it carries a `seed:` block pointing back at the module |
-| [`config/tasks/MY_METRICS.yaml`](../src/qikly/inputs_public/examples/config/tasks/MY_METRICS.yaml) | `qikly --scaffold my_metrics.py --fresh`. Writes a fresh implementation of the same interface, so it has no `seed:` block |
-| [`data/MY_METRICS/input_01.csv`](../src/qikly/inputs_public/examples/data/MY_METRICS/input_01.csv) | Sample input data, first file |
-| [`data/MY_METRICS/input_02.csv`](../src/qikly/inputs_public/examples/data/MY_METRICS/input_02.csv) | Sample input data, second file |
+| `my_metrics.py` | The module you already have. Four functions, no implementation: scaffold reads signatures, never bodies. Each body carries a `TODO` saying what is expected there |
+| `inputs_private/config/tasks/MY_METRICS_VERIFY.yaml` | What `qikly --scaffold my_metrics.py` writes. Tests the code you already have, so it carries a `seed:` block pointing back at the module |
+| `inputs_private/config/tasks/MY_METRICS.yaml` | What `qikly --scaffold my_metrics.py --fresh` writes. A fresh implementation of the same interface, so no `seed:` block |
+| `inputs_private/data/MY_METRICS/input_01.csv` | Sample input data, first file |
+| `inputs_private/data/MY_METRICS/input_02.csv` | Sample input data, second file |
 
-Under `examples/` rather than beside the bundled tasks, and deliberately. A
-scaffolded pair breaks three rules the bundled tasks keep: `MY_METRICS_VERIFY`
+It never overwrites, so running it twice is safe and your edits survive. Then:
+
+```bash
+qikly --validate --tasks MY_METRICS_VERIFY    # free, no model call
+qikly --tasks MY_METRICS_VERIFY
+```
+
+`--validate` will warn that `requirements` and `acceptance_criteria` are still
+`TODO`. That is the example working as intended: those two sections are the
+ones only you can write, and [the quick
+start](QUICK_START_ON_YOUR_OWN_DATA.md#getting-the-two-halves-right) has the
+rule for telling them apart.
+
+## Why these files exist
+
+Nothing here is illustrative. The two YAML files are the verbatim output of
+`qikly --scaffold` run on `my_metrics.py`, and `tests/test_scaffold_examples.py`
+regenerates them and fails if they drift, so what you open is what scaffold
+writes today rather than what it wrote once.
+
+The copies that ship live under [`src/qikly/inputs_public/examples/`](../src/qikly/inputs_public/examples),
+laid out the way a real project is rather than as a flat folder of samples, so
+the paths you read there are the paths `--with-example` writes them to. They
+sit under `examples/` rather than beside the bundled tasks deliberately: a
+scaffolded pair breaks three rules the bundled tasks keep. `MY_METRICS_VERIFY`
 ends in the suffix reserved for scaffolding, the pair shares one data folder
 where bundled ids map one to one, and both files still carry the `TODO`s that
 are the whole point of an example. Keeping it out of the task list also keeps
-`qikly --validate` quiet, since a bundled task full of placeholders would warn
-on every run.
+`qikly --validate` quiet for everyone who never asked for the example.
 
 ## What to look at in the two task files
 

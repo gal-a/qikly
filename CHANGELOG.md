@@ -9,6 +9,23 @@ packaging tools would read as `1.1`.
 > Two new ceilings, a narrower failure channel you can opt into, one feature withdrawn, and documentation that now matches what the coding agent actually receives
 
 ### Added
+- **`qikly --init --with-example`** copies a worked scaffold example into your
+  project, at the paths its own task files name: `my_metrics.py` at the root,
+  `MY_METRICS.yaml` and `MY_METRICS_VERIFY.yaml` in
+  `inputs_private/config/tasks/`, and two sample CSVs in
+  `inputs_private/data/MY_METRICS/`. It runs as it stands, so
+  `qikly --validate --tasks MY_METRICS_VERIFY` is clean and
+  `qikly --tasks MY_METRICS_VERIFY` works without writing anything first.
+  Never overwrites, so a second run keeps your edits.
+
+  The example files ship under `inputs_public/examples/`, laid out the way a
+  real project is. They are deliberately not bundled tasks: a scaffolded pair
+  ends in the `_VERIFY` suffix reserved for scaffolding, shares one data folder
+  where bundled ids map one to one, and still carries the `TODO`s that are the
+  point of an example, which would otherwise warn on every `--validate` for
+  everyone who never asked for it. Until this flag existed there was no way to
+  get them into a project at all, which the documentation did not admit.
+
 - **`diagnostic_feedback: staged`**, under `agent:` in `settings.yaml`, and
   **off by default.** With it on, a failing stage starts the coding agent at
   pytest's `line` traceback, which gives the file, the line and the error but

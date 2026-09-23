@@ -424,6 +424,12 @@ qikly --init                    # creates inputs_private/ and a starter task
 qikly --tasks MY_TASK
 ```
 
+Want to watch it work before writing anything, `qikly --init --with-example`
+adds a worked example that runs as it stands: a module, the two task files a
+scaffold of it produces, and sample data, each at the path a real task uses.
+It is the one command here that puts a file in your project root,
+`my_metrics.py`, and you can delete it when you are done.
+
 **[docs/QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md)** has the
 rest: the task file field by field, getting the split between `requirements`
 and `acceptance_criteria` right (decisions in one, their consequences in the other, and the gap between them is the whole mechanism),

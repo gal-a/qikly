@@ -338,3 +338,66 @@ def init_project(root):
             handle.write(body)
         made.append(path)
     return made, skipped
+
+
+# The worked example ships in the wheel under inputs_public/examples/, laid out
+# the way a real project is. Nothing copies it out on its own: it is not a
+# bundled task, so ensure_task_data never sees it and the task loader never
+# scans it. This map is the one route from the package into a project, and the
+# destinations are exactly the paths the two task files already name, so the
+# example runs the moment it lands.
+#
+# my_metrics.py goes to the project root rather than under inputs_private/
+# because MY_METRICS_VERIFY.yaml records its seed as `implementation:
+# "my_metrics.py"`, relative to the root. Put it anywhere else and the seeded
+# task cannot find the code it is meant to test.
+EXAMPLE_FILES = {
+    ("config", "tasks", "MY_METRICS.yaml"):
+        ("inputs_private", "config", "tasks", "MY_METRICS.yaml"),
+    ("config", "tasks", "MY_METRICS_VERIFY.yaml"):
+        ("inputs_private", "config", "tasks", "MY_METRICS_VERIFY.yaml"),
+    ("data", "MY_METRICS", "input_01.csv"):
+        ("inputs_private", "data", "MY_METRICS", "input_01.csv"),
+    ("data", "MY_METRICS", "input_02.csv"):
+        ("inputs_private", "data", "MY_METRICS", "input_02.csv"),
+    ("reference", "MY_METRICS", "my_metrics.py"):
+        ("my_metrics.py",),
+}
+
+
+def example_source_dir():
+    """Where the shipped example lives inside the installed package."""
+    from qikly.paths import PUBLIC_INPUTS_DIR
+
+    return os.path.join(PUBLIC_INPUTS_DIR, "examples")
+
+
+def install_example(root):
+    """
+    Copy the worked example into a project, at the paths its task files name.
+
+    Same contract as init_project: never overwrites, and reports what it wrote
+    and what it left alone. A reader who has already edited my_metrics.py keeps
+    their version, and the run that follows tests theirs rather than ours.
+
+    Returns (made, skipped, missing). `missing` is non-empty only if the wheel
+    was built without the examples, which is reported rather than raised so a
+    partial install is never left behind silently.
+    """
+    import shutil
+
+    source_dir = example_source_dir()
+    made, skipped, missing = [], [], []
+    for source_parts, dest_parts in sorted(EXAMPLE_FILES.items()):
+        source = os.path.join(source_dir, *source_parts)
+        dest = os.path.join(root, *dest_parts)
+        if not os.path.isfile(source):
+            missing.append("/".join(source_parts))
+            continue
+        if os.path.exists(dest):
+            skipped.append(dest)
+            continue
+        os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
+        shutil.copyfile(source, dest)
+        made.append(dest)
+    return made, skipped, missing
