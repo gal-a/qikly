@@ -4,6 +4,110 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## 0.5.1
+
+> The withheld section stops being found by a regex, one flag for the fixture gap, and a run that says why it is quiet
+
+### Fixed
+- **The acceptance criteria could reach the coding agent, twice over, and both
+  routes are closed.** Two separate defects in the same strip, found a week
+  apart, neither triggered by any bundled task:
+
+  A comment written between two criteria ended the match, because the lookahead
+  stopped at any line beginning with a non-space character and `#` is one.
+  Every criterion below that comment was handed over word for word. Nobody had
+  put a comment there, which is why nothing caught it.
+
+  Then, with that fixed, a wrapped criterion did the same thing. A double
+  quoted YAML scalar may continue on a line starting at column 0, so a long
+  criterion wrapped without indenting its second line reads as one list item to
+  YAML and as the end of the section to a lookahead for the next key.
+
+  Both come from the same mistake, so the fix is to stop making it: the strip
+  no longer re-derives where the section ends. `yaml.compose` returns the node
+  tree with source offsets, the span YAML itself assigned to the key is cut out
+  of the raw text, and the strip and `yaml.safe_load` now agree by
+  construction. A task file that does not parse raises instead of falling back
+  to something looser. This also fixes a quieter bug in the same lookahead,
+  which silently deleted any top level key containing a dot.
+
+- **`qikly --scaffold X --from-doc Y` wrote a task file that did not parse,**
+  then died inside its own `yaml.safe_load`. Scaffold's placeholder criterion
+  wraps, and the merge that replaces it matched only lines opening with a dash,
+  so the wrapped half was stranded below the replacement. It is step 3 of the
+  quick start, so it was reachable by following the documentation.
+
+- **`--example` handed over two tasks,** its own and `--init`'s blank
+  `MY_FIRST_TASK` starter, because it made the layout by calling `init_project`.
+  One of them was documented nowhere, and a later bare `qikly` with no `--tasks`
+  would have run both.
+
+- **Ctrl+C during a run left the task processes running** and printing, so the
+  console looked like it had ignored the interrupt. Reported from a Windows
+  shell, where it is worst.
+
+### Changed
+- **The `# Criteria: 2` markers no longer reach the coding agent.** Test
+  generation writes them into each test's docstring for the reviewer and the
+  coverage report, and pytest prints a failing test's whole docstring, so they
+  went over too: how many criteria exist, which one was just failed, and across
+  iterations a partial map of the bar. Unlike the prose around them they carry
+  nothing a repair can use, which makes this the only one of the three channels
+  that closes for free. `traceability_markers_visible: true` under `agent:`
+  restores the old behaviour. The suite on disk keeps its markers.
+
+  The other two channels stay open and are now written down in the README
+  rather than implied. A failing test's docstring paraphrases its criterion and
+  is load bearing for the repair, so it stays under `diagnostic_feedback`, off
+  by default. Test names travel for passing tests as well, and closing that
+  would cost the per-test statuses the reports are built from.
+
+- **The worked example arrives finished.** `qikly --example` used to lay down
+  task files with `TODO` in the two sections the agents read, while printing
+  the paid `qikly --tasks` line as a next step and `--validate` warning but
+  exiting 0. Both files now carry written requirements and criteria, every
+  criterion names a boundary some row in the sample data reaches, and two tests
+  hold it there.
+
+- **`qikly --validate` and `qikly --explain` look at the rest of the handover,**
+  not only at `requirements`. Everything in a task file except the criteria
+  block goes to the coding agent, comments included, so a note explaining an
+  answer is the answer. `--explain`'s verdict compares text, which reads wider
+  than it is, and it now says so when a line restates a criterion without
+  copying it. Read both as a prompt to look rather than as a guarantee: the
+  measure is word overlap, and a paraphrase can score below the threshold.
+
+- **The run says when every call will think.** Anthropic's default is
+  `claude-sonnet-5` and the Messages API reasons whenever no thinking parameter
+  is sent, which is what this project sends, so a demo that takes under a
+  minute on the Gemini default has taken about sixteen on that one with nothing
+  printed throughout. The banner now names the effective model and what it
+  implies, a line follows any call over 45 seconds, and
+  `docs/TROUBLESHOOTING.md#provider-defaults` has the table.
+
+- **Integration tests are named after the seam they cross**,
+  `test_<first>_to_<second>_<what>`, so a failure says where the pipeline came
+  apart rather than only what was wrong.
+
+- **CALC_TAX lost half its commentary.** It carried a tutorial that restated
+  the quick start almost point for point, and comments are not stripped, so
+  every FIX and PATCH prompt of every run paid to read it.
+
+### Added
+- **`qikly --propose-fixtures --tasks X`.** It was reachable only as `python -m
+  qikly.orchestrator.tuning.propose_fixtures`, shelved with the scripts that
+  measure this project, while it is a step in preparing your own task: it
+  reports which acceptance criteria no row of your data reaches and proposes a
+  row for each, and never edits your fixtures. One model call per task, and it
+  reports usage like every other command that spends money.
+- **`tools/release_check.py`**, which performs every check in
+  `RELEASE_CHECKLIST.md` that a machine can perform. `--after` confirms the
+  three places a release lands agree once the workflow finishes.
+- **The README says where test data comes from:** invented by the test-writing
+  agent for the unit and integration stages, yours for the system stage. The
+  agent never sees your fixture data, which is why a criterion no row reaches
+  is checked by an invented row and never on the path the code will take.
+
 ## 0.5.0
 
 > A worked example that arrives finished rather than as a form to fill in, one flag to get it, and the criteria import that wrote a file it could not read back
