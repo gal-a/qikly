@@ -181,7 +181,65 @@ def check_task(path):
             f"requirement: {req[:60]!r} criterion: {crit[:60]!r}",
             group=("restated", crit)))
 
+    # The same question asked of everything else the coding agent reads.
+    #
+    # `requirements` is the field people paste into, so it gets its own check
+    # above. But the handover is the whole file minus the criteria block, and a
+    # comment is prose nobody reviews as input: it reads as a note to the next
+    # maintainer while going to the agent word for word. ADAS_HEADWAY's header
+    # comment explained that a certain boundary was settled only in the
+    # criteria, and then said which way it was settled.
+    for line, crit, score in _restated_outside_requirements(raw, task):
+        warnings.append(Note(
+            f"{name}: a comment or description restates a criterion "
+            f"({int(score * 100)}% of its words). Everything in this file "
+            f"except the acceptance_criteria block goes to the coding agent, "
+            f"comments included, so a note explaining the answer is the "
+            f"answer. line: {line[:60]!r} criterion: {crit[:60]!r}",
+            group=("restated-comment", crit)))
+
     return errors, warnings
+
+
+def _restated_outside_requirements(raw, task, threshold=0.6):
+    """
+    Lines the coding agent reads, other than `requirements`, that restate a
+    criterion. Returns (line, criterion, score) triples.
+    """
+    from qikly.agent_api.agent_interface import without_acceptance_criteria
+    from qikly.from_doc import common_vocabulary, overlap
+
+    criteria = [c for c in (task.get("acceptance_criteria") or [])
+                if isinstance(c, str)]
+    if not criteria:
+        return []
+
+    requirement_text = {str(r).strip() for r in (task.get("requirements") or [])}
+    handed_over = without_acceptance_criteria(raw)
+
+    lines = []
+    for line in handed_over.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            stripped = stripped.lstrip("#").strip()
+        elif stripped.startswith("- "):
+            stripped = stripped[2:].strip().strip('"')
+        # Short lines carry no signal, and a line that IS a requirement is the
+        # other check's business: reporting it twice trains people to skim both.
+        if len(stripped) < 30 or stripped in requirement_text:
+            continue
+        if any(stripped in req for req in requirement_text):
+            continue
+        lines.append(stripped)
+
+    common = common_vocabulary(criteria)
+    found = []
+    for line in lines:
+        for crit in criteria:
+            score = overlap(line, crit, common=common)
+            if score >= threshold:
+                found.append((line, crit, round(score, 2)))
+    return found
 
 
 def check_all(task_ids=None):

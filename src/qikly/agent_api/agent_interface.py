@@ -30,7 +30,21 @@ def test_agent_md_path():
 
 AGENT_SRC_ROOT = "outputs/agent_src/code"
 
-_ACCEPTANCE_CRITERIA_RE = re.compile(r"^acceptance_criteria:.*?(?=^\S|\Z)", re.MULTILINE | re.DOTALL)
+# Everything from the heading to the next top level key, comments included.
+#
+# The lookahead used to be `^\S`, which stops at any line starting with a
+# non-space character, and `#` is one. A comment written between two criteria
+# therefore ended the match, and every criterion below it went to the coding
+# agent verbatim: the whole claim lost, silently, to a note somebody added for
+# the next reader. No bundled task did that, which is exactly why nothing
+# caught it.
+#
+# Comments sitting between the criteria and the next key go too. A comment in
+# that position is usually about the criteria it follows, and losing a note the
+# coding agent could have read costs less than leaking the bar it is judged
+# against.
+_ACCEPTANCE_CRITERIA_RE = re.compile(
+    r"^acceptance_criteria:.*?(?=^[A-Za-z_][\w-]*:|\Z)", re.MULTILINE | re.DOTALL)
 _TARGET_FILES_RE = re.compile(r"^target_files:\s*\n((?:[ \t]*-.*\n?)*)", re.MULTILINE)
 
 # Known task-type prefixes. Add a new domain family's prefix here when it's
@@ -94,6 +108,17 @@ def _read_task(task_id):
         hint = f" Did you mean {suggestion[0]!r}?" if suggestion else ""
         raise FileNotFoundError(f"task config not found at: {path}.{hint}")
     return open(path).read()
+
+
+def without_acceptance_criteria(task_text):
+    """
+    The task file as the coding agent receives it: everything but the criteria.
+
+    Public because `validate` has to check the same text this hands over. Two
+    definitions of "what the agent reads" would be one definition and one
+    guess, and the guess is the one that stops catching leaks.
+    """
+    return _ACCEPTANCE_CRITERIA_RE.sub("", task_text).rstrip() + "\n"
 
 
 def _task_without_acceptance_criteria(task_id):

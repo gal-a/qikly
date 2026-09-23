@@ -59,6 +59,11 @@ requirements:
 # Write "rejects 0 and accepts 1" rather than "must be positive": the first
 # forces a test at the boundary, the second invites a test at 5. Every one
 # below names a value that some row in the sample data actually reaches.
+#
+# And keep them out of the comments. Only this section is withheld: every other
+# line of this file, comments included, goes to the coding agent as written. A
+# note above saying which way a boundary falls is that boundary, handed over by
+# a route nobody thinks to check. `qikly --validate` looks for it.
 acceptance_criteria:
   - "A humidity_pct of 100 is usable and one of 101 is not"
   - "A temp_c of 0.0 is a measurement rather than a missing value, so a

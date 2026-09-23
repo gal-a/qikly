@@ -471,3 +471,89 @@ def test_a_collection_error_is_still_legible_at_the_narrow_rungs():
     assert "COLLECTION ERROR" in text
     assert "ModuleNotFoundError" in text
     assert "Unknown failure" not in text
+
+
+# --------------------------------------------- the comment that broke it ----
+
+COMMENTED_TASK_YAML = f"""task_id: "SENTINEL_TASK"
+
+requirements:
+  - "Read rows from the input CSVs and write results to the output path."
+
+acceptance_criteria:
+  - "{SENTINEL_A} must be rejected with a reason."
+# Reviewer: check this one against the ticket before the next release.
+  - "{SENTINEL_B} must be rounded to two decimal places."
+
+# About the interface, not the criteria.
+interface:
+  module: "outputs.agent_src.code.SENTINEL_TASK.calc"
+  system_entrypoint: "run(input_paths, output_path) -> None"
+"""
+
+
+def test_a_comment_between_two_criteria_does_not_leak_the_rest():
+    """
+    The strip stops at the next top level key, not at the next `#`.
+
+    With the old lookahead of `^\\S` it stopped at any line opening with a
+    non-space character, and a comment is one. Everything below that comment
+    went to the coding agent word for word. No bundled task had a comment
+    there, and the sentinel task in this file did not either, so every test
+    here passed while the property was one keystroke from being lost in
+    anybody's own task file.
+    """
+    stripped = ai._ACCEPTANCE_CRITERIA_RE.sub("", COMMENTED_TASK_YAML)
+
+    assert SENTINEL_A not in stripped, "the criterion above the comment leaked"
+    assert SENTINEL_B not in stripped, (
+        "the criterion BELOW the comment leaked: the strip stopped at the "
+        "comment instead of at the next top level key")
+    assert "rounded to two decimal places" not in stripped
+    assert "check this one against the ticket" not in stripped, (
+        "a comment sitting inside the criteria block is about the criteria, "
+        "so it goes with them")
+
+    # The rest of the file must survive, or the coding agent has no task.
+    assert "interface:" in stripped
+    assert "system_entrypoint" in stripped
+    assert "Read rows from the input CSVs" in stripped
+
+
+def test_every_bundled_task_hands_over_none_of_its_own_criteria():
+    """
+    The property, asserted against the files that ship rather than a fixture.
+
+    A sentinel task proves the regex. This proves the thirteen real ones, which
+    is where a criterion actually written by a person could survive.
+    """
+    import os
+
+    import yaml
+
+    from qikly.paths import PUBLIC_INPUTS_DIR
+
+    tasks = os.path.join(PUBLIC_INPUTS_DIR, "config", "tasks")
+    checked = 0
+    for name in sorted(os.listdir(tasks)):
+        if not name.endswith(".yaml"):
+            continue
+        with open(os.path.join(tasks, name), encoding="utf-8") as handle:
+            raw = handle.read()
+        criteria = (yaml.safe_load(raw) or {}).get("acceptance_criteria") or []
+        if not criteria:
+            continue
+        stripped = ai._ACCEPTANCE_CRITERIA_RE.sub("", raw)
+        for criterion in criteria:
+            assert str(criterion) not in stripped, (
+                "%s hands the coding agent one of its own acceptance criteria: "
+                "%r" % (name, str(criterion)[:80]))
+        # The parsed key, not the word. A comment naming the section (CALC_TAX
+        # explains the file's three parts to whoever opens it) says only that a
+        # withheld section exists, which this project states everywhere anyway.
+        reparsed = yaml.safe_load(stripped) or {}
+        assert "acceptance_criteria" not in reparsed, (
+            "%s still carries an acceptance_criteria key after stripping" % name)
+        checked += 1
+
+    assert checked >= 13, "expected to check every bundled task, checked %d" % checked

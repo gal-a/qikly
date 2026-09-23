@@ -5,12 +5,16 @@
 # measured to misread a clear criterion (see orchestrator/tuning/check_suites.py).
 #
 # One asymmetry is deliberate. The requirements give the radar's rated range as
-# an upper limit and leave the bottom of it open, so whether a gap of exactly
-# zero is a measurement is settled only in the criteria. That is what makes this
-# task a worked example: the coding agent writes `gap_m < 0`, a test it never
-# saw rejects a zero-metre gap, and it closes the range from the failure alone.
-# ADAS_TTC states its lower bound in the requirements instead, which is the
-# usual way round.
+# an upper limit and leave the bottom of it open, so where that range ends is
+# settled only in the criteria, and the coding agent has to arrive at it from a
+# failing test rather than from anything it was told. ADAS_TTC states its lower
+# bound in the requirements instead, which is the usual way round.
+#
+# Which way it falls is not written here, and must not be. Comments are not
+# stripped: everything in this file except the acceptance_criteria block goes
+# to the coding agent as written, so a comment explaining the answer is the
+# answer. This paragraph used to give it away, in the one task chosen to
+# demonstrate a boundary the agent cannot guess.
 task_id: "ADAS_HEADWAY"
 
 task_name: "ADAS - Following-Distance Headway Check"

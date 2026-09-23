@@ -60,6 +60,11 @@ requirements:
 #
 # Write "rejects 0 and accepts 1" rather than "must be positive": the first
 # forces a test at the boundary, the second invites a test at 5.
+#
+# And keep them out of the comments. Only this section is withheld: every other
+# line of this file, comments included, goes to the coding agent as written. A
+# note above saying which way a boundary falls is that boundary, handed over by
+# a route nobody thinks to check. `qikly --validate` looks for it.
 acceptance_criteria:
   - "TODO: one checkable statement, with its boundary value, e.g. a humidity of
     100 is accepted and 101 is rejected"

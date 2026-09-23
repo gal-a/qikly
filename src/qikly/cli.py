@@ -1847,8 +1847,24 @@ def main():
     ]
     for p in processes:
         p.start()
-    for p in processes:
-        p.join()
+    try:
+        for p in processes:
+            p.join()
+    except KeyboardInterrupt:
+        # Ctrl+C arrives while the parent is blocked in join(). Without this it
+        # raises here, the parent unwinds, and the children keep running and
+        # keep printing, so the console looks like it ignored the interrupt
+        # entirely. Reported from a Windows shell, where it is worst: the only
+        # process that reacted is the one that had stopped waiting.
+        print()
+        print("Interrupted. Stopping %d task process(es)." % len(processes))
+        for p in processes:
+            if p.is_alive():
+                p.terminate()
+        for p in processes:
+            p.join(timeout=10)
+        print("Stopped. Anything already written is under outputs/.")
+        sys.exit(130)
 
     failed = [p.name for p in processes if p.exitcode != 0]
     if failed:

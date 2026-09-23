@@ -67,6 +67,46 @@ convergence rate, take it on the default. If you need the strictest bar for one
 important specification, pay for it once. One run of each is an anecdote, not a
 comparison; the figures above are a single run per model.
 
+### The default model is not the same size on every provider
+
+<a id="provider-defaults"></a>Set no `LLM_MODEL` and each provider gets its own
+default, and they are not the same class of model. This is the first thing to
+check when a run takes far longer on one provider than another:
+
+| Provider | Default model | What that means for a run |
+|---|---|---|
+| Gemini | `gemini-3.5-flash-lite` | Small, cheap, no reasoning step. Every published figure here was measured on it. A demo task runs in well under a minute |
+| OpenAI | `gpt-4o` | Mid-tier. Slower and dearer than the Gemini default |
+| Anthropic | `claude-sonnet-5` | A reasoning model. qikly sends no thinking configuration, and on this model that means adaptive thinking runs by default, so every call thinks before it answers |
+
+The Anthropic default is the one that surprises people. The same demo task that
+finishes in under a minute on the Gemini default has taken around sixteen
+minutes on it, for the same seven or so model calls. Nothing is wrong when that
+happens: you are watching a reasoning model think, and it produces a stricter
+suite for it.
+
+**For a like-for-like comparison with the Gemini default, name the model:**
+
+```bash
+export LLM_MODEL=claude-haiku-4-5    # Windows PowerShell: $env:LLM_MODEL = "claude-haiku-4-5"
+```
+
+Haiku is the closest Anthropic analogue to a flash-lite class model, and qikly
+sends no thinking budget, which that model needs before it will think at all.
+So a run on it spends no time or tokens on reasoning.
+
+Keep `claude-sonnet-5` when you want the stricter bar, and expect the run to
+take minutes rather than seconds. What qikly does not yet expose is the middle
+setting: the API takes a reasoning effort level, and a way to ask for less of
+it without changing model would make this a dial rather than a switch.
+
+**If it looks stuck**, it probably is not. A single call can legitimately run
+for minutes on a reasoning model and qikly prints nothing while it waits. One
+call is abandoned after `QIKLY_REQUEST_TIMEOUT` seconds, 300 by default, which
+was chosen when the slowest observed call was well under a minute; on a
+reasoning model consider raising it, or a slow-but-working call is thrown away
+and retried from scratch.
+
 ## 2. Read what actually blocked it
 
 Every run writes a timeline:

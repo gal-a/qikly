@@ -66,6 +66,12 @@ nothing.
 | OpenAI | `OPENAI_API_KEY` | `pip install "qikly[openai]"` |
 | Anthropic | `ANTHROPIC_API_KEY` | `pip install "qikly[anthropic]"` |
 
+**The default model differs by provider**, and they are not the same size:
+Gemini gets `gemini-3.5-flash-lite`, OpenAI `gpt-4o`, Anthropic
+`claude-sonnet-5`, which is a reasoning model and takes minutes rather than
+seconds per run. [Which default you get, and how to change
+it](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md#provider-defaults).
+
 One key is enough and `LLM_PROVIDER` is optional: qikly uses the one key it
 finds and prints which. Set `LLM_PROVIDER` to `gemini`, `openai` or `anthropic`
 only when you hold more than one and want to choose. The key is a shell
@@ -75,7 +81,11 @@ in [docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PR
 
 `--demo` runs one task end to end in a throwaway `demo/<timestamp>/` directory
 and prints what it built and where. It writes nothing outside that directory,
-so a first run leaves everything else untouched. About 30 seconds.
+so a first run leaves everything else untouched. About 30 seconds on the Gemini
+default, and [several minutes on the Anthropic
+one](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md#provider-defaults),
+which is a reasoning model. There is no progress output while a call is in
+flight, so a long wait is not a hang.
 
 For the same thing on vehicle sensor data rather than an order pipeline:
 

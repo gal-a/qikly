@@ -72,7 +72,38 @@ def build(task_id):
         "coding_agent_sees": withheld,
         "leaked": leaked,
         "withheld_ok": not leaked and bool(criteria),
+        # Not part of the verdict. A restatement is a judgement call and the
+        # measure is blunt, so it is reported as something to look at rather
+        # than as a pass or a fail.
+        "restated": _restated_lines(task_id),
     }
+
+
+def _restated_lines(task_id):
+    """
+    Lines of prose the coding agent reads that resemble a withheld criterion.
+
+    Same check `qikly --validate` runs, reported here because this is the
+    command people run to satisfy themselves the withholding is real, and a
+    string comparison is not the whole of that question.
+    """
+    import yaml
+
+    from qikly.agent_api.agent_interface import task_config_path
+    from qikly.validate import _restated_outside_requirements
+
+    # Only the file being unreadable is survivable here. A bare `except` around
+    # the whole body once hid a NameError in this very function and returned
+    # "nothing restated", which is the shape of guard this project exists to
+    # argue against: it reported a clean result while checking nothing.
+    try:
+        with open(task_config_path(task_id), encoding="utf-8") as handle:
+            raw = handle.read()
+    except OSError:
+        return []
+    task = yaml.safe_load(raw) or {}
+    return [{"line": line, "criterion": crit, "score": score}
+            for line, crit, score in _restated_outside_requirements(raw, task)]
 
 
 def render(facts):
@@ -152,6 +183,17 @@ def render(facts):
         lines.append("  VERDICT: no criterion text reaches the coding agent, so when a "
                      "test fails it")
         lines.append("  sees the error and never the rule it broke.")
+        if facts.get("restated"):
+            lines.append("")
+            lines.append("  BUT LOOK AT THIS. That verdict compares text. These lines "
+                         "are not")
+            lines.append("  copied from a criterion and say much the same thing, and "
+                         "they go over")
+            lines.append("  with everything else in the file:")
+            for item in facts["restated"][:3]:
+                lines.append(f"    line     : {item['line'][:66]}")
+                lines.append(f"    criterion: {item['criterion'][:66]}")
+                lines.append("")
     else:
         lines.append("  VERDICT: FAILED. Criteria text is present in what the coding")
         lines.append("  agent receives, which breaks the property this whole tool rests")
