@@ -395,36 +395,49 @@ def _call(prompt, seed):
 # Anthropic's Messages API runs adaptive thinking whenever no `thinking`
 # parameter is sent, which is what this project sends, so every model there
 # thinks except the Haiku line, which needs an explicit budget before it will.
+# The fast, non-reasoning line on each provider. Written this way round on
+# purpose: a model nobody has heard of is assumed to reason.
+#
+# The first version listed the reasoning models instead, and got Gemini exactly
+# backwards, reporting a pro model as the fast option. Inverting it for Gemini
+# alone left the same shape behind on OpenAI, where a future reasoning model
+# not named o1/o3/o4 would have been called fast. So both directions now agree:
+# name the family known to be fast, and let everything else warn. A wrong
+# warning costs a sentence; a wrong silence costs someone sixteen minutes
+# wondering whether the thing has hung.
+_FAST_FAMILIES = {
+    # Anthropic reasons on every model when no thinking parameter is sent,
+    # which is what this project sends. Haiku needs an explicit budget first.
+    "anthropic": ("haiku",),
+    "gemini": ("flash",),
+    "openai": ("gpt-4o", "gpt-3.5", "gpt-4-turbo"),
+}
+
+
 def thinks_before_answering(provider, model):
     """Whether one call to this model includes a reasoning step."""
+    families = _FAST_FAMILIES.get(provider)
+    if families is None:
+        # An unknown provider gets silence rather than a guess.
+        return False
     name = (model or "").lower()
-    if provider == "anthropic":
-        # Every model here reasons when no thinking parameter is sent, which is
-        # what this project sends, except the Haiku line: that one needs an
-        # explicit budget before it will think at all.
-        return "haiku" not in name
-    if provider == "gemini":
-        # The flash line is the fast, non-reasoning one. Everything else on
-        # this provider, pro included, reasons before it answers, so listing
-        # only the reasoning models would have gone stale on the next release
-        # and reported a thinking model as fast.
-        return "flash" not in name
-    if provider == "openai":
-        return name.startswith(("o1", "o3", "o4"))
-    return False
+    return not any(family in name for family in families)
 
 
 def effective_model(provider):
-    """The model this run will actually use, default included."""
+    """
+    The model this run will actually use, default included.
+
+    Asks `default_model_for`, which reads each provider module's own
+    DEFAULT_MODEL, rather than keeping a second copy of those three strings
+    here. A copy would agree today and drift the first time a provider's
+    default changed, and the banner would then name a model the run is not
+    using, which is worse than saying nothing.
+    """
     chosen = os.environ.get("LLM_MODEL")
     if chosen:
         return chosen
-    defaults = {
-        "gemini": "gemini-3.5-flash-lite",
-        "openai": "gpt-4o",
-        "anthropic": "claude-sonnet-5",
-    }
-    return defaults.get(provider, "<provider default>")
+    return default_model_for(provider) or "<provider default>"
 
 
 def speed_notice(provider, model):

@@ -504,7 +504,7 @@ def test_a_comment_between_two_criteria_does_not_leak_the_rest():
     here passed while the property was one keystroke from being lost in
     anybody's own task file.
     """
-    stripped = ai._ACCEPTANCE_CRITERIA_RE.sub("", COMMENTED_TASK_YAML)
+    stripped = ai.without_acceptance_criteria(COMMENTED_TASK_YAML)
 
     assert SENTINEL_A not in stripped, "the criterion above the comment leaked"
     assert SENTINEL_B not in stripped, (
@@ -544,7 +544,7 @@ def test_every_bundled_task_hands_over_none_of_its_own_criteria():
         criteria = (yaml.safe_load(raw) or {}).get("acceptance_criteria") or []
         if not criteria:
             continue
-        stripped = ai._ACCEPTANCE_CRITERIA_RE.sub("", raw)
+        stripped = ai.without_acceptance_criteria(raw)
         for criterion in criteria:
             assert str(criterion) not in stripped, (
                 "%s hands the coding agent one of its own acceptance criteria: "
@@ -647,3 +647,63 @@ def test_restoring_the_old_behaviour_is_one_setting(monkeypatch):
         {"raw_output": MARKED_FAILURE, "failed_tests": []}, strip_markers=False)
     assert "# Criteria: 2" in text, (
         "traceability_markers_visible: true must restore the old channel")
+
+
+WRAPPED_TASK_YAML = f"""task_id: "SENTINEL_TASK"
+
+requirements:
+  - "Read rows from the input CSVs and write results to the output path."
+
+acceptance_criteria:
+  - "{SENTINEL_A} is rejected, and the reason
+note: names the field that caused it"
+  - "{SENTINEL_B} must be rounded to two decimal places."
+
+interface:
+  module: "outputs.agent_src.code.SENTINEL_TASK.calc"
+  system_entrypoint: "run(input_paths, output_path) -> None"
+"""
+
+
+def test_a_criterion_wrapped_onto_column_zero_does_not_end_the_strip():
+    """
+    The case a regex could not be taught, and the reason this uses the parser.
+
+    A double-quoted YAML scalar may continue on a line beginning at column 0.
+    To every YAML parser the block above is two criteria. To a lookahead for
+    the next top level key, `note:` was the next section, so the strip stopped
+    there and handed over the rest of that criterion and all of the one below.
+
+    Nothing exotic produced it: wrapping a long quoted criterion without
+    indenting the continuation is all it takes.
+    """
+    import yaml
+
+    parsed = yaml.safe_load(WRAPPED_TASK_YAML)
+    assert len(parsed["acceptance_criteria"]) == 2, (
+        "if YAML stops reading this as two criteria the test no longer covers "
+        "the case it was written for")
+
+    stripped = ai.without_acceptance_criteria(WRAPPED_TASK_YAML)
+
+    assert SENTINEL_A not in stripped
+    assert SENTINEL_B not in stripped, (
+        "the criterion after the wrapped one leaked: the strip ended at a "
+        "continuation line it mistook for the next key")
+    assert "names the field that caused it" not in stripped
+    assert "rounded to two decimal places" not in stripped
+
+    assert "interface:" in stripped
+    assert "Read rows from the input CSVs" in stripped
+
+
+def test_a_task_file_that_does_not_parse_fails_closed():
+    """
+    No fallback to a looser method. A run cannot use a file YAML rejects, so
+    the choice is between an error and handing over unverified text.
+    """
+    import pytest as _pytest
+
+    broken = 'task_id: "T"\nacceptance_criteria:\n  - "unclosed quote\n'
+    with _pytest.raises(RuntimeError, match="does not parse"):
+        ai.without_acceptance_criteria(broken)

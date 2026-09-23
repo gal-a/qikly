@@ -44,8 +44,18 @@ def _collection_summary(raw):
 # `# Requirements: 2, 4` and `# Criteria: 2`, as test generation writes them
 # into a docstring and `qikly.traceability` reads them back. Tolerant about
 # spacing and about the label's plural, because a model writes the line.
+#
+# The value has to be a list of indices, or `none`, and that is the load
+# bearing part of this pattern rather than a nicety. Matching on the label
+# alone also matched an implementation's own comments: the coding agent has
+# just read a task file with a `requirements:` section, so a comment reading
+# `# Requirements: reject rows missing a tax_rate` is an ordinary thing for it
+# to write, and pytest prints the frames around a failure. That comment was
+# then deleted from the next FIX prompt, which is the opposite of a leak and
+# still a bug: this narrowing is only free if it removes nothing else.
 _TRACE_MARKER = re.compile(
-    r"^\s*#\s*(?:requirements?|criteri(?:on|a))\s*:.*$",
+    r"^[ \t]*#[ \t]*(?:requirements?|criteri(?:on|a))[ \t]*:"
+    r"[ \t]*(?:none|\d+(?:[ \t]*,[ \t]*\d+)*)[ \t]*$",
     re.IGNORECASE | re.MULTILINE)
 
 

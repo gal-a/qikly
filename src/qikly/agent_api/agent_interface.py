@@ -110,6 +110,43 @@ def _read_task(task_id):
     return open(path).read()
 
 
+def _criteria_span(task_text):
+    """
+    Where `acceptance_criteria` starts and ends, according to YAML itself.
+
+    Returns (start, end) character offsets into `task_text`, or None if the
+    file declares no criteria. The span runs from the key to the start of the
+    next top level key, so comments sitting between the criteria and that key
+    go with them: a comment in that position is usually about the criteria it
+    follows, and losing a note costs less than leaking the bar.
+
+    Offsets come from `yaml.compose`, which is the same parser `safe_load`
+    uses, so this cannot disagree with what a run actually reads. That is the
+    whole point of doing it this way. A regex has to re-derive where a value
+    ends, and YAML has more ways to continue one than a lookahead can carry: a
+    double-quoted scalar may wrap onto a line beginning at column 0, which the
+    previous `^[A-Za-z_][\w-]*:` lookahead read as the next section. It
+    stopped there and handed over the remainder of that criterion and every
+    criterion below it.
+    """
+    import yaml
+
+    node = yaml.compose(task_text)
+    if node is None or not isinstance(node, yaml.MappingNode):
+        return None
+
+    for index, (key, value) in enumerate(node.value):
+        if getattr(key, "value", None) != "acceptance_criteria":
+            continue
+        start = key.start_mark.index
+        if index + 1 < len(node.value):
+            end = node.value[index + 1][0].start_mark.index
+        else:
+            end = len(task_text)
+        return start, end
+    return None
+
+
 def without_acceptance_criteria(task_text):
     """
     The task file as the coding agent receives it: everything but the criteria.
@@ -117,8 +154,25 @@ def without_acceptance_criteria(task_text):
     Public because `validate` has to check the same text this hands over. Two
     definitions of "what the agent reads" would be one definition and one
     guess, and the guess is the one that stops catching leaks.
+
+    A file that does not parse raises rather than falling back to a looser
+    method. Failing closed is the only safe direction here: a run cannot use a
+    task file YAML rejects anyway, so the choice is between an error and
+    handing over text nobody has verified.
     """
-    return _ACCEPTANCE_CRITERIA_RE.sub("", task_text).rstrip() + "\n"
+    import yaml
+
+    try:
+        span = _criteria_span(task_text)
+    except yaml.YAMLError as exc:
+        raise RuntimeError(
+            "this task file does not parse as YAML, so which part of it is the "
+            "withheld section cannot be established: %s" % exc) from exc
+
+    if span is None:
+        return task_text.rstrip() + "\n"
+    start, end = span
+    return (task_text[:start] + task_text[end:]).rstrip() + "\n"
 
 
 def _task_without_acceptance_criteria(task_id):
@@ -135,7 +189,7 @@ def _task_without_acceptance_criteria(task_id):
     developer working from requirements alone would be.
     """
     task_text = _read_task(task_id)
-    stripped = _ACCEPTANCE_CRITERIA_RE.sub("", task_text)
+    stripped = without_acceptance_criteria(task_text)
     return stripped.rstrip() + "\n"
 
 
