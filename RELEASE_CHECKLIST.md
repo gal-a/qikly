@@ -165,12 +165,9 @@ the one list that gets read before every upload.
 
 Waiting for the next upload:
 
-- The `ADAS_*` tasks by name, in "Who it is for" and in the use-case table. The
-  page currently says which domains they serve without naming the tasks.
-- Independence evidence: for code you supply, a run reports whether git says
-  the criteria were settled before that code's first commit, and prints the
-  bounds of that claim beside it. The use-case row for "code someone else
-  wrote" is where it belongs.
+- Nothing at the moment. Both items that stood here through 0.5.0 are on the
+  page: the `ADAS_*` tasks are named in "Who it is for", with the command to
+  run one, and independence evidence has its own row in the comparison table.
 
 Clear an item as you add it, and add one whenever something lands on the branch
 that the page cannot honestly show yet.
