@@ -37,11 +37,11 @@ requirements:
   - "Normalize accepted fields into a consistent format before writing output: title case for street and city (each word's first letter capitalized, the rest lowercase, once whitespace is trimmed and collapsed to single spaces), a consistent two-letter state code, and a consistent zip format"
   - "Treat rows as duplicates -- and keep only the first occurrence -- whenever they represent the same address once normalized"
   - "A row that fails validation, or that's a duplicate of an earlier row, is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected (which field was invalid, or that it duplicated an earlier row)"
-  - "Write the result to outputs/data/ETL_ADDRESS/output.json as a single JSON object with two keys: \"accepted\" (the list of valid, normalized rows) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+  - "Write the result to outputs/data/ETL_ADDRESS/output.json as JSON. The interface above gives the shape it must have"
 
 acceptance_criteria:
   - "All valid rows appear in the output JSON's \"accepted\" list, and only valid rows appear there"
-  - "Invalid, malformed, or duplicate rows are excluded from \"accepted\" and instead appear in \"rejected\", each with a reason"
+  - "Every input row from both files is accounted for exactly once across \"accepted\" and \"rejected\" combined: the two lists together have the same number of entries as the input had rows, so no row is lost and none is counted twice"
   - "Output JSON is a single object with \"accepted\" and \"rejected\" keys, each a list of objects"
   - "Each rejected row's reason names the specific field that caused rejection (e.g. \"zip\", \"state\", \"street\") rather than a generic message like \"invalid row\" -- except duplicates, whose reason identifies them as a duplicate rather than naming a field"
   - "A zip code is only valid if, after normalization, it is exactly 5 digits -- a ZIP+4 style input (5 digits, a hyphen, then 4 more digits) is normalized by keeping only the first 5 digits; any zip containing a letter, or with fewer than 5 or more than 5 digits before an optional '-XXXX' suffix, is invalid"

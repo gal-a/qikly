@@ -36,7 +36,7 @@ requirements:
   - "Apply reasonable, strict real-world validation to sku, transaction_type, quantity, and timestamp -- reject anything malformed or implausible"
   - "Process valid transactions to maintain an accurate running stock level per sku, in the correct order, rejecting any transaction that would make a sku's stock go negative"
   - "A transaction that fails validation, or that would violate stock non-negativity, is not included among accepted -- but is not silently dropped either: record the original transaction alongside a brief, specific reason it was rejected"
-  - "Write the result to outputs/data/MERGE_STOCK/output.json as a single JSON object with two keys: \"accepted\" (the list of valid, processed transactions, each with its resulting stock level for that sku) and \"rejected\" (a list of objects, each the original transaction plus a \"reason\" field)"
+  - "Write the result to outputs/data/MERGE_STOCK/output.json as JSON. The interface above gives the shape it must have"
 
 # A hand-written implementation that satisfies this spec, used only to check
 # whether a generated suite refuses code that is correct. NEVER shown to any

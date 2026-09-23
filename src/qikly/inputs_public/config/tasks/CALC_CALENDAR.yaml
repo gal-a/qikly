@@ -36,7 +36,7 @@ requirements:
   - "Apply reasonable, strict real-world validation to customer_id, start_date, end_date, and monthly_rate -- reject anything malformed or implausible"
   - "For each valid request, compute the charge_amount owed for the date range described by start_date and end_date, given the flat monthly_rate, as a currency amount rounded to the nearest cent"
   - "A request that fails validation is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
-  - "Write the result to outputs/data/CALC_CALENDAR/output.json as a single JSON object with two keys: \"accepted\" (the list of valid requests, each with its computed charge_amount) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+  - "Write the result to outputs/data/CALC_CALENDAR/output.json as JSON. The interface above gives the shape it must have"
 
 acceptance_criteria:
   - "All valid billing requests appear in the output JSON's \"accepted\" list, and only valid requests appear there"

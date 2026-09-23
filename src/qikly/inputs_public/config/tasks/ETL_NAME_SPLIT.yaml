@@ -36,7 +36,7 @@ requirements:
   - "Apply reasonable, strict real-world validation to full_name -- reject anything malformed or that doesn't contain enough information to identify a first and last name"
   - "For each valid row, split full_name into its component parts: first_name, last_name, and suffix (if present)"
   - "A row that fails validation is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
-  - "Write the result to outputs/data/ETL_NAME_SPLIT/output.json as a single JSON object with two keys: \"accepted\" (the list of valid rows, each with its split first_name, last_name, and suffix) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+  - "Write the result to outputs/data/ETL_NAME_SPLIT/output.json as JSON. The interface above gives the shape it must have"
 
 acceptance_criteria:
   - "All valid names appear in the output JSON's \"accepted\" list, and only valid names appear there"

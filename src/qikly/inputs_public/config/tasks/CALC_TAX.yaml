@@ -76,7 +76,7 @@ requirements:
   - "Apply reasonable, strict real-world data-quality validation to item_price, quantity, and tax_rate -- reject anything malformed, implausible, or out of range"
   - "For each valid row, compute the line subtotal (item_price times quantity), the tax owed (subtotal times tax_rate), and the line total (subtotal plus tax), all as currency amounts rounded to the nearest cent"
   - "A row that fails validation is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
-  - "Write the result to outputs/data/CALC_TAX/output.json as a single JSON object with two keys: \"accepted\" (the list of valid rows, each with its computed subtotal, tax, and total) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+  - "Write the result to outputs/data/CALC_TAX/output.json as JSON. The interface above gives the shape it must have"
 
 acceptance_criteria:
   - "All valid rows appear in the output JSON's \"accepted\" list, and only valid rows appear there"

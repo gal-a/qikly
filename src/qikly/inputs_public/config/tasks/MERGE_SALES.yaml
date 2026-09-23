@@ -36,7 +36,7 @@ requirements:
   - "Apply reasonable, strict real-world validation to amount and date -- reject anything malformed or implausible"
   - "The same transaction_id must never be double-counted just because it appears in both files' overlapping coverage windows"
   - "A transaction that fails validation is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
-  - "Write the result to outputs/data/MERGE_SALES/output.json as a single JSON object with two keys: \"accepted\" (the list of valid, deduplicated transactions) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+  - "Write the result to outputs/data/MERGE_SALES/output.json as JSON. The interface above gives the shape it must have"
 
 acceptance_criteria:
   - "All valid, non-duplicate transactions appear in the output JSON's \"accepted\" list, and only those appear there"

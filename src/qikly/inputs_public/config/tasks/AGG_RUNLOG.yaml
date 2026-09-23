@@ -35,7 +35,7 @@ requirements:
   - "A test_run event carries a \"counts\" object (passed/failed/error/skipped/total), a \"status\" of pass or fail, a \"stage\", and the boolean flags \"is_bootstrap\" and \"is_regression_check\"."
   - "For each log, report: how many test runs happened, how many iterations of real fixing work the run took, how many fix cycles were attempted, how many patches were applied, how many failed to apply, how many regression re-checks ran and how many of those failed, whether the run finished successfully, and how many lines could not be read."
   - "Summarize each log separately, then also report combined totals across all logs."
-  - "Write the result to outputs/data/AGG_RUNLOG/output.json as a single JSON object with two keys: \"runs\" (a list of per-log summaries, in the order the logs were given, each including the log's own path under \"source\") and \"totals\" (the same count fields, summed across every log)."
+  - "Write the result to outputs/data/AGG_RUNLOG/output.json as JSON. The interface above gives the shape it must have"
   - "The logs are written by a long-running process and are not guaranteed to be complete or well-formed at the point they are read"
 
 acceptance_criteria:

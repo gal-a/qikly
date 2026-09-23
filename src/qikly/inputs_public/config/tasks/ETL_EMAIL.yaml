@@ -37,7 +37,7 @@ requirements:
   - "Treat rows as duplicates -- and keep only the first occurrence -- whenever they share an identifying field once normalized"
   - "Normalize accepted fields before writing output (e.g. consistent whitespace, consistent email case)"
   - "A row that fails validation, or that's a duplicate of an earlier row, is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected (which field was invalid, or that it duplicated an earlier row)"
-  - "Write the result to outputs/data/ETL_EMAIL/output.json as a single JSON object with two keys: \"accepted\" (the list of valid, normalized rows) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+  - "Write the result to outputs/data/ETL_EMAIL/output.json as JSON. The interface above gives the shape it must have"
 
 acceptance_criteria:
   - "All valid rows appear in the output JSON's \"accepted\" list, and only valid rows appear there"

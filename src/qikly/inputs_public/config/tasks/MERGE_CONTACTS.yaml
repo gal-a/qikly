@@ -36,7 +36,7 @@ requirements:
   - "Apply reasonable, strict real-world validation to name, phone, email, and last_modified -- reject anything malformed or implausible"
   - "When the same contact_id appears in both input files, reconcile them into a single, most up-to-date record rather than keeping both or arbitrarily choosing one"
   - "A record that fails validation is not included among the accepted rows -- but is not silently dropped either: record the original row alongside a brief, specific reason it was rejected"
-  - "Write the result to outputs/data/MERGE_CONTACTS/output.json as a single JSON object with two keys: \"accepted\" (the list of valid, reconciled contact records) and \"rejected\" (a list of objects, each the original row plus a \"reason\" field)"
+  - "Write the result to outputs/data/MERGE_CONTACTS/output.json as JSON. The interface above gives the shape it must have"
 
 acceptance_criteria:
   - "All valid contacts appear in the output JSON's \"accepted\" list, and only valid contacts appear there"
