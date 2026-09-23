@@ -104,8 +104,15 @@ def test_criteria_are_never_derived_from_the_implementation(module):
     """
     text, _ = scaffold.build_task(str(module), str(module.parent.parent))
     data = yaml.safe_load(text)
-    assert data["acceptance_criteria"] == ["TODO: one checkable statement, with its boundary value"]
-    assert data["requirements"] == ["TODO: describe what this module must do"]
+    # startswith, not equality: the placeholder carries an `e.g.` showing the
+    # shape of a criterion, and that example is fixed template text. What this
+    # test is about is that nothing was read out of the module, so it pins the
+    # placeholder rather than the wording of the hint attached to it.
+    assert len(data["acceptance_criteria"]) == 1
+    assert data["acceptance_criteria"][0].startswith(
+        "TODO: one checkable statement, with its boundary value")
+    assert len(data["requirements"]) == 1
+    assert data["requirements"][0].startswith("TODO: describe what this module must do")
     assert "never sees" in text.lower() or "NEVER sees" in text
 
 

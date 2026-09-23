@@ -115,6 +115,10 @@ packages = [
     "inputs_public/reference/*/*.py",
     "inputs_public/agent_defs/*.md",
     "inputs_public/data/**/*",
+    # The worked scaffold example, laid out the way a real project is so a
+    # reader sees the right shape. Not a bundled task: it lives under
+    # examples/ so it stays out of the task list and out of --validate.
+    "inputs_public/examples/**/*",
     # The MCP server's icon. Shipped rather than read out of docs/, which is
     # not in the wheel, and embedded as a data URI at runtime so no host has
     # to resolve a path on the reader's filesystem.

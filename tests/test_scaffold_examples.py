@@ -1,10 +1,17 @@
 """
-The worked example in docs/examples/ is real output, and stays real.
+The worked example is real output, and stays real.
 
-`docs/examples/` holds the two task files `qikly --scaffold` writes for
-`my_metrics.py`, one with `--fresh` and one without, and the quick start links
-to them so a reader can see what step 1 produces instead of reading a
-description of it.
+`inputs_public/examples/` mirrors the layout of a real project, so a reader sees
+where these files belong rather than a flat folder of samples: the two task
+files `qikly --scaffold` writes for `my_metrics.py`, one with `--fresh` and one
+without, under `config/tasks/`, the sample data under `data/MY_METRICS/`, and
+the module itself under `reference/MY_METRICS/`.
+
+Under examples/ rather than beside the bundled tasks, and deliberately. A
+scaffolded pair breaks three rules bundled tasks keep: `MY_METRICS_VERIFY` ends
+in the suffix reserved for scaffolding, the pair shares one data folder where
+bundled ids map one to one, and both files still carry the `TODO`s that are the
+point of an example. Shipping it as a bundled task would have cost all three.
 
 An example nobody regenerates drifts. That is not hypothetical here: the worked
 example in `docs/design_1_case_study.md` printed a test with a name and a body
@@ -21,7 +28,10 @@ import tempfile
 import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EXAMPLES = os.path.join(ROOT, "docs", "examples")
+EXAMPLE = os.path.join(ROOT, "src", "qikly", "inputs_public", "examples")
+TASKS = os.path.join(EXAMPLE, "config", "tasks")
+DATA = os.path.join(EXAMPLE, "data", "MY_METRICS")
+MODULE = os.path.join(EXAMPLE, "reference", "MY_METRICS", "my_metrics.py")
 
 
 def _scaffold(fresh):
@@ -31,7 +41,7 @@ def _scaffold(fresh):
     workspace = tempfile.mkdtemp(prefix="qikly-scaffold-example-")
     try:
         module = os.path.join(workspace, "my_metrics.py")
-        shutil.copy2(os.path.join(EXAMPLES, "my_metrics.py"), module)
+        shutil.copy2(MODULE, module)
         text, error = scaffold.build_task(
             module, workspace, seed=None if fresh else "existing")
         assert error is None, "scaffold refused to build the example: %s" % error
@@ -42,7 +52,7 @@ def _scaffold(fresh):
 
 
 def _committed(name):
-    with open(os.path.join(EXAMPLES, name), encoding="utf-8") as handle:
+    with open(os.path.join(TASKS, name), encoding="utf-8") as handle:
         return handle.read()
 
 
@@ -57,7 +67,7 @@ def test_the_committed_example_is_what_scaffold_writes_today(fresh, name):
     # prevent: a guard that reports success while checking nothing.
     text = _scaffold(fresh)
     assert text.strip() == _committed(name).strip(), (
-        "docs/examples/%s no longer matches what `qikly --scaffold%s "
+        "inputs_public/config/tasks/%s no longer matches what `qikly --scaffold%s "
         "my_metrics.py` writes. Regenerate it rather than editing it by hand."
         % (name, " --fresh" if fresh else ""))
 
@@ -97,8 +107,8 @@ def test_the_sample_data_reaches_more_than_the_happy_path():
     someone tidies the awkward rows out, the lesson goes with them.
     """
     rows = []
-    for name in ("input_my_metrics_01.csv", "input_my_metrics_02.csv"):
-        with open(os.path.join(EXAMPLES, name), encoding="utf-8") as handle:
+    for name in ("input_01.csv", "input_02.csv"):
+        with open(os.path.join(DATA, name), encoding="utf-8") as handle:
             rows.extend(handle.read().splitlines()[1:])
 
     joined = "\n".join(rows)

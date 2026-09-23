@@ -36,7 +36,9 @@ outputs:
   - "outputs/data/{task_id}/output.json"
 
 # Read out of {source_rel}. Check the entrypoint: it was guessed from the
-# function names, and the guess is only as good as the naming.
+# function names, and the guess is only as good as the naming. Each `e.g.`
+# below shows the shape of a useful answer, not a claim about your function.
+# Replace it with what yours actually does.
 interface:
   module: "{module}"
   integration_functions:
@@ -47,7 +49,9 @@ interface:
 # including any choice that could have gone another way, such as a threshold, a
 # unit or an exemption. The coding agent sees this section.
 requirements:
-  - "TODO: describe what this module must do"
+  - "TODO: describe what this module must do, e.g. a reading whose temperature
+    is missing or non-numeric is dropped, and its station still appears in the
+    output with whatever readings remain"
 
 # TODO. The consequences: what must be true if those decisions are implemented
 # correctly, each naming its boundary value. The coding agent NEVER sees this
@@ -57,7 +61,8 @@ requirements:
 # Write "rejects 0 and accepts 1" rather than "must be positive": the first
 # forces a test at the boundary, the second invites a test at 5.
 acceptance_criteria:
-  - "TODO: one checkable statement, with its boundary value"
+  - "TODO: one checkable statement, with its boundary value, e.g. a humidity of
+    100 is accepted and 101 is rejected"
 {seed_block}'''
 
 
@@ -222,7 +227,8 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
     inputs = inputs or [f"inputs_private/data/{base}/input_01.csv"]
 
     fn_lines = "\n".join(
-        f'    - "{_signature(f)}  # TODO: what it does"' for f in functions)
+        f'    - "{_signature(f)}  # TODO: what it does, e.g. reads one CSV and '
+        f'returns its rows"' for f in functions)
     in_lines = "\n".join(f'  - "{p}"' for p in inputs)
 
     source_rel = _source_rel(source_path, project_root)
@@ -235,8 +241,8 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
     return TASK_TEMPLATE.format(
         seed_block=seed_block,
         task_id=task_id,
-        task_name=f"{task_id}: TODO one line summary",
-        description="TODO: one paragraph on what this module is for",
+        task_name=f"{task_id}: TODO one line summary, e.g. per-station daily temperature and humidity metrics",
+        description="TODO: one paragraph on what this module is for, e.g. reads raw sensor CSVs, drops unusable readings, and writes one record per station per day",
         inputs=in_lines,
         module=module_path(source_path, task_id),
         functions=fn_lines,
