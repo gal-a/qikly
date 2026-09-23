@@ -622,6 +622,19 @@ def _validate_generated_tests(source, stage):
     if not re.search(r"^def test_\w+\s*\(", source, re.MULTILINE):
         return f"generated {stage} test file contains no test_ functions"
 
+    # A test that reads a name before anything assigns it raises NameError on
+    # every run, so it fails identically every iteration and the coding agent
+    # has nothing to learn from. That is the case this whole function's
+    # docstring describes, and until now it caught only the syntactic half of
+    # it. Measured on the worked example: 4 runs in 37 failed, every one of
+    # them on a test flagged by this check, and it flags nothing else in 513
+    # real generated files.
+    from qikly.agent_tools.undefined_names import describe as _undefined
+
+    detail = _undefined(source)
+    if detail:
+        return f"generated {stage} test file uses a name before assigning it: {detail}"
+
     return None
 
 GENERATE_TESTS_MAX_ATTEMPTS = 3
