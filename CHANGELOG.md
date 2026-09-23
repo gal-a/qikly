@@ -66,6 +66,14 @@ packaging tools would read as `1.1`.
   server.
 
 ### Changed
+- **The demo says which build produced it, and separates its own housekeeping
+  from the task's inputs.** `INPUTS` now opens with `Code version qikly X.Y.Z`,
+  because a demo transcript outlives the session it came from and the version
+  was otherwise only findable by grepping the console log. Where the demo
+  writes, and the promise that nothing outside it is touched, moved into their
+  own `DEMO FILES` block above `INPUTS`: that is a fact about the demo, not an
+  input to the task, and it is the first thing a cautious reader looks for.
+
 - **`--start` is now `--run`**, matching the MCP tool it shares its machinery
   with, `qikly_run`. Two names for one action was the kind of thing nobody
   notices until they have to explain it. `--start` still works and will keep

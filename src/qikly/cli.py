@@ -369,6 +369,13 @@ def _print_demo_facts(demo_root, task_id, elapsed):
         spec_note = f"{f['reqs']} requirements, {f['crits']} acceptance criteria"
 
     print("  INPUTS")
+    # Which build produced everything below. A demo transcript outlives the
+    # session it came from, and without this line the only way to tell which
+    # version wrote a given report is to find the console log and grep it.
+    # That came up on 0.4.9, when a shell prompt naming an old venv made a
+    # correct run look like it had used the wrong build.
+    from qikly import __version__ as _qikly_version
+    print(f"    Code version   qikly {_qikly_version}")
     print(f"    Spec           {task_id}.yaml   {spec_note}")
     if f["spec"]:
         print(f"                   {f['spec']}")
@@ -456,9 +463,15 @@ def _demo_body(task_ids, demo_root, env, console_log):
     print()
     print("=" * 72)
     print(f"  qikly demo: {', '.join(task_ids)}")
-    print(f"  Writing everything to {demo_root}")
-    print("  Nothing outside that folder is touched. Delete it to undo the demo.")
     print("=" * 72)
+    print()
+    # Separated from INPUTS on purpose. Where the demo writes is a fact about
+    # the demo, not an input to the task, and the reassurance that nothing
+    # outside it is touched is the first thing a cautious reader looks for.
+    print("  DEMO FILES")
+    print(f"    Location       {demo_root}")
+    print("    Scope          nothing outside that folder is touched")
+    print("    To undo        delete that folder")
     print()
 
     # Before the run, not after. Someone watching a demo has one question
