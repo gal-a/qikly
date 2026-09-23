@@ -274,7 +274,21 @@ def main():
         rep_label = f" [rep {rep + 1}/{reps}]" if reps > 1 else ""
 
         if not args.skip_run:
-            cmd = [sys.executable, "run.py"]
+            # `-m qikly`, not `run.py`. The other two stages below already
+            # invoke themselves with `-m`, and this one did not: it named a
+            # file that exists only in a git clone, so a sweep started from an
+            # installed copy failed 130 times in a row, instantly, with "can't
+            # open file run.py" and no model call. The accounting caught it
+            # (every repetition reported 0 of 13 summaries and the aggregate
+            # refused to quote a rate over 0 runs), which is the only reason it
+            # was not read as a convergence collapse.
+            #
+            # `-m qikly` rather than `-m qikly.cli`, because qikly/__main__.py
+            # wraps main() in SystemExit. Called the other way the module
+            # returns a failing status and exits 0, which run.py's own
+            # docstring records as having once made every failure read as a
+            # pass.
+            cmd = [sys.executable, "-m", "qikly"]
             if args.tasks:
                 cmd += ["--tasks", args.tasks]
             seed_override = None

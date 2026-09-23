@@ -41,6 +41,20 @@ agent:
   # honest position is that the effect is unknown rather than neutral.
   diagnostic_feedback: full
 
+  # Show the coding agent the `# Criteria: 2` and `# Requirements: 2, 4`
+  # markers that test generation writes into each test's docstring.
+  #
+  # Off, and the opposite default to diagnostic_feedback above, for the
+  # opposite reason. Withholding a docstring is a real trade, so it stays off
+  # until somebody measures it. Withholding a criterion's number trades
+  # nothing: the number is not a rule and no repair turns on one. What it does
+  # say is how many criteria exist and which one a failing test came from,
+  # which over several iterations maps out the bar the agent is judged against.
+  #
+  # The suite on disk keeps its markers either way, so `qikly.traceability`
+  # and the coverage report are unaffected. Only the agent's copy loses them.
+  traceability_markers_visible: false
+
 logging:
   save_transactions: true
 

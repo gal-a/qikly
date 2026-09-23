@@ -1907,14 +1907,41 @@ def main():
         # keep printing, so the console looks like it ignored the interrupt
         # entirely. Reported from a Windows shell, where it is worst: the only
         # process that reacted is the one that had stopped waiting.
+        #
+        # terminate() reaches the task process and nothing below it, and a task
+        # spends most of its wall clock inside subprocess.run around pytest or
+        # around the `patch` CLI. So this waits for each one to actually go,
+        # rather than announcing the run stopped while a pytest nobody is
+        # supervising is still writing to the iteration log.
         print()
         print("Interrupted. Stopping %d task process(es)." % len(processes))
         for p in processes:
             if p.is_alive():
                 p.terminate()
+
+        stubborn = []
         for p in processes:
-            p.join(timeout=10)
-        print("Stopped. Anything already written is under outputs/.")
+            p.join(timeout=15)
+            if p.is_alive():
+                stubborn.append(p)
+
+        # Anything still up after fifteen seconds is wedged behind a child of
+        # its own. kill() is SIGKILL on POSIX and TerminateProcess on Windows,
+        # and neither is refusable.
+        for p in stubborn:
+            print("  %s did not stop; killing it." % p.name)
+            p.kill()
+            p.join(timeout=5)
+
+        still = [p.name for p in processes if p.is_alive()]
+        if still:
+            # Said plainly rather than swallowed: a half-stopped run can still
+            # be writing, and the next line used to promise it was not.
+            print("  still running: %s. A test runner they started may also be "
+                  "running; check before starting the same task again."
+                  % ", ".join(still))
+        else:
+            print("Stopped. Anything already written is under outputs/.")
         sys.exit(130)
 
     failed = [p.name for p in processes if p.exitcode != 0]
