@@ -1789,7 +1789,12 @@ def main():
     # The demo spawns this same entry point as a child, so without the guard
     # the provider banner appears twice, once from each process.
     if not os.environ.get("QIKLY_QUIET_BANNER"):
-        print(f"LLM provider: {provider} (model={os.environ.get('LLM_MODEL', '<provider default>')})")
+        from qikly.agent_api.providers.router import effective_model, speed_notice
+
+        model = effective_model(provider)
+        print(f"LLM provider: {provider} (model={model})")
+        for line in speed_notice(provider, model):
+            print(line)
 
     # After validate_config() so a missing API key fails before we create a
     # demo directory that would then sit there empty.

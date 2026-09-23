@@ -384,3 +384,58 @@ def _call(prompt, seed):
         raise
     except Exception as e:
         raise RuntimeError(_explain_call_failure(e, provider)) from e
+
+
+# --------------------------------------------------- what the model costs ---
+
+# Models that reason before answering, by provider. A run makes one call per
+# stage per iteration, so anything paid per call is paid many times over: this
+# is the difference between a demo finishing in under a minute and in sixteen.
+#
+# Anthropic's Messages API runs adaptive thinking whenever no `thinking`
+# parameter is sent, which is what this project sends, so every model there
+# thinks except the Haiku line, which needs an explicit budget before it will.
+def thinks_before_answering(provider, model):
+    """Whether one call to this model includes a reasoning step."""
+    name = (model or "").lower()
+    if provider == "anthropic":
+        return "haiku" not in name
+    # Named explicitly rather than guessed. A model absent from this list is
+    # reported as not thinking, which is the quiet answer: a wrong warning
+    # teaches people to ignore the next one.
+    return name in {"gemini-3.5-pro", "o1", "o1-mini", "o3", "o3-mini"}
+
+
+def effective_model(provider):
+    """The model this run will actually use, default included."""
+    chosen = os.environ.get("LLM_MODEL")
+    if chosen:
+        return chosen
+    defaults = {
+        "gemini": "gemini-3.5-flash-lite",
+        "openai": "gpt-4o",
+        "anthropic": "claude-sonnet-5",
+    }
+    return defaults.get(provider, "<provider default>")
+
+
+def speed_notice(provider, model):
+    """
+    Lines for the run banner, empty when there is nothing to say.
+
+    Deliberately not a warning. Nothing is wrong with choosing a model that
+    thinks, and the stricter suite it writes is the reason to. What it is not
+    is the fast option, and the run should say so before the silence starts
+    rather than in a document nobody has open.
+    """
+    if not thinks_before_answering(provider, model):
+        return []
+    faster = ("LLM_MODEL=claude-haiku-4-5" if provider == "anthropic"
+              else "a model with no reasoning step")
+    return [
+        "  Note: %s reasons before it answers, on every call, and a run" % model,
+        "  makes one call per stage per iteration. Expect minutes rather than",
+        "  seconds, and no output while a call is in flight.",
+        "  For fast runs prefer a model that does not think: %s." % faster,
+        "  Keep this one when you want the stricter suite it writes.",
+    ]
