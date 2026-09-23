@@ -36,7 +36,7 @@ directory and the interpreter together.
 python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install qikly
 qikly --version                # which build, from where, on which Python
-export GEMINI_API_KEY=...      # or OPENAI_API_KEY, or ANTHROPIC_API_KEY
+export GEMINI_API_KEY=...      # or OPENAI_API_KEY / ANTHROPIC_API_KEY, see table below
 qikly --demo
 ```
 
@@ -47,7 +47,7 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install qikly
 qikly --version
-$env:GEMINI_API_KEY = "..."    # or OPENAI_API_KEY, or ANTHROPIC_API_KEY
+$env:GEMINI_API_KEY = "..."    # or OPENAI_API_KEY / ANTHROPIC_API_KEY, see table below
 qikly --demo
 ```
 
@@ -59,11 +59,11 @@ broken install.
 Only `--demo` needs a key. `--version`, `--explain`, `--validate` and
 `--scaffold` make no model call and cost nothing.
 
-| Provider | Key variable |
-|---|---|
-| Gemini, the default | `GEMINI_API_KEY`, or `GOOGLE_API_KEY` |
-| OpenAI | `OPENAI_API_KEY` |
-| Anthropic | `ANTHROPIC_API_KEY` |
+| Provider | Key variable | Install |
+|---|---|---|
+| Gemini, the default | `GEMINI_API_KEY`, or `GOOGLE_API_KEY` | included above |
+| OpenAI | `OPENAI_API_KEY` | `pip install "qikly[openai]"` |
+| Anthropic | `ANTHROPIC_API_KEY` | `pip install "qikly[anthropic]"` |
 
 One key is enough and `LLM_PROVIDER` is optional: qikly uses the one key it
 finds and prints which. Set `LLM_PROVIDER` to `gemini`, `openai` or `anthropic`

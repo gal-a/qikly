@@ -20,7 +20,9 @@ needs no card, then `qikly --demo`.
 
 You do not have to choose one forever. All three keys can sit in your
 environment at once; `LLM_PROVIDER` decides which is used, and if you set no
-provider and hold exactly one key, qikly uses that one and says so.
+provider and hold exactly one key, qikly uses that one and says so. The recipes
+below set it anyway, because each one is about a named provider. With a single
+key you can leave it out, which is why the quick start does not set it.
 
 **Restricting the key.** qikly calls exactly one endpoint per provider, so a
 minimal key is enough. On OpenAI, choose **Restricted** and grant only
