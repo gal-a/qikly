@@ -25,6 +25,18 @@ qikly --validate --tasks MY_METRICS_VERIFY    # free, no model call
 qikly --tasks MY_METRICS_VERIFY
 ```
 
+**What to expect from that run: it converged 9 times in 10.** Measured on
+2026-09-23, ten runs from a fresh project each time, on the default model. The
+nine took 4 to 6 iterations and 26 to 52 seconds; the tenth exhausted its
+budget after 17 repair attempts and exited non-zero, which is the loop working
+rather than the example being broken. A first run is a draw, not a promise, and
+this one is a better draw than the bundled tasks at roughly 6 in 10 because the
+implementation is supplied and the specification is short.
+
+Every one of those runs did real work before it converged: the module ships as
+signatures with no bodies, so the first integration attempt fails every test
+and the coding agent writes the implementation from those failures.
+
 `--validate` reports the task clean, with nothing left to fill in. That is
 the one way this differs from scaffolding your own module: scaffold leaves
 `requirements` and `acceptance_criteria` as `TODO`, because neither can be
