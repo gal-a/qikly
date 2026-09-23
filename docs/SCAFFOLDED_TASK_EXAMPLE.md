@@ -1,7 +1,7 @@
 # A scaffolded task, start to finish
 
 ```bash
-qikly --init --with-example
+qikly --example
 ```
 
 That puts the whole example in your project, ready to run:
@@ -36,7 +36,7 @@ writes today rather than what it wrote once.
 
 The copies that ship live under [`src/qikly/inputs_public/examples/`](../src/qikly/inputs_public/examples),
 laid out the way a real project is rather than as a flat folder of samples, so
-the paths you read there are the paths `--with-example` writes them to. They
+the paths you read there are the paths `--example` writes them to. They
 sit under `examples/` rather than beside the bundled tasks deliberately: a
 scaffolded pair breaks three rules the bundled tasks keep. `MY_METRICS_VERIFY`
 ends in the suffix reserved for scaffolding, the pair shares one data folder

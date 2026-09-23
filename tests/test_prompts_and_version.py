@@ -273,7 +273,10 @@ def test_every_invocation_checks_for_a_new_release():
 
     source = inspect.getsource(cli.main)
     check_at = source.index("check_for_update()")
-    for early_return in ("if args.init:", "if args.scaffold:", "if args.check_criteria:"):
+    # Spelled as the source spells them. `--example` shares --init's branch,
+    # because it needs the same layout, so that condition now names both.
+    for early_return in ("if args.init or args.example:", "if args.scaffold:",
+                         "if args.check_criteria:"):
         assert check_at < source.index(early_return), (
             f"{early_return} returns before the version check runs"
         )

@@ -151,14 +151,14 @@ def test_the_example_installs_to_the_paths_its_own_task_files_name():
             for declared in task["inputs"]:
                 landed = os.path.join(workspace, declared.replace("/", os.sep))
                 assert os.path.isfile(landed), (
-                    "%s says it reads %s, and --with-example does not put a file "
+                    "%s says it reads %s, and --example does not put a file "
                     "there" % (name, declared))
 
         # The seeded task names its implementation relative to the project root.
         seed = yaml.safe_load(_committed("MY_METRICS_VERIFY.yaml"))["seed"]
         landed = os.path.join(workspace, seed["implementation"].replace("/", os.sep))
         assert os.path.isfile(landed), (
-            "MY_METRICS_VERIFY.yaml seeds from %s, which --with-example does not "
+            "MY_METRICS_VERIFY.yaml seeds from %s, which --example does not "
             "write there" % seed["implementation"])
     finally:
         shutil.rmtree(workspace, ignore_errors=True)

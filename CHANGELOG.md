@@ -9,7 +9,7 @@ packaging tools would read as `1.1`.
 > Two new ceilings, a narrower failure channel you can opt into, one feature withdrawn, and documentation that now matches what the coding agent actually receives
 
 ### Added
-- **`qikly --init --with-example`** copies a worked scaffold example into your
+- **`qikly --example`** copies a worked scaffold example into your
   project, at the paths its own task files name: `my_metrics.py` at the root,
   `MY_METRICS.yaml` and `MY_METRICS_VERIFY.yaml` in
   `inputs_private/config/tasks/`, and two sample CSVs in
@@ -136,6 +136,15 @@ packaging tools would read as `1.1`.
   can be retuned rather than rewritten blind.
 
 ### Fixed
+- **A modifier flag used on its own no longer starts a run.** `--fresh`,
+  `--from-doc`, `--task-id`, `--force` and `--demo-dir` are each read inside
+  their partner's dispatch branch, so alone they were never looked at and the
+  chain fell through to a normal run: `qikly --fresh`, meaning `qikly --scaffold
+  X --fresh` with the target forgotten, ran every task in the project and spent
+  real money on a typo. Each now prints what it goes with and exits 2, the check
+  `--html` has carried since it shipped. `--by` is deliberately exempt, since it
+  has a default and cannot be told apart from the one argparse supplies.
+
 - **A spend ceiling never actually stopped a repair loop.** `BudgetExceeded`
   is a `RuntimeError`, and the FIX and PATCH calls in `run_fix_patch_cycle`
   were wrapped in bare `except Exception`, so a ceiling firing mid-loop was

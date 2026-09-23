@@ -424,8 +424,8 @@ qikly --init                    # creates inputs_private/ and a starter task
 qikly --tasks MY_TASK
 ```
 
-Want to watch it work before writing anything, `qikly --init --with-example`
-adds a worked example that runs as it stands: a module, the two task files a
+Want to watch it work before writing anything, `qikly --example` adds a
+worked example that runs as it stands: a module, the two task files a
 scaffold of it produces, and sample data, each at the path a real task uses.
 It is the one command here that puts a file in your project root,
 `my_metrics.py`, and you can delete it when you are done.

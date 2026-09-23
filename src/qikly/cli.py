@@ -627,12 +627,12 @@ def _parse_args():
              "until this has been run. Never overwrites an existing file."
     )
     parser.add_argument(
-        "--with-example", action="store_true",
-        help="With --init: also copy the worked scaffold example into the project, at "
-             "the paths its task files name. Lays down my_metrics.py, the two task "
-             "files a scaffold of it produces, and sample data, so `qikly --tasks "
-             "MY_METRICS_VERIFY` runs end to end without you writing anything first. "
-             "Never overwrites an existing file."
+        "--example", action="store_true",
+        help="Copy the worked scaffold example into the project, at the paths its "
+             "task files name, creating the inputs_private/ layout first if it is "
+             "not there yet. Lays down my_metrics.py, the two task files a scaffold "
+             "of it produces, and sample data, so `qikly --tasks MY_METRICS_VERIFY` "
+             "runs end to end without you writing anything first. Never overwrites."
     )
     parser.add_argument(
         "--scaffold", metavar="FILE", default=None,
@@ -1701,8 +1701,45 @@ def main():
             _print_run(item, brief=True)
         return 0
 
-    if args.init:
-        return _do_init(with_example=args.with_example)
+    # A flag that modifies another flag does nothing on its own, and until this
+    # guard existed it did nothing *silently*: the dispatch chain fell through
+    # to a normal run, so `qikly --fresh` (meaning `--scaffold X --fresh`) spent
+    # real money running every task in the project rather than saying what it
+    # should have been attached to. --html has had this check since it shipped;
+    # these are the ones it missed.
+    #
+    # --by is deliberately absent. It carries a default, so a --by the user
+    # typed is indistinguishable from the one argparse supplies, and it changes
+    # only how --trends groups rows.
+    for flag, given, wants, example in (
+        ("--fresh", args.fresh, "--scaffold",
+         "qikly --scaffold my_module.py --fresh"),
+        ("--from-doc", args.from_doc is not None, "--scaffold",
+         "qikly --scaffold my_module.py --from-doc feature.md"),
+        ("--task-id", args.task_id is not None,
+         "--scaffold, --criteria-from or --criteria-from-jira",
+         "qikly --scaffold my_module.py --task-id MY_TASK"),
+        ("--force", args.force, "--install-mcp",
+         "qikly --install-mcp claude --force"),
+        ("--demo-dir", args.demo_dir is not None, "--demo",
+         "qikly --demo --demo-dir ./try-it"),
+    ):
+        if not given:
+            continue
+        attached = {
+            "--fresh": bool(args.scaffold),
+            "--from-doc": bool(args.scaffold),
+            "--task-id": bool(args.scaffold or args.criteria_from
+                              or args.criteria_from_jira),
+            "--force": args.install_mcp is not None,
+            "--demo-dir": args.demo,
+        }[flag]
+        if not attached:
+            print(f"{flag} goes with {wants}, as in: {example}", file=sys.stderr)
+            return 2
+
+    if args.init or args.example:
+        return _do_init(with_example=args.example)
     if args.scaffold:
         return _do_scaffold(args.scaffold, args.task_id, args.from_doc, fresh=args.fresh)
     if args.criteria_from:

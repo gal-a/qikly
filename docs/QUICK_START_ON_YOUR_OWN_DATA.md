@@ -103,7 +103,7 @@ code.
 Rather see it work before you point it at your own code?
 
 ```bash
-qikly --init --with-example
+qikly --example
 ```
 
 That writes a worked example into your project, at the paths a real task uses,
@@ -111,6 +111,14 @@ and prints what to run next. Nothing to fill in first, no model call to check
 it. [What it lays down, and what to look at in it](https://github.com/gal-a/qikly/blob/main/docs/SCAFFOLDED_TASK_EXAMPLE.md).
 
 The five steps below are the same thing on your own module.
+
+> **No module to start from?** You do not need one. `qikly --init` writes a
+> starter task with `requirements` and `acceptance_criteria` and no `seed:`
+> block, so a run writes the first implementation from your requirements
+> instead of testing code you already have. Skip step 1, fill in those two
+> sections, and the rest of the steps are unchanged. Scaffolding exists to read
+> signatures out of code that already exists, which is the only part you are
+> missing.
 
 1. **Scaffold a task from the module.**
 
