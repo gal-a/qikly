@@ -116,19 +116,64 @@ def test_the_default_model_is_known_without_the_optional_sdks(monkeypatch):
     assert router.effective_model("gemini") == "gemini-3.5-flash-lite"
 
 
-def test_the_shared_defaults_table_matches_each_provider_module():
+def test_no_provider_restates_its_default_model_as_a_literal():
     """
-    One source of truth, asserted rather than trusted.
+    One source of truth, checked without importing anything.
 
-    The table exists so a default can be read without the SDK. If a provider
-    module ever sets its own literal again, the banner and the provider
-    disagree about what a run is using, which is the drift the table was
-    introduced to end.
+    The first version of this imported each provider module to compare its
+    DEFAULT_MODEL against the table, and two of the three modules cannot be
+    imported without an optional SDK. It therefore failed in CI for exactly
+    the condition the table exists to handle, which is a neat demonstration of
+    the trap and a poor test.
+
+    So this reads the source. What matters is not the value, which the table
+    already holds, but that each module takes it from the table instead of
+    writing it out again: a literal here and a literal there is how the run
+    banner and the provider come to disagree about what a run is using.
     """
-    import importlib
+    import ast
+    import os
 
-    from qikly.agent_api.providers.defaults import DEFAULT_MODELS
+    from qikly.agent_api.providers import defaults
 
-    for provider, expected in DEFAULT_MODELS.items():
-        module = importlib.import_module("qikly.agent_api.providers.%s" % provider)
-        assert module.DEFAULT_MODEL == expected, provider
+    providers_dir = os.path.dirname(os.path.abspath(defaults.__file__))
+    checked = []
+
+    for provider in sorted(defaults.DEFAULT_MODELS):
+        path = os.path.join(providers_dir, "%s.py" % provider)
+        assert os.path.isfile(path), "no module for provider %r" % provider
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read())
+
+        assignments = [
+            node for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id == "DEFAULT_MODEL"
+                    for t in node.targets)
+        ]
+        assert len(assignments) == 1, (
+            "%s should set DEFAULT_MODEL exactly once, found %d"
+            % (provider, len(assignments)))
+
+        value = assignments[0].value
+        assert isinstance(value, ast.Subscript), (
+            "%s.py sets DEFAULT_MODEL to a literal again. Read it from "
+            "providers/defaults.py, or the banner and the provider will "
+            "disagree about which model a run used." % provider)
+        assert isinstance(value.value, ast.Name) and value.value.id == "DEFAULT_MODELS", (
+            "%s.py should subscript DEFAULT_MODELS" % provider)
+        checked.append(provider)
+
+    assert checked == sorted(defaults.DEFAULT_MODELS), checked
+
+
+def test_the_table_and_the_importable_provider_agree():
+    """
+    The value itself, for the one provider a plain install can import.
+
+    Gemini is a required dependency, so this runs everywhere. The other two are
+    covered by the source check above, which needs no SDK.
+    """
+    from qikly.agent_api.providers import defaults, gemini
+
+    assert gemini.DEFAULT_MODEL == defaults.DEFAULT_MODELS["gemini"]
