@@ -81,6 +81,10 @@ def _run_task_process(task_id, seed, generate_criteria, resume=False):
     interleaves line by line -- without a prefix there'd be no way to tell
     which task a given line belongs to.
     """
+    # Before anything else, so an interrupt can take this task and everything
+    # it starts without the signal also reaching the parent that sent it. No
+    # effect on Windows, which kills the tree by parent id instead.
+    _own_process_group()
     import builtins
     real_print = builtins.print
     prefix = f"[{task_id}]"
@@ -856,6 +860,61 @@ def _print_run(info, brief=False):
     else:
         print(_json.dumps(info, indent=2, default=str))
     return 0 if state in ("passed", "running") else 1
+
+
+def _own_process_group():
+    """
+    Put this task process in a session of its own, on POSIX.
+
+    So that the interrupt handler can signal the whole group later without the
+    signal also reaching the parent doing the signalling. Windows has no
+    equivalent and does not need one: taskkill walks the tree by parent id.
+
+    Best effort. A platform without setsid, or a process that already leads a
+    session, must not stop a run from starting.
+    """
+    if hasattr(os, "setsid"):
+        try:
+            os.setsid()
+        except OSError:                                  # pragma: no cover
+            pass
+
+
+def _kill_process_tree(pid, name):
+    """
+    Kill a task process and everything it started. Returns True if it tried.
+
+    The reason this exists rather than `Process.kill()`: a task is usually
+    blocked in `subprocess.run` around pytest, and killing the task reaches
+    the task alone. The pytest carries on, unsupervised, still appending to
+    the iteration log, after the console has said the run stopped.
+    """
+    if os.name == "nt":
+        # /T for the tree, /F because a console application that is mid-write
+        # will not otherwise take it. Output is swallowed: taskkill reports
+        # "process not found" on a race, which is not worth printing during a
+        # shutdown the user asked for.
+        try:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           timeout=15)
+            return True
+        except Exception:                                # noqa: BLE001
+            return False
+
+    try:
+        import signal
+
+        os.killpg(os.getpgid(pid), signal.SIGKILL)
+        return True
+    except Exception:                                    # noqa: BLE001
+        # The group may already be gone, or the worker may never have reached
+        # setsid. Fall back to the single process rather than giving up.
+        try:
+            os.kill(pid, signal.SIGKILL)
+            return True
+        except Exception:                                # noqa: BLE001
+            return False
 
 
 def _do_init(with_example=False):
@@ -1915,31 +1974,30 @@ def main():
         # supervising is still writing to the iteration log.
         print()
         print("Interrupted. Stopping %d task process(es)." % len(processes))
-        for p in processes:
-            if p.is_alive():
-                p.terminate()
 
-        stubborn = []
+        # The tree first, and the ordering is the whole fix. Asking the task
+        # to stop politely and then taking its tree does not work: once the
+        # task has exited there is no live parent to walk from, its pytest has
+        # been reparented, and the tree kill finds nothing. Measured exactly
+        # that way round, which is how the previous version came to print
+        # "Stopped" beside a pytest that was still running.
+        #
+        # So the graceful step is given up deliberately. A run the user has
+        # abandoned is not worth a process that outlives the message saying it
+        # stopped, and the records that matter are written atomically
+        # (runs.py's temp-file-and-replace) or one appended line at a time.
         for p in processes:
-            p.join(timeout=15)
-            if p.is_alive():
-                stubborn.append(p)
-
-        # Anything still up after fifteen seconds is wedged behind a child of
-        # its own. kill() is SIGKILL on POSIX and TerminateProcess on Windows,
-        # and neither is refusable.
-        for p in stubborn:
-            print("  %s did not stop; killing it." % p.name)
-            p.kill()
-            p.join(timeout=5)
+            if p.pid and p.is_alive():
+                _kill_process_tree(p.pid, p.name)
+        for p in processes:
+            p.join(timeout=10)
 
         still = [p.name for p in processes if p.is_alive()]
         if still:
             # Said plainly rather than swallowed: a half-stopped run can still
-            # be writing, and the next line used to promise it was not.
-            print("  still running: %s. A test runner they started may also be "
-                  "running; check before starting the same task again."
-                  % ", ".join(still))
+            # be writing, and this line used to promise it was not.
+            print("  still running: %s. Check before starting the same task "
+                  "again." % ", ".join(still))
         else:
             print("Stopped. Anything already written is under outputs/.")
         sys.exit(130)
