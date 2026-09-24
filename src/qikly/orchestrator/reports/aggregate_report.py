@@ -312,6 +312,11 @@ _COMMENSURABLE_ON = (
     ("model", "model"),
     ("max_retries_per_stage", "max_retries_per_stage"),
     ("criteria_per_batch", "criteria_per_batch"),
+    # How much of a failing test the coding agent saw. An arm run narrow and an
+    # arm run wide are different experiments, and comparing them is the reason
+    # somebody would change either setting in the first place.
+    ("diagnostic_feedback", "diagnostic_feedback setting"),
+    ("traceability_markers_visible", "traceability_markers_visible setting"),
 )
 
 

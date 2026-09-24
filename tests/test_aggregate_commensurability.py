@@ -19,6 +19,8 @@ import pytest
 from qikly.orchestrator.reports.aggregate_report import commensurability
 
 BASE = {
+    "diagnostic_feedback": "full",
+    "traceability_markers_visible": False,
     "qikly_version": "0.5.1",
     "git_commit": "abc123456789",
     "provider": "gemini",
@@ -45,6 +47,8 @@ def test_one_system_produces_no_warnings():
     ("provider", "anthropic", "provider"),
     ("max_retries_per_stage", 4, "max_retries_per_stage"),
     ("criteria_per_batch", 4, "criteria_per_batch"),
+    ("diagnostic_feedback", "staged", "diagnostic_feedback"),
+    ("traceability_markers_visible", True, "traceability_markers_visible"),
 ])
 def test_each_thing_that_changes_the_outcome_is_checked(field, other, phrase):
     """
@@ -95,3 +99,20 @@ def test_a_missing_provenance_block_does_not_invent_a_difference():
     one people learn to scroll past.
     """
     assert commensurability(runs(5) + [{"provenance": {}}, {}]) == []
+
+
+def test_a_narrow_arm_and_a_wide_one_are_not_one_rate():
+    """
+    The comparison the guard exists for, which it could not see.
+
+    `diagnostic_feedback` decides how much of a failing test the coding agent
+    is shown, so running one arm narrow and one wide is the whole point of
+    having the setting. Neither it nor `traceability_markers_visible` was in
+    the provenance block, so an aggregate pooled the two arms into one rate
+    and reported nothing at all. Found by asking whether a sweep had measured
+    what narrowing costs: it had not, and no artifact said so either way.
+    """
+    pooled = runs(65) + runs(65, diagnostic_feedback="staged")
+    found = commensurability(pooled)
+    assert any("diagnostic_feedback" in w for w in found), found
+    assert any("65 run" in w for w in found), found

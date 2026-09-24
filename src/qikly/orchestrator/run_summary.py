@@ -119,6 +119,15 @@ def _provenance():
         out["criteria_per_batch"] = criteria_per_batch()
         out["max_retries_per_stage"] = (settings.get("orchestrator") or {}).get(
             "max_retries_per_stage")
+        # How much of a failing test the coding agent was shown. These decide
+        # what a run is measuring as directly as the model does, and leaving
+        # them out meant an aggregate could pool a narrow arm with a wide one
+        # and say nothing: the comparison the guard exists for was the one it
+        # could not see.
+        from qikly.orchestrator.orchestrator import (diagnostic_feedback,
+                                                     traceability_markers_visible)
+        out["diagnostic_feedback"] = diagnostic_feedback()
+        out["traceability_markers_visible"] = traceability_markers_visible()
         # Only the agents that actually override the default are worth
         # recording; the rest are the default by definition.
         overrides = {name: cfg.get("model") for name, cfg in agents.items()
