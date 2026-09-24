@@ -92,13 +92,27 @@ def test_several_differences_are_all_reported():
 
 def test_a_missing_provenance_block_does_not_invent_a_difference():
     """
-    Older summaries predate some of these fields.
+    Absent is reported as absent, never as a disagreement.
 
-    Treating absent as a distinct value would report every historical
-    aggregate as incommensurable, and a warning that fires on everything is
-    one people learn to scroll past.
+    This test used to assert silence here, on the reasoning that treating
+    absent as a distinct value would flag every historical aggregate and a
+    warning firing on everything is one people scroll past. The reasoning was
+    right and the conclusion was not: staying silent meant a run recording
+    nothing pooled as though it agreed with whatever the rest of the group
+    said, which is the failure the whole guard exists to prevent.
+
+    Both concerns are met by warning only when a field is missing from SOME of
+    the runs. An archive where none of them has it says nothing, and the
+    wording says the comparison could not be made rather than that the values
+    differ.
     """
-    assert commensurability(runs(5) + [{"provenance": {}}, {}]) == []
+    found = commensurability(runs(5) + [{"provenance": {}}, {}])
+
+    assert found, "runs recording nothing pooled silently"
+    assert all("record no" in w for w in found), (
+        "a missing field must read as not compared, not as a difference: %s"
+        % found)
+    assert not any("do not share" in w for w in found), found
 
 
 def test_a_narrow_arm_and_a_wide_one_are_not_one_rate():
@@ -116,3 +130,31 @@ def test_a_narrow_arm_and_a_wide_one_are_not_one_rate():
     found = commensurability(pooled)
     assert any("diagnostic_feedback" in w for w in found), found
     assert any("65 run" in w for w in found), found
+
+
+def test_a_run_that_recorded_nothing_is_not_counted_as_agreeing():
+    """
+    "Absent" and "agrees" are different, and pooling read them the same.
+
+    A summary written before a field existed, or one whose provenance
+    collection failed partway through its own broad try/except, contributes
+    None to every comparison and was filtered out before the count. It then
+    pooled as though it matched whatever the rest of the group said. Schema 3
+    predates the provenance block entirely and is still accepted, so this is
+    reachable from real archived runs rather than only in principle.
+    """
+    pooled = runs(8) + [{"provenance": {}}, {"provenance": {}}]
+    found = commensurability(pooled)
+
+    assert found, "two runs with no provenance pooled silently"
+    assert any("record no" in w and "2 of 10" in w for w in found), found
+
+
+def test_a_group_that_all_predates_tracking_says_nothing():
+    """
+    Nothing to compare is not a disagreement.
+
+    An archive of old runs is a legitimate thing to aggregate, and a warning
+    on every row of it is a warning nobody reads.
+    """
+    assert commensurability([{"provenance": {}}] * 5) == []

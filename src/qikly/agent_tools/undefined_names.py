@@ -71,7 +71,40 @@ def _own_scope_names(node):
                         names.add(target.id)
         elif isinstance(child, ast.Lambda):
             names |= _parameters(child)
+        elif isinstance(child, ast.NamedExpr):
+            # `total = (n := f()) + n` binds n while the statement is still
+            # being evaluated, so the later read is legal. Loads are collected
+            # for a whole statement before its bindings are added, which made
+            # this look like a use before assignment.
+            for target in ast.walk(child.target):
+                if isinstance(target, ast.Name):
+                    names.add(target.id)
     return names
+
+
+def _walk_this_scope(node):
+    """
+    Every node belonging to this scope, not descending into a nested one.
+
+    A `def` or `class` inside a test opens a scope of its own. Its parameters
+    are not the enclosing function's names, and its body may legally read
+    something the enclosing function binds later, because a closure resolves
+    when it is called rather than when it is written. Walking flat through it,
+    which `ast.walk` does, reported both as errors.
+    """
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        yield current
+        for child in ast.iter_child_nodes(current):
+            if current is not node and isinstance(
+                    child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                  ast.ClassDef)) and child is not node:
+                # Bind the nested definition by its name and look no further.
+                continue
+            stack.append(child)
 
 
 def _loaded_by(node):
@@ -82,7 +115,7 @@ def _loaded_by(node):
     """
     skip = _own_scope_names(node)
     found = []
-    for child in ast.walk(node):
+    for child in _walk_this_scope(node):
         if isinstance(child, ast.Name) and isinstance(child.ctx, ast.Load):
             if child.id in skip:
                 continue
@@ -124,8 +157,17 @@ def _parameters(func):
 # Statements whose body may run more than once, or out of order, so a name
 # bound inside one can legitimately be read before the binding is reached in
 # source order. Anything containing one of these is left alone entirely.
-_REORDERING = (ast.For, ast.AsyncFor, ast.While, ast.Try, ast.If,
-               ast.With, ast.AsyncWith)
+_REORDERING = tuple(
+    node for node in (
+        ast.For, ast.AsyncFor, ast.While, ast.Try, ast.If, ast.With,
+        ast.AsyncWith,
+        # `match` has the same shape as `if`: one branch runs and the others
+        # bind nothing. It also binds through MatchAs.name rather than a Name
+        # node, so nothing here would register the capture as a binding even
+        # if the ordering were followed.
+        getattr(ast, "Match", None),
+        getattr(ast, "TryStar", None),
+    ) if node is not None)
 
 
 def undefined_uses(source):
@@ -155,6 +197,16 @@ def undefined_uses(source):
 
         bound = set(module_names) | _parameters(func)
         for statement in func.body:
+            # A nested def or class is a scope of its own from its first line.
+            # It contributes its name to the enclosing function and nothing
+            # else: its parameters are not the enclosing function's names, and
+            # its body may legally read something bound later, because a
+            # closure resolves when it is called rather than when it is
+            # written. Reading loads out of it reported both as errors.
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                      ast.ClassDef)):
+                bound |= _bound_by(statement)
+                continue
             for name, line in _loaded_by(statement):
                 if name not in bound:
                     problems.append((func.name, name, line))

@@ -45,6 +45,18 @@ Turn it off completely:
 export QIKLY_NO_VERSION_CHECK=1
 ```
 
+## One more, only if you ask for it
+
+`qikly --criteria-from-jira PROJ-412` reads a ticket from the Jira server you
+configure with `JIRA_BASE_URL`, `JIRA_EMAIL` and `JIRA_API_TOKEN`. It is a
+read: it fetches that issue's text so the acceptance criteria already written
+there can become a task file, and it sends none of your code or specification
+anywhere. It runs only when you pass that flag, against a server you named,
+with credentials you supplied.
+
+Listed separately because the section above says "the one other network call",
+and without this line that sentence would be wrong.
+
 ## What stays on your machine
 
 Everything else, under `outputs/` in your own project directory: the generated

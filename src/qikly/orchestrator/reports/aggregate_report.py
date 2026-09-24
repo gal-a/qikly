@@ -349,6 +349,22 @@ def commensurability(payloads):
                 "groups may be the %s rather than anything measured."
                 % (label, spread, label))
 
+    # "Absent" is not "agrees". A summary written before a field existed, or
+    # one whose provenance collection failed partway through its own broad
+    # try/except, contributes None to every comparison above and is filtered
+    # out before the count. It then pools as though it matched whatever the
+    # rest of the group said, with nothing to distinguish "this predates
+    # tracking" from "this run's tracking silently failed".
+    for key, label in _COMMENSURABLE_ON:
+        missing = sum(1 for p in payloads
+                      if (p.get("provenance") or {}).get(key) is None)
+        if missing and missing != len(payloads):
+            warnings.append(
+                "%d of %d run(s) record no %s, so they were compared on it "
+                "with nothing and pooled as though they agreed. Read any "
+                "difference in this rate as possibly being that."
+                % (missing, len(payloads), label))
+
     dirty = sum(1 for p in payloads
                 if (p.get("provenance") or {}).get("git_dirty"))
     if dirty:
