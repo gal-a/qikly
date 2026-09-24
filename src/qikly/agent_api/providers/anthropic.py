@@ -7,7 +7,13 @@ from qikly.agent_api.usage import record_usage
 
 from anthropic import Anthropic, APIError
 
-DEFAULT_MODEL = "claude-sonnet-5"
+from qikly.agent_api.providers.defaults import DEFAULT_MODELS
+
+# Kept as a module attribute because this is where a reader looks
+# for it, and read from the shared table so a plain install can
+# still answer "what model would this provider use" without the
+# SDK that only an extra installs.
+DEFAULT_MODEL = DEFAULT_MODELS["anthropic"]
 # Anthropic requires an explicit output budget, and 4096 was wrong for a
 # reasoning model. claude-sonnet-5 thinks before it answers, thinking tokens
 # come out of this same budget, and a first real run spent the entire 4096 on

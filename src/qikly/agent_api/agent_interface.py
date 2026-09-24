@@ -111,7 +111,7 @@ def _read_task(task_id):
 
 
 def _criteria_span(task_text):
-    """
+    r"""
     Where `acceptance_criteria` starts and ends, according to YAML itself.
 
     Returns (start, end) character offsets into `task_text`, or None if the

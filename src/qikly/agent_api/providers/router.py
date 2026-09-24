@@ -55,7 +55,13 @@ def default_model_for(provider):
     try:
         return getattr(importlib.import_module(entry[0]), "DEFAULT_MODEL", None)
     except Exception:
-        return None
+        # Two of the three SDKs are optional extras, so a plain install cannot
+        # import two of the three provider modules at all. Reading the default
+        # through the module therefore answers on a developer machine and not
+        # in CI, which is how the run banner came to print `<provider default>`
+        # there and the right model here. The table imports nothing.
+        from qikly.agent_api.providers.defaults import default_model
+        return default_model(provider)
 
 
 def accepted_key_vars(provider):

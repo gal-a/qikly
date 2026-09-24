@@ -8,7 +8,13 @@ from google import genai
 from google.genai import types
 from google.genai.errors import APIError
 
-DEFAULT_MODEL = "gemini-3.5-flash-lite"
+from qikly.agent_api.providers.defaults import DEFAULT_MODELS
+
+# Kept as a module attribute because this is where a reader looks
+# for it, and read from the shared table so a plain install can
+# still answer "what model would this provider use" without the
+# SDK that only an extra installs.
+DEFAULT_MODEL = DEFAULT_MODELS["gemini"]
 MAX_OUTPUT_TOKENS = 8192
 
 

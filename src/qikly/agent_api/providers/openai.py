@@ -7,7 +7,13 @@ from qikly.agent_api.usage import record_usage
 
 from openai import APIError, OpenAI
 
-DEFAULT_MODEL = "gpt-4o"
+from qikly.agent_api.providers.defaults import DEFAULT_MODELS
+
+# Kept as a module attribute because this is where a reader looks
+# for it, and read from the shared table so a plain install can
+# still answer "what model would this provider use" without the
+# SDK that only an extra installs.
+DEFAULT_MODEL = DEFAULT_MODELS["openai"]
 
 
 def call_openai(prompt, seed=None):
