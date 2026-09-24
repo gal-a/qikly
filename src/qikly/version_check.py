@@ -118,7 +118,16 @@ def check_for_update():
             title = stripped if len(stripped) <= TITLE_MAX else (
                 stripped[:TITLE_MAX - 3].rstrip() + "...")
     suffix = f" + {title}" if title else ""
-    message = f"{DIST_NAME} {latest} is available{suffix} (you have {__version__})"
+    # `--upgrade` spelled out, because leaving it out is the failure people
+    # actually have: `pip install qikly` on an existing install prints
+    # "Requirement already satisfied" and changes nothing, so a reader can
+    # follow this notice, run the obvious command, and stay exactly where they
+    # were while believing otherwise. Naming the flag costs eleven characters
+    # on a line that is already the only thing this tool says to somebody who
+    # installed months ago.
+    message = (f"{DIST_NAME} {latest} is available{suffix} "
+               f"(you have {__version__}; upgrade with: "
+               f"pip install --upgrade {DIST_NAME})")
     print(message)
     global _ANNOUNCED
     _ANNOUNCED = message

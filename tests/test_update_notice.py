@@ -57,7 +57,23 @@ def test_a_title_that_is_only_the_version_is_dropped(notice, title):
 
 def test_no_title_at_all_still_produces_a_notice(notice):
     msg = notice("0.3.6", None)
-    assert msg == "qikly 0.3.6 is available (you have 0.3.5)"
+    assert msg == ("qikly 0.3.6 is available (you have 0.3.5; upgrade with: "
+                   "pip install --upgrade qikly)")
+
+
+def test_the_notice_names_the_upgrade_flag(notice):
+    """
+    `pip install qikly` on an existing install upgrades nothing.
+
+    It prints "Requirement already satisfied" and exits 0, so a reader who
+    follows this notice and types the obvious command stays exactly where they
+    were and believes otherwise. Reported by a reader who did that from 0.4.5.
+    The flag is the whole point of the sentence, so it is asserted rather than
+    left to whoever edits the wording next.
+    """
+    msg = notice("0.3.6", "v0.3.6: something changed")
+    assert "pip install --upgrade qikly" in msg
+    assert "0.3.5" in msg and "0.3.6" in msg
 
 
 def test_a_long_title_is_cut_so_the_notice_stays_one_line(notice):
