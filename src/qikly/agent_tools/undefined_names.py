@@ -34,13 +34,27 @@ import builtins
 
 
 def _bound_by(node):
-    """Every name this statement binds, once it has finished executing."""
+    """
+    Every name this statement binds in the scope it sits in.
+
+    Not what it binds anywhere. A walk descends into a nested def or class, so
+    using one here made `EXPECTED = 42` inside a helper class a binding of the
+    test function around it, and a method reading a bare `EXPECTED` then looked
+    legal even after class bodies were correctly taken out of the lookup chain.
+    That is the same mistake `_module_level_names` and `_loaded_by` each had
+    before it, which is three appearances of one habit in one file.
+
+    A definition contributes its name and nothing else.
+    """
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return {node.name}
+
     names = set()
-    for child in ast.walk(node):
-        if isinstance(child, ast.Name) and isinstance(child.ctx, (ast.Store, ast.Del)):
-            names.add(child.id)
-        elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+    for child in _walk_this_scope(node):
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             names.add(child.name)
+        elif isinstance(child, ast.Name) and isinstance(child.ctx, (ast.Store, ast.Del)):
+            names.add(child.id)
         elif isinstance(child, (ast.Import, ast.ImportFrom)):
             for alias in child.names:
                 names.add((alias.asname or alias.name).split(".")[0])
@@ -190,10 +204,11 @@ def undefined_uses(source):
     module_names = _module_level_names(tree)
     problems = []
 
-    for func in tree.body:
-        if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        _check_scope(func, set(module_names), func.name, problems)
+    for node in tree.body:
+        # Classes too. A helper or a fake defined beside the tests used to be
+        # skipped here, so nothing in it was ever checked.
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            _check_scope(node, set(module_names), node.name, problems)
 
     return problems
 
@@ -223,7 +238,17 @@ def _check_scope(scope, outer_bound, label, problems):
         everything_here |= _bound_by(statement)
 
     bound = set(outer_bound) | _parameters(scope)
-    inner_outer = set(outer_bound) | _parameters(scope) | everything_here
+
+    # What a scope nested inside this one can see. A function's locals are
+    # visible to functions defined inside it, at any point, because a closure
+    # resolves when it is called. A CLASS body's names are not: Python leaves
+    # the class body out of the chain its own methods look through, so a method
+    # reading a bare class attribute raises NameError and must say self.NAME.
+    # Passing them down made exactly that error read as legal.
+    if isinstance(scope, ast.ClassDef):
+        inner_outer = set(outer_bound)
+    else:
+        inner_outer = set(outer_bound) | _parameters(scope) | everything_here
 
     for statement in scope.body:
         if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef,

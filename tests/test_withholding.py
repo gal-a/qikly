@@ -913,3 +913,99 @@ def test_whitespace_and_wrapping_do_not_hide_a_criterion():
 
     with pytest.raises(RuntimeError, match="cannot be stripped safely"):
         ai.without_acceptance_criteria(task)
+
+
+# ------------------------- the exemption, and what it must not excuse --------
+
+def test_the_requirements_exemption_does_not_excuse_a_copy_elsewhere():
+    """
+    The tenth defeat of this strip, and the subtlest.
+
+    The exemption asked whether a criterion's text appears inside some
+    requirement and waved it through if so, whatever the surviving copy
+    actually was. So a criterion duplicated into a `notes:` field went over
+    untouched whenever an unrelated requirement happened to contain the same
+    sentence: the copy-under-another-key leak, routed through the one door
+    deliberately left open.
+
+    The question asked now is narrower. The requirements' own text is removed
+    from what is searched, so a criterion that survives ONLY there is the
+    author's doing and anything else is a leak.
+    """
+    criterion = "bankers rounding applied to ties"
+    task = (
+        'task_id: "SENTINEL_TASK"\n'
+        'requirements:\n  - "Context: %s, as discussed"\n'
+        'notes: "%s"\n'
+        'acceptance_criteria:\n  - "%s"\n'
+        'interface:\n  module: "m"\n' % (criterion, criterion, criterion))
+
+    with pytest.raises(RuntimeError, match="cannot be stripped safely"):
+        ai.without_acceptance_criteria(task)
+
+
+def test_metadata_beside_a_criterion_does_not_refuse_an_ordinary_file():
+    """
+    A false refusal blocks a run outright, which is why this direction matters.
+
+    Collecting every string under a dict-shaped criterion made `severity: high`
+    a value that must appear nowhere else, so a file with an unrelated
+    `default_priority: high` was refused with no leak in it at all. A label
+    beside a criterion is not the bar.
+    """
+    task = (
+        'task_id: "SENTINEL_TASK"\n'
+        'default_priority: high\n'
+        'requirements:\n  - "log every request"\n'
+        'acceptance_criteria:\n'
+        '  - text: "must reject malformed payloads"\n'
+        '    severity: high\n'
+        'interface:\n  module: "m"\n')
+
+    handed_over = ai.without_acceptance_criteria(task)
+    assert "must reject malformed payloads" not in handed_over
+    assert "default_priority" in handed_over
+
+
+def test_the_prose_of_a_dict_shaped_criterion_is_still_checked():
+    """The other half: dropping labels must not drop the criterion."""
+    task = (
+        'task_id: "SENTINEL_TASK"\n'
+        'notes: "must reject malformed payloads"\n'
+        'acceptance_criteria:\n'
+        '  - text: "must reject malformed payloads"\n'
+        '    severity: high\n'
+        'interface:\n  module: "m"\n')
+
+    with pytest.raises(RuntimeError, match="cannot be stripped safely"):
+        ai.without_acceptance_criteria(task)
+
+
+def test_the_same_sentence_in_two_unicode_forms_is_one_sentence():
+    """
+    A combining accent and a precomposed one look identical and are different
+    strings. Copying between tools produces both, so the comparison normalises.
+    """
+    import unicodedata
+
+    text = "cafe\u0301 readings are rejected"
+    task = (
+        'task_id: "SENTINEL_TASK"\n'
+        'acceptance_criteria:\n  - "%s"\n'
+        'notes: "%s"\n'
+        'interface:\n  module: "m"\n'
+        % (unicodedata.normalize("NFD", text), unicodedata.normalize("NFC", text)))
+
+    with pytest.raises(RuntimeError, match="cannot be stripped safely"):
+        ai.without_acceptance_criteria(task)
+
+
+@pytest.mark.parametrize("document", ['- "a"\n- "b"\n', "just a string\n"])
+def test_a_document_that_is_not_a_mapping_is_refused_not_crashed(document):
+    """
+    It blocked the run either way, by raising AttributeError from a line that
+    assumed a dict. A refusal naming the problem costs the same and reads as
+    intended rather than as a bug.
+    """
+    with pytest.raises(RuntimeError, match="cannot be stripped safely"):
+        ai.without_acceptance_criteria(document)

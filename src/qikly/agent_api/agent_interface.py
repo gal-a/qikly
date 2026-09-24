@@ -204,19 +204,31 @@ def _all_criteria(task_text):
 
     found = []
 
-    def leaves(node):
-        """Every string anywhere inside a value, whatever shape it has."""
+    def leaves(node, labelled=False):
+        """
+        The criteria inside a value, whatever shape holds it.
+
+        `labelled` marks a value that came out of a mapping, where the prose
+        sits beside labels like `severity: high` or an id. Those labels are not
+        the bar, and treating them as criteria refused an ordinary file for
+        having an unrelated field set to the same word. A criterion is a
+        sentence, so inside a mapping only multi-word strings count; an item of
+        the criteria list is a criterion whatever it looks like.
+        """
         if isinstance(node, str):
-            yield node
+            if not labelled or " " in node.strip():
+                yield node
         elif isinstance(node, dict):
             for value in node.values():
-                yield from leaves(value)
+                yield from leaves(value, labelled=True)
         elif isinstance(node, (list, tuple)):
             for item in node:
-                yield from leaves(item)
+                yield from leaves(item, labelled=labelled)
         elif node is not None and not isinstance(node, bool):
-            # A number written as a criterion is still a criterion.
-            yield str(node)
+            # A number written as a criterion is still a criterion, when it is
+            # the item rather than a label beside one.
+            if not labelled:
+                yield str(node)
 
     def walk(node):
         if isinstance(node, dict):
@@ -246,12 +258,22 @@ def _surviving_criteria(task_text, handed_over):
     acceptable and never a judgement call.
     """
     import re
+    import unicodedata
 
     import yaml
 
     def normalise(value):
-        """Whitespace collapsed, so wrapping and indentation stop mattering."""
-        return re.sub(r"\s+", " ", str(value)).strip()
+        """
+        Whitespace collapsed and accents composed, so the same sentence reads
+        the same however it was typed.
+
+        Wrapping, indentation and Unicode normalisation form are all ways one
+        sentence can be two different strings. A criterion written with a
+        combining accent did not match the same visible text written
+        precomposed, which is a plausible result of copying between tools.
+        """
+        return unicodedata.normalize(
+            "NFC", re.sub(r"\s+", " ", str(value))).strip()
 
     # A criterion the author also wrote into `requirements` reaches the coding
     # agent because they put it there, which is a specification mistake that
@@ -262,7 +284,12 @@ def _surviving_criteria(task_text, handed_over):
     # Each requirement is compared on its own. Joining them first meant a
     # criterion spanning the end of one and the start of the next read as
     # authored when no requirement had ever said it.
-    parsed = yaml.safe_load(task_text) or {}
+    parsed = yaml.safe_load(task_text)
+    if not isinstance(parsed, dict):
+        # A document whose root is a list or a scalar is not a task file. It
+        # used to raise AttributeError from the next line, which blocked the
+        # run but with a stack trace where a sentence was intended.
+        return ["<this file's root is not a mapping, so it is not a task>"]
     authored = [normalise(r) for r in (parsed.get("requirements") or [])]
 
     # The handed-over text parsed back, so the comparison is value against
@@ -272,28 +299,31 @@ def _surviving_criteria(task_text, handed_over):
         handed_values = [normalise(v) for v in _all_strings(yaml.safe_load(handed_over))]
     except yaml.YAMLError:                               # pragma: no cover
         handed_values = []
+
+    # A criterion the author also wrote into `requirements` reaches the coding
+    # agent because they put it there, which `--validate` warns about by name.
+    # That text is therefore removed from what is searched, rather than used to
+    # excuse the criterion wherever else it turns up. Exempting on "this text
+    # appears in some requirement" waved through a copy sitting in an unrelated
+    # field whenever a requirement happened to contain the same sentence, which
+    # is the leak this whole file exists to prevent.
+    searchable = [v for v in handed_values if v not in authored]
     handed_raw = normalise(handed_over)
+    for requirement in authored:
+        handed_raw = handed_raw.replace(requirement, " ")
 
     survivors = []
     for criterion in _all_criteria(task_text):
         text = normalise(criterion)
+
+        # Labels beside a criterion are dropped where they are collected, in
+        # `_all_criteria`, which knows whether a value came from the criteria
+        # list or from a mapping. Here only an empty one is left to skip.
         if not text:
             continue
 
-        # Short criteria are matched whole against a value rather than looked
-        # for inside the raw text, which is what the old length floor was
-        # reaching for. The floor skipped them entirely instead, so anything
-        # under twelve characters was never checked at all.
-        if len(text) < 12:
-            present = text in handed_values
-        else:
-            present = text in handed_raw or any(text in v for v in handed_values)
-        if not present:
-            continue
-
-        if any(text in requirement for requirement in authored):
-            continue
-        survivors.append(text)
+        if text in handed_raw or any(text in v for v in searchable):
+            survivors.append(text)
     return survivors
 
 

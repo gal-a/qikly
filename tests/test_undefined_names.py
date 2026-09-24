@@ -235,3 +235,59 @@ def test_a_loop_in_the_test_does_not_excuse_a_nested_helper():
         "    assert helper()\n"
     )
     assert undefined_uses(source), "the nested helper was not checked"
+
+
+def test_a_bare_class_attribute_is_not_visible_to_its_own_methods():
+    """
+    Python leaves a class body out of the chain its methods look through.
+
+        class Helper:
+            EXPECTED = 42
+            def check(self):
+                return EXPECTED      # NameError, every time
+
+    Two separate mistakes made this read as legal. The class body's names were
+    handed down to its methods as though a class were a function, and
+    `_bound_by` walked into the nested class so `EXPECTED` counted as a binding
+    of the test around it. That second one is the third appearance of the same
+    habit in this module, after `_module_level_names` and `_loaded_by`.
+    """
+    broken = (
+        "def test_x():\n"
+        "    class Helper:\n"
+        "        EXPECTED = 42\n"
+        "        def check(self):\n"
+        "            return EXPECTED\n"
+        "    assert Helper().check() == 42\n"
+    )
+    problems = undefined_uses(broken)
+    assert problems, "a bare class attribute read from a method went unreported"
+    assert problems[0][1] == "EXPECTED"
+
+    correct = broken.replace("return EXPECTED", "return self.EXPECTED")
+    assert undefined_uses(correct) == [], "self.NAME is how a method reads it"
+
+
+def test_a_class_body_can_read_its_own_earlier_names():
+    """Inside the class body itself, the names are in scope."""
+    source = (
+        "def test_x():\n"
+        "    class Helper:\n"
+        "        A = 1\n"
+        "        B = A + 1\n"
+        "    assert Helper.B == 2\n"
+    )
+    assert undefined_uses(source) == []
+
+
+def test_a_class_at_module_level_is_analysed_too():
+    """
+    It was skipped entirely: the top level loop only picked out functions, so
+    a helper or a fake defined beside the tests was never read.
+    """
+    source = (
+        "class Fake:\n"
+        "    def get(self):\n"
+        "        return totally_undefined_xyz\n"
+    )
+    assert undefined_uses(source), "a module level class went unchecked"
