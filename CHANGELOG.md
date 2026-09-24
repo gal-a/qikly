@@ -4,6 +4,68 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## 0.5.2
+
+> The withheld criteria could reach the coding agent six more ways, all closed, and a run that stops when you stop it
+
+### Fixed
+- **Six further ways the acceptance criteria could reach the coding agent, all
+  found by audit and all confirmed by running before being believed.** A YAML
+  merge key (`<<:`) pulling criteria in from an anchor, which left the file
+  entirely unstripped. An alias whose anchor lives under another key, so the
+  reference went and the content stayed. Two `acceptance_criteria:` keys, where
+  the parser takes the last and the strip removed the first. A second copy
+  nested under an unrelated key. Criteria written as a mapping rather than a
+  list, which the verification collected as nothing at all. And a requirement
+  short enough to blind the check meant to exempt it.
+
+  One cause behind all of them: `yaml.safe_load` decides what the criteria are,
+  because it is what test generation reads, and every other idea of where they
+  live is a second opinion that can differ. The strip now removes the span YAML
+  itself assigns the key, then verifies by collecting every criterion the
+  parser sees, at any depth and whatever shape holds it, parsing the handed-over
+  text back, and comparing values to values with whitespace and Unicode
+  normalised. **A file it cannot prove clean is refused rather than handed
+  over**, naming the construction so its author can fix it. No bundled task,
+  and no file the scaffolder writes, is affected.
+
+- **Ctrl+C now stops the run it says it stopped.** `terminate()` reaches the
+  task process and not the pytest it is blocked inside, so a test runner
+  supervised by nobody kept writing to the iteration log after the console said
+  "Stopped". The whole tree goes now, and the ordering is the fix: taken after
+  the task exits, its children have been reparented and there is nothing left
+  to walk from.
+
+- **A generated test that reads a name before assigning it is regenerated
+  rather than run.** `records = transform(records)` raises NameError every
+  time, so the coding agent sees an identical failure each iteration with
+  nothing to act on and spends its whole budget on a file whose problem is not
+  in its code. Measured on the worked example: every failure in 50 runs was a
+  test of this shape, and the check flags 4 files in 1426 real generated ones.
+
+- **The repeated sweep only ever ran from a git clone**, so a sweep started
+  from an installed copy failed once per task per repetition with no model
+  call. Its own accounting is what caught it, refusing to quote a rate computed
+  over zero runs.
+
+### Changed
+- **The update notice says how to upgrade.** `pip install qikly` on an existing
+  install prints "Requirement already satisfied" and changes nothing, so a
+  reader could follow the notice, type the obvious command, and stay where they
+  were. It now names `pip install --upgrade qikly`.
+- **An aggregate says when the runs it pooled were not the same experiment**,
+  comparing the model, the provider, both budgets, the feedback settings, the
+  version and the commit that produced each one, and saying when a field is
+  missing from some of them rather than treating absent as agreeing.
+- **`PRIVACY.md`** now names the Jira fetch and the `User-Agent` the version
+  check sends.
+
+### Measured
+- **Convergence held while the bar was tightened**, which is the claim worth
+  making: 80% of runs pass every integration and system test and 60% pass
+  everything, over 130 runs on this release and 520 across 0.5.x, unchanged
+  from the 967 runs measured before any of this hardening existed.
+
 ## 0.5.1
 
 > The withheld section stops being found by a regex, a worked example that arrives worked, and a run that says why it is quiet
