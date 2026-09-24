@@ -291,3 +291,36 @@ def test_a_class_at_module_level_is_analysed_too():
         "        return totally_undefined_xyz\n"
     )
     assert undefined_uses(source), "a module level class went unchecked"
+
+
+def test_a_lambda_body_resolves_when_it_is_called():
+    """
+    A lambda is a deferred scope, exactly like a nested def.
+
+        f = lambda: LATER
+        LATER = 5
+
+    is legal and runs, and was reported as a use before assignment because the
+    walk went through the lambda as part of the enclosing statement. The same
+    scope-boundary mistake as the three this module has already had, in the one
+    place left that had it.
+    """
+    source = (
+        "def test_x():\n"
+        "    f = lambda: LATER\n"
+        "    LATER = 5\n"
+        "    assert f() == 5\n"
+    )
+    assert undefined_uses(source) == []
+
+
+def test_a_lambda_does_not_hide_a_real_bug_beside_it():
+    source = (
+        "def test_x():\n"
+        "    rows = [1]\n"
+        "    f = lambda v: v + 1\n"
+        "    out = transform(out)\n"
+        "    assert f(out)\n"
+    )
+    problems = undefined_uses(source)
+    assert problems and problems[0][1] == "out"

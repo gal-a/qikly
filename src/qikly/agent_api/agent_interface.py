@@ -135,14 +135,41 @@ def _criteria_span(task_text):
     if node is None or not isinstance(node, yaml.MappingNode):
         return None
 
+    return _key_span(task_text, "acceptance_criteria")
+
+
+def _key_span(text, wanted, to_next_key=True):
+    """
+    Where a top level key starts and where its block ends, or None.
+
+    Shared, because two places need to remove a whole block and neither can do
+    it by matching text. Cutting `requirements` used to be a string replace of
+    each requirement's own value, which an empty requirement turned into
+    `"".replace`, inserting a space between every character of the document.
+
+    `to_next_key` decides what "ends" means, and the two callers want opposite
+    things. Removing the criteria takes everything up to the next key, so a
+    comment sitting under them goes too: a comment in that position is usually
+    about the criteria it follows. Removing the requirements takes only the
+    value's own extent, because a comment after them is not theirs, and
+    swallowing it hid a criterion copied into one.
+    """
+    import yaml
+
+    node = yaml.compose(text)
+    if node is None or not isinstance(node, yaml.MappingNode):
+        return None
+
     for index, (key, value) in enumerate(node.value):
-        if getattr(key, "value", None) != "acceptance_criteria":
+        if getattr(key, "value", None) != wanted:
             continue
         start = key.start_mark.index
+        if not to_next_key:
+            return start, value.end_mark.index
         if index + 1 < len(node.value):
             end = node.value[index + 1][0].start_mark.index
         else:
-            end = len(task_text)
+            end = len(text)
         return start, end
     return None
 
@@ -219,8 +246,15 @@ def _all_criteria(task_text):
             if not labelled or " " in node.strip():
                 yield node
         elif isinstance(node, dict):
+            # A label is only a label when prose sits beside it. In
+            # {text: "...", severity: high} the sentence is the criterion and
+            # "high" is filing; in {strictness: "Exact"} there is no sentence,
+            # so the single word IS the criterion and dropping it left the bar
+            # unchecked.
+            has_prose = any(isinstance(v, str) and " " in v.strip()
+                            for v in node.values())
             for value in node.values():
-                yield from leaves(value, labelled=True)
+                yield from leaves(value, labelled=has_prose)
         elif isinstance(node, (list, tuple)):
             for item in node:
                 yield from leaves(item, labelled=labelled)
@@ -308,9 +342,26 @@ def _surviving_criteria(task_text, handed_over):
     # field whenever a requirement happened to contain the same sentence, which
     # is the leak this whole file exists to prevent.
     searchable = [v for v in handed_values if v not in authored]
+
+    # The requirements' own text removed from what is searched, so a criterion
+    # surviving only there stays the author's business.
+    #
+    # Two things this must not do. An empty requirement turns `.replace` into
+    # `"".replace`, which inserts a space between every character of the
+    # document and leaves no multi-character string in it to find; a one-word
+    # requirement fragments every word containing it. Either blinds the raw
+    # scan, which is the only pass that sees a YAML comment, because safe_load
+    # drops comments entirely. So only a requirement long enough to contain a
+    # criterion is removed, and nothing shorter can contain one anyway.
+    #
+    # Cutting the block by its YAML span looked like the tidier answer and is
+    # not: a sequence node's end_mark runs past a trailing comment to the next
+    # token, so cutting the span took the comment with it and hid the leak
+    # just as thoroughly.
     handed_raw = normalise(handed_over)
     for requirement in authored:
-        handed_raw = handed_raw.replace(requirement, " ")
+        if len(requirement) >= 12 and " " in requirement:
+            handed_raw = handed_raw.replace(requirement, " ")
 
     survivors = []
     for criterion in _all_criteria(task_text):

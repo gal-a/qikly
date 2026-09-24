@@ -773,9 +773,13 @@ def test_a_task_the_strip_cannot_clean_is_refused_rather_than_handed_over(shape)
 
     message = str(raised.value)
     assert "cannot be stripped safely" in message
-    assert SENTINEL_A not in message or "starting with" in message, (
-        "the error may quote the leaked criterion to identify it, but only "
-        "to the person reading their own file")
+    # This used to read `SENTINEL_A not in message or "starting with" in
+    # message`, and the message template always contains "starting with", so
+    # the assertion could not fail whatever it was given. Assert the thing
+    # instead: the error names the criterion so its author can find it, and
+    # says how many there were.
+    assert SENTINEL_A in message, "the error should name what it found"
+    assert "acceptance criterion" in message
 
 
 @pytest.mark.parametrize("shape", sorted(_ATTACKS))
@@ -1009,3 +1013,88 @@ def test_a_document_that_is_not_a_mapping_is_refused_not_crashed(document):
     """
     with pytest.raises(RuntimeError, match="cannot be stripped safely"):
         ai.without_acceptance_criteria(document)
+
+
+# ------------------ the raw scan is the only one that sees a comment ---------
+
+_COMMENT_LEAK = (
+    'task_id: "SENTINEL_TASK"\n'
+    'requirements:\n%s'
+    '# NOTE TO SELF: remember that %s\n'
+    'acceptance_criteria:\n  - "%s"\n'
+    'interface:\n  module: "m"\n'
+)
+
+
+@pytest.mark.parametrize("requirements", [
+    ['"read the widget rows carefully"'],
+    ['""', '"read the widget rows carefully"'],          # empty
+    ['"row"', '"read the widget rows carefully"'],       # one word
+])
+def test_a_short_requirement_does_not_blind_the_scan(requirements):
+    """
+    The sixth defeat of this exemption, and the same lesson as the fifth: the
+    narrowing became the hole.
+
+    To stop a requirement excusing a criterion everywhere, each requirement's
+    text was deleted from what gets searched. An empty one turns that into
+    `"".replace`, which inserts a space between every character of the document
+    and leaves no multi-character string in it to find. A one-word one
+    fragments every word containing it. Either blinds the raw scan, and the raw
+    scan is the only pass that can see a YAML comment, because `safe_load`
+    drops comments entirely. A criterion copied into a comment then went over
+    in silence.
+
+    Only a requirement long enough to contain a criterion is removed now, and
+    nothing shorter could contain one anyway.
+    """
+    body = "".join("  - %s\n" % r for r in requirements)
+    task = _COMMENT_LEAK % (body, SENTINEL_A, SENTINEL_A)
+
+    with pytest.raises(RuntimeError, match="cannot be stripped safely"):
+        ai.without_acceptance_criteria(task)
+
+
+def test_cutting_the_requirements_block_by_its_span_would_hide_the_comment():
+    """
+    Why this is done by text removal rather than by the tidier looking span.
+
+    A sequence node's end_mark runs past a trailing comment to the next token,
+    so cutting `requirements` by its YAML span takes any comment under it as
+    well, which hides exactly the leak above. Asserted here because the span
+    approach is the obvious refactor and this is the reason not to make it.
+    """
+    task = _COMMENT_LEAK % ('  - "read the widget rows carefully"\n',
+                            SENTINEL_A, SENTINEL_A)
+    span = ai._key_span(task, "requirements", to_next_key=False)
+    assert span, "requirements should have a span"
+    assert "NOTE TO SELF" in task[span[0]:span[1]], (
+        "if end_mark no longer swallows the comment, the simpler span-based "
+        "cut becomes safe and this test is the one to revisit")
+
+
+def test_a_single_word_criterion_in_a_mapping_is_still_a_criterion():
+    """
+    A label is only a label when prose sits beside it.
+
+    Dropping every single-word value inside a mapping stopped
+    `severity: high` being treated as the bar, and also dropped a genuine
+    one-word criterion authored as a mapping value, leaving it unchecked.
+    """
+    leaky = (
+        'task_id: "SENTINEL_TASK"\n'
+        'acceptance_criteria:\n  strictness: "Exact"\n'
+        'notes: "Matching policy: Exact"\n'
+        'interface:\n  module: "m"\n')
+    with pytest.raises(RuntimeError, match="cannot be stripped safely"):
+        ai.without_acceptance_criteria(leaky)
+
+    labelled = (
+        'task_id: "SENTINEL_TASK"\n'
+        'default_priority: high\n'
+        'acceptance_criteria:\n'
+        '  - text: "must reject malformed payloads"\n'
+        '    severity: high\n'
+        'interface:\n  module: "m"\n')
+    handed_over = ai.without_acceptance_criteria(labelled)
+    assert "default_priority" in handed_over

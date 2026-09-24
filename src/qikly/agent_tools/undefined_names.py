@@ -111,12 +111,12 @@ def _walk_this_scope(node):
         current = stack.pop()
         yield current
         for child in ast.iter_child_nodes(current):
-            if current is not node and isinstance(
-                    child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                continue
+            # A lambda body resolves when it is called, exactly like a nested
+            # def, so `f = lambda: LATER` followed by `LATER = 5` is legal and
+            # was being reported. The first of the two conditions this replaces
+            # was dead: a node is never its own descendant.
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef,
-                                  ast.ClassDef)) and child is not node:
-                # Bind the nested definition by its name and look no further.
+                                  ast.ClassDef, ast.Lambda)):
                 continue
             stack.append(child)
 
