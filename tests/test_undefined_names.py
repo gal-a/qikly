@@ -171,14 +171,10 @@ def test_a_typo_inside_a_nested_helper_is_still_caught():
     checked on its own terms instead of skipped.
     """
     source = (
-        "def test_x():
-"
-        "    def helper():
-"
-        "        return totally_undefined_xyz
-"
-        "    assert helper() == 1
-"
+        "def test_x():\n"
+        "    def helper():\n"
+        "        return totally_undefined_xyz\n"
+        "    assert helper() == 1\n"
     )
     problems = undefined_uses(source)
     assert problems, "a typo inside a nested helper went unreported"
@@ -193,16 +189,11 @@ def test_a_nested_helper_may_read_what_the_test_binds_later():
     the enclosing test binds further down is correct Python.
     """
     source = (
-        "def test_x():
-"
-        "    def helper(index):
-"
-        "        return rows[index]
-"
-        "    rows = [1]
-"
-        "    assert helper(0) == 1
-"
+        "def test_x():\n"
+        "    def helper(index):\n"
+        "        return rows[index]\n"
+        "    rows = [1]\n"
+        "    assert helper(0) == 1\n"
     )
     assert undefined_uses(source) == []
 
@@ -210,32 +201,21 @@ def test_a_nested_helper_may_read_what_the_test_binds_later():
 def test_a_class_body_is_a_scope_too():
     """Both directions, for a class defined inside a test."""
     fine = (
-        "def test_x():
-"
-        "    class Fake:
-"
-        "        def get(self):
-"
-        "            return payload
-"
-        "    payload = 1
-"
-        "    assert Fake().get() == 1
-"
+        "def test_x():\n"
+        "    class Fake:\n"
+        "        def get(self):\n"
+        "            return payload\n"
+        "    payload = 1\n"
+        "    assert Fake().get() == 1\n"
     )
     assert undefined_uses(fine) == []
 
     typo = (
-        "def test_x():
-"
-        "    class Fake:
-"
-        "        def get(self):
-"
-        "            return undefined_in_class_xyz
-"
-        "    assert Fake()
-"
+        "def test_x():\n"
+        "    class Fake:\n"
+        "        def get(self):\n"
+        "            return undefined_in_class_xyz\n"
+        "    assert Fake()\n"
     )
     assert undefined_uses(typo), "a typo inside a nested class went unreported"
 
@@ -247,17 +227,11 @@ def test_a_loop_in_the_test_does_not_excuse_a_nested_helper():
     read.
     """
     source = (
-        "def test_x():
-"
-        "    for index in [1]:
-"
-        "        pass
-"
-        "    def helper():
-"
-        "        return nope_xyz
-"
-        "    assert helper()
-"
+        "def test_x():\n"
+        "    for index in [1]:\n"
+        "        pass\n"
+        "    def helper():\n"
+        "        return nope_xyz\n"
+        "    assert helper()\n"
     )
     assert undefined_uses(source), "the nested helper was not checked"
