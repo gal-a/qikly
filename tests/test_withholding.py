@@ -814,3 +814,102 @@ def test_a_requirement_repeating_a_criterion_still_runs():
     handed_over = ai.without_acceptance_criteria(task)
     assert same in handed_over, "the requirement is the author's to write"
     assert "acceptance_criteria" not in (yaml.safe_load(handed_over) or {})
+
+
+# --------------------- and the ways its verification could be walked past ----
+
+# The span cut is sound. These are attacks on the check that follows it, which
+# exists precisely because a cut cannot be trusted on its own. Each one handed
+# a criterion to the coding agent while the function returned normally: no
+# error, no warning, and `--explain` reporting a clean bill of health.
+
+_VERIFICATION_ATTACKS = {
+    "criteria written as a mapping rather than a list": """task_id: "SENTINEL_TASK"
+acceptance_criteria:
+  first: "%(s)s must be rejected with a reason"
+notes: "%(s)s must be rejected with a reason"
+interface:
+  module: "m"
+""",
+    "a criterion that is not a string": """task_id: "SENTINEL_TASK"
+acceptance_criteria:
+  - 4242424242
+notes: "4242424242"
+interface:
+  module: "m"
+""",
+    "a criterion spanning two requirements": """task_id: "SENTINEL_TASK"
+requirements:
+  - "%(s)s must be"
+  - "rejected with a reason"
+notes: "%(s)s must be rejected with a reason"
+acceptance_criteria:
+  - "%(s)s must be rejected with a reason"
+interface:
+  module: "m"
+""",
+    "the same sentence in different YAML quoting": """task_id: "SENTINEL_TASK"
+acceptance_criteria:
+  - "%(s)s can't exceed the stated limit"
+notes: '%(s)s can''t exceed the stated limit'
+interface:
+  module: "m"
+""",
+    "a criterion shorter than the old length floor": """task_id: "SENTINEL_TASK"
+acceptance_criteria:
+  - "reject nil"
+notes: "reject nil"
+interface:
+  module: "m"
+""",
+}
+
+
+@pytest.mark.parametrize("shape", sorted(_VERIFICATION_ATTACKS))
+def test_the_verification_cannot_be_walked_past(shape):
+    task = _VERIFICATION_ATTACKS[shape] % {"s": SENTINEL_A}
+
+    with pytest.raises(RuntimeError, match="cannot be stripped safely"):
+        ai.without_acceptance_criteria(task)
+
+
+def test_a_criterion_inside_a_requirement_is_exempt_and_that_is_correct():
+    """
+    The one case that looks like a hole and is not.
+
+    A requirement containing the criterion, padded or otherwise, hands it to
+    the coding agent by itself. Refusing the run would prevent nothing: the
+    text is in a section the agent reads, and only rewriting that requirement
+    changes it. The right response is the warning `--validate` already gives,
+    measured at 100% of the criterion's words on exactly this shape.
+
+    Asserted here so that a later attempt to "close" this does not quietly
+    turn a warning somebody chose to live with into a hard stop.
+    """
+    criterion = "a humidity of 100 is accepted and 101 is rejected"
+    task = (
+        'task_id: "SENTINEL_TASK"\n'
+        'requirements:\n  - "Background note: %s, which is context"\n'
+        'acceptance_criteria:\n  - "%s"\n'
+        'interface:\n  module: "m"\n' % (criterion, criterion))
+
+    handed_over = ai.without_acceptance_criteria(task)
+    assert criterion in handed_over, "the requirement is the author's to write"
+    assert "acceptance_criteria" not in (yaml.safe_load(handed_over) or {})
+
+
+def test_whitespace_and_wrapping_do_not_hide_a_criterion():
+    """
+    Values are compared as values. A criterion wrapped across lines by YAML,
+    or indented differently, is the same criterion, and comparing a parsed
+    string against raw bytes said otherwise.
+    """
+    task = (
+        'task_id: "SENTINEL_TASK"\n'
+        'acceptance_criteria:\n'
+        '  - "%s must be rejected\n    with a specific reason"\n'
+        'notes: "%s must be rejected with a specific reason"\n'
+        'interface:\n  module: "m"\n' % (SENTINEL_A, SENTINEL_A))
+
+    with pytest.raises(RuntimeError, match="cannot be stripped safely"):
+        ai.without_acceptance_criteria(task)

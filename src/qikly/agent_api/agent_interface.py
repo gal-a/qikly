@@ -204,11 +204,29 @@ def _all_criteria(task_text):
 
     found = []
 
+    def leaves(node):
+        """Every string anywhere inside a value, whatever shape it has."""
+        if isinstance(node, str):
+            yield node
+        elif isinstance(node, dict):
+            for value in node.values():
+                yield from leaves(value)
+        elif isinstance(node, (list, tuple)):
+            for item in node:
+                yield from leaves(item)
+        elif node is not None and not isinstance(node, bool):
+            # A number written as a criterion is still a criterion.
+            yield str(node)
+
     def walk(node):
         if isinstance(node, dict):
             for key, value in node.items():
-                if key == "acceptance_criteria" and isinstance(value, list):
-                    found.extend(c for c in value if isinstance(c, str))
+                if key == "acceptance_criteria":
+                    # Every leaf, not just the items of a list. Criteria
+                    # written as a mapping were collected as nothing at all,
+                    # which left the verification below with nothing to check
+                    # and let a verbatim copy elsewhere in the file through.
+                    found.extend(leaves(value))
                 walk(value)
         elif isinstance(node, list):
             for item in node:
@@ -227,26 +245,70 @@ def _surviving_criteria(task_text, handed_over):
     warning; this is for the text itself arriving intact, which is never
     acceptable and never a judgement call.
     """
+    import re
+
     import yaml
+
+    def normalise(value):
+        """Whitespace collapsed, so wrapping and indentation stop mattering."""
+        return re.sub(r"\s+", " ", str(value)).strip()
 
     # A criterion the author also wrote into `requirements` reaches the coding
     # agent because they put it there, which is a specification mistake that
     # `--validate` warns about by name. It is not the strip failing, and
     # refusing to run would turn a warning somebody chose to live with into a
-    # hard stop. What this looks for is a criterion surviving by a route the
-    # author did not choose.
+    # hard stop.
+    #
+    # Each requirement is compared on its own. Joining them first meant a
+    # criterion spanning the end of one and the start of the next read as
+    # authored when no requirement had ever said it.
     parsed = yaml.safe_load(task_text) or {}
-    authored = " ".join(str(r) for r in (parsed.get("requirements") or []))
+    authored = [normalise(r) for r in (parsed.get("requirements") or [])]
+
+    # The handed-over text parsed back, so the comparison is value against
+    # value. Comparing a parsed criterion against raw bytes made the same
+    # sentence in different YAML quoting read as different text.
+    try:
+        handed_values = [normalise(v) for v in _all_strings(yaml.safe_load(handed_over))]
+    except yaml.YAMLError:                               # pragma: no cover
+        handed_values = []
+    handed_raw = normalise(handed_over)
 
     survivors = []
     for criterion in _all_criteria(task_text):
-        text = criterion.strip()
-        if len(text) < 12 or text not in handed_over:
+        text = normalise(criterion)
+        if not text:
             continue
-        if text in authored:
+
+        # Short criteria are matched whole against a value rather than looked
+        # for inside the raw text, which is what the old length floor was
+        # reaching for. The floor skipped them entirely instead, so anything
+        # under twelve characters was never checked at all.
+        if len(text) < 12:
+            present = text in handed_values
+        else:
+            present = text in handed_raw or any(text in v for v in handed_values)
+        if not present:
+            continue
+
+        if any(text in requirement for requirement in authored):
             continue
         survivors.append(text)
     return survivors
+
+
+def _all_strings(node):
+    """Every string anywhere in a parsed document, keys included."""
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, dict):
+        for key, value in node.items():
+            if isinstance(key, str):
+                yield key
+            yield from _all_strings(value)
+    elif isinstance(node, (list, tuple)):
+        for item in node:
+            yield from _all_strings(item)
 
 
 def _task_without_acceptance_criteria(task_id):
