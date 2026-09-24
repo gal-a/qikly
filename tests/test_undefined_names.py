@@ -159,3 +159,105 @@ def test_the_orchestrator_rejects_such_a_file():
 
     fine = broken.replace("transform(records)", "transform(rows)")
     assert _validate_generated_tests(fine, "unit") is None
+
+
+def test_a_typo_inside_a_nested_helper_is_still_caught():
+    """
+    The regression this file's own fix introduced, and then undid.
+
+    Excluding nested definitions removed a false positive and created a false
+    negative: a name nothing binds anywhere, inside a nested helper, stopped
+    being flagged, and it had been flagged before. A nested scope is now
+    checked on its own terms instead of skipped.
+    """
+    source = (
+        "def test_x():
+"
+        "    def helper():
+"
+        "        return totally_undefined_xyz
+"
+        "    assert helper() == 1
+"
+    )
+    problems = undefined_uses(source)
+    assert problems, "a typo inside a nested helper went unreported"
+    assert problems[0][1] == "totally_undefined_xyz"
+
+
+def test_a_nested_helper_may_read_what_the_test_binds_later():
+    """
+    The false positive that prompted the skip, which must stay fixed.
+
+    A nested function resolves names when it is called, so reading something
+    the enclosing test binds further down is correct Python.
+    """
+    source = (
+        "def test_x():
+"
+        "    def helper(index):
+"
+        "        return rows[index]
+"
+        "    rows = [1]
+"
+        "    assert helper(0) == 1
+"
+    )
+    assert undefined_uses(source) == []
+
+
+def test_a_class_body_is_a_scope_too():
+    """Both directions, for a class defined inside a test."""
+    fine = (
+        "def test_x():
+"
+        "    class Fake:
+"
+        "        def get(self):
+"
+        "            return payload
+"
+        "    payload = 1
+"
+        "    assert Fake().get() == 1
+"
+    )
+    assert undefined_uses(fine) == []
+
+    typo = (
+        "def test_x():
+"
+        "    class Fake:
+"
+        "        def get(self):
+"
+        "            return undefined_in_class_xyz
+"
+        "    assert Fake()
+"
+    )
+    assert undefined_uses(typo), "a typo inside a nested class went unreported"
+
+
+def test_a_loop_in_the_test_does_not_excuse_a_nested_helper():
+    """
+    Control flow disables checking for the scope it appears in, not for the
+    scopes nested inside it. A test with a `for` loop still has its helpers
+    read.
+    """
+    source = (
+        "def test_x():
+"
+        "    for index in [1]:
+"
+        "        pass
+"
+        "    def helper():
+"
+        "        return nope_xyz
+"
+        "    assert helper()
+"
+    )
+    assert undefined_uses(source), "the nested helper was not checked"

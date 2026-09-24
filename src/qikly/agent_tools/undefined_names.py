@@ -145,7 +145,11 @@ def _module_level_names(tree):
 
 
 def _parameters(func):
-    args = func.args
+    # A class body has no parameters. It is still a scope, so it is checked
+    # like one, and asking it for arguments was an AttributeError.
+    args = getattr(func, "args", None)
+    if args is None:
+        return set()
     names = {a.arg for a in list(args.posonlyargs) + list(args.args) + list(args.kwonlyargs)}
     if args.vararg:
         names.add(args.vararg.arg)
@@ -189,30 +193,53 @@ def undefined_uses(source):
     for func in tree.body:
         if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
-        # One control-flow statement anywhere in the function and this stops
-        # looking. Test functions that build a fixture and call the code under
-        # test are straight-line, which is the shape worth checking.
-        if any(isinstance(n, _REORDERING) for n in ast.walk(func)):
-            continue
-
-        bound = set(module_names) | _parameters(func)
-        for statement in func.body:
-            # A nested def or class is a scope of its own from its first line.
-            # It contributes its name to the enclosing function and nothing
-            # else: its parameters are not the enclosing function's names, and
-            # its body may legally read something bound later, because a
-            # closure resolves when it is called rather than when it is
-            # written. Reading loads out of it reported both as errors.
-            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef,
-                                      ast.ClassDef)):
-                bound |= _bound_by(statement)
-                continue
-            for name, line in _loaded_by(statement):
-                if name not in bound:
-                    problems.append((func.name, name, line))
-            bound |= _bound_by(statement)
+        _check_scope(func, set(module_names), func.name, problems)
 
     return problems
+
+
+def _check_scope(scope, outer_bound, label, problems):
+    """
+    One function or class body, read in the order Python evaluates it.
+
+    `outer_bound` is everything the enclosing scopes bind, with no ordering,
+    because a nested function resolves names when it is called and may
+    therefore read something its enclosing function binds further down. What it
+    may not read is a name nothing binds anywhere, which is the typo this
+    catches and which skipping nested definitions entirely had stopped
+    catching.
+    """
+    # One control-flow statement anywhere in this scope and it stops looking
+    # here. A body that builds a fixture and calls the code under test is
+    # straight-line, which is the shape worth checking. Nested scopes are
+    # still checked on their own terms.
+    reordering = any(isinstance(n, _REORDERING)
+                     for n in _walk_this_scope(scope))
+
+    # Everything this scope binds, anywhere in it, for the benefit of scopes
+    # nested inside it.
+    everything_here = set()
+    for statement in scope.body:
+        everything_here |= _bound_by(statement)
+
+    bound = set(outer_bound) | _parameters(scope)
+    inner_outer = set(outer_bound) | _parameters(scope) | everything_here
+
+    for statement in scope.body:
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                  ast.ClassDef)):
+            # Its name is available here from this point; its body is checked
+            # against the enclosing bindings without ordering.
+            bound |= _bound_by(statement)
+            _check_scope(statement, inner_outer,
+                         "%s.%s" % (label, statement.name), problems)
+            continue
+
+        if not reordering:
+            for name, line in _loaded_by(statement):
+                if name not in bound:
+                    problems.append((label, name, line))
+        bound |= _bound_by(statement)
 
 
 def describe(source):

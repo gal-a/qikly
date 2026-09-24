@@ -33,9 +33,11 @@ indexes:
 - `https://pypi.org/pypi/qikly/json`
 - `https://api.github.com/repos/gal-a/qikly/releases/latest`
 
-Both are ordinary public endpoints. The request carries no identifier, no usage
-data and nothing about your project: it is the same request anyone's browser
-would make. It reads indexes rather than any address this project controls, on
+Both are ordinary public endpoints. The request carries no usage data and
+nothing about your project. It does identify the software: the `User-Agent`
+header reads `qikly/<version>`, which is how the check knows whether to tell
+you a newer release exists, and it is the only thing about you that the request
+says. It reads indexes rather than any address this project controls, on
 purpose, so that the check cannot become a channel for whatever a maintainer
 decides to say later.
 
