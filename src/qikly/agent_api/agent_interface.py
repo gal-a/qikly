@@ -170,9 +170,83 @@ def without_acceptance_criteria(task_text):
             "withheld section cannot be established: %s" % exc) from exc
 
     if span is None:
-        return task_text.rstrip() + "\n"
-    start, end = span
-    return (task_text[:start] + task_text[end:]).rstrip() + "\n"
+        handed_over = task_text.rstrip() + "\n"
+    else:
+        start, end = span
+        handed_over = (task_text[:start] + task_text[end:]).rstrip() + "\n"
+
+    leaked = _surviving_criteria(task_text, handed_over)
+    if leaked:
+        raise RuntimeError(
+            "this task file cannot be stripped safely, so nothing was handed "
+            "over: %d acceptance criterion(s) would still have reached the "
+            "coding agent, starting with %r. This happens when the criteria "
+            "are not one plain block under a single top level "
+            "`acceptance_criteria:` key: a YAML merge key (`<<:`), an alias "
+            "(`*name`) whose anchor lives elsewhere, a second "
+            "`acceptance_criteria:` key, or a copy nested under another key. "
+            "Write them as one top level block and run `qikly --validate` "
+            "again." % (len(leaked), leaked[0][:70]))
+    return handed_over
+
+
+def _all_criteria(task_text):
+    """
+    Every acceptance criterion in the document, at any depth.
+
+    `safe_load` rather than the node tree, because this has to see what the
+    rest of the system sees: merge keys resolved, aliases followed, the last
+    of two duplicate keys winning. At any depth, because a second block nested
+    under an unrelated key is still a copy of the bar, and the top level list
+    does not contain it.
+    """
+    import yaml
+
+    found = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "acceptance_criteria" and isinstance(value, list):
+                    found.extend(c for c in value if isinstance(c, str))
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(yaml.safe_load(task_text))
+    return found
+
+
+def _surviving_criteria(task_text, handed_over):
+    """
+    Which criteria are still readable in what the coding agent receives.
+
+    Compared whole and stripped of surrounding whitespace. A criterion that
+    merely shares words with a requirement is `--validate`'s business and a
+    warning; this is for the text itself arriving intact, which is never
+    acceptable and never a judgement call.
+    """
+    import yaml
+
+    # A criterion the author also wrote into `requirements` reaches the coding
+    # agent because they put it there, which is a specification mistake that
+    # `--validate` warns about by name. It is not the strip failing, and
+    # refusing to run would turn a warning somebody chose to live with into a
+    # hard stop. What this looks for is a criterion surviving by a route the
+    # author did not choose.
+    parsed = yaml.safe_load(task_text) or {}
+    authored = " ".join(str(r) for r in (parsed.get("requirements") or []))
+
+    survivors = []
+    for criterion in _all_criteria(task_text):
+        text = criterion.strip()
+        if len(text) < 12 or text not in handed_over:
+            continue
+        if text in authored:
+            continue
+        survivors.append(text)
+    return survivors
 
 
 def _task_without_acceptance_criteria(task_id):

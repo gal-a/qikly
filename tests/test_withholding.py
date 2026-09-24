@@ -13,6 +13,7 @@ what the regex was load-bearing for.
 import re
 
 import pytest
+import yaml
 
 from qikly.agent_api import agent_interface as ai
 from qikly.agent_api.prompts.fix_prompt import build_fix_prompt
@@ -707,3 +708,109 @@ def test_a_task_file_that_does_not_parse_fails_closed():
     broken = 'task_id: "T"\nacceptance_criteria:\n  - "unclosed quote\n'
     with _pytest.raises(RuntimeError, match="does not parse"):
         ai.without_acceptance_criteria(broken)
+
+
+# ------------------------------ the four that beat the node-mark version ----
+
+# Each of these hands the coding agent real criteria on the released 0.5.1,
+# confirmed by running. They share one cause: `yaml.safe_load`, which is what
+# test generation reads and therefore what the criteria ARE, resolves merge
+# keys, follows aliases and lets the last of two duplicate keys win, while the
+# strip looked for the first literal `acceptance_criteria` key of the top level
+# mapping. Two parsers, two answers, and every disagreement is a leak.
+#
+# The lesson is in the shape of the fix rather than in any one of these: the
+# previous version replaced a regex with a parser for exactly this reason and
+# then reasoned about where the text sits instead of what it says. So the strip
+# now verifies the property afterwards and refuses what it cannot prove clean.
+
+_ATTACKS = {
+    "merge key pulling criteria in from an anchor": """defaults: &base
+  acceptance_criteria:
+    - "%(s)s must be rejected with a reason"
+task_id: "SENTINEL_TASK"
+<<: *base
+interface:
+  module: "m"
+""",
+    "alias whose anchor lives under another key": """shared: &crit
+  - "%(s)s must be rejected with a reason"
+task_id: "SENTINEL_TASK"
+acceptance_criteria: *crit
+interface:
+  module: "m"
+""",
+    "two acceptance_criteria keys, last wins": """task_id: "SENTINEL_TASK"
+acceptance_criteria:
+  - "a stale decoy criterion left after a reorder"
+interface:
+  module: "m"
+acceptance_criteria:
+  - "%(s)s must be rejected with a reason"
+""",
+    "a second copy nested under another key": """task_id: "SENTINEL_TASK"
+metadata:
+  acceptance_criteria:
+    - "%(s)s must be rejected with a reason"
+acceptance_criteria:
+  - "the real top level criterion, which is fine"
+interface:
+  module: "m"
+""",
+}
+
+
+@pytest.mark.parametrize("shape", sorted(_ATTACKS))
+def test_a_task_the_strip_cannot_clean_is_refused_rather_than_handed_over(shape):
+    """
+    Fail closed. A file that cannot be stripped safely is one nobody should
+    run, and an error naming the construction costs its author a minute.
+    """
+    task = _ATTACKS[shape] % {"s": SENTINEL_A}
+
+    with pytest.raises(RuntimeError) as raised:
+        ai.without_acceptance_criteria(task)
+
+    message = str(raised.value)
+    assert "cannot be stripped safely" in message
+    assert SENTINEL_A not in message or "starting with" in message, (
+        "the error may quote the leaked criterion to identify it, but only "
+        "to the person reading their own file")
+
+
+@pytest.mark.parametrize("shape", sorted(_ATTACKS))
+def test_none_of_them_reaches_the_coding_agent_by_any_path(shape):
+    """
+    The property itself, asserted separately from how it is enforced.
+
+    If a later version learns to strip these rather than refuse them, this
+    test should still pass and the one above should be the one that changes.
+    """
+    task = _ATTACKS[shape] % {"s": SENTINEL_A}
+    try:
+        handed_over = ai.without_acceptance_criteria(task)
+    except RuntimeError:
+        return
+    assert SENTINEL_A not in handed_over, (
+        "%s: the criterion reached the coding agent" % shape)
+
+
+def test_a_requirement_repeating_a_criterion_still_runs():
+    """
+    The line between a leak and a specification mistake.
+
+    An author who writes the same sentence into `requirements` has handed it
+    over themselves, and `--validate` says so by name. Refusing would turn a
+    warning somebody chose to live with into a hard stop, so the check looks
+    only for a criterion surviving by a route the author did not choose.
+    """
+    same = "A quantity of 0 is rejected and a quantity of 1 is accepted"
+    task = (
+        'task_id: "SENTINEL_TASK"\n'
+        'requirements:\n  - "%s"\n'
+        'acceptance_criteria:\n  - "%s"\n'
+        'interface:\n  module: "m"\n' % (same, same))
+
+    handed_over = ai.without_acceptance_criteria(task)
+    assert same in handed_over, "the requirement is the author's to write"
+    assert "acceptance_criteria" not in (yaml.safe_load(handed_over) or {})

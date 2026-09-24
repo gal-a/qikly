@@ -162,6 +162,17 @@ def test_no_provider_restates_its_default_model_as_a_literal():
             "disagree about which model a run used." % provider)
         assert isinstance(value.value, ast.Name) and value.value.id == "DEFAULT_MODELS", (
             "%s.py should subscript DEFAULT_MODELS" % provider)
+        # The key, not just the shape. Without this the test passes on
+        # `DEFAULT_MODEL = DEFAULT_MODELS["gemini"]` sitting in anthropic.py,
+        # which is the copy-paste that reintroduces the banner naming a model
+        # the run is not using, and CI cannot catch it in the no-extras job
+        # because it cannot import the module to compare values.
+        key = value.slice
+        if hasattr(ast, "Index") and isinstance(key, getattr(ast, "Index")):
+            key = key.value                              # pragma: no cover
+        assert isinstance(key, ast.Constant) and key.value == provider, (
+            "%s.py reads DEFAULT_MODELS[%r], not its own key"
+            % (provider, getattr(key, "value", key)))
         checked.append(provider)
 
     assert checked == sorted(defaults.DEFAULT_MODELS), checked
