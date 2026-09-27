@@ -394,3 +394,29 @@ def test_the_package_version_matches_pyproject():
         f"qikly.__version__ is {qikly.__version__} but pyproject.toml says "
         f"{declared}. Bump both."
     )
+
+def test_a_quick_command_does_not_repeat_the_notice():
+    """
+    The repeat exists because a long run scrolls the opening line away. A
+    command that finishes in under a second has scrolled nothing, and a
+    first-time user running `--validate` saw the same sentence twice, four
+    lines apart, in an output four lines long.
+    """
+    import io as _io
+
+    from qikly import version_check as vc
+
+    monkey = pytest.MonkeyPatch()
+    try:
+        monkey.setattr(vc, "_ANNOUNCED", "qikly 9.9.9 is available")
+
+        quick = _io.StringIO()
+        assert vc.repeat_notice(stream=quick, elapsed=0.4) is None
+        assert quick.getvalue() == "", "it repeated after an instant command"
+
+        slow = _io.StringIO()
+        assert vc.repeat_notice(stream=slow, elapsed=120.0) is not None
+        assert "9.9.9" in slow.getvalue(), (
+            "a run long enough to scroll the first line should still repeat it")
+    finally:
+        monkey.undo()

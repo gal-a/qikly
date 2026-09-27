@@ -222,3 +222,40 @@ def test_the_refusal_says_how_to_undo_it(tmp_path):
     done = _run(["--example"], str(scratch))
     assert DEMO_MARKER in done.stdout, (
         "the way out is not named:\n%s" % done.stdout)
+
+def test_it_says_so_before_scattering_files_through_your_home_directory(tmp_path):
+    """
+    A first-time user ran `--example` in his home directory and finished with
+    inputs_private/, outputs/, my_metrics.py and demo/ beside Documents,
+    Downloads and Dropbox, then could not tell which of two identical-looking
+    trees was his project.
+
+    Warned rather than refused: nothing here overwrites anything, and somebody
+    may mean it.
+    """
+    home = tmp_path / "home"
+    home.mkdir()
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = SRC
+    environment["USERPROFILE"] = str(home)   # Windows
+    environment["HOME"] = str(home)          # everywhere else
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY",
+                 "ANTHROPIC_API_KEY"):
+        environment.pop(name, None)
+
+    done = subprocess.run([sys.executable, "-m", "qikly", "--example"],
+                          cwd=str(home), env=environment, capture_output=True,
+                          text=True, timeout=300)
+    assert "this is your home directory" in done.stdout.lower(), done.stdout
+    assert "mkdir qikly-test" in done.stdout
+    # Warned, not refused: the files are still created.
+    assert (home / "inputs_private").is_dir(), (
+        "it warned and then did nothing, which is not what a warning is")
+
+    elsewhere = tmp_path / "a-project"
+    elsewhere.mkdir()
+    done = subprocess.run([sys.executable, "-m", "qikly", "--example"],
+                          cwd=str(elsewhere), env=environment,
+                          capture_output=True, text=True, timeout=300)
+    assert "your home directory" not in done.stdout.lower(), (
+        "an ordinary project directory was warned about:\n%s" % done.stdout)

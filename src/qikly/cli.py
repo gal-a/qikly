@@ -1141,6 +1141,25 @@ def _do_init(with_example=False):
         return 2
 
     root = INVOKED_FROM
+
+    # Warned, not refused. A first-time user ran this in his home directory
+    # and ended up with inputs_private/, outputs/, my_metrics.py and demo/
+    # sitting beside Documents, Downloads and Dropbox, then could not tell
+    # which of two identical-looking trees was his. Nothing here is
+    # destructive, and somebody may mean it, so this says so loudly and
+    # continues rather than deciding for them.
+    if os.path.normcase(os.path.abspath(root)) == os.path.normcase(
+            os.path.abspath(os.path.expanduser("~"))):
+        print()
+        print("  NOTE: this is your home directory.")
+        print("  qikly is about to create inputs_private/, outputs/ and a")
+        print("  module here, beside Documents and Downloads. Most people")
+        print("  want a folder of their own:")
+        print("    mkdir qikly-test")
+        print("    cd qikly-test")
+        print("    qikly --example")
+        print("  Carrying on here, since nothing is overwritten.")
+        print()
     # The example is a finished task, so it arrives on its own rather than
     # beside a blank starter the reader never asked for.
     made, skipped = init_project(root, starter=not with_example)

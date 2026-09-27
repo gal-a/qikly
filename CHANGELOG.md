@@ -43,6 +43,16 @@ packaging tools would read as `1.1`.
   project. Reported by a first-time user.
 
 ### Fixed
+- **`--init` and `--example` now say so before filling your home directory.**
+  A first-time user ran `--example` in his home folder and finished with
+  `inputs_private/`, `outputs/`, a module and a `demo/` tree sitting beside
+  Documents, Downloads and Dropbox, then could not tell which of two
+  identical-looking trees was his project. Warned rather than refused, since
+  nothing there overwrites anything.
+- **The upgrade notice stopped repeating itself after instant commands.** It
+  prints once at the start and again at the end, because a run takes minutes
+  and the first line scrolls away. On `--validate`, which returns in under a
+  second, that put the same sentence twice in a four-line output.
 - **Upgrading left you with the previous release's Skill, silently.**
   `pip install --upgrade qikly` replaces the package and cannot touch a Skill
   already copied into your project, so an upgrade left you following

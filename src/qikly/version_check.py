@@ -27,6 +27,7 @@ and a failure mode in exchange for saving something that costs nothing.
 import json
 import os
 import sys
+import time
 import urllib.request
 
 from qikly import __version__
@@ -139,7 +140,15 @@ def check_for_update():
 _ANNOUNCED = None
 
 
-def repeat_notice(stream=None):
+# Below this many seconds, the opening line is still on screen and repeating
+# it is noise. A first-time user ran `--validate`, which prints three lines and
+# returns in under a second, and saw the same sentence twice four lines apart.
+REPEAT_AFTER_SECONDS = 20.0
+
+_STARTED = time.monotonic()
+
+
+def repeat_notice(stream=None, elapsed=None):
     """
     Say it again at the end, because the beginning has scrolled off by then.
 
@@ -148,6 +157,11 @@ def repeat_notice(stream=None):
     repeats the line already computed: no second network call, and nothing at
     all when the first line was not printed.
 
+    **And nothing when the command was quick.** The reason to repeat is that
+    the first line scrolled away, so a command that finishes in under
+    REPEAT_AFTER_SECONDS has nothing to repeat: a first-time user ran
+    `--validate` and saw the same sentence twice, four lines apart.
+
     To stderr, not stdout, and that is the whole reason this is safe to add.
     `--json` exists so a caller can parse stdout, and a trailing line appended
     after the JSON would break exactly the callers most likely to be reading
@@ -155,6 +169,11 @@ def repeat_notice(stream=None):
     `--json` already follows.
     """
     if not _ANNOUNCED:
+        return None
+    if elapsed is None:
+        elapsed = time.monotonic() - _STARTED
+    if elapsed < REPEAT_AFTER_SECONDS:
+        # Nothing has scrolled, so there is nothing to repeat.
         return None
     print(_ANNOUNCED, file=stream if stream is not None else sys.stderr)
     return _ANNOUNCED
