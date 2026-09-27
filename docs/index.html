@@ -803,7 +803,11 @@ footer {
       of the task file before the coding agent is handed it, so there is no
       channel left for them to arrive through, whichever model is writing.
       <code>qikly --explain</code> prints what each side received, so you can
-      see the cut rather than trust it. <em>You can also do both</em>: qikly
+      see the cut rather than trust it, and
+      <code>tests/test_withholding.py</code> fails the build if any call site
+      ever lets a criterion through
+      (<a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md"
+          data-goatcounter-click="explain-detail">how it works, in full</a>). <em>You can also do both</em>: qikly
       picks a model per agent role.
 </p>
     <p class="counter">
@@ -1091,23 +1095,8 @@ qikly --demo</code></pre>
   </section>
 
   <section class="band">
-    <p class="eyebrow">Checkable, not asserted</p>
-    <h2>See the acceptance criteria being removed, in one command</h2>
-    <!-- Two paragraphs of explanation used to sit here. They walked through
-         what --explain prints and how the withholding is held by a test, which
-         is the right level of detail for somebody who has decided to look and
-         too much for somebody deciding whether to. The command and the link
-         carry it now; the detail lives where it is read on purpose. -->
-    <pre><code>qikly --explain CALC_TAX</code></pre>
-    <p>
-      It prints the task file twice, once as each agent receives it, and the
-      difference between them. No API key, no model call, about a second. The
-      withholding is a property of the code rather than a promise about how a
-      model was prompted, and <code>tests/test_withholding.py</code> fails the
-      build if any call site ever lets a criterion through.
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md"
-         data-goatcounter-click="explain-detail">How it works, in full</a>.
-    </p>
+    <p class="eyebrow">Measured, not claimed</p>
+    <h2>What three sweeps actually showed</h2>
     <div class="figures">
       <div class="fig">
         <span class="fig-n">~60%</span>
