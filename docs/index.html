@@ -336,46 +336,6 @@ pre code { background: none; padding: 0; }
   margin-bottom: 8px;
 }
 
-/* numbers */
-
-.figures {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1px;
-  background: var(--rule);
-  border: 1px solid var(--rule);
-  border-radius: 9px;
-  overflow: hidden;
-  margin-bottom: 18px;
-}
-
-.fig { background: var(--surface); padding: 18px; }
-
-.fig-n {
-  font-family: Archivo, sans-serif;
-  font-weight: 700;
-  font-size: 1.9rem;
-  line-height: 1;
-  letter-spacing: -.02em;
-  font-variant-numeric: tabular-nums;
-  display: block;
-}
-
-.fig-l {
-  font-size: .85rem;
-  color: var(--ink-soft);
-  display: block;
-  margin-top: 6px;
-}
-
-.fig-ci {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: .7rem;
-  color: var(--ink-faint);
-  display: block;
-  margin-top: 3px;
-}
-
 .caveat {
   background: var(--warn-bg);
   border-radius: 7px;
@@ -386,9 +346,19 @@ pre code { background: none; padding: 0; }
 
 .caveat strong { color: var(--warn); }
 
+.designs {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  max-width: 66ch;
+}
+.designs li { margin: 0 0 8px; }
+
 .origin {
   max-width: 60ch;
-  margin: 0 auto 2.5rem;
+  /* Space above as well as below. It is a footnote about the author sitting
+     directly under the last section, and with no top margin it read as part
+     of whatever happened to end above it. */
+  margin: 2.5rem auto 3rem;
   padding: 0 1.5rem;
   font-size: 0.95rem;
   line-height: 1.6;
@@ -406,13 +376,6 @@ footer {
   justify-content: space-between;
 }
 
-
-.replication {
-  margin: 10px 0 0;
-  max-width: 60ch;
-  font-size: .95rem;
-  opacity: .82;
-}
 
 
 
@@ -1089,40 +1052,28 @@ qikly --demo</code></pre>
       have to name real functions.
     </p>
 
-  </section>
+    <h3 class="spaced">The design write-up, in three parts</h3>
+    <p>
+      Each stands on its own.
+    </p>
+    <ul class="designs">
+      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md"
+             data-goatcounter-click="design-1">1. The case</a>. Why an agent
+      that writes its own tests is grading its own homework, and one repair
+      followed end to end: what the coding agent was given, the test it failed,
+      the reasoning it produced from that failure alone, and the one-line
+      patch.</li>
+      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md"
+             data-goatcounter-click="design-2">2. How well it works</a>. Three
+      sweeps and 967 runs, the benchmark defect found and corrected between
+      them, the unit-stage gap, what makes a run stall, and the results this
+      project measured and then withdrew.</li>
+      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md"
+             data-goatcounter-click="design-3">3. How it is built</a>. The five
+      agents and what each may read, the FIX and PATCH separation, the
+      thirteen example tasks, and supplying your own code or tests.</li>
+    </ul>
 
-  <section class="band">
-    <p class="eyebrow">Measured, not claimed</p>
-    <h2>What three sweeps actually showed</h2>
-    <div class="figures">
-      <div class="fig">
-        <span class="fig-n">~60%</span>
-        <span class="fig-l">converged end to end, unit tests included</span>
-        <span class="fig-ci">measured three times, across 967 runs</span>
-      </div>
-      <div class="fig">
-        <span class="fig-n">~80%</span>
-        <span class="fig-l">passed integration and system tests</span>
-        <span class="fig-ci">small cheap model, so read it as a floor</span>
-      </div>
-      <div class="fig">
-        <span class="fig-n">0</span>
-        <span class="fig-l">runs reported success on code their own tests rejected</span>
-        <span class="fig-ci">across every run measured</span>
-      </div>
-    </div>
-    <p class="replication">Those are round numbers on purpose. A 427-run sweep gave 59% and 80%; a second sweep of 140 runs sixteen days later gave 67% and 87%, well inside the first one’s intervals. Then the benchmark itself turned out to be wrong: in eight of the ten tasks some acceptance criteria could not be triggered by any input row, so part of the bar was not lower, it was absent. Thirty-one rows were added and 400 runs were taken again, giving 64% and 83%. The prediction was that convergence would fall once the bar was genuinely enforceable. It did not move. Three sweeps agreeing, one of them against a corrected benchmark, is worth more than any one of their decimal places.</p>
-    <p>
-      A run that cannot satisfy its own suite exits non-zero, names the blocking
-      tests, and ships nothing. That is the property worth having: the failure
-      mode is a refusal, not a false pass.
-    </p>
-    <p>
-      One run is an artifact, not a rate. The same task with the same seed
-      converges on some runs and not others, which is why a figure here comes
-      from repetition and names the model and date it was taken on.
-    </p>
-    
   </section>
 
   <p class="origin">The separation this tool enforces is ordinary practice in safety-critical engineering, where verification is required to be independent of implementation as part of a V&amp;V (Verification &amp; Validation) methodology for testing. This library's author worked in that setting on General Motors' autonomous vehicle program before building this toolset.</p>
