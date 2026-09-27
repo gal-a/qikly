@@ -67,6 +67,46 @@ def bundled_dir():
                         "skills", SKILL_NAME)
 
 
+def _declared_version(path):
+    """
+    `metadata.version` out of a SKILL.md, as a comparable tuple, or None.
+
+    Deliberately not a YAML parse: this runs against a file a user may have
+    edited, and a malformed one must produce "I cannot tell" rather than an
+    exception in the middle of an install.
+    """
+    try:
+        with open(path, encoding="utf-8") as handle:
+            for line in handle:
+                stripped = line.strip()
+                if stripped.startswith("version:"):
+                    raw = stripped.split(":", 1)[1].strip().strip('"').strip("'")
+                    return tuple(int(part) for part in raw.split("."))
+    except Exception:
+        return None
+    return None
+
+
+def is_stale(destination):
+    """
+    True when the installed Skill is older than the one this qikly ships.
+
+    `pip install --upgrade qikly` replaces the package and cannot touch a Skill
+    already copied into somebody's project, so an upgrade leaves them with
+    instructions that name a different set of commands. Nothing said so: the
+    installer reported "already exists, nothing was changed" whether the copy
+    on disk was identical or three releases behind.
+
+    Returns None when either version cannot be read, because "I do not know"
+    and "it is current" must not print the same thing.
+    """
+    theirs = _declared_version(os.path.join(destination, "SKILL.md"))
+    ours = _declared_version(os.path.join(bundled_dir(), "SKILL.md"))
+    if theirs is None or ours is None:
+        return None
+    return theirs < ours
+
+
 def install_all(root, hosts=None, force=False, dry_run=False):
     """
     Install for each named host. Returns [(host, destination, outcome, backup)].

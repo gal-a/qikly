@@ -1369,9 +1369,24 @@ def _do_install_skill(agent, force, dry_run):
                   "clone.")
             return 1
         if outcome == "exists":
-            print(f"{relative} already exists, so nothing was changed. Pass "
-                  f"--force to replace it, or delete it first if you have "
-                  f"edited it.")
+            # The upgrade path nobody was told about. `pip install --upgrade`
+            # replaces the package and cannot touch a Skill already copied into
+            # somebody's project, so an upgrade leaves them following
+            # instructions that name a different set of commands, and this
+            # message used to say the same thing whether their copy was
+            # identical or three releases behind.
+            from qikly.skill_install import is_stale
+
+            stale = is_stale(destination)
+            if stale:
+                print(f"{relative} already exists and is OLDER than the Skill "
+                      f"this qikly ships, so it names a different set of "
+                      f"commands. Replace it with --force, which keeps a "
+                      f"timestamped copy of what is there now.")
+            else:
+                print(f"{relative} already exists, so nothing was changed. Pass "
+                      f"--force to replace it, or delete it first if you have "
+                      f"edited it.")
             continue
         if outcome == "would write":
             print(f"Would write {len(files_in(bundled_dir()))} files to {relative}")

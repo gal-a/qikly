@@ -32,6 +32,12 @@ packaging tools would read as `1.1`.
   project. Reported by a first-time user.
 
 ### Fixed
+- **Upgrading left you with the previous release's Skill, silently.**
+  `pip install --upgrade qikly` replaces the package and cannot touch a Skill
+  already copied into your project, so an upgrade left you following
+  instructions that name a different set of commands. `--install-skill` said
+  "already exists, nothing was changed" whether your copy was identical or
+  three releases behind. It now says when yours is older and what to do.
 - **`qikly --artifacts-url ...` on its own started a real, billed run**, the
   same unguarded fallthrough as the one below, in the sibling flag nobody
   thought to check. Found by auditing the fix for the first one.

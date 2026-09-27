@@ -424,3 +424,47 @@ def test_two_backups_in_the_same_second_sit_side_by_side(tmp_path):
         "the second backup's content is not where its path says")
     assert not os.path.isdir(os.path.join(first, "qikly")), (
         "the second backup was nested inside the first")
+
+def test_an_older_installed_skill_is_reported_as_older(tmp_path):
+    """
+    The upgrade path nobody was told about.
+
+    `pip install --upgrade qikly` replaces the package and cannot touch a Skill
+    already copied into somebody's project. Everyone upgrading from the release
+    before this one therefore keeps a Skill that names a different set of
+    commands, and the installer said "already exists, nothing was changed"
+    whether their copy was identical or three releases behind.
+    """
+    import shutil
+
+    from qikly.skill_install import bundled_dir, is_stale
+
+    destination = tmp_path / "qikly"
+    shutil.copytree(bundled_dir(), str(destination))
+
+    assert is_stale(str(destination)) is False, "a fresh copy read as stale"
+
+    skill = destination / "SKILL.md"
+    text = skill.read_text(encoding="utf-8")
+    assert "version: 0." in text
+    skill.write_text(text.replace("version: 0.2.0", "version: 0.1.0"),
+                     encoding="utf-8")
+    assert is_stale(str(destination)) is True, "an older copy read as current"
+
+
+def test_a_skill_whose_version_cannot_be_read_is_not_guessed_at(tmp_path):
+    """
+    None, not False. "I cannot tell" and "it is current" must not print the
+    same thing, and this runs against a file the user may have edited.
+    """
+    from qikly.skill_install import is_stale
+
+    destination = tmp_path / "qikly"
+    destination.mkdir()
+    (destination / "SKILL.md").write_text("no frontmatter here\n",
+                                          encoding="utf-8")
+    assert is_stale(str(destination)) is None
+
+    (destination / "SKILL.md").write_text("version: not-a-number\n",
+                                          encoding="utf-8")
+    assert is_stale(str(destination)) is None
