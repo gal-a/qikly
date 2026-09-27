@@ -5,8 +5,8 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.1.0
-  requires: qikly >= 0.5.3
+  version: 0.2.0
+  requires: qikly >= 0.5.4
 ---
 
 # qikly: tests written from a spec the coder never read
@@ -42,8 +42,9 @@ pip install qikly
 qikly --version          # version, package directory and interpreter
 ```
 
-**This Skill needs qikly 0.5.3 or later**, which is where `--score-suite` and
-the reachability warning in `--validate` arrive. Against an older install an
+**This Skill needs qikly 0.5.4 or later**, which is where `--score-code`
+arrives, alongside `--score-suite` and the reachability warning in `--validate`
+from 0.5.3. Against an older install an
 agent following this page will recommend a flag that does not exist, so check
 `qikly --version` before trusting the command table below. The Skill's own
 version is separate from the tool's: it changes when these instructions
@@ -196,6 +197,12 @@ qikly --validate --tasks MY_METRICS_VERIFY    # free, no model call
 qikly --tasks MY_METRICS_VERIFY               # the paid one
 ```
 
+**Before that last line, check which provider key is set.** It decides the
+model, and therefore the wait and the bill; see Install above. On
+`ANTHROPIC_API_KEY` every call thinks before it answers, and a run of ten calls
+is minutes rather than seconds. Tell the user which one they are about to spend
+on before they spend it.
+
 **A task file has a third section.** `interface` names the module and the
 function signatures, and the coding agent reads it: it is how both agents agree
 what to call things. Scaffolding fills it in from the real signatures, so it
@@ -225,7 +232,16 @@ applies here.
 
 To see the whole shape first, `qikly --example` lays down a finished worked
 task, module and sample data included, so you can read a filled-in pair before
-writing one.
+writing one, in the directory you are standing in.
+
+**`qikly --demo` is a different command and the difference matters.** It runs a
+bundled task end to end in a throwaway `demo/<timestamp>/` folder that exists to
+be deleted, and it is the one most people try first. A user who has just watched
+it work is standing in something that looks exactly like a working project, and
+the obvious next move is to start theirs there. **Never set up someone's real
+project inside a demo folder.** If the user says they ran "the demo" and wants
+to continue where they are, establish which of the two commands they ran before
+writing anything. This has already cost a first-time user an afternoon.
 
 ## The free checks, and when to reach for each
 
@@ -234,6 +250,7 @@ writing one.
 | `qikly --validate --tasks X` | free | always, before any run. Catches a missing input file, a leftover TODO, a criterion made of adjectives, a requirement restating a criterion, and criteria the data cannot reach |
 | `qikly --explain X` | free | to show the user exactly what each agent receives, criteria present on one side and absent on the other |
 | `qikly --score-suite --tasks X` | free, and slow | after a run converges, to find what the suite would not have noticed. It plants one fault at a time in the code and reports which ones the tests missed. Free because every fault is an edit to the code's syntax tree and no model is asked anything; slow because each fault means running your whole suite again |
+| `qikly --score-code PATH --score-tests PATH` | free, and slow | **for a suite qikly did not write**, which is what somebody already has before they have anything else. Point it at a module or package and the tests for it, and it reports which planted faults the tests did not notice. No task file, no run, no model call, nothing of theirs modified, and the report lands beside their code. This is usually the right first thing to run on a stranger's project |
 | `qikly --check-criteria --tasks X` | one model call | when a spec may contradict itself, before spending a run on it |
 | `qikly --propose-fixtures --tasks X` | one model call | when `--validate` says a criterion's values are missing from the data, to get the rows it would take |
 
@@ -241,6 +258,13 @@ writing one.
 number.** A suite cannot catch a fault in behaviour no input row exercises, so
 unreachable criteria lower the score for a reason that is about the fixtures
 and not about the tests. Fix the data first, then score.
+
+**`--score-code` prints no such warning, and you must not imply it does.**
+There is no task file and therefore no criteria to be unreachable, so the
+report carries the score and nothing above it. The underlying problem has not
+gone away: a fault that survives may be on a line no test ever executes, which
+is a gap in what the tests reach rather than in what they assert. Say that to
+the user rather than handing them a percentage as a verdict on their suite.
 
 ## When a run does not converge
 
@@ -292,8 +316,9 @@ on somebody's real code rather than after.
 
 **In CI**, qikly ships a GitHub Action. A run costs a model call per attempt,
 so per pull request is a budget decision rather than a technical one, and the
-free checks (`--validate`, `--score-suite`) are the ones that belong on every
-commit.
+free checks are the ones that belong on every commit: `--validate`,
+`--score-suite` for a suite qikly generated, and `--score-code` for one that
+predates it, which on most real repositories is the relevant half.
 
 ## What to tell the user honestly
 
