@@ -32,6 +32,7 @@ Your implementation, your suite and your fixtures are read and never written.
 """
 import os
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -76,6 +77,90 @@ def suite_dirs(task_id, root=TEST_ROOT):
             if os.path.isdir(os.path.join(root, task_id, stage))]
 
 
+# Directories never worth copying into a scratch workspace, and the ones most
+# likely to make a copy enormous rather than merely large.
+_SKIP = ("__pycache__", ".git", ".hg", ".svn", ".venv", "venv", "env",
+         "node_modules", ".tox", ".mypy_cache", ".pytest_cache", ".ruff_cache",
+         "site-packages", "dist", "build", ".idea", ".vscode")
+
+# A copy above this is a sign the wrong directory was chosen, not a sign of a
+# big project. Refusing with an explanation beats copying a gigabyte in silence.
+_MAX_FILES = 4000
+
+
+class Target(object):
+    """
+    What to mutate, what to run against it, and what to copy so it runs.
+
+    Both entry points produce one of these. The module used to thread a task
+    id through every function, which fixed the layout to
+    `outputs/agent_src/code/<task>/` and `outputs/tests/<task>/<stage>/`: a
+    converged run's own output, and nothing else. That is the least likely
+    thing a newcomer has. Everyone has a suite before they have a task file.
+    """
+
+    def __init__(self, label, files, suites, root, task_id=None):
+        self.label = label      # what the report calls this
+        self.files = files      # [(real path, path relative to root)]
+        self.suites = suites    # paths relative to root, passed to pytest
+        self.root = root        # the directory copied into the workspace
+        self.task_id = task_id  # only a qikly task has one
+
+    def __bool__(self):
+        return bool(self.files and self.suites)
+
+    __nonzero__ = __bool__
+
+
+def from_task(task_id, code_root=CODE_ROOT):
+    """The original shape: a converged run's own implementation and suite."""
+    return Target(label=task_id,
+                  files=implementation(task_id, code_root),
+                  suites=suite_dirs(task_id),
+                  root=os.getcwd(),
+                  task_id=task_id)
+
+
+def from_paths(code, tests):
+    """
+    An implementation and a suite that already exist, anywhere.
+
+    The workspace is a copy of the nearest directory containing both, because
+    a suite imports whatever it imports and copying less breaks it in ways
+    that look like a caught fault. `_SKIP` keeps that copy to source rather
+    than to a virtualenv, and `_MAX_FILES` refuses rather than copying a tree
+    that was clearly not what anyone meant.
+    """
+    code, tests = os.path.abspath(code), os.path.abspath(tests)
+    for path, what in ((code, "implementation"), (tests, "suite")):
+        if not os.path.exists(path):
+            raise ValueError(f"no {what} at {path}")
+
+    root = os.path.commonpath([os.path.dirname(code) if os.path.isfile(code) else code,
+                               os.path.dirname(tests) if os.path.isfile(tests) else tests])
+
+    if os.path.isfile(code):
+        sources = [code]
+    else:
+        sources = []
+        for base, dirs, names in os.walk(code):
+            # In place, so os.walk does not descend into them.
+            dirs[:] = [d for d in dirs if d not in _SKIP]
+            for name in names:
+                if name.endswith(".py") and not name.startswith("__"):
+                    sources.append(os.path.join(base, name))
+        sources.sort()
+
+    if not sources:
+        raise ValueError(f"no Python files to mutate under {code}")
+
+    return Target(label=os.path.basename(code.rstrip(os.sep)) or code,
+                  files=[(s, os.path.relpath(s, root)) for s in sources],
+                  suites=[os.path.relpath(tests, root)],
+                  root=root,
+                  task_id=None)
+
+
 def sites(source):
     """[(family, index, description)] for every fault this can plant."""
     out = []
@@ -87,24 +172,42 @@ def sites(source):
     return out
 
 
-def _workspace(task_id, tmp, code_root=CODE_ROOT):
+def _workspace(target, tmp, code_root=CODE_ROOT):
     """A copy of the project a suite can run against, minus the implementation."""
     workspace = os.path.join(tmp, "ws")
+
+    if target.task_id is None:
+        # A project qikly did not lay out, so there is no known set of
+        # directories to copy: the suite imports what it imports.
+        count = 0
+        for base, dirs, names in os.walk(target.root):
+            dirs[:] = [d for d in dirs if d not in _SKIP]
+            count += len(names)
+            if count > _MAX_FILES:
+                raise ValueError(
+                    f"{target.root} holds more than {_MAX_FILES} files, which "
+                    f"is almost certainly wider than you meant. Point "
+                    f"--score-code and --score-tests at directories closer to "
+                    f"the code.")
+        shutil.copytree(target.root, workspace, dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns(*_SKIP))
+        return workspace
+
     for relative in ("inputs_private", "inputs_public", "outputs"):
         if os.path.isdir(relative):
             shutil.copytree(relative, os.path.join(workspace, relative),
                             dirs_exist_ok=True,
                             ignore=shutil.ignore_patterns("__pycache__", "old"))
-    os.makedirs(os.path.join(workspace, code_root, task_id), exist_ok=True)
+    os.makedirs(os.path.join(workspace, code_root, target.task_id), exist_ok=True)
     return workspace
 
 
-def _suite_passes(workspace, task_id):
+def _suite_passes(workspace, target):
     """True only when every stage of the suite passes in this workspace."""
-    return _suite_verdict(workspace, task_id) == "pass"
+    return _suite_verdict(workspace, target) == "pass"
 
 
-def _suite_verdict(workspace, task_id):
+def _suite_verdict(workspace, target):
     """
     "pass", "fail" or "error" for the suite in this workspace.
 
@@ -114,12 +217,12 @@ def _suite_verdict(workspace, task_id):
     "the suite noticed" credits a mutant that broke collection as a fault
     caught, when no assertion ever ran.
     """
-    for directory in suite_dirs(task_id):
-        target = os.path.join(workspace, directory)
-        if not os.path.isdir(target):
+    for directory in target.suites:
+        where = os.path.join(workspace, directory)
+        if not os.path.exists(where):
             continue
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", target, "-q", "--tb=no",
+            [sys.executable, "-m", "pytest", where, "-q", "--tb=no",
              # The project's own addopts already carry -q, and -qq suppresses
              # the count line entirely, so every parsed count reads as zero,
              # which looks exactly like a suite that ran and passed.
@@ -132,15 +235,19 @@ def _suite_verdict(workspace, task_id):
     return "pass"
 
 
-def score(task_id, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
+def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
     """
     Plant faults one at a time and report which the suite caught.
 
     Returns a dict, or None when there is nothing to score: no implementation,
     no suite, or an implementation with no mutation sites at all.
     """
-    files = implementation(task_id, code_root)
-    if not files or not suite_dirs(task_id):
+    if isinstance(target, str):
+        # Kept because a task id reads naturally at a call site and this was
+        # the only signature for a release.
+        target = from_task(target, code_root)
+    files = target.files
+    if not target:
         return None
 
     candidates = []
@@ -157,15 +264,15 @@ def score(task_id, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
 
     caught, missed, unscorable = [], [], 0
     with tempfile.TemporaryDirectory() as tmp:
-        workspace = _workspace(task_id, tmp, code_root)
+        workspace = _workspace(target, tmp, code_root)
 
         # The control. A suite that already fails on the untouched code cannot
         # say anything about a mutant, because every mutant would "fail" for
         # the reason the original does.
         for path, relative in files:
             shutil.copy2(path, os.path.join(workspace, relative))
-        if not _suite_passes(workspace, task_id):
-            return {"task": task_id, "baseline": False, "caught": [],
+        if not _suite_passes(workspace, target):
+            return {"task": target.label, "baseline": False, "caught": [],
                     "missed": [], "unscorable": 0, "total": 0}
 
         for path, relative, source, family, index, described in candidates:
@@ -173,10 +280,10 @@ def score(task_id, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
             if mutant is None:
                 unscorable += 1
                 continue
-            target = os.path.join(workspace, relative)
-            with open(target, "w", encoding="utf-8", newline="\n") as handle:
+            planted = os.path.join(workspace, relative)
+            with open(planted, "w", encoding="utf-8", newline="\n") as handle:
                 handle.write(mutant)
-            verdict = _suite_verdict(workspace, task_id)
+            verdict = _suite_verdict(workspace, target)
             if verdict == "error":
                 # pytest could not run the suite at all, so nothing was
                 # demonstrated about it. Counting this as caught would credit
@@ -187,9 +294,9 @@ def score(task_id, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
                 (missed if verdict == "pass" else caught).append(
                     {"file": os.path.basename(path), "family": family,
                      "change": described})
-            shutil.copy2(path, target)
+            shutil.copy2(path, planted)
 
-    return {"task": task_id, "baseline": True, "caught": caught,
+    return {"task": target.label, "baseline": True, "caught": caught,
             "missed": missed, "unscorable": unscorable,
             "total": len(caught) + len(missed)}
 
@@ -198,10 +305,17 @@ def unreachable_criteria(task_id):
     """
     Criteria this task's data cannot trigger, or [] when it cannot be checked.
 
+    Returns [] for a suite qikly did not write: there is no task file, so
+    there are no criteria to be unreachable. That is a different thing from
+    None, which means the check could not be run and the caveat is therefore
+    unknown, and the report says so in both cases.
+
     The score is read beside this, never on its own: a suite cannot catch a
     fault in behaviour no input row exercises, so an unreachable criterion
     lowers the score for a reason that has nothing to do with the suite.
     """
+    if task_id is None:
+        return []
     try:
         import yaml
 
@@ -274,25 +388,53 @@ def render(result, gaps):
     return "\n".join(lines) + "\n"
 
 
+def report_dir(target, invoked_from=None):
+    """
+    Where the report goes, which is not the same place for the two modes.
+
+    A qikly task's report belongs in the project's `outputs/`, beside every
+    other artefact of the run that produced it. A report about somebody else's
+    code does not: this process has already moved to a resolved project root,
+    which may be a clone of qikly on the other side of the disk, and writing
+    there both loses the report and litters a tree the user never asked us to
+    touch. That happened on the first run of this feature, into this
+    repository's own `outputs/`.
+    """
+    if target.task_id is not None:
+        return OUT_DIR
+    return os.path.join(invoked_from or os.getcwd(), "qikly-suite-score")
+
+
 def write(result, gaps, out_dir=OUT_DIR):
     os.makedirs(out_dir, exist_ok=True)
+    # A task id is already a safe name; a label taken from a path is not, and
+    # "src/pricing.py" in a filename is a directory that does not exist.
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", result["task"]) or "suite"
     path = os.path.join(
-        out_dir, f"{result['task']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md")
+        out_dir, f"{safe}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md")
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(render(result, gaps))
     return path
 
 
-def run(task_id, mutants=DEFAULT_MUTANTS, seed=None):
+def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
     """The command's body: score, report, and say what the number is worth."""
-    result = score(task_id, mutants=mutants, seed=seed)
+    if isinstance(target, str):
+        target = from_task(target)
+    task_id = target.label
+
+    result = score(target, mutants=mutants, seed=seed)
     if result is None:
-        print(f"[{task_id}] nothing to score: this needs an implementation and "
-              f"a generated suite from a run that converged.")
+        if target.task_id is None:
+            print(f"[{task_id}] nothing to score: no Python files to mutate, "
+                  f"or no tests at the path given.")
+        else:
+            print(f"[{task_id}] nothing to score: this needs an implementation "
+                  f"and a generated suite from a run that converged.")
         return None
 
-    gaps = unreachable_criteria(task_id)
-    path = write(result, gaps)
+    gaps = unreachable_criteria(target.task_id)
+    path = write(result, gaps, report_dir(target, invoked_from))
 
     if not result["baseline"]:
         print(f"[{task_id}] the suite does not pass your current code, so a "

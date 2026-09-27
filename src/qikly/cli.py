@@ -763,6 +763,19 @@ def _parse_args():
              "the reachability warning the report prints above it."
     )
     parser.add_argument(
+        "--score-code", metavar="PATH", default=None,
+        help="Score a suite qikly did not write. The module or package to "
+             "plant faults in, with --score-tests. Needs no task file and no "
+             "run: point it at code and tests you already have, and it reports "
+             "what your tests would not have noticed. Free, no model call, and "
+             "nothing of yours is modified."
+    )
+    parser.add_argument(
+        "--score-tests", metavar="PATH", default=None,
+        help="The suite to run against those planted faults: a test file or a "
+             "directory of them. Goes with --score-code."
+    )
+    parser.add_argument(
         "--score-mutants", type=int, default=None,
         help="How many faults --score-suite plants (default 12). Each one is a "
              "full run of your suite, so this is the time it takes."
@@ -1327,18 +1340,50 @@ def _do_install_skill(agent, force, dry_run):
     return 0
 
 
-def _do_score_suite(tasks, mutants, seed):
+def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
     """
     `--score-suite`: how much of your own code can be broken without the suite
     noticing.
 
     Free, because every fault is planted by an AST rewrite rather than by a
     model, and repeatable, because the sample of faults is seeded.
+
+    Two ways in. `--tasks` scores a converged run's own output, which is what
+    this did for one release and assumes a qikly project. `--score-code` and
+    `--score-tests` score a suite and an implementation that already exist,
+    which is what everybody actually has before they have anything else.
     """
-    from qikly.mutation_score import DEFAULT_MUTANTS, run
+    from qikly.mutation_score import DEFAULT_MUTANTS, from_paths, run
     from qikly.orchestrator.orchestrator import discover_task_ids
 
     stamp()
+
+    if code or tests:
+        if not (code and tests):
+            missing = "--score-tests" if code else "--score-code"
+            print(f"{missing} is needed too: one says what to break, the other "
+                  f"says what should notice.", file=sys.stderr)
+            return 2
+        # Relative to where the user typed the command, not to the project
+        # root this process moved to at import. Scaffold already does this;
+        # the first version of this did not, and `--score-code pricing.py`
+        # went looking in a directory the user had never heard of.
+        code, tests = (p if os.path.isabs(p) else os.path.join(INVOKED_FROM, p)
+                       for p in (code, tests))
+        try:
+            target = from_paths(code, tests)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        try:
+            run(target, mutants=mutants or DEFAULT_MUTANTS, seed=seed,
+                invoked_from=INVOKED_FROM)
+        except Exception as exc:
+            print(f"[{target.label}] could not be scored: "
+                  f"{type(exc).__name__}: {exc}")
+            return 1
+        return 0
+
     ids = [t.strip() for t in tasks.split(",")] if tasks else discover_task_ids()
     for task_id in [t for t in ids if t]:
         try:
@@ -2119,8 +2164,9 @@ def main():
         return _do_propose_fixtures(args.tasks)
     if args.install_skill:
         return _do_install_skill(args.install_skill, args.force, args.dry_run)
-    if args.score_suite:
-        return _do_score_suite(args.tasks, args.score_mutants, args.score_seed)
+    if args.score_suite or args.score_code or args.score_tests:
+        return _do_score_suite(args.tasks, args.score_mutants, args.score_seed,
+                               code=args.score_code, tests=args.score_tests)
 
     if args.demo and not args.tasks:
         task_ids = [DEMO_TASK]

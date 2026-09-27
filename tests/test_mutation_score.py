@@ -257,19 +257,23 @@ def test_the_real_suite_runner_reads_pytest_s_three_outcomes(tmp_path, monkeypat
     stage = workspace / ms.TEST_ROOT / "T" / "integration"
     stage.mkdir(parents=True)
     relative = os.path.join(ms.TEST_ROOT, "T", "integration")
-    monkeypatch.setattr(ms, "suite_dirs", lambda task_id, root=None: [relative])
+    # A Target rather than a task id: the module now carries what to run in
+    # the object, so that one suite of checks serves both a qikly task and a
+    # suite qikly never wrote.
+    target = ms.Target(label="T", files=[], suites=[relative],
+                       root=str(tmp_path), task_id="T")
 
     io.open(str(stage / "test_ok.py"), "w", encoding="utf-8").write(
         "def test_ok():\n    assert True\n")
-    assert ms._suite_verdict(str(workspace), "T") == "pass"
+    assert ms._suite_verdict(str(workspace), target) == "pass"
 
     io.open(str(stage / "test_ok.py"), "w", encoding="utf-8").write(
         "def test_ok():\n    assert False\n")
-    assert ms._suite_verdict(str(workspace), "T") == "fail"
+    assert ms._suite_verdict(str(workspace), target) == "fail"
 
     io.open(str(stage / "test_ok.py"), "w", encoding="utf-8").write(
         "import a_module_that_does_not_exist_anywhere\n")
-    assert ms._suite_verdict(str(workspace), "T") == "error"
+    assert ms._suite_verdict(str(workspace), target) == "error"
 
 
 def test_the_console_says_when_reachability_is_unknown(monkeypatch, capsys):

@@ -7,6 +7,14 @@ packaging tools would read as `1.1`.
 ## Unreleased
 
 ### Added
+- **`qikly --score-code PATH --score-tests PATH` scores a suite qikly did not
+  write.** It needed a task file and a converged run, which is the least likely
+  thing a newcomer has: everyone has a suite before they have anything else.
+  Point it at code and tests you already have and it plants faults and reports
+  what your tests would not have noticed. Free, no model call, nothing of yours
+  modified, and the report is written beside your code rather than into qikly's
+  project. Found by watching an agent that had read `--help`, could not use the
+  flag, and wrote its own mutation harness instead.
 - **Every command that does work now opens with a stamp**: the version, the
   date and time, and the directory it was run in. A user reports a problem by
   sending a photograph of their terminal, and until now 0.4.6 and 0.5.3 printed
