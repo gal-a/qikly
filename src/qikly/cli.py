@@ -955,7 +955,7 @@ def _parse_args():
              "moved when the configuration moved is not a trend."
     )
     parser.add_argument(
-        "--by", default="day", choices=("day", "week", "month"),
+        "--by", default=None, choices=("day", "week", "month"),
         help="Period for --trends. Default day."
     )
     parser.add_argument(
@@ -1699,7 +1699,11 @@ def _do_trends(tasks, grain, as_json):
     from qikly.orchestrator.reports.trend_report import collect, render, write_json
 
     task_ids = [t.strip() for t in tasks.split(",")] if tasks else None
-    trends = collect(task_ids, grain=grain)
+    # The default lives here rather than in argparse. With a default on the
+    # flag, a --by the user typed was indistinguishable from the one argparse
+    # supplied, so it could not be guarded, so `qikly --by week` fell through
+    # to the ordinary run and started a real one.
+    trends = collect(task_ids, grain=grain or "day")
 
     if as_json:
         import json as _json
@@ -2272,9 +2276,12 @@ def main():
     # should have been attached to. --html has had this check since it shipped;
     # these are the ones it missed.
     #
-    # --by is deliberately absent. It carries a default, so a --by the user
-    # typed is indistinguishable from the one argparse supplies, and it changes
-    # only how --trends groups rows.
+    # --by was deliberately absent for exactly the reason above: it carried a
+    # default, so a --by the user typed was indistinguishable from the one
+    # argparse supplied. That reasoning was right about the symptom and wrong
+    # about the fix. `qikly --by week` fell through to the ordinary run path
+    # and, with a provider key set, started a real one. The default now lives
+    # in _do_trends and the flag is guarded like every other.
     for flag, given, wants, example in (
         ("--fresh", args.fresh, "--scaffold",
          "qikly --scaffold my_module.py --fresh"),
@@ -2310,6 +2317,9 @@ def main():
         ("--json", args.json,
          "--validate, --explain, --trends or --compare-criteria",
          "qikly --validate --json"),
+        # The fourth, found by the audit of the test written to catch the
+        # third. See the test's own note on why it did not.
+        ("--by", args.by is not None, "--trends", "qikly --trends --by week"),
     ):
         if not given:
             continue
@@ -2331,6 +2341,7 @@ def main():
             "--artifacts-url": bool(args.pr_comment),
             "--json": bool(args.validate or args.explain or args.trends
                            or args.compare_criteria),
+            "--by": bool(args.trends),
         }[flag]
         if not attached:
             print(f"{flag} goes with {wants}, as in: {example}", file=sys.stderr)

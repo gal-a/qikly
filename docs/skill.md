@@ -178,10 +178,12 @@ that name a different set of commands. From 0.5.4 any qikly command says so
 when it notices:
 
 ```
-note: the qikly Skill in .claude/skills/qikly is older than this qikly, so it
-describes a different set of commands. `qikly --install-skill --force`
+note: the qikly Skill in .claude\skills\qikly is older than this qikly, so
+it describes a different set of commands. `qikly --install-skill --force`
 replaces it and keeps a copy of the old one.
 ```
+
+The path is printed with your platform's own separator, so it reads with forward slashes on macOS and Linux.
 
 `--force` keeps a timestamped copy of what it replaces, so a Skill you have
 edited is recoverable. That is the whole update mechanism: qikly tells you, and

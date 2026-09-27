@@ -43,6 +43,10 @@ packaging tools would read as `1.1`.
   project. Reported by a first-time user.
 
 ### Fixed
+- **`tools/release_check.py` reported the Skill missing** when run from
+  anywhere but the repository root. One check used a bare relative path where
+  every other resolves against the repository, so a release could fail for a
+  reason that was not true.
 - **An installed Skill never updated itself and nothing said so.** `pip install
   --upgrade qikly` replaces the package and cannot touch a folder copied into
   your project, so an upgrade left you following instructions that name a
@@ -65,6 +69,15 @@ packaging tools would read as `1.1`.
   instructions that name a different set of commands. `--install-skill` said
   "already exists, nothing was changed" whether your copy was identical or
   three releases behind. It now says when yours is older and what to do.
+- **`qikly --by week` on its own started a real, billed run**, the fourth flag
+  with this defect. It was left out of the guard on purpose, because it carried
+  an argparse default and a value the user typed was indistinguishable from the
+  one argparse supplied. That reasoning was right about the symptom and wrong
+  about the fix: the default now lives in the handler and the flag is guarded
+  like every other. The test written to catch this class missed it, because it
+  probed every value-taking option with the string "x" and argparse rejects
+  that before the code under test is reached. It now probes with a value each
+  option accepts.
 - **`qikly --json` on its own started a real, billed run**, the third flag with
   this defect and the one three separate audits walked past. `--html` has had
   this check since it shipped; `--json` sits beside it and never did.

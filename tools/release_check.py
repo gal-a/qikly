@@ -120,10 +120,15 @@ def check_skill_floor(version):
     import io
     import re
 
-    path = os.path.join("src", "qikly", "skills", "qikly", "SKILL.md")
+    # ROOT-anchored, like read() and run() above. This alone used a bare
+    # relative path, so running the checklist from anywhere but the repository
+    # root reported the Skill missing and failed a release for a reason that
+    # was not true.
+    relative = os.path.join("src", "qikly", "skills", "qikly", "SKILL.md")
+    path = os.path.join(ROOT, relative)
     if not os.path.isfile(path):
         return check("the agent Skill is present", False,
-                     "%s is missing, so --install-skill ships nothing" % path)
+                     "%s is missing, so --install-skill ships nothing" % relative)
 
     text = io.open(path, encoding="utf-8").read()
     found = re.search(r"requires:\s*qikly\s*>=\s*(\d+\.\d+\.\d+)", text)

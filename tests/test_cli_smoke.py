@@ -209,6 +209,14 @@ def _every_option():
             continue
         if action.nargs in (0, "?") or isinstance(action, argparse._StoreTrueAction):
             yield flag, [flag]
+        elif action.choices:
+            # A real choice, never a placeholder. Probing `--by x` made
+            # argparse reject the value and exit 2 before the option ever
+            # reached the code being tested, so this test passed for --by
+            # while `qikly --by week` fell straight through to a real, billed
+            # run. A guard that cannot see the thing it guards is worse than
+            # no guard, because it is also reassuring.
+            yield flag, [flag, str(sorted(action.choices)[0])]
         elif action.type is int:
             yield flag, [flag, "3"]
         else:
@@ -228,6 +236,12 @@ def test_no_option_starts_a_run_on_its_own_unless_it_is_meant_to(tmp_path):
     doing it.
 
     Eyeballing a list of forty options finds one at a time. This runs them.
+
+    Then a fourth, `--by`, got past the first version of this test, because
+    that version probed every value-taking option with the literal string "x".
+    For an option with `choices`, argparse rejects "x" and exits before the
+    code under test is reached, so the test saw a refusal and called it a pass.
+    It now probes with a value the option actually accepts.
 
     The signature is the same in every case: with no key set, a flag that
     reaches the run path dies at the provider check, and a flag that does its
