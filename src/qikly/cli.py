@@ -3,6 +3,7 @@ import atexit
 import json
 import multiprocessing
 import os
+import re
 import contextlib
 import subprocess
 import sys
@@ -26,6 +27,98 @@ from qikly.paths import ENV_VAR, chdir_to_project_root
 INVOKED_FROM = os.getcwd()
 
 PROJECT_ROOT = chdir_to_project_root()
+
+
+def stamp(stream=None):
+    """
+    One line saying which qikly this is, when it ran, and from where.
+
+    It exists for the screenshot. A user reports a problem by sending a photo
+    of their terminal, and the first two questions are always which version and
+    when, neither of which the old output answered: 0.4.6 and 0.5.3 printed the
+    same thing. Without it the first reply is a round trip asking for
+    `qikly --version`, and a day can go past before anyone knows they were
+    debugging a version that no longer exists.
+
+    The directory is here for the same reason. Every confusion this has caused
+    so far, a demo folder mistaken for a project, an example written where
+    nobody looked, a sweep writing into the repository, was someone reading a
+    relative path against the wrong root.
+
+    Deliberately one line: anything longer gets skipped by the eye it is
+    written for.
+    """
+    from qikly import __version__
+
+    target = stream if stream is not None else sys.stdout
+    target.write("qikly %s  %s  run in %s\n"
+                 % (__version__,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    INVOKED_FROM))
+
+    # The mismatch, said out loud, because it is this project's most repeated
+    # bug shape. qikly changes directory to a resolved project root at import,
+    # so a command run in one place can operate on files somewhere else
+    # entirely, and until now nothing said so. It has cost a sweep that wrote
+    # into the repository, a smoke test that scored the wrong project, and a
+    # first-time user who could not find files the tool had just reported
+    # creating.
+    if os.path.abspath(PROJECT_ROOT) != os.path.abspath(INVOKED_FROM):
+        target.write("  project root is elsewhere: %s\n"
+                     "  (set %s to choose it, or cd there)\n"
+                     % (PROJECT_ROOT, ENV_VAR))
+
+
+# demo/20260927_112524, the throwaway directory --demo runs in.
+_DEMO_STAMP = re.compile(r"^\d{8}_\d{6}$")
+
+
+def inside_a_demo(where=None):
+    """
+    The throwaway directory this is standing in, or None.
+
+    `--demo` runs in `demo/<timestamp>/` precisely so it touches nothing of
+    yours, which also means everything in there is disposable. Someone who has
+    just watched the demo work is standing in a folder that looks exactly like
+    a working project, and the obvious next move is to start their own there.
+    It was reported the day this was written: the files were created, the tool
+    said where, and they were inside the scratch copy.
+
+    Walks up rather than checking the immediate parent, because the reader may
+    well have gone into `outputs/` or a task folder to look around first.
+    """
+    current = os.path.abspath(where or INVOKED_FROM)
+    while True:
+        parent, name = os.path.split(current)
+        if not parent or parent == current:
+            return None
+        if _DEMO_STAMP.match(name) and os.path.basename(parent) == DEMO_DIR:
+            return current
+        current = parent
+
+
+def _refuse_inside_demo():
+    """
+    Stop, and say where to go instead. True when it refused.
+
+    Called before anything is created or any provider key is checked: the
+    first version of this ran after `init_project`, so it printed its refusal
+    and made the project anyway, and the `--demo` path never reached it at all
+    because the missing-API-key error came first.
+    """
+    scratch = inside_a_demo()
+    if not scratch:
+        return False
+    stamp()
+    print()
+    print("  This is the demo's throwaway copy, not a project:")
+    print(f"    {scratch}")
+    print("  Everything in it is disposable and nothing in it is yours.")
+    print("  Start somewhere of your own instead, for example:")
+    print(f"    cd {os.path.expanduser('~')}")
+    print("    qikly --example")
+    return True
+
 
 # Edit this to pin a seed directly instead of using the AGENT_SEED env var.
 # The env var takes precedence over this when set.
@@ -443,6 +536,7 @@ def _run_demo(task_ids, where=None):
     orchestrator.py is relative to it. A child process with QIKLY_PROJECT_ROOT
     preset resolves the root once, correctly, on its own import.
     """
+    stamp()
     demo_root = _demo_root(where)
     os.makedirs(demo_root, exist_ok=True)
 
@@ -962,6 +1056,12 @@ def _do_init(with_example=False):
     """Create the project layout. Prints what it made and what to do next."""
     from qikly.scaffold import init_project, install_example
 
+    # Before anything is written. The first version of this guard printed its
+    # refusal after init_project had already made the directories, so it
+    # refused and created the project anyway.
+    if _refuse_inside_demo():
+        return 2
+
     root = INVOKED_FROM
     # The example is a finished task, so it arrives on its own rather than
     # beside a blank starter the reader never asked for.
@@ -972,6 +1072,7 @@ def _do_init(with_example=False):
         # already exists and the two lists print as one story.
         ex_made, ex_skipped, missing = install_example(root)
         made, skipped = made + ex_made, skipped + ex_skipped
+    stamp()
     print(f"qikly init in {root}")
     for path in made:
         print(f"  created  {os.path.relpath(path, root)}")
@@ -1237,6 +1338,7 @@ def _do_score_suite(tasks, mutants, seed):
     from qikly.mutation_score import DEFAULT_MUTANTS, run
     from qikly.orchestrator.orchestrator import discover_task_ids
 
+    stamp()
     ids = [t.strip() for t in tasks.split(",")] if tasks else discover_task_ids()
     for task_id in [t for t in ids if t]:
         try:
@@ -1485,6 +1587,11 @@ def _do_validate(tasks, as_json):
 
     task_ids = [t.strip() for t in tasks.split(",")] if tasks else None
     results = check_all(task_ids)
+
+    # Not in the JSON branch: that output is parsed, and a banner would be a
+    # breaking change to anyone reading it with a script.
+    if not as_json:
+        stamp()
 
     if as_json:
         import json as _json
@@ -1976,6 +2083,13 @@ def main():
         if not attached:
             print(f"{flag} goes with {wants}, as in: {example}", file=sys.stderr)
             return 2
+
+    # A demo inside a demo nests throwaway folders nobody can tell apart, and
+    # the inner one is deleted with the outer. Checked here rather than in
+    # _run_demo because the provider-key check runs first and would report a
+    # missing key instead, which is true and useless.
+    if args.demo and args.demo_dir is None and _refuse_inside_demo():
+        return 2
 
     if args.init or args.example:
         return _do_init(with_example=args.example)

@@ -1,0 +1,154 @@
+"""
+The two lines that answer "where am I and what am I running".
+
+Both come from the same report. A first-time user ran `qikly --example`, the
+tool said it had created seven files, and he could not find any of them. Three
+explanations were proposed from a screenshot and all three were wrong, because
+the output did not carry the two facts needed to tell them apart: which version
+produced it, and which directory it was standing in.
+
+## What each guards
+
+`stamp()` is for the screenshot. A user reports a problem with a photo of their
+terminal, and 0.4.6 and 0.5.3 used to print identically. It also names the
+directory, and says so when the project root is somewhere else, which is this
+project's most repeated bug shape: a sweep that wrote into the repository, a
+smoke test that scored the wrong project, and this report.
+
+`inside_a_demo()` is for the trap underneath it. `--demo` runs in
+`demo/<timestamp>/` so it touches nothing of yours, which also means everything
+in there is thrown away. Someone who has just watched it work is standing in
+something that looks exactly like a working project.
+"""
+import io
+import os
+import re
+import subprocess
+import sys
+
+import pytest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "src")
+
+STAMP = re.compile(r"^qikly \d+\.\d+\.\d+  "
+                   r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}  run in .+")
+
+
+def _run(arguments, cwd):
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = SRC
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY",
+                 "ANTHROPIC_API_KEY"):
+        environment.pop(name, None)
+    return subprocess.run([sys.executable, "-m", "qikly"] + arguments,
+                          cwd=cwd, env=environment, capture_output=True,
+                          text=True, timeout=300)
+
+
+# ------------------------------------------------------------------ stamp --
+
+def test_the_first_line_names_the_version_the_time_and_the_place(tmp_path):
+    done = _run(["--example"], str(tmp_path))
+    first = done.stdout.splitlines()[0]
+    assert STAMP.match(first), "the stamp is missing or reshaped:\n%s" % first
+
+
+def test_it_names_the_directory_the_user_typed_in_not_the_one_it_moved_to(tmp_path):
+    """
+    The whole point, and the thing that made the first version useless.
+
+    qikly changes directory to a resolved project root at import. Printing
+    os.getcwd() therefore named a directory the user had never heard of, while
+    `--example` wrote somewhere else entirely, which is a better way of causing
+    the confusion than of fixing it.
+    """
+    done = _run(["--example"], str(tmp_path))
+    first = done.stdout.splitlines()[0]
+    assert str(tmp_path) in first, (
+        "the stamp does not name where the command was run:\n%s" % first)
+
+
+def test_a_project_root_somewhere_else_is_said_out_loud(tmp_path):
+    done = _run(["--example"], str(tmp_path))
+    assert "project root is elsewhere" in done.stdout
+    assert "QIKLY_PROJECT_ROOT" in done.stdout
+
+
+def test_it_stays_quiet_when_there_is_nothing_to_warn_about(tmp_path):
+    """A warning on every single run is a warning nobody reads."""
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = SRC
+    environment["QIKLY_PROJECT_ROOT"] = str(tmp_path)
+    done = subprocess.run([sys.executable, "-m", "qikly", "--validate"],
+                          cwd=str(tmp_path), env=environment,
+                          capture_output=True, text=True, timeout=300)
+    assert "project root is elsewhere" not in done.stdout
+
+
+def test_json_output_is_left_alone(tmp_path):
+    """
+    `--validate --json` is parsed by other programs, so a banner on top of it
+    is a breaking change rather than a helpful line.
+    """
+    import json
+
+    done = _run(["--validate", "--json"], str(tmp_path))
+    json.loads(done.stdout)
+
+
+# ------------------------------------------------------- the demo's folder --
+
+@pytest.mark.parametrize("depth", [".", "outputs", "outputs/data/CALC_TAX"])
+def test_a_new_project_is_refused_inside_the_demos_copy(depth, tmp_path):
+    """
+    Refused from anywhere inside it, not only at the top.
+
+    The reader who has just watched the demo has usually gone into `outputs/`
+    to look at what it produced, and that is where they are standing when they
+    decide to start their own.
+    """
+    scratch = tmp_path / "demo" / "20260927_112524" / depth
+    scratch.mkdir(parents=True, exist_ok=True)
+
+    done = _run(["--example"], str(scratch))
+    assert "throwaway copy" in done.stdout
+    assert done.returncode == 2
+    assert not (scratch / "inputs_private").exists(), (
+        "it refused and created the project anyway")
+
+
+def test_a_demo_inside_a_demo_is_refused_too(tmp_path):
+    scratch = tmp_path / "demo" / "20260927_112524"
+    scratch.mkdir(parents=True)
+    done = _run(["--demo"], str(scratch))
+    assert "throwaway copy" in done.stdout
+    assert done.returncode == 2
+
+
+def test_an_ordinary_directory_is_not_mistaken_for_one(tmp_path):
+    for name in ("demo", "demo/notes", "20260927_112524", "demos/20260927_112524"):
+        d = tmp_path / name
+        d.mkdir(parents=True, exist_ok=True)
+        done = _run(["--example"], str(d))
+        assert "throwaway copy" not in done.stdout, (
+            "%s was treated as the demo's scratch directory" % name)
+
+
+def test_the_check_is_by_shape_not_by_a_path_containing_demo():
+    """
+    Checked directly, because the subprocess tests cannot reach a user whose
+    home directory is called `demo` or whose project lives under `demos/`.
+    """
+    sys.path.insert(0, SRC)
+    from qikly.cli import inside_a_demo
+
+    assert inside_a_demo(os.path.join("x", "demo", "20260927_112524"))
+    assert inside_a_demo(os.path.join("x", "demo", "20260927_112524", "outputs"))
+    assert inside_a_demo(os.path.join("demo", "19700101_000000"))
+
+    assert inside_a_demo(os.path.join("x", "demo")) is None
+    assert inside_a_demo(os.path.join("x", "demo", "notes")) is None
+    assert inside_a_demo(os.path.join("x", "demos", "20260927_112524")) is None
+    assert inside_a_demo(os.path.join("x", "20260927_112524")) is None
+    assert inside_a_demo(os.path.join("x", "demo", "2026092_112524")) is None

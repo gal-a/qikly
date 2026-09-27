@@ -4,6 +4,30 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## Unreleased
+
+### Added
+- **Every command that does work now opens with a stamp**: the version, the
+  date and time, and the directory it was run in. A user reports a problem by
+  sending a photograph of their terminal, and until now 0.4.6 and 0.5.3 printed
+  identically, so the first reply was always a round trip asking which version.
+  `--validate --json` is unchanged, because that output is parsed.
+- **It says when the project root is somewhere else.** qikly moves to a
+  resolved project root at startup, so a command run in one directory can
+  operate on files in another, and nothing said so. That has now caused a sweep
+  that wrote into the wrong tree, a test that scored the wrong project, and a
+  first-time user who could not find files the tool had just reported creating.
+- **`--init`, `--example` and `--demo` refuse to run inside `demo/<timestamp>/`**
+  and say where to go instead. The demo runs there so it touches nothing of
+  yours, which also means everything in it is thrown away; someone who has just
+  watched it work is standing in something that looks exactly like a working
+  project. Reported by a first-time user.
+
+### Fixed
+- **`--install-skill all` printed "That is the path all documents for skills"**,
+  substituting the target name where an agent name belongs, and implying one
+  path when it writes four.
+
 ## 0.5.3
 
 > Two free checks that tell you what your tests are not measuring, and an agent Skill
