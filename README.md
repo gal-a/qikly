@@ -23,8 +23,6 @@
 
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
 
-**The solution: two agents.** One turns the acceptance criteria into tests.
-The other writes the code and **never sees the acceptance criteria.**
 
 **Who it is for:** a developer or team pointing an AI coding agent at a
 self-contained Python module that transforms data, for example an ETL step, a
@@ -36,16 +34,28 @@ most naturally where verification already has to be independent, such as
 automotive, medical devices, fintech and defence: `ADAS_HEADWAY`, a bundled
 example, checks following distance from forward-radar samples. See [What it is for](#what-it-is-for).
 
-**Just want to see how it works?**
+## Start here
 
-- **Free, and with no API key.** Run `pip install qikly`, then
-  `qikly --explain CALC_TAX`: it prints what each agent is shown, and the
-  difference. [More on the free commands](#try-it-without-spending-anything).
-- **With an API key**, for Gemini, Claude or OpenAI:
-  [quick start on the demo task](#quick-start), which converges a real run in
-  about half a minute for well under a cent.
+```bash
+pip install qikly
+```
 
-**Just want to try it on your own data?** [Quick start on your own data](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md), five steps from your module to a first run.
+Four ways in. Pick the row that matches what you have, and ignore the rest of
+this page until it has run.
+
+| If you want to | Run | Costs |
+|---|---|---|
+| **See the split for yourself**, before anything else | `qikly --explain CALC_TAX` | nothing, no API key |
+| **Watch a real run** end to end | `qikly --demo` | needs a key, about half a minute and well under a cent |
+| **Start from a finished example** in a project of your own | `qikly --example` | nothing to set it up |
+| **Point it at your own module** | `qikly --scaffold my_module.py` | nothing to set it up |
+
+`--demo` works in a throwaway `demo/<timestamp>/` folder it expects you to
+delete. It is for watching, not for building in. `--example` and `--scaffold`
+create a real project in the directory you are standing in, and those are the
+two to start from.
+
+Then [five steps from your module to a first run](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md).
 
 ## The idea
 
@@ -294,9 +304,11 @@ says which command each one needs:
 4. **Run a catalog unattended.** Non-zero exit on any non-convergence, so a
    scheduler or CI job can run many specs and keep the reports.
 
-## Try it without spending anything
+## The free commands, in detail
 
-Three commands that make no model call, need no API key, and cost nothing.
+Three commands that make no model call, need no API key, and cost
+nothing. `--explain` is the first row of [Start here](#start-here); this
+is what it and its two neighbours actually do.
 
 ```bash
 qikly --explain MERGE_SALES   # what each side is shown, and the difference
@@ -323,27 +335,25 @@ resolve, and that criteria name values instead of adjectives. It is also
 available as a pre-commit hook, `qikly-validate`, deliberately the free check
 rather than the paid one.
 
-## Quick start
+## What `--demo` looks like
+
+The second row of [Start here](#start-here), in full. It needs a provider
+key:
 
 ```bash
-pip install qikly
 export GEMINI_API_KEY=...     # PowerShell: $env:GEMINI_API_KEY = "..."
 qikly --demo
 ```
 
-Needs Python 3.10+ and GNU `patch`; on macOS run `brew install gpatch` first.
-The demo runs a bundled task end to end in a throwaway folder, in about thirty
-seconds, and writes nothing outside it.
+Python 3.10+ and GNU `patch`; on macOS run `brew install gpatch` first.
+It runs a bundled task end to end in a throwaway `demo/<timestamp>/`
+folder, in about thirty seconds, writes nothing outside it, and expects
+you to delete the folder afterwards rather than build there.
 
 ![One `qikly --demo` run, unedited: criteria withheld, tests generated, a test
 failing, a patch, green.](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_demo.gif)
 
 That is a real run on `gemini-3.5-flash-lite`, 38 seconds, not sped up.
-
-**To try it on your own code and data, start at
-[docs/QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md)**: five steps
-from `qikly --scaffold your_module.py` to a first run, and the table of which
-command fits what you already have.
 
 **Tried it?** [Tell us what happened](https://github.com/gal-a/qikly/discussions/6), whether it worked, stalled
 or never got past install.
@@ -467,11 +477,13 @@ relative to the criterion it was proposed for, and fixtures that grow in
 whatever direction a model finds interesting stop resembling the data you
 actually process.
 
-## Running it on your own data
+## Your own data, in full
 
-Four steps: make the two directories, drop your fixture data in, write the task
-file, run it. Nothing is written into the package, and nothing is written into
-your source tree.
+The fourth row of [Start here](#start-here), in full: make the two
+directories, drop your fixture data in, write the task file, run it. Nothing
+is written into the package and nothing is written into your source tree. The
+walkthrough with the task file explained field by field is in
+[docs/QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md).
 
 ```bash
 qikly --init                    # creates inputs_private/ and a starter task
