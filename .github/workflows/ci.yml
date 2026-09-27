@@ -121,6 +121,8 @@ jobs:
             assert os.path.exists(os.path.join(p, 'inputs_public/config/settings.yaml')), 'settings.yaml missing from the wheel'; \
             assert os.path.isdir(os.path.join(p, 'inputs_public/agent_defs')), 'agent_defs missing from the wheel'; \
             assert os.path.isdir(os.path.join(p, 'inputs_public/config/tasks')), 'task configs missing from the wheel'; \
+            assert os.path.isfile(os.path.join(p, 'skills/qikly/SKILL.md')), 'the agent Skill is missing from the wheel'; \
+            assert os.path.isfile(os.path.join(p, 'skills/qikly/references/TROUBLESHOOTING.md')), 'the Skill ships without its references'; \
             print('wheel contents OK')"
 
       - name: Console scripts are registered

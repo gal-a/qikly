@@ -110,6 +110,35 @@ html, body { overflow-x: hidden; overflow-x: clip; }
 
 a { color: var(--accent); }
 
+/* The "new" box in the hero. Deliberately quiet: a border and a tag rather
+   than a coloured slab, because it sits directly under the claim the page is
+   built on and must not outshout it. It is the only place on the page that
+   says "new", so it is worth something; two of these and it is worth
+   nothing. */
+.whats-new {
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  padding: 18px 22px;
+  margin: 4px 0 0;
+}
+.whats-new .tag {
+  margin: 0 0 8px;
+  font: 600 12px/1 var(--mono, monospace);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.whats-new p { margin: 0 0 10px; }
+.whats-new p:last-child { margin-bottom: 0; }
+.whats-new code {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--code-bg, rgba(0,0,0,.06));
+}
+.whats-new .fine { font-size: .92em; opacity: .8; }
+
 /* ------------------------------------------------------------- hero -- */
 
 .hero {
@@ -574,6 +603,18 @@ footer {
       suite that checks it. Everything goes green, and the green means nothing.
       <strong>qikly takes the answer key away from the student.</strong>
     </p>
+    <aside class="whats-new">
+      <p class="tag">New</p>
+      <p><strong>An agent Skill.</strong> It teaches your coding agent which
+      line of a specification is a decision it needs and which is a consequence
+      to withhold.</p>
+      <p><code>qikly --install-skill</code></p>
+      <p class="fine">Instructions, not enforcement: the withholding is
+      enforced in qikly's code either way.
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/skill.md"
+         data-goatcounter-click="hero-skill">What is in it</a>.</p>
+    </aside>
+
     <p class="eyebrow">Who it is for</p>
     <p class="route-note">A developer or team pointing an AI coding agent at a self-contained
       Python module, for example an ETL step, a merge, a calculation or a validation routine,
@@ -997,6 +1038,20 @@ qikly --demo</code></pre>
           the same four commands, reachable from whatever you already work in.</td>
         </tr>
         <tr>
+          <td>Your coding agent should know when to reach for qikly, and how to
+          split a spec</td>
+          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
+          <td><code>qikly --install-skill</code></td>
+          <td>Copies qikly's agent Skill into <code>.claude/skills/qikly</code>
+          in the directory you are standing in. A Skill is a folder your agent
+          reads rather than a server it calls: it carries the one question that
+          decides where each line of a spec goes, what a stalled repair loop
+          means, and which commands are free. It teaches; it does not enforce,
+          and it says so. The withholding is enforced by the tool either way.
+          <b>You get:</b> an agent that uses qikly properly without being told
+          how each time.</td>
+        </tr>
+        <tr>
           <td>A previous run stopped before finishing</td>
           <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
           <td><code>qikly --tasks &lt;MY_TASKS&gt;
@@ -1084,6 +1139,8 @@ qikly --demo</code></pre>
     <span><a href="https://github.com/marketplace/actions/qikly-test-generation" data-goatcounter-click="footer-marketplace">GitHub Marketplace</a></span>
     <span>Built by <a href="https://www.linkedin.com/in/galarav/" data-goatcounter-click="footer-linkedin">Gal Arav</a></span>
     <span><a href="https://github.com/gal-a/qikly/blob/main/PRIVACY.md" data-goatcounter-click="footer-privacy">Privacy</a></span>
+    <span><a href="https://qikly.substack.com/subscribe" data-goatcounter-click="footer-substack">Newsletter</a></span>
+    <span><a href="https://x.com/GA4198498563411" data-goatcounter-click="footer-x">X</a></span>
     <span>Also by the author: <a href="https://www.qikly.com/" data-goatcounter-click="footer-books">Applied Statistics for Data Science</a></span>
   </footer>
 

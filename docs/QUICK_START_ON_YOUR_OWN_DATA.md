@@ -365,9 +365,16 @@ proves nothing. The rest of the suite is unaffected and still bites, which is
 what makes it easy to miss: the run looks entirely normal. Nothing fails, and
 nothing was learned about that boundary.
 
-Only a person can fix either one, by moving the line into the other half. The
-loop cannot: it can tighten a bar the code already attempts, and it cannot tell
-you a line is in the wrong place.
+**The loop cannot fix either one.** It can tighten a bar the code already
+attempts, and it cannot tell you a line is in the wrong place.
+
+An assistant reading your spec can help with half of it. Given the question
+above, it can say which line looks misplaced and why, and qikly's
+[agent Skill](https://github.com/gal-a/qikly/blob/main/docs/skill.md) exists
+partly to make it good at that. What it cannot do is settle the decision:
+whether exactly 2.00 s warns, or whether an empty string counts as missing, is
+not in the specification, which is what makes it a decision. Someone has to
+choose, and that someone is you.
 
 **To see a task that follows the rule,** run `qikly --explain CALC_TAX`. Its
 requirements say amounts are "currency amounts rounded to the nearest cent",

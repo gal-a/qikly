@@ -6,7 +6,8 @@
      server.json exactly. -->
 <!-- mcp-name: io.github.gal-a/qikly -->
 
-[![1,359 tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=1%2C359%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
+[![Agent Skill](https://img.shields.io/badge/Agent_Skill-qikly%20--install--skill-7e22ce)](https://github.com/gal-a/qikly/blob/main/docs/skill.md)
+[![1,500+ tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=1%2C500%2B%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
 [![pypi](https://img.shields.io/pypi/v/qikly?color=blue)](https://pypi.org/project/qikly/)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/gal-a/qikly/blob/main/LICENSE)
@@ -15,6 +16,12 @@
 [![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22qikly%5Bmcp%5D%22%2C%22qikly-mcp%22%5D%7D)
 
 [![qikly: one spec in, code and tests out, written by a coding agent and a test agent that are kept apart](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_hero.png)](https://test.qikly.com)
+
+> **New: an agent Skill.** `qikly --install-skill` teaches your coding agent
+> which line of a specification is a decision it needs and which is a
+> consequence to withhold. Instructions, not enforcement: the withholding is
+> enforced in qikly's code either way.
+> [What is in it](https://github.com/gal-a/qikly/blob/main/docs/skill.md).
 
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
 
@@ -694,6 +701,42 @@ broke.
 [`docs/mcp.md`](https://github.com/gal-a/qikly/blob/main/docs/mcp.md) has the four tools, other hosts,
 installing with pip instead, what to do when the server does not start, and
 how to keep the generated tests out of your agent's reach.
+
+### Or as a Skill, which teaches rather than calls
+
+```bash
+qikly --install-skill
+```
+
+That copies a Skill into `.claude/skills/qikly` in the directory you are
+standing in. A Skill is a folder your agent reads: it tells the agent when
+qikly is the right move, which line of a spec is a decision the coder needs and
+which is a consequence to withhold, what a stalled repair loop means, and which
+commands cost nothing. No server, no configuration.
+
+**The two are not alternatives.** The MCP server is code, so it can enforce:
+no tool returns your criteria, and a test fails the build if that ever changes.
+A Skill is instructions, so it can only inform, and it says so itself. The
+withholding is enforced by the tool whether or not the Skill is installed.
+[`docs/skill.md`](https://github.com/gal-a/qikly/blob/main/docs/skill.md) has
+what is in it, how to check it loads, and the difference stated in full.
+
+## Two free checks on what your tests are not measuring
+
+**Which criteria your data cannot reach.** `qikly --validate` now says when a
+criterion names a value no input row holds, because that criterion produces a
+test which passes whatever the code does:
+
+```
+MY_TASK.yaml: criterion 2 names 0 for gap_m, and no row holds it.
+`qikly --propose-fixtures --tasks MY_TASK` drafts the rows it would take.
+```
+
+**What your suite would not have noticed.** `qikly --score-suite --tasks X`
+breaks your converged code one place at a time, re-runs the suite against each
+break, and lists what went unnoticed. Nothing of yours is modified. Read the
+score beside the reachability warning printed above it: a suite cannot catch a
+fault in behaviour no row exercises.
 
 ## Using qikly? Show it
 

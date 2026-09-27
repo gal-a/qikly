@@ -85,6 +85,12 @@ def _run_task_process(task_id, seed, generate_criteria, resume=False):
     # it starts without the signal also reaching the parent that sent it. No
     # effect on Windows, which kills the tree by parent id instead.
     _own_process_group()
+    # The heartbeat writes to stderr, which the prefixing below does not
+    # touch, so under a sweep thirteen concurrent tasks produced lines saying
+    # "[test_integration] still waiting" with nothing to say whose they were.
+    # One process is one task, so the environment is the simplest place to
+    # carry it.
+    os.environ["QIKLY_TASK_ID"] = task_id
     import builtins
     real_print = builtins.print
     prefix = f"[{task_id}]"
@@ -639,6 +645,41 @@ def _parse_args():
              "runs end to end without you writing anything first. Never overwrites."
     )
     parser.add_argument(
+        "--install-skill", nargs="?", const="claude",
+        choices=["claude", "agents", "cursor", "gemini", "all"],
+        metavar="AGENT",
+        help="Copy qikly's agent Skill into the directory you are standing in, "
+             "so a coding agent knows when to reach for qikly and how to split "
+             "a spec into the half it reads and the half it must not. Defaults "
+             "to claude (.claude/skills/); 'agents' is the cross-agent path "
+             "(.agents/skills/) several tools read, and cursor and gemini "
+             "write their own. The Skill format is shared across agents; "
+             "Claude Code is the combination qikly runs in its own tests. A Skill is "
+             "instructions, not enforcement, and the withholding is enforced by "
+             "the tool either way. Existing files are left alone unless you "
+             "pass --force."
+    )
+    parser.add_argument(
+        "--score-suite", action="store_true",
+        help="Plant one deliberate fault at a time in the code a run produced, "
+             "re-run the suite against each, and report how many it caught. A "
+             "suite that tests nothing passes everything, and this is the "
+             "difference. No model calls and nothing of yours is modified: "
+             "mutants are written to a temporary copy. Read the score beside "
+             "the reachability warning the report prints above it."
+    )
+    parser.add_argument(
+        "--score-mutants", type=int, default=None,
+        help="How many faults --score-suite plants (default 12). Each one is a "
+             "full run of your suite, so this is the time it takes."
+    )
+    parser.add_argument(
+        "--score-seed", type=int, default=None,
+        help="Which faults --score-suite plants, as a seed. The same seed "
+             "plants the same sample, so a score can be compared with the one "
+             "you took before you changed the suite."
+    )
+    parser.add_argument(
         "--propose-fixtures", action="store_true",
         help="For each acceptance criterion, ask whether any row in your input "
              "data reaches it, and propose a row for the ones nothing reaches. "
@@ -1116,6 +1157,86 @@ def _do_install_mcp(host, dry_run, force):
     # everything", and both printed a friendly message and exited 0.
     if not dry_run and declined and not wrote:
         return 2
+    return 0
+
+
+def _do_install_skill(agent, force, dry_run):
+    """
+    `--install-skill`: put the bundled Skill where an agent will find it.
+
+    Writes into the directory you are standing in, for the same reason
+    `--install-mcp` does: printing a path is not consent, and `cd` is a
+    clearer way to mean somewhere else.
+    """
+    from qikly.skill_install import HOSTS, bundled_dir, files_in, install_all
+
+    root = os.path.abspath(INVOKED_FROM)
+    results = install_all(root, [agent], force=force, dry_run=dry_run)
+
+    wrote = False
+    for host, destination, outcome, backup in results:
+        relative = os.path.relpath(destination, root)
+        if outcome == "missing":
+            print("The Skill is not in this install. A wheel built without its "
+                  "package data will do that; reinstall with 'pip install "
+                  "--upgrade qikly', or copy src/qikly/skills/qikly from a "
+                  "clone.")
+            return 1
+        if outcome == "exists":
+            print(f"{relative} already exists, so nothing was changed. Pass "
+                  f"--force to replace it, or delete it first if you have "
+                  f"edited it.")
+            continue
+        if outcome == "would write":
+            print(f"Would write {len(files_in(bundled_dir()))} files to {relative}")
+            continue
+        if outcome.startswith("failed:"):
+            # One host of several, reported and stepped over. With `all` the
+            # others still install, and the summary says which did not.
+            print(f"{relative} could not be written. {outcome[len('failed: '):]}")
+            continue
+        wrote = True
+        print(f"Skill written to {relative}")
+        if backup:
+            print(f"  what was there is kept at {os.path.relpath(backup, root)}")
+        for name in files_in(destination):
+            print(f"  {name}")
+
+    if wrote:
+        print()
+        print("Your agent loads it when what you ask matches its description. "
+              "Try asking for tests for one of your own modules without naming "
+              "qikly, and see whether it reaches for it.")
+        if agent != "claude":
+            # Say which tool the unknown belongs to. "We have not tested this"
+            # reads as doubt about qikly; naming the other tool's docs as the
+            # source, and the format as open, puts the uncertainty where it
+            # actually is, on whether that agent loads what it documents.
+            print("That is the path %s documents for skills, and the Skill "
+                  "format is the same across agents. Claude Code is the one "
+                  "combination we run ourselves, so if this loads for you we "
+                  "would like to hear: "
+                  "https://github.com/gal-a/qikly/discussions/6" % agent)
+    return 0
+
+
+def _do_score_suite(tasks, mutants, seed):
+    """
+    `--score-suite`: how much of your own code can be broken without the suite
+    noticing.
+
+    Free, because every fault is planted by an AST rewrite rather than by a
+    model, and repeatable, because the sample of faults is seeded.
+    """
+    from qikly.mutation_score import DEFAULT_MUTANTS, run
+    from qikly.orchestrator.orchestrator import discover_task_ids
+
+    ids = [t.strip() for t in tasks.split(",")] if tasks else discover_task_ids()
+    for task_id in [t for t in ids if t]:
+        try:
+            run(task_id, mutants=mutants or DEFAULT_MUTANTS, seed=seed)
+        except Exception as exc:
+            print(f"[{task_id}] could not be scored: {type(exc).__name__}: {exc}")
     return 0
 
 
@@ -1827,7 +1948,7 @@ def main():
         ("--task-id", args.task_id is not None,
          "--scaffold, --criteria-from or --criteria-from-jira",
          "qikly --scaffold my_module.py --task-id MY_TASK"),
-        ("--force", args.force, "--install-mcp",
+        ("--force", args.force, "--install-mcp or --install-skill",
          "qikly --install-mcp claude --force"),
         ("--demo-dir", args.demo_dir is not None, "--demo",
          "qikly --demo --demo-dir ./try-it"),
@@ -1839,7 +1960,11 @@ def main():
             "--from-doc": bool(args.scaffold),
             "--task-id": bool(args.scaffold or args.criteria_from
                               or args.criteria_from_jira),
-            "--force": args.install_mcp is not None,
+            # Both installers take it. Listing only one here is what made
+            # `--install-skill --force` exit 2 before it reached its handler,
+            # while three separate places documented it as working.
+            "--force": (args.install_mcp is not None
+                        or args.install_skill is not None),
             "--demo-dir": args.demo,
         }[flag]
         if not attached:
@@ -1872,6 +1997,10 @@ def main():
         return _do_check_criteria(args.tasks)
     if args.propose_fixtures:
         return _do_propose_fixtures(args.tasks)
+    if args.install_skill:
+        return _do_install_skill(args.install_skill, args.force, args.dry_run)
+    if args.score_suite:
+        return _do_score_suite(args.tasks, args.score_mutants, args.score_seed)
 
     if args.demo and not args.tasks:
         task_ids = [DEMO_TASK]

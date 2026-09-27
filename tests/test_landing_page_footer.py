@@ -1,9 +1,13 @@
 """
-The landing page footer links to the author's books.
+The landing page footer's outbound links, pinned.
 
-That link points at www.qikly.com, a separate site this repository does not
-control, so nothing here would notice if it moved. If it does, change
-BOOKS_URL below and the footer in docs/index.html together.
+Every one of them points at a site this repository does not control, so
+nothing here would notice if one moved or was renamed. Each is pinned below
+and in docs/index.html, and the two have to change together.
+
+The newsletter link is the one worth watching: it is the only channel on the
+page that the project owns, and it is the conversion for a visitor who liked
+what they read and is not going to install anything today.
 
 Offline by default. Before a release, check every footer link still answers:
 
@@ -17,12 +21,35 @@ import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOOKS_URL = "https://www.qikly.com/"
+SUBSTACK_URL = "https://qikly.substack.com/subscribe"
+X_URL = "https://x.com/GA4198498563411"
+LINKEDIN_URL = "https://www.linkedin.com/in/galarav/"
 
 
 def _footer():
     with open(os.path.join(ROOT, "docs", "index.html"), encoding="utf-8") as handle:
         page = handle.read()
     return page[page.index("<footer>"):page.index("</footer>")]
+
+
+def test_the_footer_carries_every_channel_we_want_counted():
+    """
+    Each link, with the GoatCounter name that makes its clicks countable.
+
+    A link without `data-goatcounter-click` is a link nobody can tell apart
+    from the others in the dashboard, which is the whole reason for adding
+    these: to find out which of three channels a visitor actually uses.
+    """
+    footer = _footer()
+    for url, counter in ((SUBSTACK_URL, "footer-substack"),
+                         (X_URL, "footer-x"),
+                         (LINKEDIN_URL, "footer-linkedin"),
+                         (BOOKS_URL, "footer-books")):
+        pattern = r'<a href="%s"[^>]*data-goatcounter-click="%s"' % (
+            re.escape(url), re.escape(counter))
+        assert re.search(pattern, footer), (
+            "%s is missing from the footer, or is not counted as %s"
+            % (url, counter))
 
 
 def test_the_footer_links_the_books():

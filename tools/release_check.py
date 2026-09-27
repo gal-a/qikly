@@ -104,6 +104,57 @@ def check_versions_agree():
     return distinct[0] if ok else None
 
 
+def check_skill_floor(version):
+    """
+    The Skill's minimum qikly version has to be true of the release going out.
+
+    The Skill travels: a copy taken from a directory listing sits beside
+    whatever qikly the user already has, so it names a floor. If that floor is
+    above the version being released, every reader of the listing is told to
+    use something that does not exist yet, and nothing else in this checklist
+    would notice.
+
+    It is a floor and not a pin, so a floor below the release is correct and
+    ordinary. Only a floor above it is wrong.
+    """
+    import io
+    import re
+
+    path = os.path.join("src", "qikly", "skills", "qikly", "SKILL.md")
+    if not os.path.isfile(path):
+        return check("the agent Skill is present", False,
+                     "%s is missing, so --install-skill ships nothing" % path)
+
+    text = io.open(path, encoding="utf-8").read()
+    found = re.search(r"requires:\s*qikly\s*>=\s*(\d+\.\d+\.\d+)", text)
+    if not found:
+        return check("the Skill names a minimum qikly version", False,
+                     "no 'requires: qikly >= X.Y.Z' in the frontmatter")
+
+    floor = found.group(1)
+    # Compare only the leading numeric components. A pre-release or build tag,
+    # `0.5.3rc1` or `0.5.3+build2`, is a legal version here and used to raise
+    # ValueError out of int(), taking the whole release checklist down with a
+    # traceback before the suite, the wheel or the remote were ever checked.
+    def parts(text):
+        out = []
+        for piece in text.split("."):
+            digits = ""
+            for character in piece:
+                if not character.isdigit():
+                    break
+                digits += character
+            out.append(int(digits) if digits else 0)
+        return tuple(out)
+
+    ok = parts(floor) <= parts(version)
+    check("the Skill's floor is at or below this release", ok,
+          "Skill requires qikly >= %s, releasing %s" % (floor, version),
+          "a floor above the release tells every reader to use a version that "
+          "does not exist yet")
+    return ok
+
+
 def check_prose_pins(version):
     """
     The Action pins written in prose are examples people copy, so a stale one
@@ -385,6 +436,7 @@ def main():
         check_remote_ready(version)
     else:
         check_prose_pins(version)
+        check_skill_floor(version)
         check_changelog(version)
         check_tree_clean()
         check_no_experiment_leftovers()

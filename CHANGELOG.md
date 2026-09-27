@@ -4,6 +4,59 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## 0.5.3
+
+> Two free checks that tell you what your tests are not measuring, and an agent Skill
+
+### Added
+- **`qikly --validate` now names the criteria your data cannot reach.** A
+  criterion naming a value no input row holds produces a test that passes
+  whatever the code does, and nothing said so. The check is free, makes no
+  model call, and names the field and the command that drafts the missing
+  rows. It is deliberately narrow: it reports only when a criterion names a
+  field your data has, names a value for it, and that field holds none of
+  them. Looser rules were measured against the thirteen bundled tasks first
+  and each one drowned the real findings, at 49 and then 11 false reports out
+  of 134 criteria. This one reports none of them, which is the right answer
+  for fixtures audited for exactly this.
+
+- **`qikly --score-suite` plants faults in your code and reports what your
+  suite missed.** A suite that tests nothing passes everything, and a run
+  cannot tell you the difference. This breaks the converged implementation in
+  one known place at a time, re-runs the suite against each, and lists what
+  went unnoticed. Free, because every fault is an edit to the syntax tree and
+  no model is asked anything; slow, because each fault means running your
+  suite again. It refuses to score a suite that already fails on untouched
+  code, and it prints the reachability warning above the number, because a
+  suite cannot catch a fault in behaviour no input row exercises.
+
+- **An agent Skill, with `qikly --install-skill`.** A folder your coding agent
+  reads: when to reach for qikly, which line of a specification is a decision
+  the coder needs and which is a consequence to withhold, what a repeating
+  identical patch means, and which commands cost nothing. It installs where
+  Claude Code looks by default, and `--install-skill agents`, `cursor` or
+  `gemini` write where those tools document their own. **A Skill is
+  instructions and enforces nothing**: the withholding is enforced in qikly's
+  code whether or not the Skill is installed, and the Skill says so itself.
+
+- **A run says when it is waiting.** A model call printed nothing until it
+  answered, which on a reasoning model is minutes of silence that looks
+  exactly like a hang. After ten seconds it now says so, one line every
+  fifteen. `QIKLY_NO_PROGRESS=1` turns it off.
+
+### Fixed
+- **`--score-suite` crashed on its first line**, reading an `args.seed` that no
+  flag defined. Found by running the command rather than the function, which
+  is now how the command line is tested: 25 free commands, each run for real,
+  each asserted not to produce a traceback.
+- **A NUL byte in any input file crashed `--validate` for every task in the
+  run.** `csv.reader` raises outside the read that was guarded, and
+  `--validate` is recommended as a pre-commit hook, so one misencoded export
+  stopped it reporting on anything.
+- **The README's test-count badge is now a floor rather than a count.** It
+  claimed an exact number that only CI can observe, so every update was a
+  guess below an invisible figure, and its own check had stopped running.
+
 ## 0.5.2
 
 > The withheld criteria could reach the coding agent six more ways, all closed, and a run that stops when you stop it

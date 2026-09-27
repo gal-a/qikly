@@ -114,6 +114,12 @@ packages = [
     "inputs_public/config/tasks/*.yaml",
     "inputs_public/reference/*/*.py",
     "inputs_public/agent_defs/*.md",
+    # The agent Skill, so `qikly --install-skill` works from a wheel and not
+    # only from a clone. A Skill is a folder an agent reads, and its two
+    # bundled references are complete copies of the docs pages, asserted
+    # identical by tests/test_skill_bundle.py, so it works with no network.
+    "skills/*/*.md",
+    "skills/*/references/*.md",
     "inputs_public/data/**/*",
     # The worked scaffold example, laid out the way a real project is so a
     # reader sees the right shape. Not a bundled task: it lives under

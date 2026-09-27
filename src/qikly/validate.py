@@ -29,6 +29,11 @@ first test run, after the suites have already been generated and paid for.
 requirements or criteria passes every other check, and a run would hand the
 placeholder to the agents as the specification.
 
+**The data can reach the criteria.** Advisory. A criterion naming values no
+input row contains produces a test that passes whatever the code does, and
+nothing in a normal run says so. `--propose-fixtures` answers the richer
+question, which rows would fix it, at the price of a model call.
+
 **The criteria name boundary values.** Advisory, not an error. A criterion
 phrased "reject large amounts" produces a test at some arbitrary large number;
 "100 is accepted and 101 is rejected" forces the boundary. This is the single
@@ -97,6 +102,27 @@ def _input_exists(relative):
     return False
 
 
+def _readable_input(relative):
+    """
+    The path a declared input can actually be read from, or None.
+
+    `_input_exists` answers the yes-or-no question the error check needs;
+    this returns the location, because the reachability check has to open the
+    file. Same two rules, in the same order, so the two never disagree about
+    whether a fixture is present.
+    """
+    from qikly.paths import DEFAULT_PRIVATE_DIR, resolve_input
+
+    if os.path.isfile(relative):
+        return relative
+    parts = relative.replace("\\", "/").split("/")
+    if parts and parts[0] in (DEFAULT_PRIVATE_DIR, "inputs_public"):
+        resolved = resolve_input("/".join(parts[1:]))
+        if os.path.isfile(resolved):
+            return resolved
+    return None
+
+
 def check_task(path):
     """
     Returns (errors, warnings) for one task file. Errors mean a run cannot
@@ -151,6 +177,13 @@ def check_task(path):
                         f"{name}: criterion {i} says {hit!r} without naming a "
                         f"value. A suite tests the boundary when the criterion "
                         f"names the boundary")
+
+    # Which criteria the data cannot reach. Free, and the same question
+    # `--propose-fixtures` answers with a model call: that one proposes the
+    # rows, this one only says which criteria are currently unmeasurable.
+    from qikly.fixture_reach import describe as _unreachable
+    for line in _unreachable(task, name, _readable_input):
+        warnings.append(Note(line, group=("unreachable", line.split("criterion: ")[-1])))
 
     leftover = [field for field in ("task_name", "description", "interface",
                                     "requirements", "acceptance_criteria")

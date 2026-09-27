@@ -1,6 +1,7 @@
 import os
 import time
 
+from qikly.agent_api.waiting import Heartbeat
 from qikly.agent_api.providers.router import (effective_model, route_model,
                                               thinks_before_answering)
 from qikly.agent_api.retry import with_retry
@@ -67,7 +68,13 @@ def call_llm(mode, prompt, seed=None):
     # saw. A refusal that retrying cannot fix, a depleted balance or a bad
     # key, is raised immediately with its own message intact.
     started = time.monotonic()
-    answer = with_retry(lambda: route_model(mode, prompt, seed=seed))
+    # A heartbeat while the call is out. Nothing is printed for the first ten
+    # seconds, so an ordinary call on the default model stays silent; past
+    # that, a line every fifteen seconds is the difference between a run that
+    # looks slow and a run that looks dead. Set QIKLY_NO_PROGRESS=1 to silence
+    # it.
+    with Heartbeat(mode):
+        answer = with_retry(lambda: route_model(mode, prompt, seed=seed))
     # After the answer, not in a finally: a call that failed has an error of
     # its own to print, and how long it took before failing is not the thing
     # to say about it.

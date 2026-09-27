@@ -155,6 +155,28 @@ So the title has to earn its place. Say what changed and whether to hurry:
 Anyone can open the release and confirm the title matches what shipped, which
 is what makes it a claim rather than an announcement.
 
+## 7d. The agent Skill catches up here
+
+`src/qikly/skills/qikly/SKILL.md` is instructions an agent quotes with
+confidence, so a stale one is worse than shipping none. Its two bundled
+references are asserted byte-identical to the docs they came from by
+`tests/test_skill_bundle.py`, so those cannot drift silently. The prose can,
+and nothing catches it.
+
+Ask, for whatever this release changed:
+
+- Does it add or rename a flag the Skill names?
+- Does it change which commands are free?
+- Does it move the convergence figures, or what they measure?
+- Does it add a failure mode the troubleshooting section should carry?
+- Does it introduce something the Skill now depends on? Then
+  `metadata.requires` and the sentence in the Install section both move, and a
+  test asserts the two agree. `release_check.py` fails if that floor is above
+  the version being released.
+
+`metadata.version` is the Skill's own and moves when its instructions move,
+not on every release. It is 0.x deliberately, and a test says so.
+
 ## 7c. The landing page catches up here
 
 `docs/index.html` is served at test.qikly.com to people running the *published*

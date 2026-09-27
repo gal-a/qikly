@@ -1,0 +1,43 @@
+{
+  // A throwaway machine for trying the agent Skill in agents other than
+  // Claude Code.
+  //
+  // Why this exists: qikly ships a Skill, and the Skill format is shared
+  // across Claude Code, Codex, Gemini CLI and Cursor. Only Claude Code is
+  // covered by qikly's own tests. Installing three more agent CLIs on a
+  // working machine to find out about the rest is a poor trade; a Codespace
+  // is free to create, free to delete, and leaves nothing behind.
+  //
+  // Open this repository in a Codespace, wait for the post-create step, then:
+  //
+  //     python tools/skill_bench.py
+  //
+  // It is not needed to develop qikly, and nothing in CI reads it.
+  "name": "qikly skill bench",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+
+  "features": {
+    // Node, because two of the three agent CLIs install through npm.
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
+  },
+
+  // Installed here rather than in the image so a failure is visible in the
+  // creation log rather than baked into a broken container. Each one is
+  // allowed to fail without taking the others down: these are third-party
+  // CLIs in active development, and one of them being briefly unpublishable
+  // should not cost you the whole bench.
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"]
+    }
+  },
+
+  // No ports, no services, no secrets. Provider keys are yours to export in
+  // the terminal if you want to run a paid command; nothing here asks for one
+  // and the Skill checks worth running are free.
+  "forwardPorts": []
+}
