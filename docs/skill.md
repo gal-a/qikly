@@ -21,7 +21,13 @@ That writes `.claude/skills/qikly/`, which is where agents look. Then open your
 agent in that directory and ask for something ordinary, without mentioning
 qikly:
 
-> Write tests for `src/pricing.py` that would actually catch a bug.
+> Write tests for `src/headway.py` that would actually catch a bug.
+
+`src/headway.py` stands in for a module you actually have; name a real one,
+because an agent asked about a file that does not exist will spend its answer
+asking you which file you meant. The examples on this page all use following
+distance from radar samples, which is the worked case in the Skill itself, so
+the two read together.
 
 It should reach for qikly by itself. That has been watched happen in **Claude
 Code, Gemini CLI, Codex and Cursor**, once each, in a throwaway project with a
@@ -97,7 +103,7 @@ distance.
 **2. Just name it.** This always works, because it does not depend on the
 agent being told what the Skill is for:
 
-> Use the qikly skill to write tests for `src/pricing.py`.
+> Use the qikly skill to write tests for `src/headway.py`.
 
 If naming it works and the neutral request did not, the Skill is fine and the
 problem is discovery.
@@ -137,11 +143,7 @@ do nothing.
 ask for something in its territory, **naming a real module of your own** and
 not mentioning qikly:
 
-> Write tests for `src/pricing.py` that would actually catch a bug in it.
-
-Any module will do; `src/pricing.py` is a stand-in for a file you actually
-have, and the request has to name one that exists or the agent will spend its
-answer asking you which file you meant.
+> Write tests for `src/headway.py` that would actually catch a bug in it.
 
 The agent should mention qikly, or the decisions-and-consequences split,
 unprompted. If it does not, see [when an agent does not pick it
