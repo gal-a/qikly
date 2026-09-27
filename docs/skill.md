@@ -29,23 +29,7 @@ rival testing skill installed beside this one and a request that never
 mentioned qikly. Four sessions is four anecdotes rather than a rate, and your
 project has more skills in it than that test did.
 
-If it does not, name it:
-
-> Use the qikly skill to write tests for `src/pricing.py`.
-
-Naming it always works, because it does not depend on the agent being told
-what the Skill is for. Whether an agent picks it up unprompted depends on two
-things: how thoroughly the model explores before it starts typing, and whether
-the host actually passed the description along.
-
-**If you have many skills installed, the second one can bite.** Claude Code
-reserves a fraction of the context window for the whole skill listing, 1% by
-default. When the listing does not fit, Anthropic's own bundled skills keep
-their descriptions and everything else is ranked by how often you have used it,
-so a skill you have never invoked can be listed as a bare name with nothing to
-match against. Raising `skillListingBudgetFraction` in your Claude Code
-settings gives the listing more room. Naming the Skill sidesteps it entirely.
-See [checking that it works](#checking-that-it-works) below.
+If it does not, see [if your agent does not pick it up](#if-your-agent-does-not-pick-it-up).
 
 **A few options, none of them needed the first time.** `--dry-run` shows what
 it would write. `--force` replaces a Skill you have already edited, keeping a
@@ -100,31 +84,75 @@ context window. The withholding is enforced by the tool, in code, whether or
 not this Skill is installed. The Skill's own text says so, and there is a test
 asserting it still does.
 
+## If your agent does not pick it up
+
+Three causes, in the order to check them.
+
+**1. Your agent is not in that directory.** The Skill is per project. It is
+files on disk, so an agent started in another folder, or running in a browser
+with its own sandbox rather than on your machine, cannot see them. Start the
+agent in the directory you installed into. This is the commonest cause by some
+distance.
+
+**2. Just name it.** This always works, because it does not depend on the
+agent being told what the Skill is for:
+
+> Use the qikly skill to write tests for `src/pricing.py`.
+
+If naming it works and the neutral request did not, the Skill is fine and the
+problem is discovery.
+
+**3. The host did not pass the description along.** Whether an agent reaches
+for a Skill unprompted depends on how much it explores before it starts typing,
+and on what the host told it. Claude Code reserves a fraction of the context
+window for the whole skill listing, 1% by default; when the listing does not
+fit, Anthropic's own bundled skills keep their descriptions and everything else
+is ranked by how often you have used it. So a skill you have never invoked can
+arrive as a bare name with nothing to match against. Raising
+`skillListingBudgetFraction` in your Claude Code settings gives the listing more
+room, and that single change turned four failed routing attempts into a clean
+one during testing.
+
 ## Checking that it works
 
 A Skill either loads or it does not, and it never tells you which, so it is
-worth five minutes once. If you only do one of these, do number three.
+worth five minutes once. **If you only do one of these, do number four:** the
+others check that the Skill arrived, and that one checks that it is right.
 
-**1. It is where the agent looks.**
+**1. The files are where your agent looks for them.** In the project you ran
+`qikly --install-skill` in:
 
 ```bash
-ls .claude/skills/qikly/SKILL.md
+ls .claude/skills/qikly/SKILL.md        # macOS, Linux
+dir .claude\skills\qikly\SKILL.md       # Windows PowerShell
 ```
 
+**And start your agent in that same directory.** The Skill is per project, not
+per machine: an agent started somewhere else, or running in a browser with its
+own sandbox rather than on your computer, cannot see these files and will never
+load them. That is the commonest reason a correctly installed Skill appears to
+do nothing.
+
 **2. It loads on a request that should trigger it.** Start a fresh session and
-ask for something in its territory without naming qikly:
+ask for something in its territory, **naming a real module of your own** and
+not mentioning qikly:
 
 > Write tests for `src/pricing.py` that would actually catch a bug in it.
 
+Any module will do; `src/pricing.py` is a stand-in for a file you actually
+have, and the request has to name one that exists or the agent will spend its
+answer asking you which file you meant.
+
 The agent should mention qikly, or the decisions-and-consequences split,
-unprompted. If it does not, the description in the frontmatter is the thing to
-change: an agent decides whether to load a Skill from that sentence alone.
+unprompted. If it does not, see [when an agent does not pick it
+up](#if-your-agent-does-not-pick-it-up) below before changing anything.
 
 **3. It does not load when it should not.** Ask something unrelated, such as
 "rename this variable everywhere", and it should stay quiet. A Skill that loads
 for everything costs context on every request.
 
-**4. It gives the right answer to the question that matters.** Ask:
+**4. It gives the right answer to the question that matters.** This is the one
+to do if you do only one. Ask:
 
 > My spec says "warn when following distance breaks the two-second rule", and
 > the acceptance criteria say a headway of exactly 2.00 s does not warn. Is
@@ -140,6 +168,28 @@ coding agent never sees the criteria. The answer should point at qikly's code
 and its build-failing test, not at the Skill.
 
 ## Keeping it current
+
+**An installed Skill does not update itself, and until 0.5.4 nothing told you.**
+`pip install --upgrade qikly` replaces the package; it cannot touch a folder
+copied into your project, so after an upgrade you can be following instructions
+that name a different set of commands. From 0.5.4 any qikly command says so
+when it notices:
+
+```
+note: the qikly Skill in .claude/skills/qikly is older than this qikly, so it
+describes a different set of commands. `qikly --install-skill --force`
+replaces it and keeps a copy of the old one.
+```
+
+`--force` keeps a timestamped copy of what it replaces, so a Skill you have
+edited is recoverable. That is the whole update mechanism: qikly tells you, and
+you run one command. There is no background process and nothing phones home;
+the check is two version strings read from two files on your disk.
+
+The Skill's version is its own and moves when its instructions move, not when
+qikly releases, so a release that does not touch it produces no notice.
+
+---
 
 The Skill itself lives at
 [`src/qikly/skills/qikly/`](https://github.com/gal-a/qikly/tree/main/src/qikly/skills/qikly)

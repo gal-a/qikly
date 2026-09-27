@@ -43,6 +43,12 @@ packaging tools would read as `1.1`.
   project. Reported by a first-time user.
 
 ### Fixed
+- **An installed Skill never updated itself and nothing said so.** `pip install
+  --upgrade qikly` replaces the package and cannot touch a folder copied into
+  your project, so an upgrade left you following instructions that name a
+  different set of commands. Any qikly command now says when the Skill it finds
+  in the directory you are standing in is older than the one it ships, and what
+  to run about it. Silent when it is current.
 - **`--init` and `--example` now say so before filling your home directory.**
   A first-time user ran `--example` in his home folder and finished with
   `inputs_private/`, `outputs/`, a module and a `demo/` tree sitting beside

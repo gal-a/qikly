@@ -109,6 +109,43 @@ def inside_a_demo(where=None):
         current = parent
 
 
+def stale_skill_notice(stream=None):
+    """
+    One line when a Skill installed here is older than the one this qikly ships.
+
+    `pip install --upgrade qikly` replaces the package and cannot touch a Skill
+    already copied into somebody's project, so an upgrade silently leaves them
+    following instructions that name a different set of commands. The installer
+    says so if you happen to re-run it, which nobody does.
+
+    The same shape as the version notice, and for the same reason: the person
+    who needs to know is working, not reading release notes.
+
+    Silent unless there is something to say, and never fatal: a Skill somebody
+    has edited by hand, or one with no readable version, produces nothing
+    rather than a complaint or an exception.
+    """
+    try:
+        from qikly.skill_install import TARGETS, is_stale
+
+        target = stream if stream is not None else sys.stderr
+        for host, relative in TARGETS.items():
+            destination = os.path.join(INVOKED_FROM, relative)
+            if not os.path.isdir(destination):
+                continue
+            if is_stale(destination) is True:
+                target.write(
+                    "  note: the qikly Skill in %s is older than this qikly, "
+                    "so it describes a different set of commands. "
+                    "`qikly --install-skill --force` replaces it and keeps a "
+                    "copy of the old one.\n" % relative)
+                return True
+    except Exception:
+        # A courtesy line must never take down a command.
+        return None
+    return None
+
+
 def _refuse_inside_demo():
     """
     Stop, and say where to go instead. True when it refused.
@@ -2196,6 +2233,9 @@ def main():
     try:
         from qikly.version_check import check_for_update, repeat_notice
         check_for_update()
+        # And the same courtesy for the Skill, which pip cannot upgrade
+        # because it lives in the user's project rather than in the package.
+        stale_skill_notice()
         # And again on the way out. A run prints for minutes, so the opening
         # line has scrolled away by the time anyone reads the result. atexit
         # rather than a wrapper around the body below, because main() returns

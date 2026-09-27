@@ -541,3 +541,46 @@ def test_the_closing_note_never_substitutes_a_target_for_an_agent(tmp_path):
             assert bad not in done.stdout, (
                 "%s leaked a target name into the prose:\n%s"
                 % (target or "bare", done.stdout))
+
+def test_a_stale_installed_skill_is_mentioned_by_any_command(tmp_path):
+    """
+    pip cannot upgrade a Skill: it lives in the user's project, not in the
+    package. So an upgrade leaves them following instructions that name a
+    different set of commands, and the installer only says so if they happen
+    to re-run it, which nobody does.
+
+    Silent when the copy is current, because a notice on every command is a
+    notice nobody reads.
+    """
+    import subprocess
+    import sys
+
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = SRC
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY",
+                 "ANTHROPIC_API_KEY"):
+        environment.pop(name, None)
+
+    def run():
+        return subprocess.run([sys.executable, "-m", "qikly", "--validate"],
+                              cwd=str(tmp_path), env=environment,
+                              capture_output=True, text=True, timeout=300)
+
+    subprocess.run([sys.executable, "-m", "qikly", "--install-skill"],
+                   cwd=str(tmp_path), env=environment, capture_output=True,
+                   text=True, timeout=300)
+
+    fresh = run()
+    assert "older than this qikly" not in (fresh.stdout + fresh.stderr), (
+        "it nags about a copy that is current")
+
+    skill = tmp_path / ".claude" / "skills" / "qikly" / "SKILL.md"
+    text = skill.read_text(encoding="utf-8")
+    skill.write_text(text.replace("version: 0.2.0", "version: 0.1.0"),
+                     encoding="utf-8")
+
+    aged = run()
+    assert "older than this qikly" in (aged.stdout + aged.stderr), (
+        "an upgrade can leave a stale Skill in place and say nothing")
+    assert "--install-skill --force" in (aged.stdout + aged.stderr), (
+        "the notice must say what to do about it")
