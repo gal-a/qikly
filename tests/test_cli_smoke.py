@@ -162,3 +162,101 @@ def test_the_install_message_reads_as_english(target, tmp_path):
         assert "we would like to hear" in output, (
             "a path other than Claude's should say what is and is not known "
             "about it:\n%s" % output[-400:])
+
+# The six options that are supposed to start a run when given on their own.
+# Everything else must either do its own job and stop, or be refused by the
+# attachment guard for having nothing to attach to.
+#
+# Adding a flag here is a decision that it may spend money unaccompanied. If
+# the test below fails for a new flag, the question is which of the two it is,
+# and the answer is almost always the guard.
+STARTS_A_RUN = {
+    "--tasks",              # the ordinary way to run named tasks
+    "--demo",               # a run in a throwaway directory
+    "--resume",             # continues a run that stopped
+    "--generate-criteria",  # writes criteria, which is a model call
+    "--dry-run",            # a run that stops before applying patches
+    "--review-patches",     # a run that pauses at each patch
+}
+
+
+def _every_option():
+    """One minimal invocation per option the parser accepts."""
+    import argparse
+
+    sys.path.insert(0, SRC)
+    from qikly import cli
+
+    captured = {}
+
+    def grab(self, *a, **k):
+        captured["parser"] = self
+        raise SystemExit(0)
+
+    monkey = pytest.MonkeyPatch()
+    try:
+        monkey.setattr(argparse.ArgumentParser, "parse_args", grab)
+        with pytest.raises(SystemExit):
+            cli._parse_args()
+    finally:
+        monkey.undo()
+
+    for action in captured["parser"]._actions:
+        if not action.option_strings:
+            continue
+        flag = action.option_strings[0]
+        if flag in ("-h", "--help", "--version"):
+            continue
+        if action.nargs in (0, "?") or isinstance(action, argparse._StoreTrueAction):
+            yield flag, [flag]
+        elif action.type is int:
+            yield flag, [flag, "3"]
+        else:
+            yield flag, [flag, "x"]
+
+
+def test_no_option_starts_a_run_on_its_own_unless_it_is_meant_to(tmp_path):
+    """
+    The enumeration, because three separate audits each found one of these by
+    reading and none of them found all three.
+
+    `--score-mutants`, `--artifacts-url` and `--json` each did nothing on their
+    own, were in no dispatch branch, and were missing from the guard that
+    refuses an option with nothing to attach to. So control fell through to the
+    ordinary run, and with a provider key set each would have started a real,
+    billed run over every task. One was reproduced by an audit that spent money
+    doing it.
+
+    Eyeballing a list of forty options finds one at a time. This runs them.
+
+    The signature is the same in every case: with no key set, a flag that
+    reaches the run path dies at the provider check, and a flag that does its
+    own job never gets there.
+    """
+    offenders = []
+    for flag, arguments in _every_option():
+        if flag in STARTS_A_RUN:
+            continue
+        done = _run(arguments, str(tmp_path))
+        if "LLM configuration error" in (done.stdout + done.stderr):
+            offenders.append(flag)
+
+    assert not offenders, (
+        "these options start a real run on their own, which spends money when "
+        "a provider key is set: %s\nEither add each to the attachment guard "
+        "in cli.py, or, if it really is meant to run unaccompanied, to "
+        "STARTS_A_RUN with a reason." % ", ".join(sorted(offenders)))
+
+
+def test_the_options_that_may_start_a_run_still_can(tmp_path):
+    """
+    The other half, so the guard cannot be made to pass by refusing
+    everything.
+    """
+    for flag in sorted(STARTS_A_RUN):
+        arguments = [flag, "x"] if flag == "--tasks" else [flag]
+        done = _run(arguments, str(tmp_path))
+        assert "LLM configuration error" in (done.stdout + done.stderr), (
+            "%s no longer reaches a run, so either it was guarded by mistake "
+            "or it belongs out of STARTS_A_RUN:\n%s"
+            % (flag, (done.stdout + done.stderr)[-400:]))
