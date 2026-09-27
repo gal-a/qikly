@@ -107,6 +107,35 @@ def is_stale(destination):
     return theirs < ours
 
 
+# What a bare `--install-skill` writes when the project shows no sign of which
+# agent is in use. Claude Code's own path, plus the cross-agent one that Codex
+# and Gemini CLI both read, which is three of the four runtimes for two
+# directories. Cursor is left out on purpose: it reads only its own path, and
+# writing a directory for a tool somebody may not have is worse than telling
+# them the flag exists.
+FALLBACK = ("claude", "agents")
+
+
+def detect(root):
+    """
+    Which agent conventions this project already uses.
+
+    A bare `--install-skill` used to write `.claude/skills/` and nothing else,
+    so somebody working in Cursor got a directory their editor does not read,
+    no error, and no hint that three other conventions existed. The evidence
+    is already on disk: a project with `.cursor/` in it belongs to somebody
+    using Cursor.
+    """
+    found = [host for host in HOSTS
+             if os.path.isdir(os.path.join(root, "." + host))]
+    # Never both. Gemini CLI reads its own directory and the cross-agent one,
+    # and finding the Skill in both makes it report every skill as overriding
+    # itself. `.agents/` is the path that has actually been watched loading.
+    if "gemini" in found and "agents" in found:
+        found.remove("gemini")
+    return found
+
+
 def install_all(root, hosts=None, force=False, dry_run=False):
     """
     Install for each named host. Returns [(host, destination, outcome, backup)].
@@ -115,9 +144,11 @@ def install_all(root, hosts=None, force=False, dry_run=False):
     read the first line and stop, so `claude` comes first and the rest follow
     in the order they were asked for.
     """
-    chosen = list(hosts or ["claude"])
+    chosen = list(hosts or ["auto"])
     if "all" in chosen:
         chosen = list(HOSTS)
+    elif "auto" in chosen:
+        chosen = detect(root) or list(FALLBACK)
     out = []
     for host in chosen:
         try:

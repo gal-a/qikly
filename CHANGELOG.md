@@ -7,6 +7,15 @@ packaging tools would read as `1.1`.
 ## Unreleased
 
 ### Added
+- **`qikly --install-skill` now installs where your project says your agent
+  is.** It wrote `.claude/skills/` and nothing else, so somebody working in
+  Cursor got a directory their editor does not read, no error, and no hint
+  that three other conventions existed. It now looks for `.claude/`,
+  `.agents/`, `.cursor/` and `.gemini/`, writes to whichever are there, says
+  which it chose, and falls back to Claude Code's path plus the cross-agent
+  one when a project shows no sign either way. Never both Gemini paths at
+  once, which is what makes Gemini CLI warn about every skill overriding
+  itself.
 - **`qikly --score-code PATH --score-tests PATH` scores a suite qikly did not
   write.** It needed a task file and a converged run, which is the least likely
   thing a newcomer has: everyone has a suite before they have anything else.

@@ -17,6 +17,7 @@ import re
 import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC = os.path.join(ROOT, "src")
 SKILL_DIR = os.path.join(ROOT, "src", "qikly", "skills", "qikly")
 BUNDLED = ("TASK_FILE_REFERENCE.md", "TROUBLESHOOTING.md")
 
@@ -371,7 +372,11 @@ def test_the_cli_offers_every_host_the_installer_knows():
     assert set(HOSTS) <= set(action.choices), (
         "the CLI cannot reach every host the installer supports")
     assert "all" in action.choices
-    assert action.const == "claude", "the bare flag should still mean claude"
+    assert action.const == "auto", (
+        "the bare flag should choose from what the project already uses. It "
+        "meant claude, so somebody working in Cursor got a directory their "
+        "editor does not read, with no error and no hint that three other "
+        "conventions existed")
 
 
 def test_one_host_failing_does_not_stop_the_others(tmp_path):
@@ -468,3 +473,71 @@ def test_a_skill_whose_version_cannot_be_read_is_not_guessed_at(tmp_path):
     (destination / "SKILL.md").write_text("version: not-a-number\n",
                                           encoding="utf-8")
     assert is_stale(str(destination)) is None
+
+def test_a_bare_install_follows_the_agent_the_project_already_uses(tmp_path):
+    """
+    A bare `--install-skill` wrote `.claude/skills/` and nothing else, so
+    somebody working in Cursor got a directory their editor does not read, no
+    error, and no hint that three other conventions existed.
+
+    The evidence is already on disk: a project with `.cursor/` in it belongs to
+    somebody using Cursor.
+    """
+    from qikly.skill_install import FALLBACK, detect
+
+    assert detect(str(tmp_path)) == [], "an empty project claims a convention"
+
+    (tmp_path / ".cursor").mkdir()
+    assert detect(str(tmp_path)) == ["cursor"]
+
+    (tmp_path / ".claude").mkdir()
+    assert detect(str(tmp_path)) == ["claude", "cursor"]
+
+    assert FALLBACK == ("claude", "agents"), (
+        "the fallback should cover Claude Code and the cross-agent path, "
+        "which is three runtimes for two directories")
+
+
+def test_it_never_installs_to_both_gemini_paths(tmp_path):
+    """
+    Gemini CLI reads its own directory and the cross-agent one, and finding
+    the Skill in both makes it report every skill as overriding itself. That
+    warning greeted a real test session.
+    """
+    from qikly.skill_install import detect
+
+    (tmp_path / ".gemini").mkdir()
+    (tmp_path / ".agents").mkdir()
+    found = detect(str(tmp_path))
+    assert "agents" in found
+    assert "gemini" not in found, "both Gemini paths at once makes it warn"
+
+
+def test_the_closing_note_never_substitutes_a_target_for_an_agent(tmp_path):
+    """
+    `all` and `auto` are targets, not agents. Substituting one produced "the
+    path all documents for skills", and then, in the very next release, "the
+    path auto documents for skills". The same defect twice, so the message is
+    now built from the hosts actually written.
+    """
+    import subprocess
+    import sys
+
+    environment = dict(os.environ)
+    environment["PYTHONPATH"] = SRC
+    for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY",
+                 "ANTHROPIC_API_KEY"):
+        environment.pop(name, None)
+
+    for target in ([], ["all"], ["cursor"]):
+        where = tmp_path / ("t_" + ("bare" if not target else target[0]))
+        where.mkdir()
+        done = subprocess.run(
+            [sys.executable, "-m", "qikly", "--install-skill"] + target,
+            cwd=str(where), env=environment, capture_output=True, text=True,
+            timeout=300)
+        for bad in ("path all documents", "path auto documents",
+                    "in auto,", "in all,"):
+            assert bad not in done.stdout, (
+                "%s leaked a target name into the prose:\n%s"
+                % (target or "bare", done.stdout))

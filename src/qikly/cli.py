@@ -801,19 +801,19 @@ def _parse_args():
              "Never overwrites."
     )
     parser.add_argument(
-        "--install-skill", nargs="?", const="claude",
-        choices=["claude", "agents", "cursor", "gemini", "all"],
+        "--install-skill", nargs="?", const="auto",
+        choices=["auto", "claude", "agents", "cursor", "gemini", "all"],
         metavar="AGENT",
         help="Copy qikly's agent Skill into the directory you are standing in, "
              "so a coding agent knows when to reach for qikly and how to split "
-             "a spec into the half it reads and the half it must not. Defaults "
-             "to claude (.claude/skills/); 'agents' is the cross-agent path "
-             "(.agents/skills/) several tools read, and cursor and gemini "
-             "write their own. The Skill format is shared across agents; "
-             "Claude Code is the combination qikly runs in its own tests. A Skill is "
-             "instructions, not enforcement, and the withholding is enforced by "
-             "the tool either way. Existing files are left alone unless you "
-             "pass --force."
+             "a spec into the half it reads and the half it must not. With no "
+             "argument it writes wherever this project already shows an agent "
+             "in use (.claude/, .agents/, .cursor/, .gemini/), and falls back "
+             "to .claude/ plus the cross-agent .agents/ path when there is no "
+             "sign of one. Name a host to override that, or 'all' for every "
+             "path. A Skill is instructions, not enforcement, and the "
+             "withholding is enforced by the tool either way. Existing files "
+             "are left alone unless you pass --force."
     )
     parser.add_argument(
         "--score-suite", action="store_true",
@@ -1354,9 +1354,26 @@ def _do_install_skill(agent, force, dry_run):
     `--install-mcp` does: printing a path is not consent, and `cd` is a
     clearer way to mean somewhere else.
     """
-    from qikly.skill_install import HOSTS, bundled_dir, files_in, install_all
+    from qikly.skill_install import (FALLBACK, HOSTS, bundled_dir, detect,
+                                     files_in, install_all)
 
     root = os.path.abspath(INVOKED_FROM)
+
+    # Say what the bare form decided and why, before it writes. Choosing for
+    # somebody silently is only an improvement if they can see what was
+    # chosen: a Cursor user who gets .claude/ and no explanation has been
+    # given a directory their editor does not read.
+    if agent == "auto":
+        found = detect(root)
+        if found:
+            print("This project already uses %s, so that is where it goes."
+                  % ", ".join("." + host + "/" for host in found))
+        else:
+            print("No agent directory here yet, so this covers Claude Code "
+                  "and the cross-agent path Codex and Gemini CLI read.")
+            print("For Cursor, which reads only its own: "
+                  "qikly --install-skill cursor")
+
     results = install_all(root, [agent], force=force, dry_run=dry_run)
 
     wrote = False
@@ -1408,41 +1425,36 @@ def _do_install_skill(agent, force, dry_run):
         print("Your agent loads it when what you ask matches its description. "
               "Try asking for tests for one of your own modules without naming "
               "qikly, and see whether it reaches for it.")
-        if agent != "claude":
-            # Say which tool the unknown belongs to. "We have not tested this"
-            # reads as doubt about qikly; naming the other tool's docs as the
-            # source, and the format as open, puts the uncertainty where it
-            # actually is, on whether that agent loads what it documents.
-            #
-            # `all` is a target, not an agent, so substituting it produced
-            # "the path all documents for skills", which is both broken English
-            # and wrong: `all` writes four paths rather than one.
-            where = ("Those are the paths these tools document for skills"
-                     if agent == "all"
-                     else "That is the path %s documents for skills" % agent)
-            # Naming the paths rather than the tools, because the tools are
-            # not the thing that was tested. Saying "Gemini CLI" to somebody
-            # who just wrote to .gemini/skills/ implies that path was watched
-            # loading, and it is the one that was not: the Gemini session ran
-            # through .agents/.
-            watched = {
-                "agents": "That path has been watched loading, in Gemini CLI "
-                          "and in Codex, once each.",
-                "cursor": "That path has been watched loading, in Cursor, "
-                          "once.",
-                "gemini": "That path has NOT been watched loading. Gemini CLI "
-                          "reads .agents/skills/ as well, and that is the one "
-                          "we saw work, so prefer `--install-skill agents` if "
-                          "it does not pick this up.",
-                "all": "Three of those paths have been watched loading: "
-                       ".claude/ in Claude Code, .agents/ in Gemini CLI and "
-                       "Codex, .cursor/ in Cursor. The .gemini/ one has not.",
-            }.get(agent, "")
-            print("%s, and the Skill format is the same across agents. %s "
-                  "Once each is an anecdote rather than a guarantee, so if it "
-                  "loads for you we would like to hear: "
-                  "https://github.com/gal-a/qikly/discussions/6"
-                  % (where, watched))
+        # Built from the hosts actually written, never from what was asked
+        # for. `all` and `auto` are targets rather than agents, and
+        # substituting one produced "the path all documents for skills", then
+        # "the path auto documents for skills", the same defect twice.
+        written = [host for host, _, outcome, _ in results
+                   if outcome in ("written", "replaced")]
+        # What has actually been watched loading, per path, because the tools
+        # are not the thing that was tested: saying "Gemini CLI" to somebody
+        # who just wrote to .gemini/skills/ implies that path was validated,
+        # and it is the one that was not.
+        seen = {"claude": "Claude Code",
+                "agents": "Gemini CLI and Codex",
+                "cursor": "Cursor"}
+        proven = [seen[host] for host in written if host in seen]
+        unproven = [host for host in written if host not in seen]
+
+        if [h for h in written if h != "claude"]:
+            print()
+            if proven:
+                print("Watched loading in %s, %s, which is an anecdote rather "
+                      "than a guarantee."
+                      % (", ".join(proven),
+                         "once each" if len(proven) > 1 else "once"))
+            for host in unproven:
+                print("The .%s/ path has NOT been watched loading. Gemini CLI "
+                      "reads .agents/skills/ too, and that is the one we saw "
+                      "work, so try `qikly --install-skill agents` if it does "
+                      "not pick this up." % host)
+            print("If it loads for you we would like to hear: "
+                  "https://github.com/gal-a/qikly/discussions/6")
     return 0
 
 

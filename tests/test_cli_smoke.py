@@ -138,23 +138,27 @@ def test_a_broken_task_is_reported_rather_than_raised(tmp_path):
 @pytest.mark.parametrize("target", ["all", "cursor", "gemini", "agents"])
 def test_the_install_message_reads_as_english(target, tmp_path):
     """
-    `all` is a target, not an agent, and it was being substituted as one.
+    `all` and `auto` are targets, not agents, and both got substituted as one.
 
-    The line is built as "That is the path %s documents for skills". With a
-    real agent that reads correctly: "the path cursor documents for skills".
-    With `all` it printed "the path all documents for skills", which is broken
-    English and also wrong, because `all` writes four paths rather than one.
+    The line was built as "That is the path %s documents for skills", which
+    reads correctly for a real agent and produced "the path all documents for
+    skills", then, one release later, "the path auto documents for skills".
+    The same defect twice, so the message is now assembled from the hosts
+    actually written and never from what was asked for.
 
-    Nothing caught it because every test called the installer directly and
-    none read what a user would see.
+    Nothing caught the first one because every test called the installer
+    directly and none read what a user would see.
     """
     done = _run(["--install-skill", target], str(tmp_path))
     output = done.stdout + done.stderr
 
-    assert "path all documents" not in output, (
-        "the target name is being substituted where an agent name belongs:\n%s"
-        % output[-600:])
-    if target == "all":
-        assert "Those are the paths these tools document" in output
-    else:
-        assert "That is the path %s documents for skills" % target in output
+    for leaked in ("path all documents", "path auto documents",
+                   "in all,", "in auto,"):
+        assert leaked not in output, (
+            "a target name reached the prose where an agent name belongs:\n%s"
+            % output[-600:])
+    assert "Skill written to" in output, output[-400:]
+    if target != "claude":
+        assert "we would like to hear" in output, (
+            "a path other than Claude's should say what is and is not known "
+            "about it:\n%s" % output[-400:])
