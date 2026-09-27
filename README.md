@@ -17,10 +17,9 @@
 
 [![qikly: one spec in, code and tests out, written by a coding agent and a test agent that are kept apart](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_hero.png)](https://test.qikly.com)
 
-> **New: an agent Skill.** `qikly --install-skill` teaches your coding agent
-> which line of a specification is a decision it needs and which is a
-> consequence to withhold. Instructions, not enforcement: the withholding is
-> enforced in qikly's code either way.
+> **New: an agent Skill.** `qikly --install-skill` teaches whatever coding
+> agent you already use how to drive qikly. Tested in Claude Code, Gemini CLI,
+> Codex and Cursor.
 > [What is in it](https://github.com/gal-a/qikly/blob/main/docs/skill.md).
 
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**

@@ -271,6 +271,12 @@ h3 {
   margin: 0 0 6px;
 }
 
+/* h3 has no top margin, which is right where one follows a paragraph that
+   introduces it. A heading that starts a new idea after a list or a table
+   needs air, and this is the modifier for that rather than a change to every
+   h3 on the page. */
+h3.spaced { margin-top: 34px; }
+
 p { margin: 0 0 14px; max-width: 66ch; }
 p:last-child { margin-bottom: 0; }
 
@@ -608,12 +614,16 @@ footer {
     </p>
     <aside class="whats-new">
       <p class="tag">New</p>
-      <p><strong>An agent Skill.</strong> It teaches your coding agent which
-      line of a specification is a decision it needs and which is a consequence
-      to withhold.</p>
+      <!-- This box used to close on "Instructions, not enforcement: the
+           withholding is enforced in qikly's code either way." That is true
+           and it belongs in docs/skill.md, not here: it defends against a
+           misreading this shorter text does not invite, and it uses "the
+           withholding" before a reader in the hero has met the idea. What
+           replaced it is a fact worth more anyway. -->
+      <p><strong>An agent Skill.</strong> One command teaches whatever coding
+      agent you already use how to drive qikly.</p>
       <p><code>qikly --install-skill</code></p>
-      <p class="fine">Instructions, not enforcement: the withholding is
-      enforced in qikly's code either way.
+      <p class="fine">Tested in Claude Code, Gemini CLI, Codex and Cursor.
       <a href="https://github.com/gal-a/qikly/blob/main/docs/skill.md"
          data-goatcounter-click="hero-skill">What is in it</a>.</p>
     </aside>
@@ -900,7 +910,7 @@ qikly --demo</code></pre>
       <dd>What counts as correct, each one checkable and naming its boundary
       value. <strong>Only test generation reads this.</strong></dd>
     </dl>
-    <h3>Which command depends on which parts you already have</h3>
+    <h3 class="spaced">Which qikly command depends on which parts you already have</h3>
     <p>
       A tick means you already have it. Everything without a tick is either
       written for you or is what you sit down to write.
