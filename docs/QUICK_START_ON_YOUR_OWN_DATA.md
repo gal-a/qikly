@@ -60,11 +60,10 @@ Only `--demo` needs a key. `--version`, `--explain`, `--validate`,
 `--init`, `--example` and `--scaffold` make no model call and cost
 nothing.
 
-| Provider | Key variable | Install |
-|---|---|---|
-| Gemini, the default | `GEMINI_API_KEY`, or `GOOGLE_API_KEY` | included above |
-| OpenAI | `OPENAI_API_KEY` | `pip install "qikly[openai]"` |
-| Anthropic | `ANTHROPIC_API_KEY` | `pip install "qikly[anthropic]"` |
+Gemini is the default and its key is `GEMINI_API_KEY`. For OpenAI or
+Anthropic, which need an extra install, see [the provider table in
+docs/CONFIGURATION.md](https://github.com/gal-a/qikly/blob/main/docs/CONFIGURATION.md),
+which also says where to get each key.
 
 **The default model differs by provider**, and they are not the same size:
 Gemini gets `gemini-3.5-flash-lite`, OpenAI `gpt-4o`, Anthropic
@@ -83,9 +82,10 @@ in [docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PR
 and prints what it built and where. It writes nothing outside that directory,
 so a first run leaves everything else untouched. About 30 seconds on the Gemini
 default, and [several minutes on the Anthropic
-one](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md#provider-defaults),
-which is a reasoning model. There is no progress output while a call is in
-flight, so a long wait is not a hang.
+one](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md#provider-defaults).
+After ten seconds of silence a run starts printing one line every fifteen
+saying how long it has been waiting, so a slow call is distinguishable from a
+hang.
 
 For the same thing on vehicle sensor data rather than an order pipeline:
 

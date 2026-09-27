@@ -484,10 +484,10 @@ Want to watch it work before writing anything? `qikly --example` adds a
 worked example that runs as it stands: a module, the two task files a
 scaffold of it produces, sample data, and the `requirements` and
 `acceptance_criteria` already written, each at the path a real task uses.
-It makes the same layout `--init` does, without the blank starter task,
-so the example is the only task in your project. It is the one command
-here that puts a file in your project root, `my_metrics.py`, and you can
-delete the lot when you are done.
+It is the one command here that puts a file in your project root,
+`my_metrics.py`, and you can delete the lot when you are done. Which
+starter is which, `--init` against `--example`, is set out in the quick
+start below.
 
 **[docs/QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md)** has the
 rest: the task file field by field, getting the split between `requirements`

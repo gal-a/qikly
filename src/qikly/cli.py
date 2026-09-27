@@ -531,6 +531,18 @@ def _print_demo_facts(demo_root, task_id, elapsed):
     # actually made, so it is the only one that gets to report the number.
     print(f"  {elapsed:.0f}s wall clock, everything under {demo_root}")
 
+    # Where the reader is actually standing when they decide what to do next,
+    # and the moment one of them started building a real project inside this
+    # folder. "Throwaway" appeared only as an adjective in the help text, which
+    # nobody rereads after watching a run work.
+    print()
+    print("  THAT DIRECTORY IS A SCRATCH COPY")
+    print("    Nothing in it is yours and nothing outside it was touched.")
+    print("    Delete the whole folder when you are done with it.")
+    print("    To start a project of your own, go somewhere else first:")
+    print("      cd ~/my-project")
+    print("      qikly --example      # a finished task, data and all")
+
 
 def _run_demo(task_ids, where=None):
     """
@@ -756,17 +768,24 @@ def _parse_args():
     )
     parser.add_argument(
         "--init", action="store_true",
-        help="Create the inputs_private/ layout and a commented starter task in the "
+        help="STARTING POINT 1 of 4, for your own code with a blank form. "
+             "Create the inputs_private/ layout and a commented starter task in the "
              "current directory, then stop. A fresh install has nowhere to put a task "
-             "until this has been run. Never overwrites an existing file."
+             "until this has been run. Never overwrites an existing file. See also "
+             "--example (the same layout, form already filled in), --scaffold (a task "
+             "written from a module you already have) and --demo (watch one run, "
+             "change nothing)."
     )
     parser.add_argument(
         "--example", action="store_true",
-        help="Copy the worked scaffold example into the project, at the paths its "
-             "task files name, creating the inputs_private/ layout first if it is "
-             "not there yet. Lays down my_metrics.py, the two task files a scaffold "
-             "of it produces, and sample data, so `qikly --tasks MY_METRICS_VERIFY` "
-             "runs end to end without you writing anything first. Never overwrites."
+        help="STARTING POINT 2 of 4, and the one to pick first. Copy a finished "
+             "worked example into the project, at the paths its task files name, "
+             "creating the inputs_private/ layout first if it is not there yet. "
+             "Lays down my_metrics.py, its two task files, and sample data, so "
+             "`qikly --tasks MY_METRICS_VERIFY` runs end to end without you writing "
+             "anything first. This is --init's layout with the form already filled "
+             "in. It is not the --scaffold command, which is a different thing. "
+             "Never overwrites."
     )
     parser.add_argument(
         "--install-skill", nargs="?", const="claude",
@@ -827,7 +846,8 @@ def _parse_args():
     )
     parser.add_argument(
         "--scaffold", metavar="FILE", default=None,
-        help="Read a Python file and write the task YAML for it: module path, the real "
+        help="STARTING POINT 3 of 4, for code you already have. Read a Python file "
+             "and write the task YAML for it: module path, the real "
              "signatures of its public functions, and a guessed entrypoint. Leaves "
              "requirements and acceptance_criteria for you, because criteria derived "
              "from an implementation can only describe what it already does."
@@ -1015,9 +1035,11 @@ def _parse_args():
     )
     parser.add_argument(
         "--demo", action="store_true",
-        help=f"Run one task end to end in a throwaway {DEMO_DIR}/<timestamp>/ directory and print "
+        help=f"STARTING POINT 4 of 4, to watch before committing to anything. "
+             f"Run one task end to end in a throwaway {DEMO_DIR}/<timestamp>/ directory and print "
              f"where the code, tests, and full record landed. Defaults to {DEMO_TASK}; combine with "
-             f"--tasks to demo a different one. Writes nothing outside that directory."
+             f"--tasks to demo a different one. Writes nothing outside that directory, and you "
+             f"delete the directory afterwards: do not start your own project inside it."
     )
     return parser.parse_args()
 
@@ -1139,6 +1161,13 @@ def _do_init(with_example=False):
         print("  runs: requirements go to the coding agent, acceptance_criteria")
         print("  never do. Your own code instead:")
         print("    qikly --scaffold path/to/module.py")
+        print()
+        # The one page that disambiguates the four starting points was
+        # reachable from neither --help nor from here, which is where somebody
+        # who has just run one of them is standing.
+        print("  The rest, including which starter is which:")
+        print("    https://github.com/gal-a/qikly/blob/main/docs/"
+              "QUICK_START_ON_YOUR_OWN_DATA.md")
     else:
         print("  Next: edit inputs_private/config/tasks/MY_FIRST_TASK.yaml, then run")
         print("    qikly --tasks MY_FIRST_TASK")
