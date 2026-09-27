@@ -129,6 +129,13 @@ def _refuse_inside_demo():
     print("  Start somewhere of your own instead, for example:")
     print(f"    cd {os.path.expanduser('~')}")
     print("    qikly --example")
+    print()
+    # The way out, named. Somebody who kept a demo folder and made it their
+    # own is otherwise blocked here forever by a hidden file whose name this
+    # message never mentioned.
+    print("  If you meant to keep this directory and work in it, delete the")
+    print("  marker that identifies it as a demo and run the command again:")
+    print(f"    del {os.path.join(scratch, DEMO_MARKER)}")
     return True
 
 
@@ -577,10 +584,16 @@ def _run_demo(task_ids, where=None):
                 "folder when you are done.\n"
                 "Start your own project somewhere else, with `qikly "
                 "--example`.\n")
-    except OSError:
+    except OSError as exc:
         # A marker is a convenience. Failing to write one must never stop a
-        # demo that is otherwise fine.
-        pass
+        # demo that is otherwise fine. But it must not fail in silence either:
+        # without it, a --demo-dir directory has no `demo` component to match
+        # on and the guard that stops someone building here cannot see it, so
+        # the bug this marker fixes is quietly back.
+        print(f"  note: could not mark this directory as a demo ({exc}). "
+              f"Nothing is broken, but qikly will not recognise it as "
+              f"disposable later, so delete it yourself when you are done.",
+              file=sys.stderr)
 
     # Same reasoning as run_all.py's _subprocess_env(): `-m` in a child needs
     # the package's parent on PYTHONPATH, or a src-layout clone fails to
@@ -1392,11 +1405,29 @@ def _do_install_skill(agent, force, dry_run):
             where = ("Those are the paths these tools document for skills"
                      if agent == "all"
                      else "That is the path %s documents for skills" % agent)
-            print("%s, and the Skill format is the same across agents. We have "
-                  "watched it load in Claude Code, Gemini CLI, Codex and "
-                  "Cursor, once each, which is four anecdotes rather than a "
-                  "guarantee, so if it loads for you we would like to hear: "
-                  "https://github.com/gal-a/qikly/discussions/6" % where)
+            # Naming the paths rather than the tools, because the tools are
+            # not the thing that was tested. Saying "Gemini CLI" to somebody
+            # who just wrote to .gemini/skills/ implies that path was watched
+            # loading, and it is the one that was not: the Gemini session ran
+            # through .agents/.
+            watched = {
+                "agents": "That path has been watched loading, in Gemini CLI "
+                          "and in Codex, once each.",
+                "cursor": "That path has been watched loading, in Cursor, "
+                          "once.",
+                "gemini": "That path has NOT been watched loading. Gemini CLI "
+                          "reads .agents/skills/ as well, and that is the one "
+                          "we saw work, so prefer `--install-skill agents` if "
+                          "it does not pick this up.",
+                "all": "Three of those paths have been watched loading: "
+                       ".claude/ in Claude Code, .agents/ in Gemini CLI and "
+                       "Codex, .cursor/ in Cursor. The .gemini/ one has not.",
+            }.get(agent, "")
+            print("%s, and the Skill format is the same across agents. %s "
+                  "Once each is an anecdote rather than a guarantee, so if it "
+                  "loads for you we would like to hear: "
+                  "https://github.com/gal-a/qikly/discussions/6"
+                  % (where, watched))
     return 0
 
 
@@ -2181,6 +2212,12 @@ def main():
         ("--score-seed", args.score_seed is not None,
          "--score-suite, or --score-code with --score-tests",
          "qikly --score-suite --tasks CALC_TAX --score-seed 3"),
+        # Found by the audit of the fix above, which is the point of auditing
+        # a fix: the same unguarded fallthrough, in the sibling flag nobody
+        # thought to check. Given alone it reached the ordinary run path and
+        # was stopped only by a missing provider key.
+        ("--artifacts-url", args.artifacts_url is not None, "--pr-comment",
+         "qikly --pr-comment --artifacts-url https://ci.example.com/build/12"),
     ):
         if not given:
             continue
@@ -2199,6 +2236,7 @@ def main():
                                     or args.score_tests),
             "--score-seed": bool(args.score_suite or args.score_code
                                  or args.score_tests),
+            "--artifacts-url": bool(args.pr_comment),
         }[flag]
         if not attached:
             print(f"{flag} goes with {wants}, as in: {example}", file=sys.stderr)

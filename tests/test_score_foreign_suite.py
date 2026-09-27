@@ -189,3 +189,50 @@ def test_a_label_from_a_path_cannot_become_a_directory():
         path = write(result, [], out_dir=tmp)
         assert os.path.isfile(path)
         assert os.path.dirname(path) == tmp
+
+def test_the_saved_report_gives_advice_that_fits_the_mode(tmp_path):
+    """
+    The console message was made mode-aware and the report file was not, so
+    the artefact a user keeps and pastes into a pull request still told them
+    to converge a run they had never started.
+    """
+    sys.path.insert(0, SRC)
+    from qikly.mutation_score import render
+
+    foreign = {"task": "pricing.py", "baseline": False, "caught": [],
+               "missed": [], "unscorable": 0, "total": 0, "generated": False}
+    text = render(foreign, [])
+    assert "converge" not in text, text
+    assert "--score-tests" in text
+
+    generated = dict(foreign, task="CALC_TAX", generated=True)
+    assert "converge" in render(generated, [])
+
+
+def test_the_workspace_count_follows_links_like_the_copy_does(tmp_path):
+    """
+    The count and the copy have to agree about symlinks or the size ceiling
+    means nothing. Recreating links instead was tried and is worse: a link
+    with an absolute target is recreated pointing at the same place, so the
+    file in the copy IS the original, and a mutant written through it would
+    land on the user's real source.
+    """
+    import ast
+    import io as _io
+
+    sys.path.insert(0, SRC)
+    from qikly import mutation_score
+
+    source = _io.open(mutation_score.__file__, encoding="utf-8").read()
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "_workspace":
+            body = ast.dump(node)
+            assert "followlinks" in body, (
+                "the count no longer follows links, so the ceiling can be "
+                "bypassed by a linked directory")
+            assert "symlinks" not in body, (
+                "the copy recreates links again, which puts the user's real "
+                "file inside the workspace")
+            return
+    raise AssertionError("_workspace is gone")

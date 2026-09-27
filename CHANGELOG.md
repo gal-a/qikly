@@ -32,6 +32,9 @@ packaging tools would read as `1.1`.
   project. Reported by a first-time user.
 
 ### Fixed
+- **`qikly --artifacts-url ...` on its own started a real, billed run**, the
+  same unguarded fallthrough as the one below, in the sibling flag nobody
+  thought to check. Found by auditing the fix for the first one.
 - **`qikly --score-mutants 5` on its own started a real, billed run.** Neither
   `--score-mutants` nor `--score-seed` triggers the scoring path by itself, and
   neither was listed in the guard that refuses an option with nothing to attach
@@ -43,6 +46,17 @@ packaging tools would read as `1.1`.
   with no `demo` component anywhere, which is the combination the help text
   itself recommends. Every demo directory now carries a marker file saying what
   it is.
+- **The saved report still told you to converge a run you never started.** The
+  console message was made mode-aware and the report file was not, and the
+  report is the artefact people keep and paste into a pull request.
+- **`--install-skill gemini` implied that path had been watched loading.** It
+  has not: Gemini CLI also reads `.agents/skills/`, and that is the one that
+  was observed. The message now names what was tested per path rather than per
+  tool.
+- **The demo marker had no way out.** A kept demo folder blocked `--init`,
+  `--example` and `--demo` for every directory beneath it, with a message that
+  never named the hidden file responsible. The refusal now says how to undo it,
+  and a marker that cannot be written says so rather than failing silently.
 - **A symlinked subdirectory slipped past the size ceiling** on the workspace
   copy: the count did not descend into it and the copy dereferenced it, so a
   project with a linked virtualenv was counted as a handful of files and then

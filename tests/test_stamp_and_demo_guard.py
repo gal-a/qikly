@@ -187,6 +187,9 @@ def test_the_demo_folder_name_is_matched_whatever_its_case(tmp_path):
     ["--score-mutants", "5"],
     ["--score-seed", "3"],
     ["--score-mutants", "5", "--score-seed", "3"],
+    # Found by auditing the fix for the three above, which is the point of
+    # auditing a fix: the same defect in the sibling flag nobody checked.
+    ["--artifacts-url", "https://ci.example.com/build/12"],
 ])
 def test_a_scoring_option_alone_never_starts_a_real_run(arguments, tmp_path):
     """
@@ -200,3 +203,19 @@ def test_a_scoring_option_alone_never_starts_a_real_run(arguments, tmp_path):
     assert "goes with" in done.stderr
     assert "generating" not in done.stdout.lower(), (
         "a run started:\n%s" % done.stdout[:400])
+
+def test_the_refusal_says_how_to_undo_it(tmp_path):
+    """
+    Someone who kept a demo folder and made it their own was otherwise blocked
+    here forever by a hidden file whose name the message never mentioned.
+    """
+    sys.path.insert(0, SRC)
+    from qikly.cli import DEMO_MARKER
+
+    scratch = tmp_path / "demo" / "20260927_120000"
+    scratch.mkdir(parents=True)
+    (scratch / DEMO_MARKER).write_text("demo", encoding="utf-8")
+
+    done = _run(["--example"], str(scratch))
+    assert DEMO_MARKER in done.stdout, (
+        "the way out is not named:\n%s" % done.stdout)

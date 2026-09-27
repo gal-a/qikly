@@ -188,8 +188,18 @@ def _workspace(target, tmp, code_root=CODE_ROOT):
     if target.task_id is None:
         # A project qikly did not lay out, so there is no known set of
         # directories to copy: the suite imports what it imports.
-        count = 0
-        for base, dirs, names in os.walk(target.root):
+        # followlinks, because the copy below dereferences. The two have to
+        # agree: counting without following and copying with following was how
+        # a project with a linked virtualenv measured as a handful of files and
+        # then copied whole. Following needs its own cycle guard, which is why
+        # os.walk does not do it by default.
+        count, seen = 0, set()
+        for base, dirs, names in os.walk(target.root, followlinks=True):
+            real = os.path.realpath(base)
+            if real in seen:
+                dirs[:] = []
+                continue
+            seen.add(real)
             dirs[:] = [d for d in dirs if d not in _SKIP]
             count += len(names)
             if count > _MAX_FILES:
@@ -198,13 +208,15 @@ def _workspace(target, tmp, code_root=CODE_ROOT):
                     f"is almost certainly wider than you meant. Point "
                     f"--score-code and --score-tests at directories closer to "
                     f"the code.")
-        # symlinks=True so the copy follows the same rule the count did.
-        # os.walk does not descend into a linked directory, but copytree
-        # dereferences one by default, so a project with a venv or a
-        # node_modules symlink was counted as a handful of files and then
-        # copied in full, straight past the ceiling above.
+        # Dereferencing, deliberately, now that the count above follows links
+        # too. Recreating the links instead was tried and is worse: a link with
+        # an absolute target is recreated pointing at the same place, so the
+        # file in the "copy" is the original file, and the first restore raises
+        # SameFileError. Worse than that, a mutant written through such a link
+        # would land on the user's real source, which is the one thing this
+        # module promises can never happen.
         shutil.copytree(target.root, workspace, dirs_exist_ok=True,
-                        symlinks=True, ignore=shutil.ignore_patterns(*_SKIP))
+                        ignore=shutil.ignore_patterns(*_SKIP))
         return workspace
 
     for relative in ("inputs_private", "inputs_public", "outputs"):
@@ -287,7 +299,8 @@ def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
             shutil.copy2(path, os.path.join(workspace, relative))
         if not _suite_passes(workspace, target):
             return {"task": target.label, "baseline": False, "caught": [],
-                    "missed": [], "unscorable": 0, "total": 0}
+                    "missed": [], "unscorable": 0, "total": 0,
+                    "generated": target.task_id is not None}
 
         for path, relative, source, family, index, described in candidates:
             mutant, _ = make_mutant(source, index, family)
@@ -312,7 +325,8 @@ def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
 
     return {"task": target.label, "baseline": True, "caught": caught,
             "missed": missed, "unscorable": unscorable,
-            "total": len(caught) + len(missed)}
+            "total": len(caught) + len(missed),
+            "generated": target.task_id is not None}
 
 
 def unreachable_criteria(task_id):
@@ -354,10 +368,16 @@ def render(result, gaps):
              f"No model calls, and nothing of yours was modified.", ""]
 
     if not result["baseline"]:
+        # The console message was made mode-aware and this one was not, so the
+        # file a user actually keeps and pastes into a pull request still told
+        # them to converge a run they had never started.
+        nothing_yet = ("Check that the path given to `--score-tests` holds "
+                       "tests that run and pass on their own."
+                       if result.get("generated") is False
+                       else "Get the run to converge first.")
         lines += ["**Not scored.** The suite does not pass the untouched "
                   "implementation, so a mutant failing says nothing: it would "
-                  "fail for the reason the original does. Get the run to "
-                  "converge first.", ""]
+                  "fail for the reason the original does. " + nothing_yet, ""]
         return "\n".join(lines) + "\n"
 
     total = result["total"]

@@ -101,7 +101,10 @@ setting: the API takes a reasoning effort level, and a way to ask for less of
 it without changing model would make this a dial rather than a switch.
 
 **If it looks stuck**, it probably is not. A single call can legitimately run
-for minutes on a reasoning model and qikly prints nothing while it waits. One
+for minutes on a reasoning model. After ten seconds of silence a run starts
+saying so, one line every fifteen: `[patch] still waiting on the model, 45s`.
+Those lines are the difference between slow and stalled, and
+`QIKLY_NO_PROGRESS=1` turns them off. One
 call is abandoned after `QIKLY_REQUEST_TIMEOUT` seconds, 300 by default, which
 was chosen when the slowest observed call was well under a minute; on a
 reasoning model consider raising it, or a slow-but-working call is thrown away
