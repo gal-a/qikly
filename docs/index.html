@@ -745,7 +745,7 @@ footer {
 
     <h3 class="sub">Two obvious objections</h3>
     <p class="counter">
-      You might argue, <b>"just use one model for the code and another for the tests."</b>
+      <b>1.</b> You might argue, <b>"just use one model for the code and another for the tests."</b>
       That helps a little. It does not fix the underlying issue.
     </p>
     <p class="counter">
@@ -771,7 +771,7 @@ footer {
       picks a model per agent role.
 </p>
     <p class="counter">
-      You might also ask, <b>"doesn't a failing test give the criteria away?"</b>
+      <b>2.</b> You might also ask, <b>"doesn't a failing test give the criteria away?"</b>
       It gives away one case: the test name and the assertion error. Never the
       rule behind it, and never the tests the agent has not failed yet.
     </p>
@@ -783,7 +783,7 @@ footer {
     </p>
 
 
-    <h3 class="sub">Two ways to get a test suite, and what each can prove</h3>
+    <h3 class="sub">Two ways to generate a test suite, and what each can prove</h3>
     <table class="uses compare">
       <thead>
         <tr>
@@ -1039,12 +1039,7 @@ qikly --demo</code></pre>
     </p>
 
     <p class="route-note">
-      "Spec" in this page means the first two together, which is what the
-      coding agent is given. The criteria are the standard, and they are the
-      part held back.
-    </p>
-    <p class="route-note">
-      One thing the three parts do not say, and it matters:
+      One thing the three concepts do not say, and it matters:
       <strong class="says-all">test generation never reads the implementation either.</strong>
       Integration and system tests are written before any code exists, from the
       specification alone. The unit stage is the single exception, written last
