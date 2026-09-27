@@ -18,7 +18,11 @@ import os
 import re
 import sys
 
-ROOT = r"C:\Code\GitHub\v_and_v\test-qikly\src\qikly\skills\qikly"
+# Relative to this file, not to wherever it is run from, and not an absolute
+# path on one machine. It was the latter, which leaked the working copy's
+# directory names into a public repository and meant the tool ran nowhere else.
+ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "src", "qikly", "skills", "qikly")
 
 
 def read(path):
