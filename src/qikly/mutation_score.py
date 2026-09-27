@@ -136,8 +136,17 @@ def from_paths(code, tests):
         if not os.path.exists(path):
             raise ValueError(f"no {what} at {path}")
 
-    root = os.path.commonpath([os.path.dirname(code) if os.path.isfile(code) else code,
-                               os.path.dirname(tests) if os.path.isfile(tests) else tests])
+    try:
+        root = os.path.commonpath(
+            [os.path.dirname(code) if os.path.isfile(code) else code,
+             os.path.dirname(tests) if os.path.isfile(tests) else tests])
+    except ValueError:
+        # Different drives on Windows. commonpath's own message is accurate
+        # and says nothing about what to do, unlike every other failure here.
+        raise ValueError(
+            f"the code and the tests are on different drives, so there is no "
+            f"directory holding both to copy.\n  code:  {code}\n"
+            f"  tests: {tests}")
 
     if os.path.isfile(code):
         sources = [code]
@@ -189,8 +198,13 @@ def _workspace(target, tmp, code_root=CODE_ROOT):
                     f"is almost certainly wider than you meant. Point "
                     f"--score-code and --score-tests at directories closer to "
                     f"the code.")
+        # symlinks=True so the copy follows the same rule the count did.
+        # os.walk does not descend into a linked directory, but copytree
+        # dereferences one by default, so a project with a venv or a
+        # node_modules symlink was counted as a handful of files and then
+        # copied in full, straight past the ceiling above.
         shutil.copytree(target.root, workspace, dirs_exist_ok=True,
-                        ignore=shutil.ignore_patterns(*_SKIP))
+                        symlinks=True, ignore=shutil.ignore_patterns(*_SKIP))
         return workspace
 
     for relative in ("inputs_private", "inputs_public", "outputs"):
@@ -410,8 +424,14 @@ def write(result, gaps, out_dir=OUT_DIR):
     # A task id is already a safe name; a label taken from a path is not, and
     # "src/pricing.py" in a filename is a directory that does not exist.
     safe = re.sub(r"[^A-Za-z0-9._-]", "_", result["task"]) or "suite"
-    path = os.path.join(
-        out_dir, f"{safe}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md")
+    base = os.path.join(
+        out_dir, f"{safe}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    # Two reports of the same thing inside one second overwrote each other in
+    # silence, which is the one outcome a report is supposed to prevent.
+    path, suffix = base + ".md", 2
+    while os.path.exists(path):
+        path = f"{base}_{suffix}.md"
+        suffix += 1
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(render(result, gaps))
     return path
@@ -437,8 +457,18 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
     path = write(result, gaps, report_dir(target, invoked_from))
 
     if not result["baseline"]:
-        print(f"[{task_id}] the suite does not pass your current code, so a "
-              f"score would mean nothing. Report at {path}")
+        if target.task_id is None:
+            # No run exists in this mode, so "get the run to converge" is
+            # advice about something the user does not have. The usual cause
+            # is that pytest collected nothing at all.
+            print(f"[{task_id}] your suite does not pass your untouched code, "
+                  f"so planting a fault would prove nothing: every mutant "
+                  f"would fail for the reason the original does. Check that "
+                  f"--score-tests points at tests that run and pass. Report "
+                  f"at {path}")
+        else:
+            print(f"[{task_id}] the suite does not pass your current code, so a "
+                  f"score would mean nothing. Report at {path}")
         return path
 
     total, caught = result["total"], len(result["caught"])

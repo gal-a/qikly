@@ -152,3 +152,51 @@ def test_the_check_is_by_shape_not_by_a_path_containing_demo():
     assert inside_a_demo(os.path.join("x", "demos", "20260927_112524")) is None
     assert inside_a_demo(os.path.join("x", "20260927_112524")) is None
     assert inside_a_demo(os.path.join("x", "demo", "2026092_112524")) is None
+
+def test_a_demo_dir_folder_is_recognised_too(tmp_path):
+    """
+    `--demo-dir ./try-it` produces `try-it/<timestamp>/`, with no `demo`
+    component anywhere, so a check on the path's shape could never see it. And
+    that is the combination the CLI's own help text recommends.
+
+    The fix is a marker file written into every demo directory as it is made,
+    so the folder says what it is rather than being guessed at.
+    """
+    sys.path.insert(0, SRC)
+    from qikly.cli import DEMO_MARKER, inside_a_demo
+
+    scratch = tmp_path / "try-it" / "20260927_120000"
+    scratch.mkdir(parents=True)
+    assert inside_a_demo(str(scratch)) is None, "nothing marks it yet"
+
+    (scratch / DEMO_MARKER).write_text("demo", encoding="utf-8")
+    assert inside_a_demo(str(scratch)) == str(scratch)
+    assert inside_a_demo(str(scratch / "outputs")) == str(scratch)
+    assert inside_a_demo(str(tmp_path)) is None
+
+
+def test_the_demo_folder_name_is_matched_whatever_its_case(tmp_path):
+    """A folder copied or renamed to `Demo` on Windows is the same folder."""
+    sys.path.insert(0, SRC)
+    from qikly.cli import inside_a_demo
+
+    assert inside_a_demo(os.path.join("x", "Demo", "20260927_120000"))
+
+
+@pytest.mark.parametrize("arguments", [
+    ["--score-mutants", "5"],
+    ["--score-seed", "3"],
+    ["--score-mutants", "5", "--score-seed", "3"],
+])
+def test_a_scoring_option_alone_never_starts_a_real_run(arguments, tmp_path):
+    """
+    The expensive one. Neither option triggers the scoring branch on its own,
+    so `qikly --score-mutants 5` fell straight through to the ordinary run
+    path and began a real, billed run over every bundled task. An audit
+    reproduced it by accident and spent money doing so.
+    """
+    done = _run(arguments, str(tmp_path))
+    assert done.returncode == 2, done.stdout + done.stderr
+    assert "goes with" in done.stderr
+    assert "generating" not in done.stdout.lower(), (
+        "a run started:\n%s" % done.stdout[:400])

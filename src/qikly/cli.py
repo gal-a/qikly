@@ -72,6 +72,13 @@ def stamp(stream=None):
 # demo/20260927_112524, the throwaway directory --demo runs in.
 _DEMO_STAMP = re.compile(r"^\d{8}_\d{6}$")
 
+# Dropped into every demo directory as it is created, so the folder says what
+# it is rather than being inferred from its name. The name is not enough:
+# `--demo-dir ./try-it` produces `try-it/<timestamp>/` with no `demo` component
+# anywhere, so a shape check could never see it, and that is the combination
+# the CLI's own help text recommends.
+DEMO_MARKER = ".qikly-demo"
+
 
 def inside_a_demo(where=None):
     """
@@ -89,10 +96,15 @@ def inside_a_demo(where=None):
     """
     current = os.path.abspath(where or INVOKED_FROM)
     while True:
+        if os.path.isfile(os.path.join(current, DEMO_MARKER)):
+            return current
         parent, name = os.path.split(current)
         if not parent or parent == current:
             return None
-        if _DEMO_STAMP.match(name) and os.path.basename(parent) == DEMO_DIR:
+        # The shape, still checked, for demo directories made by a version
+        # that predates the marker. Case-insensitively, because a folder copied
+        # or renamed to `Demo` on Windows is the same folder.
+        if _DEMO_STAMP.match(name) and os.path.basename(parent).lower() == DEMO_DIR:
             return current
         current = parent
 
@@ -539,6 +551,24 @@ def _run_demo(task_ids, where=None):
     stamp()
     demo_root = _demo_root(where)
     os.makedirs(demo_root, exist_ok=True)
+
+    # So the directory can say what it is later. Without this, a folder made
+    # by `--demo-dir` is indistinguishable from a real project, and the guard
+    # that stops someone building their own work inside a disposable copy
+    # could not see it.
+    try:
+        with open(os.path.join(demo_root, DEMO_MARKER), "w",
+                  encoding="utf-8", newline="\n") as handle:
+            handle.write(
+                "This directory is a qikly demo. Everything in it is a "
+                "throwaway copy\nand nothing in it is yours: delete the whole "
+                "folder when you are done.\n"
+                "Start your own project somewhere else, with `qikly "
+                "--example`.\n")
+    except OSError:
+        # A marker is a convenience. Failing to write one must never stop a
+        # demo that is otherwise fine.
+        pass
 
     # Same reasoning as run_all.py's _subprocess_env(): `-m` in a child needs
     # the package's parent on PYTHONPATH, or a src-layout clone fails to
@@ -2110,6 +2140,17 @@ def main():
          "qikly --install-mcp claude --force"),
         ("--demo-dir", args.demo_dir is not None, "--demo",
          "qikly --demo --demo-dir ./try-it"),
+        # These two were missed, and missing them was not cosmetic. Neither
+        # triggers the scoring branch on its own, so `qikly --score-mutants 5`
+        # fell through to the ordinary run path and started a real, billed run
+        # over every bundled task. An audit reproduced it by accident and spent
+        # money doing so.
+        ("--score-mutants", args.score_mutants is not None,
+         "--score-suite, or --score-code with --score-tests",
+         "qikly --score-suite --tasks CALC_TAX --score-mutants 8"),
+        ("--score-seed", args.score_seed is not None,
+         "--score-suite, or --score-code with --score-tests",
+         "qikly --score-suite --tasks CALC_TAX --score-seed 3"),
     ):
         if not given:
             continue
@@ -2124,6 +2165,10 @@ def main():
             "--force": (args.install_mcp is not None
                         or args.install_skill is not None),
             "--demo-dir": args.demo,
+            "--score-mutants": bool(args.score_suite or args.score_code
+                                    or args.score_tests),
+            "--score-seed": bool(args.score_suite or args.score_code
+                                 or args.score_tests),
         }[flag]
         if not attached:
             print(f"{flag} goes with {wants}, as in: {example}", file=sys.stderr)

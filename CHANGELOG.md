@@ -32,6 +32,21 @@ packaging tools would read as `1.1`.
   project. Reported by a first-time user.
 
 ### Fixed
+- **`qikly --score-mutants 5` on its own started a real, billed run.** Neither
+  `--score-mutants` nor `--score-seed` triggers the scoring path by itself, and
+  neither was listed in the guard that refuses an option with nothing to attach
+  to, so control fell through to the ordinary run. Found by an audit that
+  reproduced it by accident and spent money doing so.
+- **A demo directory made with `--demo-dir` was invisible to the guard** that
+  stops you building a real project inside a throwaway copy. That guard matched
+  on the path's shape, and `--demo-dir ./try-it` produces `try-it/<timestamp>/`
+  with no `demo` component anywhere, which is the combination the help text
+  itself recommends. Every demo directory now carries a marker file saying what
+  it is.
+- **A symlinked subdirectory slipped past the size ceiling** on the workspace
+  copy: the count did not descend into it and the copy dereferenced it, so a
+  project with a linked virtualenv was counted as a handful of files and then
+  copied whole.
 - **`--install-skill all` printed "That is the path all documents for skills"**,
   substituting the target name where an agent name belongs, and implying one
   path when it writes four.
