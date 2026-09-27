@@ -20,7 +20,7 @@ import urllib.request
 import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BOOKS_URL = "https://www.qikly.com/"
+BOOKS_URL = "https://leanpub.com/applied-statistics-for-data-science"
 SUBSTACK_URL = "https://qikly.substack.com/subscribe"
 X_URL = "https://x.com/GA4198498563411"
 LINKEDIN_URL = "https://www.linkedin.com/in/galarav/"

@@ -587,7 +587,9 @@ footer {
       </svg>
     </div>
     <h1>Your AI writes both the code and its tests. How do you know the tests are really valid?</h1>
-    <p class="answer"><strong>The solution: two agents.</strong> One turns the acceptance criteria into tests. The other writes the code and <strong>never sees the acceptance criteria.</strong></p>
+    <!-- No answer line here any more. It said what the hero image already
+         shows, twice over, and the analogy below carries the point in one
+         sentence instead of two. -->
     <!-- The image sits directly under the claim, before the analogy and before
          "Who it is for", on purpose: a visual hook earns the reading that
          follows. An audit suggested moving the audience line above it to match
@@ -601,7 +603,8 @@ footer {
       the exam will pass. That is what happens when one model is given the
       acceptance criteria and asked to produce both the implementation and the
       suite that checks it. Everything goes green, and the green means nothing.
-      <strong>qikly takes the answer key away from the student.</strong>
+      <strong>qikly takes the answer key away from the student: the coding
+      agent never sees the acceptance criteria.</strong>
     </p>
     <aside class="whats-new">
       <p class="tag">New</p>
@@ -770,6 +773,42 @@ footer {
       </div>
     </div>
 
+    <h3 class="sub">Two obvious objections</h3>
+    <p class="counter">
+      You might argue, <b>"just use one model for the code and another for the tests."</b>
+      That helps a little. It does not fix the underlying issue.
+    </p>
+    <p class="counter">
+      Both models still read the same criteria, so both still write to them.
+      The code is still built to satisfy the standard it is about to be judged
+      by. Changing who types it does not change what they were shown.
+    </p>
+    <p class="counter">
+      It is also a habit rather than a mechanism. Nothing checks that the two
+      models stayed different, and a config change a year from now undoes it
+      with no test to notice.
+    </p>
+    <p class="counter">
+      Withholding the acceptance criteria works differently. They are cut out
+      of the task file before the coding agent is handed it, so there is no
+      channel left for them to arrive through, whichever model is writing.
+      <code>qikly --explain</code> prints what each side received, so you can
+      see the cut rather than trust it. <em>You can also do both</em>: qikly
+      picks a model per agent role.
+</p>
+    <p class="counter">
+      You might also ask, <b>"doesn't a failing test give the criteria away?"</b>
+      It gives away one case: the test name and the assertion error. Never the
+      rule behind it, and never the tests the agent has not failed yet.
+    </p>
+    <p class="counter">
+      That does not undo the separation. Independence is a property of how the
+      suite was written, not of how much feedback follows: the integration and
+      system suites are generated from the criteria before any code exists, and
+      nothing the coding agent learns later can reshape a test already written.
+    </p>
+
+
     <h3 class="sub">Two ways to get a test suite, and what each can prove</h3>
     <table class="uses compare">
       <thead>
@@ -821,41 +860,6 @@ footer {
       </tbody>
     </table>
 
-    <h3 class="sub">Two obvious objections</h3>
-    <p class="counter">
-      You might argue, <b>"just use one model for the code and another for the tests."</b>
-      That helps a little. It does not fix the underlying issue.
-    </p>
-    <p class="counter">
-      Both models still read the same criteria, so both still write to them.
-      The code is still built to satisfy the standard it is about to be judged
-      by. Changing who types it does not change what they were shown.
-    </p>
-    <p class="counter">
-      It is also a habit rather than a mechanism. Nothing checks that the two
-      models stayed different, and a config change a year from now undoes it
-      with no test to notice.
-    </p>
-    <p class="counter">
-      Withholding the acceptance criteria works differently. They are cut out
-      of the task file before the coding agent is handed it, so there is no
-      channel left for them to arrive through, whichever model is writing.
-      <code>qikly --explain</code> prints what each side received, so you can
-      see the cut rather than trust it. <em>You can also do both</em>: qikly
-      picks a model per agent role.
-</p>
-    <p class="counter">
-      You might also ask, <b>"doesn't a failing test give the criteria away?"</b>
-      It gives away one case: the test name and the assertion error. Never the
-      rule behind it, and never the tests the agent has not failed yet.
-    </p>
-    <p class="counter">
-      That does not undo the separation. Independence is a property of how the
-      suite was written, not of how much feedback follows: the integration and
-      system suites are generated from the criteria before any code exists, and
-      nothing the coding agent learns later can reshape a test already written.
-    </p>
-
   </section>
 
   <section class="band">
@@ -877,7 +881,7 @@ qikly --demo</code></pre>
       landed. Bring your own model key; the provider is configurable per agent
       and per test stage.
     </p>
-    <h3>Three words, so the commands below make sense</h3>
+    <h3>Three concepts</h3>
     <p>
       A <strong>task file</strong> is one YAML file and it holds everything.
       It has three parts, and the split above is a split between them:
@@ -896,20 +900,6 @@ qikly --demo</code></pre>
       <dd>What counts as correct, each one checkable and naming its boundary
       value. <strong>Only test generation reads this.</strong></dd>
     </dl>
-    <p class="route-note">
-      "Spec" in this page means the first two together, which is what the
-      coding agent is given. The criteria are the standard, and they are the
-      part held back.
-    </p>
-    <p class="route-note">
-      One thing the three parts do not say, and it matters:
-      <strong class="says-all">test generation never reads the implementation either.</strong>
-      Integration and system tests are written before any code exists, from the
-      specification alone. The unit stage is the single exception, written last
-      from the code that just cleared the earlier stages, because unit tests
-      have to name real functions.
-    </p>
-
     <h3>Which command depends on which parts you already have</h3>
     <p>
       A tick means you already have it. Everything without a tick is either
@@ -1074,30 +1064,39 @@ qikly --demo</code></pre>
       a specification usually leaves vague. <code>&lt;MY_TASK&gt;</code>, singular, takes exactly one.
     </p>
 
+    <p class="route-note">
+      "Spec" in this page means the first two together, which is what the
+      coding agent is given. The criteria are the standard, and they are the
+      part held back.
+    </p>
+    <p class="route-note">
+      One thing the three parts do not say, and it matters:
+      <strong class="says-all">test generation never reads the implementation either.</strong>
+      Integration and system tests are written before any code exists, from the
+      specification alone. The unit stage is the single exception, written last
+      from the code that just cleared the earlier stages, because unit tests
+      have to name real functions.
+    </p>
+
   </section>
 
   <section class="band">
     <p class="eyebrow">Checkable, not asserted</p>
     <h2>See the acceptance criteria being removed, in one command</h2>
-    <p>
-      The first row of the table above, in full. This is the claim the rest of
-      the page rests on, so it is worth watching rather than believing.
-    </p>
+    <!-- Two paragraphs of explanation used to sit here. They walked through
+         what --explain prints and how the withholding is held by a test, which
+         is the right level of detail for somebody who has decided to look and
+         too much for somebody deciding whether to. The command and the link
+         carry it now; the detail lives where it is read on purpose. -->
     <pre><code>qikly --explain CALC_TAX</code></pre>
     <p>
-      It prints the task file twice: once as the test generation agent receives
-      it, once as the coding agent does, and the difference between them. On
-      that task, all eleven acceptance criteria go to one side and are cut
-      before the other side sees the file. No API key, no model call, about
-      a second.
-    </p>
-    <p>
-      Behind it, <code>qikly</code>'s own test suite carries
-      <code>tests/test_withholding.py</code>, which fails the build if any call
-      site ever lets a criterion through to the coding agent. The withholding is
-      not a promise about how a model was prompted, it is a property of the
-      code. A tool built to
-      stop you trusting a green checkmark should not ask you to trust its own.
+      It prints the task file twice, once as each agent receives it, and the
+      difference between them. No API key, no model call, about a second. The
+      withholding is a property of the code rather than a promise about how a
+      model was prompted, and <code>tests/test_withholding.py</code> fails the
+      build if any call site ever lets a criterion through.
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md"
+         data-goatcounter-click="explain-detail">How it works, in full</a>.
     </p>
     <div class="figures">
       <div class="fig">
@@ -1140,7 +1139,7 @@ qikly --demo</code></pre>
     <span><a href="https://github.com/gal-a/qikly/blob/main/PRIVACY.md" data-goatcounter-click="footer-privacy">Privacy</a></span>
     <span><a href="https://qikly.substack.com/subscribe" data-goatcounter-click="footer-substack">Newsletter</a></span>
     <span><a href="https://x.com/GA4198498563411" data-goatcounter-click="footer-x">X</a></span>
-    <span>Also by the author: <a href="https://www.qikly.com/" data-goatcounter-click="footer-books">Applied Statistics for Data Science</a></span>
+    <span>Also by the author: <a href="https://leanpub.com/applied-statistics-for-data-science" data-goatcounter-click="footer-books">Applied Statistics for Data Science</a></span>
   </footer>
 
 </div>
