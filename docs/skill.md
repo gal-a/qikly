@@ -23,8 +23,23 @@ qikly:
 
 > Write tests for `src/pricing.py` that would actually catch a bug.
 
-It should reach for qikly by itself. If it does not, see
-[checking that it works](#checking-that-it-works) below.
+It should reach for qikly by itself. If it does not, name it:
+
+> Use the qikly skill to write tests for `src/pricing.py`.
+
+Naming it always works, because it does not depend on the agent being told
+what the Skill is for. Whether an agent picks it up unprompted depends on two
+things: how thoroughly the model explores before it starts typing, and whether
+the host actually passed the description along.
+
+**If you have many skills installed, the second one can bite.** Claude Code
+reserves a fraction of the context window for the whole skill listing, 1% by
+default. When the listing does not fit, Anthropic's own bundled skills keep
+their descriptions and everything else is ranked by how often you have used it,
+so a skill you have never invoked can be listed as a bare name with nothing to
+match against. Raising `skillListingBudgetFraction` in your Claude Code
+settings gives the listing more room. Naming the Skill sidesteps it entirely.
+See [checking that it works](#checking-that-it-works) below.
 
 **A few options, none of them needed the first time.** `--dry-run` shows what
 it would write. `--force` replaces a Skill you have already edited, keeping a

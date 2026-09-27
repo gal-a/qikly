@@ -53,6 +53,15 @@ A run needs one provider key, `GEMINI_API_KEY`, `OPENAI_API_KEY` or
 `ANTHROPIC_API_KEY`. Several commands need no key and cost nothing; the table
 further down says which, and when to reach for each.
 
+**Which key is present decides how long a run takes.** On
+`ANTHROPIC_API_KEY` qikly uses `claude-sonnet-5`, which thinks before every
+answer, so a ten-call loop becomes minutes plus thinking tokens you are billed
+for. The published figures come from `gemini-3.5-flash-lite`, fast and cheap
+enough to repeat. Say which key a run will use, and what it means for the wait,
+before starting it. That goes for you too: a reasoning model driving this tool
+charges the user the same wait at every step, so keep the mechanical steps
+mechanical.
+
 ## The one question that decides everything
 
 Every line of a specification goes in one of two halves, and this settles it:
@@ -167,6 +176,15 @@ Without the pair, the agent can get the arithmetic wrong and nothing fails.
 Ask it as a sweep: for each requirement, what would a wrong implementation of
 this look like, and which criterion catches it? A requirement with no answer is
 a requirement nothing is testing.
+
+**And read your own requirements back against the word list above.** This
+applies to wording you wrote yourself, which is where it gets missed: an agent
+that writes "rounded to the nearest cent" has just created the ambiguity it
+knows how to spot in somebody else's spec. If a requirement you drafted uses
+one of those words, say so and ask which way the boundary falls, rather than
+writing criteria that quietly avoid the case. A tie nobody decided is not a
+withheld consequence, it is a decision nobody made, and it will surface as a
+stalled loop later.
 
 ## The five steps, on the user's own module
 

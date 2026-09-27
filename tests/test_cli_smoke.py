@@ -134,3 +134,27 @@ def test_a_broken_task_is_reported_rather_than_raised(tmp_path):
     done = _run(["--validate"], str(tmp_path))
     assert TRACEBACK not in (done.stdout + done.stderr), (
         "validate crashed on a malformed task:\n%s" % (done.stdout + done.stderr))
+
+@pytest.mark.parametrize("target", ["all", "cursor", "gemini", "agents"])
+def test_the_install_message_reads_as_english(target, tmp_path):
+    """
+    `all` is a target, not an agent, and it was being substituted as one.
+
+    The line is built as "That is the path %s documents for skills". With a
+    real agent that reads correctly: "the path cursor documents for skills".
+    With `all` it printed "the path all documents for skills", which is broken
+    English and also wrong, because `all` writes four paths rather than one.
+
+    Nothing caught it because every test called the installer directly and
+    none read what a user would see.
+    """
+    done = _run(["--install-skill", target], str(tmp_path))
+    output = done.stdout + done.stderr
+
+    assert "path all documents" not in output, (
+        "the target name is being substituted where an agent name belongs:\n%s"
+        % output[-600:])
+    if target == "all":
+        assert "Those are the paths these tools document" in output
+    else:
+        assert "That is the path %s documents for skills" % target in output

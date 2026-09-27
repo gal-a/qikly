@@ -1212,11 +1212,17 @@ def _do_install_skill(agent, force, dry_run):
             # reads as doubt about qikly; naming the other tool's docs as the
             # source, and the format as open, puts the uncertainty where it
             # actually is, on whether that agent loads what it documents.
-            print("That is the path %s documents for skills, and the Skill "
-                  "format is the same across agents. Claude Code is the one "
-                  "combination we run ourselves, so if this loads for you we "
-                  "would like to hear: "
-                  "https://github.com/gal-a/qikly/discussions/6" % agent)
+            #
+            # `all` is a target, not an agent, so substituting it produced
+            # "the path all documents for skills", which is both broken English
+            # and wrong: `all` writes four paths rather than one.
+            where = ("Those are the paths these tools document for skills"
+                     if agent == "all"
+                     else "That is the path %s documents for skills" % agent)
+            print("%s, and the Skill format is the same across agents. Claude "
+                  "Code is the one combination we run ourselves, so if this "
+                  "loads for you we would like to hear: "
+                  "https://github.com/gal-a/qikly/discussions/6" % where)
     return 0
 
 

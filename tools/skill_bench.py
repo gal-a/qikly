@@ -38,10 +38,15 @@ CHECKS = [
      "before deciding whether to read the rest."),
 
     ("It stays out of the way",
-     'Ask something unrelated:\n'
-     '    "Rename the variable `total` to `net_total` across this file."',
-     "No mention of qikly. A Skill that loads for everything costs context\n"
-     "on every request and gets uninstalled."),
+     'Ask something unrelated, naming something the file really has so\n'
+     'the agent can simply do it:\n'
+     '    "Rename the parameter `subtotal` to `net_subtotal` in\n'
+     '     pricing.py."',
+     "No mention of qikly and no skill activation. A Skill that loads for\n"
+     "everything costs context on every request and gets uninstalled.\n"
+     "An earlier version of this prompt named a variable the file does not\n"
+     "have, so the agent spent its turn asking what was meant. That still\n"
+     "showed non-activation, but it tested the wrong thing."),
 
     ("The question that matters",
      'Ask:\n'
@@ -93,6 +98,18 @@ description: Write, organise and refactor pytest test suites. Use when the user 
 Write tests with pytest. Prefer `pytest.mark.parametrize` over loops, keep
 fixtures in `conftest.py`, and name each test after the behaviour it checks.
 """
+
+# Not all four conventions. Gemini CLI reads its own `.gemini/skills/` AND the
+# cross-agent `.agents/skills/`, so installing to both makes it report every
+# skill as overriding itself:
+#
+#   Skill conflict detected: "pytest-pro" from ".agents/skills/pytest-pro"
+#   is overriding the same skill from ".gemini/skills/pytest-pro"
+#
+# The copies are identical so nothing is broken, but a warning at the top of a
+# test session is noise in exactly the place a tester is trying to read
+# carefully. `.agents` serves Gemini and Codex; Cursor reads only its own.
+HOSTS = ("claude", "agents", "cursor")
 
 MODULE = '''"""A module to point the agent at. Deliberately ordinary."""
 
@@ -153,7 +170,7 @@ def main():
         handle.write(MODULE)
 
     # The rival goes in before ours, so check 1 happens in a contested room.
-    for host in ("claude", "agents", "cursor", "gemini"):
+    for host in HOSTS:
         rival = os.path.join(root, "." + host, "skills", "pytest-pro")
         os.makedirs(rival, exist_ok=True)
         with open(os.path.join(rival, "SKILL.md"), "w", newline="\n") as handle:
@@ -178,7 +195,7 @@ def main():
     print()
 
     print("installing the Skill where each agent looks")
-    for host in ("claude", "agents", "cursor", "gemini"):
+    for host in HOSTS:
         code, output = run([sys.executable, "-m", "qikly", "--install-skill",
                             host], cwd=root)
         first = output.splitlines()[0] if output else "(no output)"
@@ -211,7 +228,17 @@ a wording problem in SKILL.md rather than a broken install.
         for line in passes.splitlines():
             print("    " + line)
     print("-" * 68)
-    notes = os.path.join(root, "RESULTS.md")
+    # NOT inside the bench directory. RESULTS.md is the answer sheet: every
+    # question, and a paragraph saying what a passing answer looks like. An
+    # agent orienting itself in a new project reads the markdown at the root
+    # before anything else, and Codex proposed `cat RESULTS.md` as part of its
+    # second command. Reading it would have handed the agent the expected
+    # answers to checks 2 through 6 before they were asked. Gemini happened
+    # not to, which is luck rather than safety. So it lives beside the bench
+    # directory instead of in it, where nothing the agent is working on
+    # reaches it.
+    notes = os.path.join(os.path.dirname(root),
+                         os.path.basename(root) + "-RESULTS.md")
     with open(notes, "w", encoding="utf-8", newline="\n") as handle:
         handle.write("# Skill bench results\n\n")
         handle.write("Agent: ______   Version: ______   Date: ______\n\n")
@@ -228,6 +255,9 @@ a wording problem in SKILL.md rather than a broken install.
         handle.write("## Anything the Skill left you guessing at\n\n\n")
 
     print("A blank results file is at %s" % notes)
+    print("It is deliberately outside the bench directory: it lists the "
+          "expected answers, and an agent reads the markdown at a "
+          "project root while orienting itself.")
     print("""
 Fill it in as you go. The wording of a wrong answer is the finding, and it
 never survives being remembered. When you are done, fold it into
