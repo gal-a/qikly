@@ -23,7 +23,13 @@ qikly:
 
 > Write tests for `src/pricing.py` that would actually catch a bug.
 
-It should reach for qikly by itself. If it does not, name it:
+It should reach for qikly by itself. That has been watched happen in **Claude
+Code, Gemini CLI, Codex and Cursor**, once each, in a throwaway project with a
+rival testing skill installed beside this one and a request that never
+mentioned qikly. Four sessions is four anecdotes rather than a rate, and your
+project has more skills in it than that test did.
+
+If it does not, name it:
 
 > Use the qikly skill to write tests for `src/pricing.py`.
 

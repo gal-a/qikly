@@ -1363,9 +1363,10 @@ def _do_install_skill(agent, force, dry_run):
             where = ("Those are the paths these tools document for skills"
                      if agent == "all"
                      else "That is the path %s documents for skills" % agent)
-            print("%s, and the Skill format is the same across agents. Claude "
-                  "Code is the one combination we run ourselves, so if this "
-                  "loads for you we would like to hear: "
+            print("%s, and the Skill format is the same across agents. We have "
+                  "watched it load in Claude Code, Gemini CLI, Codex and "
+                  "Cursor, once each, which is four anecdotes rather than a "
+                  "guarantee, so if it loads for you we would like to hear: "
                   "https://github.com/gal-a/qikly/discussions/6" % where)
     return 0
 

@@ -714,6 +714,12 @@ qikly is the right move, which line of a spec is a decision the coder needs and
 which is a consequence to withhold, what a stalled repair loop means, and which
 commands cost nothing. No server, no configuration.
 
+It has been watched loading, and then used correctly, in **Claude Code, Gemini
+CLI, Codex and Cursor**, once each, in a throwaway project with a rival testing
+skill installed beside it and a request that never mentioned qikly. Four
+sessions is four anecdotes rather than a rate. `--install-skill agents`,
+`cursor` or `gemini` write where those tools document their own folders.
+
 **The two are not alternatives.** The MCP server is code, so it can enforce:
 no tool returns your criteria, and a test fails the build if that ever changes.
 A Skill is instructions, so it can only inform, and it says so itself. The

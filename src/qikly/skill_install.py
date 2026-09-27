@@ -7,13 +7,26 @@ rather than a download, and it is the same folder a clone has.
 
 ## What it will not do
 
-**Where each agent looks differs**, and the paths here come from each tool's
-documentation rather than from testing: `.claude/skills/` for Claude Code,
-`.agents/skills/` as the cross-agent convention several tools now read,
-`.cursor/skills/` for Cursor and `.gemini/skills/` for Gemini CLI. Only the
-Claude path has been used in anger. Putting a file where the documentation says
-is not the same as knowing the tool loads it, and this module should not imply
-otherwise.
+**Where each agent looks differs**, and the paths come from each tool's
+documentation: `.claude/skills/` for Claude Code, `.agents/skills/` as the
+cross-agent convention several tools now read, `.cursor/skills/` for Cursor
+and `.gemini/skills/` for Gemini CLI.
+
+**Three of the four have now been used in anger**, on 2026-09-27, each in a
+throwaway project with a rival skill installed beside this one and a request
+that never mentioned qikly:
+
+- `.claude/skills/` loaded in Claude Code.
+- `.agents/skills/` loaded in Gemini CLI and in Codex.
+- `.cursor/skills/` loaded in Cursor.
+
+`.gemini/skills/` is still only documented, not observed: Gemini CLI reads
+both its own directory and the cross-agent one, and installing to both makes
+it report every skill as overriding itself, so the test used `.agents/`.
+
+Putting a file where the documentation says is not the same as knowing the
+tool loads it, and this module should not imply otherwise for the path where
+it is still true.
 
 **It writes where you stand**, not where `QIKLY_PROJECT_ROOT` points. That
 variable is how you aim a run at another project, and honouring it here would
