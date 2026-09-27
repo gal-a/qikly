@@ -197,8 +197,16 @@ def _workspace(target, tmp, code_root=CODE_ROOT):
         for base, dirs, names in os.walk(target.root, followlinks=True):
             real = os.path.realpath(base)
             if real in seen:
-                dirs[:] = []
-                continue
+                # Refuse, rather than prune and carry on. Pruning made the
+                # count finish, and the copy below has no visited set of its
+                # own, so it followed the same loop until the path length ran
+                # out and produced a wall of nested OS errors. A guard that
+                # protects the count and not the copy protects nothing.
+                raise ValueError(
+                    f"a directory link under {target.root} points back at "
+                    f"something already inside it, so there is no finite tree "
+                    f"to copy:\n  {base}\nPoint --score-code and --score-tests "
+                    f"at directories that do not contain that link.")
             seen.add(real)
             dirs[:] = [d for d in dirs if d not in _SKIP]
             count += len(names)

@@ -2233,6 +2233,12 @@ def main():
         # was stopped only by a missing provider key.
         ("--artifacts-url", args.artifacts_url is not None, "--pr-comment",
          "qikly --pr-comment --artifacts-url https://ci.example.com/build/12"),
+        # The third one, and the one three separate audits walked past. --html
+        # has had this check since it shipped and --json, which sits beside it
+        # and is read by four different commands, never did.
+        ("--json", args.json,
+         "--validate, --explain, --trends or --compare-criteria",
+         "qikly --validate --json"),
     ):
         if not given:
             continue
@@ -2252,6 +2258,8 @@ def main():
             "--score-seed": bool(args.score_suite or args.score_code
                                  or args.score_tests),
             "--artifacts-url": bool(args.pr_comment),
+            "--json": bool(args.validate or args.explain or args.trends
+                           or args.compare_criteria),
         }[flag]
         if not attached:
             print(f"{flag} goes with {wants}, as in: {example}", file=sys.stderr)

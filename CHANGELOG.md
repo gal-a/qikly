@@ -38,6 +38,13 @@ packaging tools would read as `1.1`.
   instructions that name a different set of commands. `--install-skill` said
   "already exists, nothing was changed" whether your copy was identical or
   three releases behind. It now says when yours is older and what to do.
+- **`qikly --json` on its own started a real, billed run**, the third flag with
+  this defect and the one three separate audits walked past. `--html` has had
+  this check since it shipped; `--json` sits beside it and never did.
+- **A directory link that loops back on itself hung the workspace copy** and
+  produced a wall of nested OS errors. The cycle guard added for this covered
+  the file count and not the copy, which protects nothing. It now refuses, and
+  names the link.
 - **`qikly --artifacts-url ...` on its own started a real, billed run**, the
   same unguarded fallthrough as the one below, in the sibling flag nobody
   thought to check. Found by auditing the fix for the first one.

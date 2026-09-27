@@ -190,6 +190,9 @@ def test_the_demo_folder_name_is_matched_whatever_its_case(tmp_path):
     # Found by auditing the fix for the three above, which is the point of
     # auditing a fix: the same defect in the sibling flag nobody checked.
     ["--artifacts-url", "https://ci.example.com/build/12"],
+    # The third one, missed by three separate audits. --html has had this
+    # check since it shipped; --json sits beside it and never did.
+    ["--json"],
 ])
 def test_a_scoring_option_alone_never_starts_a_real_run(arguments, tmp_path):
     """

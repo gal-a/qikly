@@ -236,3 +236,39 @@ def test_the_workspace_count_follows_links_like_the_copy_does(tmp_path):
                 "file inside the workspace")
             return
     raise AssertionError("_workspace is gone")
+
+def test_a_directory_link_that_loops_is_refused_not_followed(tmp_path):
+    """
+    The cycle guard protected the count and not the copy, which protects
+    nothing.
+
+    os.walk was given a visited set and told to prune, so counting finished.
+    shutil.copytree has no visited set of its own, so it followed the same
+    loop until the path length ran out, and the user got a wall of nested OS
+    errors instead of a sentence.
+    """
+    sys.path.insert(0, SRC)
+    from qikly.mutation_score import _workspace, from_paths
+
+    package = tmp_path / "a"
+    (package / "sub").mkdir(parents=True)
+    (package / "impl.py").write_text(MODULE, encoding="utf-8")
+    (tmp_path / "test_impl.py").write_text(
+        WEAK_SUITE.replace("from pricing import", "from a.impl import"),
+        encoding="utf-8")
+
+    try:
+        os.symlink(str(package), str(package / "sub" / "loop"),
+                   target_is_directory=True)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip("this machine will not create a symlink: %s" % exc)
+    if not os.path.islink(str(package / "sub" / "loop")):
+        pytest.skip("the link was silently made a real directory")
+
+    target = from_paths(str(package), str(tmp_path / "test_impl.py"))
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        with pytest.raises(ValueError) as caught:
+            _workspace(target, tmp)
+    assert "points back at" in str(caught.value)
