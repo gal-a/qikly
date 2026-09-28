@@ -34,7 +34,7 @@ what happened, then fixes to the task file, and only then more attempts.
 | A test passes whatever the code does | [9. Check your fixtures can reach every criterion](#9-check-your-fixtures-can-reach-every-criterion) | Run `propose_fixtures` and add the input rows it suggests |
 | Steady progress, then the budget ran out | [10. Give it more attempts](#10-give-it-more-attempts) | Raise `orchestrator.max_retries_per_stage` (default 10), only when the report shows progress |
 | **Nothing has run yet, and files you were told about are missing** | [Before a run](#before-a-run-where-did-my-files-go) | Read the first line of the command's output: it names the directory it worked in, and says when the project root is somewhere else |
-| **You are in a `demo/<timestamp>/` folder** | [Before a run](#before-a-run-where-did-my-files-go) | That is a throwaway copy. Start your own project somewhere else |
+| **You are in a `demo/throwaway_<timestamp>/` folder** | [Before a run](#before-a-run-where-did-my-files-go) | That is a throwaway copy. Start your own project somewhere else |
 | `--score-code` says the suite does not pass | [Before a run](#before-a-run-where-did-my-files-go) | Usually pytest collected no tests at the path given to `--score-tests` |
 | **On macOS, no patch ever applies, on any task** | [12. On macOS, no patch ever applies](#12-on-macos-no-patch-ever-applies) | `brew install gpatch`. The system `patch` is BSD and rejects the options qikly sends |
 | Integration and system pass, unit does not | [11. Expect the unit stage to be where it fails](#11-expect-the-unit-stage-to-be-where-it-fails) | Expected. Accept it, or leave the unit stage out with `orchestrator.test_order` |
@@ -371,7 +371,7 @@ To pin the project explicitly rather than let it be inferred, set
 
 ### You are standing in the demo's folder
 
-`qikly --demo` runs in a throwaway `demo/<timestamp>/` directory so it cannot
+`qikly --demo` runs in a throwaway `demo/throwaway_<timestamp>/` directory so it cannot
 touch anything of yours, which also means **everything in it goes when you
 delete the folder, and nothing in it is yours**. Somebody who has just watched
 the demo work is standing in something that looks exactly like a working

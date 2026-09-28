@@ -78,7 +78,7 @@ variable rather than a venv one, so set it once in the terminal and the venv
 sees it too. Full recipes, including making a key survive a new terminal, are
 in [docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md).
 
-`--demo` runs one task end to end in a throwaway `demo/<timestamp>/` directory
+`--demo` runs one task end to end in a throwaway `demo/throwaway_<timestamp>/` directory
 and prints what it built and where. It writes nothing outside that directory,
 so a first run leaves everything else untouched. About 30 seconds on the Gemini
 default, and [several minutes on the Anthropic

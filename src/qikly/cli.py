@@ -69,8 +69,13 @@ def stamp(stream=None):
                      % (PROJECT_ROOT, ENV_VAR))
 
 
-# demo/20260927_112524, the throwaway directory --demo runs in.
-_DEMO_STAMP = re.compile(r"^\d{8}_\d{6}$")
+# demo/throwaway_20260927_112524, the directory --demo runs in. The prefix is
+# there because the timestamp alone says when and not what, and somebody who
+# has just watched the demo work is standing in something that looks exactly
+# like a working project. The bare stamp is still matched, because folders
+# made by earlier versions are still on disk and the guard has to see them.
+DEMO_PREFIX = "throwaway_"
+_DEMO_STAMP = re.compile(r"^(throwaway_)?\d{8}_\d{6}$")
 
 # Dropped into every demo directory as it is created, so the folder says what
 # it is rather than being inferred from its name. The name is not enough:
@@ -84,7 +89,7 @@ def inside_a_demo(where=None):
     """
     The throwaway directory this is standing in, or None.
 
-    `--demo` runs in `demo/<timestamp>/` precisely so it touches nothing of
+    `--demo` runs in `demo/throwaway_<timestamp>/` precisely so it touches nothing of
     yours, which also means everything in there is disposable. Someone who has
     just watched the demo work is standing in a folder that looks exactly like
     a working project, and the obvious next move is to start their own there.
@@ -353,7 +358,7 @@ def _run_task_process(task_id, seed, generate_criteria, resume=False):
 
 def _demo_root(where=None):
     r"""
-    A fresh <somewhere>/demo/<timestamp>/ for this run, and where that is.
+    A fresh <somewhere>/demo/throwaway_<timestamp>/ for this run, and where that is.
 
     Default is the directory you invoked from, NOT the resolved project root.
     Those differ exactly when you are standing outside a project, which is the
@@ -374,7 +379,8 @@ def _demo_root(where=None):
         base = where if os.path.isabs(where) else os.path.join(INVOKED_FROM, where)
         return os.path.join(os.path.abspath(base),
                             datetime.now().strftime("%Y%m%d_%H%M%S"))
-    return os.path.join(base, DEMO_DIR, datetime.now().strftime("%Y%m%d_%H%M%S"))
+    return os.path.join(base, DEMO_DIR,
+                        DEMO_PREFIX + datetime.now().strftime("%Y%m%d_%H%M%S"))
 
 
 class _Tee:
@@ -593,7 +599,7 @@ def _run_demo(task_ids, where=None):
     Run the demo in its own throwaway project directory, so a first run
     writes nothing into the tree the reader just cloned or installed into.
 
-    Everything lands under <project>/demo/<timestamp>/: its own outputs/,
+    Everything lands under <project>/demo/throwaway_<timestamp>/: its own outputs/,
     its own inputs_private/ fixtures, its own logs and reports. Delete the
     folder and the demo never happened.
 
@@ -1088,7 +1094,8 @@ def _parse_args():
     parser.add_argument(
         "--demo", action="store_true",
         help=f"STARTING POINT 4 of 4, to watch before committing to anything. "
-             f"Run one task end to end in a throwaway {DEMO_DIR}/<timestamp>/ directory and print "
+             f"Run one task end to end in a throwaway "
+             f"{DEMO_DIR}/{DEMO_PREFIX}<timestamp>/ directory and print "
              f"where the code, tests, and full record landed. Defaults to {DEMO_TASK}; combine with "
              f"--tasks to demo a different one. Writes nothing outside that directory, and you "
              f"delete the directory afterwards: do not start your own project inside it."

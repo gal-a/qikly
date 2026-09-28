@@ -298,7 +298,7 @@ task, module and sample data included, so you can read a filled-in pair before
 writing one, in the directory you are standing in.
 
 **`qikly --demo` is a different command and the difference matters.** It runs a
-bundled task end to end in a throwaway `demo/<timestamp>/` folder that exists to
+bundled task end to end in a throwaway `demo/throwaway_<timestamp>/` folder that exists to
 be deleted, and it is the one most people try first. A user who has just watched
 it work is standing in something that looks exactly like a working project, and
 the obvious next move is to start theirs there. **Never set up someone's real

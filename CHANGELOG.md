@@ -4,7 +4,9 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
-## Unreleased
+## 0.5.5
+
+> A Skill for GitHub Copilot, a score that says what it cannot tell you, and a demo folder that admits what it is
 
 ### Added
 - **`qikly --install-skill copilot`.** GitHub Copilot reads none of the four
@@ -37,6 +39,11 @@ packaging tools would read as `1.1`.
   The missing pointer is now written and said so.
 
 ### Changed
+- **The demo's folder is named `demo/throwaway_<timestamp>/`.** The timestamp
+  alone said when, not what, and somebody who has just watched the demo work
+  is standing in something that looks exactly like a working project. The
+  guard that refuses `--init`, `--example` and `--demo` inside one still
+  recognises folders made by earlier versions.
 - **What `--install-skill` prints, in four ways.** "No agent directory here
   yet" read as "your agent is not supported" to somebody sitting in one; it
   now says nothing here says which agent you use. The alternatives for Cursor

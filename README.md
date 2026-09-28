@@ -50,7 +50,7 @@ this page until it has run.
 | **Start from a finished example** in a project of your own | `qikly --example` | nothing to set it up |
 | **Point it at your own module** | `qikly --scaffold my_module.py` | nothing to set it up |
 
-`--demo` works in a throwaway `demo/<timestamp>/` folder it expects you to
+`--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
 delete. It is for watching, not for building in. `--example` and `--scaffold`
 create a real project in the directory you are standing in, and those are the
 two to start from.
@@ -349,7 +349,7 @@ qikly --demo
 ```
 
 Python 3.10+ and GNU `patch`; on macOS run `brew install gpatch` first.
-It runs a bundled task end to end in a throwaway `demo/<timestamp>/`
+It runs a bundled task end to end in a throwaway `demo/throwaway_<timestamp>/`
 folder, in about thirty seconds, writes nothing outside it, and expects
 you to delete the folder afterwards rather than build there.
 
@@ -645,7 +645,7 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.5.4`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.5.5`, uploading the suite, the code and the JUnit XML |
 
 ## Use it in CI
 
@@ -688,7 +688,7 @@ a run.
 
 **Two ways to pin, and the choice is yours.** `@v0` is a moving alias that
 this project repoints at every release, so you receive fixes without receiving
-a breaking change. `@v0.5.4` is an exact pin that never moves, so nothing
+a breaking change. `@v0.5.5` is an exact pin that never moves, so nothing
 changes under you and nothing reaches you either. The templates use `@v0`
 because most people want the fixes; use the exact form if your policy requires
 it.
