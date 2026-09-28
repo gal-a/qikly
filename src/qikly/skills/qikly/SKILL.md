@@ -5,7 +5,7 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.3.0
+  version: 0.3.1
   requires: qikly >= 0.5.4
 ---
 
@@ -128,6 +128,15 @@ enough to repeat. Say which key a run will use, and what it means for the wait,
 before starting it. That goes for you too: a reasoning model driving this tool
 charges the user the same wait at every step, so keep the mechanical steps
 mechanical.
+
+**So set the model rather than only warning about it.** Before the first paid
+command, if `ANTHROPIC_API_KEY` is the key in play, set `LLM_MODEL` to
+`claude-haiku-4-5` for the run and say you have done it and why. That is the
+only provider whose default thinks: Gemini's is already
+`gemini-3.5-flash-lite` and OpenAI's is `gpt-4o`, neither of which has a
+reasoning step, so there is nothing to change on either. If the user has
+chosen a thinking model deliberately, leave it alone and say what the wait
+will be: the stricter suite it writes is a real reason to want one.
 
 ## The one question that decides everything
 

@@ -39,6 +39,12 @@ packaging tools would read as `1.1`.
   The missing pointer is now written and said so.
 
 ### Changed
+- **The Skill now sets the model rather than only warning about it** (Skill
+  0.3.1). Before the first paid command it sets `LLM_MODEL=claude-haiku-4-5`
+  when `ANTHROPIC_API_KEY` is the key in play, and says so. That is the only
+  provider whose default thinks before every answer, and a first run that
+  takes twenty minutes gets blamed on qikly rather than on the key that
+  happened to be set. A model chosen deliberately is left alone.
 - **The demo's folder is named `demo/throwaway_<timestamp>/`.** The timestamp
   alone said when, not what, and somebody who has just watched the demo work
   is standing in something that looks exactly like a working project. The
