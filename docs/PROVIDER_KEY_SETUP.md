@@ -31,6 +31,35 @@ Read-only will not work, because creating a completion is a write.
 
 ---
 
+## Which model
+
+Pick a small fast one. A run makes one model call per stage per iteration, so
+the length of a run is mostly the length of a single call, and a model that
+reasons before it answers turns a two minute run into twenty.
+
+| Provider | Start with | Costs you a long wait |
+|---|---|---|
+| **Gemini** | `gemini-3.5-flash-lite`, the default, or any flash model | `gemini-3.5-pro` |
+| **OpenAI** | a mini model | the reasoning models |
+| **Anthropic** | `claude-haiku-4-5` | `claude-sonnet-5`, which thinks before every answer and bills the thinking |
+
+qikly says this in the run banner when the model you chose is one that thinks,
+and again the first time a call runs long, so a slow run explains itself rather
+than looking like a hang.
+
+**Why the smallest model is the one every figure was measured on.** Every
+published qikly number comes from `gemini-3.5-flash-lite`, over hundreds of
+runs. That is the cheapest and least capable of the three defaults, and the
+choice was deliberate: a number measured there is a floor rather than a best
+case. A later flash model should clear it, not fall short of it. If yours does
+not, that is a result worth reporting.
+
+None of which makes a thinking model wrong. It writes a stricter suite, and if
+that is what you are after, the wait is what it costs. It does mean not to
+reach for one first, and that a run which seems stuck is usually this.
+
+---
+
 ## Windows PowerShell
 
 ### Gemini

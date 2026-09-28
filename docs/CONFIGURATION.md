@@ -73,6 +73,14 @@ the measured path clears. If a provider you have chosen converges poorly, reach
 for a stronger model on it before concluding anything about the tool: model
 choice moves convergence more than any setting in this file.
 
+**And which model.** Prefer a small fast one: a run makes one call per stage
+per iteration, so a model that reasons before it answers turns minutes into
+tens of minutes. `gemini-3.5-flash-lite` is the floor the published figures
+were measured on, not a best case, and a later flash model should clear it.
+The table of what to start with per provider, and when a thinking model is
+worth the wait, is in
+[docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md#which-model).
+
 **PowerShell, CI, persisting a key, restricting one, and what a wrong key or
 a wrong model looks like:** [docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md).
 
