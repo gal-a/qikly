@@ -1428,9 +1428,9 @@ def _do_install_skill(agent, force, dry_run):
             print("This project already uses %s, so that is where it goes."
                   % ", ".join("." + host + "/" for host in found))
         else:
-            print("Nothing here says which agent you use, so this covers "
-                  "Claude Code and the cross-agent path Codex and Gemini CLI "
-                  "read.")
+            print("Nothing in this folder says which agent you use, so "
+                  "this writes both of the usual paths: .claude/ for Claude "
+                  "Code, and .agents/ for Codex and Gemini CLI.")
             other_hosts = True
 
     results = install_all(root, [agent], force=force, dry_run=dry_run)
@@ -1522,9 +1522,9 @@ def _do_install_skill(agent, force, dry_run):
                 # warning about the Skill rather than a description of the
                 # test, and a user who has just installed something does not
                 # need talking out of it.
-                print("Confirmed loading in %s, with a rival testing skill "
-                      "installed beside it and a request that never mentioned "
-                      "qikly." % ", ".join(proven))
+                print("This was confirmed loading in %s, with a rival "
+                      "testing skill installed beside it and a request that "
+                      "never mentioned qikly." % ", ".join(proven))
             for host in unproven:
                 if host == "copilot":
                     # Copilot reads none of the skill directories, so the
