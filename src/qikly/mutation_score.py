@@ -286,7 +286,13 @@ def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
 
     candidates = []
     for path, relative in files:
-        with open(path, encoding="utf-8") as handle:
+        # utf-8-sig, matching scaffold.py, which carries the same comment
+        # because this was learned once already. A byte-order mark is normal on
+        # Windows: PowerShell 5.1's `Set-Content -Encoding utf8` writes one, as
+        # did older Notepad. Read as plain utf-8 the mark survives as U+FEFF and
+        # ast.parse rejects a file Python itself runs happily. Found four hours
+        # after 0.5.4 shipped, by running the release walkthrough on Windows.
+        with open(path, encoding="utf-8-sig", errors="replace") as handle:
             source = handle.read()
         for family, index, described in sites(source):
             candidates.append((path, relative, source, family, index, described))

@@ -43,6 +43,12 @@ packaging tools would read as `1.1`.
   project. Reported by a first-time user.
 
 ### Fixed
+- **`--score-code` refused a Python file with a byte-order mark**, which is
+  normal on Windows: PowerShell's `Set-Content -Encoding utf8` writes one, as
+  did older Notepad, and Python itself runs such a file happily. Read as plain
+  utf-8 the mark arrives as `U+FEFF` on line one and the parse fails.
+  `--scaffold` has read these correctly for months, with a comment explaining
+  why; the new reader did not.
 - **`tools/release_check.py` reported the Skill missing** when run from
   anywhere but the repository root. One check used a bare relative path where
   every other resolves against the repository, so a release could fail for a

@@ -272,3 +272,32 @@ def test_a_directory_link_that_loops_is_refused_not_followed(tmp_path):
         with pytest.raises(ValueError) as caught:
             _workspace(target, tmp)
     assert "points back at" in str(caught.value)
+
+def test_a_byte_order_mark_does_not_stop_it(tmp_path):
+    """
+    A BOM is normal on Windows and Python runs such a file happily.
+
+    PowerShell 5.1's `Set-Content -Encoding utf8` writes one, as did older
+    Notepad. Read as plain utf-8 the mark survives as U+FEFF at the start of
+    line one and ast.parse rejects it, so qikly refused to score a file its own
+    interpreter would import.
+
+    scaffold.py has used utf-8-sig for exactly this reason, with a comment
+    saying so, since before --score-code existed. The new reader did not, and
+    it was found four hours after 0.5.4 shipped by running the release
+    walkthrough on Windows.
+    """
+    module = tmp_path / "pricing.py"
+    module.write_bytes(b"\xef\xbb\xbf" + MODULE.encode("utf-8"))
+    (tmp_path / "test_pricing.py").write_text(WEAK_SUITE, encoding="utf-8")
+
+    # The premise: Python itself is perfectly happy with this file.
+    import ast
+    ast.parse(module.read_text(encoding="utf-8-sig"))
+
+    done = _run(["--score-code", "pricing.py", "--score-tests",
+                 "test_pricing.py", "--score-mutants", "4", "--score-seed", "1"],
+                str(tmp_path))
+    output = done.stdout + done.stderr
+    assert "U+FEFF" not in output, output[-400:]
+    assert "planted faults caught" in output, output[-400:]
