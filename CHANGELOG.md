@@ -4,6 +4,30 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## Unreleased
+
+### Added
+- **`qikly --install-skill copilot`.** GitHub Copilot reads none of the four
+  skill directories, so every VS Code user working in Copilot rather than in
+  an agent CLI had no way in except the MCP server. It reads instruction files
+  out of `.github/instructions/`, so this writes the Skill folder there and a
+  `qikly.instructions.md` beside it, which is the file Copilot actually opens.
+  Copying the folder alone would have put files on disk that nothing ever
+  reads. `--install-skill auto` picks it up when a project already has
+  `.github/instructions/` or a `copilot-instructions.md`, and not merely
+  because it has a `.github/`, which almost every repository does.
+
+### Changed
+- **A suite score now says what it cannot tell you**, under the number: it
+  reports how much of the code that is there your tests would notice being
+  changed, and nothing about a rule nobody implemented, because there is
+  nothing there to break. A seventeen-test suite caught 8 of 8 planted faults
+  in a real session while a suite written from the specification found four
+  genuine bugs in the same file. The Skill says the same to an agent before it
+  hands somebody a percentage.
+
+---
+
 ## 0.5.4
 
 > Score a suite qikly did not write, and say which qikly, when, and where it is standing

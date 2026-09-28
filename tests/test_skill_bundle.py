@@ -13,6 +13,8 @@ the docs over again, not to edit the copy.
 import io
 import os
 import re
+import shutil
+import tempfile
 
 import pytest
 
@@ -369,8 +371,65 @@ def test_every_install_target_is_a_project_local_path():
         assert not os.path.isabs(target), "%s target is absolute" % host
         assert ".." not in target.replace("\\", "/").split("/"), (
             "%s target climbs out of the project" % host)
+        if host == "copilot":
+            # Copilot reads no skills directory. Its target is the
+            # instructions folder VS Code looks in, which is the whole reason
+            # this host needed a shape of its own.
+            assert target.replace("\\", "/") == ".github/instructions/qikly"
+            continue
         assert target.replace("\\", "/").endswith("/skills/qikly"), (
             "%s target does not end in skills/qikly" % host)
+
+
+def test_the_copilot_install_writes_the_file_copilot_actually_reads():
+    """
+    Copying the folder alone would put files on disk nothing ever opens.
+
+    GitHub Copilot reads none of `.claude/`, `.agents/`, `.cursor/` or
+    `.gemini/`. It reads `.github/instructions/*.instructions.md`, and a file
+    one level further down is never looked at. So this host writes the Skill
+    folder *and* the pointer beside it, and the pointer has to carry the
+    frontmatter Copilot matches on.
+    """
+    from qikly.skill_install import POINTER, install
+
+    root = tempfile.mkdtemp()
+    try:
+        destination, outcome, _ = install(root, host="copilot")
+        assert outcome == "written"
+        assert os.path.isfile(os.path.join(destination, "SKILL.md"))
+
+        pointer = os.path.join(root, POINTER)
+        assert os.path.isfile(pointer), (
+            "no %s, so Copilot has nothing to open and the folder beside it "
+            "is never read" % POINTER)
+        text = _read(pointer)
+        assert text.startswith("---\n"), "no frontmatter, so applyTo is unset"
+        assert "applyTo:" in text
+        assert "qikly/SKILL.md" in text, (
+            "the pointer does not name the file it exists to point at")
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_copilot_is_not_detected_by_a_github_directory_alone():
+    """
+    Almost every repository has `.github/`, and finding one there proves
+    nothing about whether anybody uses Copilot. The signal is somebody already
+    writing Copilot instructions, which is a decision rather than a default,
+    or `auto` would write this into every project on earth.
+    """
+    from qikly.skill_install import detect
+
+    root = tempfile.mkdtemp()
+    try:
+        os.makedirs(os.path.join(root, ".github", "workflows"))
+        assert "copilot" not in detect(root)
+
+        os.makedirs(os.path.join(root, ".github", "instructions"))
+        assert "copilot" in detect(root)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
 
 
 def test_the_cli_offers_every_host_the_installer_knows():
@@ -417,9 +476,10 @@ def test_one_host_failing_does_not_stop_the_others(tmp_path):
     `--install-skill all` used to abandon the run mid-way.
 
     A plain file where a host's directory should be raises from makedirs, and
-    with four hosts that left two written, two never attempted, and a raw
-    traceback instead of a summary. Partial state with no report is the worst
-    of both.
+    that left the hosts before it written, the ones after it never attempted,
+    and a raw traceback instead of a summary. Partial state with no report is
+    the worst of both. The count comes from HOSTS so that adding one cannot
+    quietly narrow what this checks.
     """
     from qikly.skill_install import install_all
 
@@ -429,9 +489,11 @@ def test_one_host_failing_does_not_stop_the_others(tmp_path):
     results = install_all(str(tmp_path), ["all"])
     by_host = {host: outcome for host, _dest, outcome, _backup in results}
 
-    assert len(results) == 4, "not every host was attempted"
+    from qikly.skill_install import HOSTS
+
+    assert len(results) == len(HOSTS), "not every host was attempted"
     assert by_host["cursor"].startswith("failed:")
-    for host in ("claude", "agents", "gemini"):
+    for host in ("claude", "agents", "gemini", "copilot"):
         assert by_host[host] == "written", "%s was skipped by another host's failure" % host
 
 

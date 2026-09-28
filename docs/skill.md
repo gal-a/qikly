@@ -53,6 +53,14 @@ Your own project has more skills in it than that one did.
 
 If it does not, see [if your agent does not pick it up](#if-your-agent-does-not-pick-it-up).
 
+**Using GitHub Copilot in VS Code?** Copilot reads none of the skill folders
+above. Run `qikly --install-skill copilot`, which writes the Skill into
+`.github/instructions/` along with the `qikly.instructions.md` file Copilot
+actually opens, then use Copilot Chat in Agent mode. That path has not been
+watched loading yet, so tell us if it works for you. The MCP server is the
+other way in and is tested there:
+[docs/mcp.md](https://github.com/gal-a/qikly/blob/main/docs/mcp.md).
+
 **A few options, none of them needed the first time.** `--dry-run` shows what
 it would write. `--force` replaces a Skill you have already edited, keeping a
 timestamped copy of the old one. And `--install-skill agents`, `cursor` or

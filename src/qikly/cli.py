@@ -839,13 +839,15 @@ def _parse_args():
     )
     parser.add_argument(
         "--install-skill", nargs="?", const="auto",
-        choices=["auto", "claude", "agents", "cursor", "gemini", "all"],
+        choices=["auto", "claude", "agents", "cursor", "gemini", "copilot",
+                 "all"],
         metavar="AGENT",
         help="Copy qikly's agent Skill into the directory you are standing in, "
              "so a coding agent knows when to reach for qikly and how to split "
              "a spec into the half it reads and the half it must not. With no "
              "argument it writes wherever this project already shows an agent "
-             "in use (.claude/, .agents/, .cursor/, .gemini/), and falls back "
+             "in use (.claude/, .agents/, .cursor/, .gemini/, or Copilot "
+             "instructions under .github/), and falls back "
              "to .claude/ plus the cross-agent .agents/ path when there is no "
              "sign of one. Name a host to override that, or 'all' for every "
              "path. A Skill is instructions, not enforcement, and the "
@@ -1429,6 +1431,8 @@ def _do_install_skill(agent, force, dry_run):
                   "and the cross-agent path Codex and Gemini CLI read.")
             print("For Cursor, which reads only its own: "
                   "qikly --install-skill cursor")
+            print("For GitHub Copilot, which reads neither: "
+                  "qikly --install-skill copilot")
 
     results = install_all(root, [agent], force=force, dry_run=dry_run)
 
@@ -1510,6 +1514,15 @@ def _do_install_skill(agent, force, dry_run):
                       "installed beside it and a request that never mentioned "
                       "qikly." % ", ".join(proven))
             for host in unproven:
+                if host == "copilot":
+                    # Copilot reads none of the skill directories, so the
+                    # advice for the others would send somebody to a path
+                    # their tool ignores.
+                    print("Copilot reads .github/instructions/, so this also "
+                          "wrote qikly.instructions.md there, which is the "
+                          "file it opens. Use Copilot Chat in Agent mode. "
+                          "This path has NOT been watched loading.")
+                    continue
                 print("The .%s/ path has NOT been watched loading. Gemini CLI "
                       "reads .agents/skills/ too, and that is the one we saw "
                       "work, so try `qikly --install-skill agents` if it does "

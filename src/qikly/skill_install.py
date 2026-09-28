@@ -12,7 +12,14 @@ documentation: `.claude/skills/` for Claude Code, `.agents/skills/` as the
 cross-agent convention several tools now read, `.cursor/skills/` for Cursor
 and `.gemini/skills/` for Gemini CLI.
 
-**Three of the four have now been used in anger**, on 2026-09-27, each in a
+**GitHub Copilot reads none of them**, which is why it needs a shape of its
+own. It reads instruction files out of `.github/instructions/`, so that host
+writes the Skill folder there and a `qikly.instructions.md` beside it: the
+folder holds the content, and the pointer is the file Copilot opens. Copying
+the folder alone would have put files on disk that nothing ever reads, which
+is the failure this target exists to avoid rather than repeat.
+
+**Three of the five have now been used in anger**, on 2026-09-27, each in a
 throwaway project with a rival skill installed beside this one and a request
 that never mentioned qikly:
 
@@ -54,8 +61,33 @@ TARGETS = {
     "agents": os.path.join(".agents", "skills", SKILL_NAME),
     "cursor": os.path.join(".cursor", "skills", SKILL_NAME),
     "gemini": os.path.join(".gemini", "skills", SKILL_NAME),
+    # GitHub Copilot reads none of the four above. It reads instruction files
+    # out of `.github/instructions/`, so this target writes the same folder
+    # there and adds the one file Copilot opens, which points at it.
+    "copilot": os.path.join(".github", "instructions", SKILL_NAME),
 }
-HOSTS = ("claude", "agents", "cursor", "gemini")
+HOSTS = ("claude", "agents", "cursor", "gemini", "copilot")
+
+# The file VS Code actually reads for Copilot. It sits beside the folder rather
+# than inside it, because `.github/instructions/*.instructions.md` is the
+# pattern Copilot looks for and a file one level down is never opened.
+POINTER = os.path.join(".github", "instructions", SKILL_NAME + ".instructions.md")
+
+POINTER_TEXT = """---
+applyTo: "**"
+---
+
+# qikly
+
+When the request is about writing tests, about whether an existing suite is
+worth trusting, or about turning a specification into checks, read
+`%s/SKILL.md` beside this file and follow it.
+
+In one sentence: qikly writes the tests from the acceptance criteria and keeps
+those criteria from the agent that writes the code, so that a passing suite
+means something. `qikly --score-code PATH --score-tests PATH` scores a suite
+that already exists, free, with no API key and nothing of theirs modified.
+""" % SKILL_NAME
 
 # Kept for callers that predate the other hosts.
 TARGET = TARGETS["claude"]
@@ -127,7 +159,15 @@ def detect(root):
     using Cursor.
     """
     found = [host for host in HOSTS
-             if os.path.isdir(os.path.join(root, "." + host))]
+             if host != "copilot"
+             and os.path.isdir(os.path.join(root, "." + host))]
+    # Copilot has no directory of its own to look for. `.github/` is in almost
+    # every repository and proves nothing, so the signal is somebody already
+    # writing Copilot instructions, which is a decision rather than a default.
+    if (os.path.isdir(os.path.join(root, ".github", "instructions"))
+            or os.path.isfile(os.path.join(root, ".github",
+                                           "copilot-instructions.md"))):
+        found.append("copilot")
     # Never both. Gemini CLI reads its own directory and the cross-agent one,
     # and finding the Skill in both makes it report every skill as overriding
     # itself. `.agents/` is the path that has actually been watched loading.
@@ -194,7 +234,26 @@ def install(root, force=False, dry_run=False, host="claude"):
     saved = _backup(destination)
     os.makedirs(os.path.dirname(destination), exist_ok=True)
     shutil.copytree(source, destination)
+    if host == "copilot":
+        _write_pointer(root)
     return destination, "written", saved
+
+
+def _write_pointer(root):
+    """
+    The one file Copilot opens, beside the folder it points at.
+
+    Copilot does not read a skills directory, so copying the folder alone
+    would put files on disk that nothing ever opens. It is written every time
+    rather than only when absent, because it is generated, it is ours, and it
+    has to describe the Skill sitting next to it. Anything a user wrote lives
+    in `.github/copilot-instructions.md`, which this never touches.
+    """
+    path = os.path.join(root, POINTER)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(POINTER_TEXT)
+    return path
 
 
 def _backup(destination):
