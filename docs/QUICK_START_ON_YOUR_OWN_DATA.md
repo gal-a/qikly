@@ -36,7 +36,7 @@ directory and the interpreter together.
 python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install qikly
 qikly --version                # which build, from where, on which Python
-export GEMINI_API_KEY=...      # or OPENAI_API_KEY / ANTHROPIC_API_KEY, see table below
+export GEMINI_API_KEY=...      # or OPENAI_API_KEY / ANTHROPIC_API_KEY
 qikly --demo
 ```
 
@@ -47,7 +47,7 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install qikly
 qikly --version
-$env:GEMINI_API_KEY = "..."    # or OPENAI_API_KEY / ANTHROPIC_API_KEY, see table below
+$env:GEMINI_API_KEY = "..."    # or OPENAI_API_KEY / ANTHROPIC_API_KEY
 qikly --demo
 ```
 

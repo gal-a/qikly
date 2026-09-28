@@ -588,6 +588,24 @@ footer {
       <p><code>qikly --install-skill</code></p>
     </aside>
 
+    <!-- The first command asks nothing of the reader. It was `pip install`,
+         then `export GEMINI_API_KEY=...`, then `qikly --demo`, which asked a
+         stranger for an API key before offering any evidence and read as
+         though the tool required one provider. The free check is the
+         strongest thing on this page and now goes first. -->
+    <div class="install">
+      <span><span class="prompt">$</span> pip install qikly</span>
+      <span><span class="prompt">$</span> qikly --explain CALC_TAX</span>
+    </div>
+    <p class="route-note">That prints what each agent is given and the difference
+      between them. No API key, no model call, about a second. To watch a real run,
+      <code>qikly --demo</code> takes a key from Gemini, OpenAI or Anthropic and costs
+      well under a cent.</p>
+    <p class="route-note"><a href="https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have" data-goatcounter-click="hero-which-command">Which
+      command fits what you already have</a>, and
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="hero-quick-start">five
+      steps from your own module to a first run</a>.</p>
+
     <p class="eyebrow">Who it is for</p>
     <p class="route-note">A developer or team pointing an AI coding agent at a self-contained
       Python module, for example an ETL step, a merge, a calculation or a validation routine,
@@ -596,19 +614,6 @@ footer {
       fails, only the files that failure names are loaded, so runs stay small and quick.
       It fits most naturally where verification already has to be independent of the people
       who build the thing: automotive, medical devices, fintech and defence.</p>
-    <div class="install">
-      <span><span class="prompt">$</span> pip install qikly</span>
-      <span><span class="prompt">$</span> export GEMINI_API_KEY=...</span>
-      <span><span class="prompt">$</span> qikly --demo</span>
-    </div>
-    <p class="route-note"><strong>Just want to try it on your own data?</strong>
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="hero-quick-start">Quick start on your own
-      data</a>, five steps from your module to a first run.</p>
-    <p class="route-note">Already have the code? <code>qikly --scaffold your_module.py</code>
-      writes a task that tests <em>that</em> code, with the suite still written from your
-      acceptance criteria rather than from the code itself.
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have" data-goatcounter-click="hero-which-command">Which
-      command fits what you already have</a>.</p>
     <div class="links">
       <a class="btn btn-primary" href="https://github.com/gal-a/qikly" data-goatcounter-click="hero-github">Source on GitHub</a>
       <a class="btn" href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="hero-how-it-works">How it works, with one repair end to end</a>
@@ -840,7 +845,7 @@ footer {
     <p class="eyebrow">Getting started</p>
     <h2>One command, about thirty seconds, writes nothing outside its own folder</h2>
     <pre><code>pip install qikly
-export GEMINI_API_KEY=...
+export GEMINI_API_KEY=...        # or OPENAI_API_KEY, or ANTHROPIC_API_KEY
 qikly --demo</code></pre>
     <figure class="demo">
       <img src="images/qikly_demo.gif" width="811" height="820" loading="lazy"
