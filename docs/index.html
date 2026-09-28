@@ -139,6 +139,64 @@ a { color: var(--accent); }
 }
 .whats-new .fine { font-size: .92em; opacity: .8; }
 
+/* ---------------------------------------------------------- top bar -- */
+
+/* Sticky, quiet, and out of the way. It carries no section links on purpose:
+   this page is an argument that depends on being read in order. */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  /* Opaque first. A browser without color-mix drops the line below and keeps
+     this one; without it the declaration is invalid, the bar has no background
+     at all, and the page scrolls under it. Same pattern as the overflow-x
+     pair near the top. */
+  background: var(--ground);
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--rule);
+}
+.topbar-inner {
+  max-width: 860px;
+  margin: 0 auto;
+  /* The same side gutter as .wrap, so the bar lines up with the content
+     under it at every width. */
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.topbar-mark {
+  font-family: Archivo, sans-serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -.02em;
+  color: var(--ink);
+  text-decoration: none;
+}
+.topbar-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: .92rem;
+}
+.topbar-links a { text-decoration: none; }
+.topbar-cta {
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 5px 12px;
+  color: var(--accent);
+}
+.topbar-cta code { font-size: .92em; }
+@media (max-width: 520px) {
+  /* The command is the point of the button, so it keeps its place and the
+     plain link goes rather than both shrinking into illegibility. */
+  .topbar-links a:not(.topbar-cta) { display: none; }
+  .topbar-inner { padding: 8px 16px; }
+  .topbar-cta { padding: 4px 10px; }
+}
+
 /* ------------------------------------------------------------- hero -- */
 
 .hero {
@@ -531,7 +589,25 @@ footer {
 </head>
 <body>
 
-<div class="wrap">
+<!-- A bar, not a menu. The page is one argument read in order, and a list of
+     section links invites skipping the part that earns the rest. What was
+     actually missing is a route out: past the hero there was no way to reach
+     GitHub or the docs until the footer. Three things only, and the call to
+     action is the Skill because it is the shortest path from reading to
+     using. -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <a class="topbar-mark" href="#top" aria-label="qikly, back to top">qikly</a>
+    <nav class="topbar-links">
+      <a href="https://github.com/gal-a/qikly" data-goatcounter-click="bar-github">GitHub</a>
+      <a class="topbar-cta"
+         href="https://github.com/gal-a/qikly/blob/main/docs/skill.md"
+         data-goatcounter-click="bar-skill"><code>qikly --install-skill</code></a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap" id="top">
 
   <header class="hero">
     <div class="wordmark">
