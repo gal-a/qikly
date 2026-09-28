@@ -18,7 +18,7 @@
 [![qikly: one spec in, code and tests out, written by a coding agent and a test agent that are kept apart](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_hero.png)](https://test.qikly.com)
 
 > **New: an agent Skill.** `qikly --install-skill` teaches Claude Code, Gemini
-> CLI, Codex or Cursor how to drive qikly.
+> CLI, Codex, Cursor or GitHub Copilot how to drive qikly.
 > [What the Skill contains](https://github.com/gal-a/qikly/blob/main/docs/skill.md).
 
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
@@ -732,7 +732,9 @@ Cursor**: first time in each, in a project with a rival testing skill installed
 beside it and a request that never mentioned qikly. The agent had a competing
 option and no hint, which is what makes that worth reporting.
 `--install-skill agents`,
-`cursor` or `gemini` write where those tools document their own folders.
+`cursor` or `gemini` write where those tools document their own folders, and
+`copilot` writes the instruction file GitHub Copilot reads instead, which is
+the one path here nobody has watched load yet.
 
 **The two are not alternatives.** The MCP server is code, so it can enforce:
 no tool returns your criteria, and a test fails the build if that ever changes.
