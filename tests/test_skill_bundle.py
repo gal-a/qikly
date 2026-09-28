@@ -406,8 +406,13 @@ def test_the_copilot_install_writes_the_file_copilot_actually_reads():
         text = _read(pointer)
         assert text.startswith("---\n"), "no frontmatter, so applyTo is unset"
         assert "applyTo:" in text
-        assert "qikly/SKILL.md" in text, (
-            "the pointer does not name the file it exists to point at")
+        # A workspace-relative path, not one relative to the pointer. An
+        # agent resolving `qikly/SKILL.md` against the repository root looks
+        # at the top level and finds nothing, and "beside this file" is a
+        # sentence for a person rather than a path for a tool.
+        assert ".github/instructions/qikly/SKILL.md" in text, (
+            "the pointer does not name the file it exists to point at, by a "
+            "path an agent can resolve")
     finally:
         shutil.rmtree(root, ignore_errors=True)
 

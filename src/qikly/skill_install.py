@@ -88,12 +88,17 @@ applyTo: "**"
 
 When the request is about writing tests, about whether an existing suite is
 worth trusting, or about turning a specification into checks, read
-`%s/SKILL.md` beside this file and follow it.
+`.github/instructions/%s/SKILL.md` and follow it. That file is the full
+instructions; this one only points at it.
 
-In one sentence: qikly writes the tests from the acceptance criteria and keeps
-those criteria from the agent that writes the code, so that a passing suite
-means something. `qikly --score-code PATH --score-tests PATH` scores a suite
-that already exists, free, with no API key and nothing of theirs modified.
+**What qikly is.** It writes the tests from a specification's acceptance
+criteria and keeps those criteria from the agent that writes the code, so that
+a passing suite means something.
+
+**The command to reach for first**, because it costs nothing and runs on code
+that already exists: `qikly --score-code PATH --score-tests PATH`. It plants
+one fault at a time and reports which ones the tests did not notice. No API
+key, no model call, and nothing in the repository is modified.
 """ % SKILL_NAME
 
 # Kept for callers that predate the other hosts.
