@@ -43,6 +43,12 @@ packaging tools would read as `1.1`.
   project. Reported by a first-time user.
 
 ### Fixed
+- **Two identical rows in a suite-score report now say which line each is on.**
+  A module with two `100`s in it produced two rows reading `int 100 -> 101`,
+  indistinguishable, and a reader handed that report cannot tell which is the
+  bound and which the divisor. Two rows that look the same look like a bug in
+  the tool, which is the worst thing a report you give to somebody else's team
+  can do.
 - **`--score-code` refused a Python file with a byte-order mark**, which is
   normal on Windows: PowerShell's `Set-Content -Encoding utf8` writes one, as
   did older Notepad, and Python itself runs such a file happily. Read as plain

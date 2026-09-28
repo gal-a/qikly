@@ -301,3 +301,37 @@ def test_a_byte_order_mark_does_not_stop_it(tmp_path):
     output = done.stdout + done.stderr
     assert "U+FEFF" not in output, output[-400:]
     assert "planted faults caught" in output, output[-400:]
+
+def test_two_mutations_that_read_the_same_are_told_apart_by_line():
+    """
+    A module with two 100s in it produced two report rows reading
+    "int 100 -> 101", identically, and a reader handed that report cannot tell
+    which line each refers to. Two rows that look the same look like a bug in
+    the tool, which is the worst thing a report you hand to somebody else's
+    team can do.
+
+    Found by running the release walkthrough and reading the artefact as a
+    stranger would.
+    """
+    sys.path.insert(0, SRC)
+    from qikly.mutation_score import sites
+
+    source = (
+        "def apply_discount(subtotal, percent):\n"
+        "    if percent < 0 or percent > 100:\n"
+        "        raise ValueError('out of range')\n"
+        "    return subtotal - (subtotal * percent / 100)\n")
+
+    described = [text for _, _, text in sites(source)]
+    assert described, "nothing to mutate in a module with two comparisons"
+
+    # Every description says where.
+    for text in described:
+        assert "line " in text, "a mutation with no line: %s" % text
+
+    # And the two 100s, which read identically without one, do not collide.
+    hundreds = [text for text in described if "100 -> 101" in text]
+    assert len(hundreds) == 2, hundreds
+    assert len(set(hundreds)) == 2, (
+        "both 100s produced the same row, so the report cannot say which line "
+        "is which: %s" % hundreds)

@@ -79,10 +79,18 @@ class _Mutator(ast.NodeTransformer):
         self.seen = -1
         self.applied = None
 
-    def _hit(self, kind):
+    def _hit(self, kind, node=None):
+        """Record the nth candidate, and where it is.
+
+        The line number matters in the report rather than here. A module with
+        two 100s in it produced two rows reading "int 100 -> 101", identically,
+        and a reader handed that report cannot tell which line each refers to.
+        Two rows that look the same look like a bug in the tool.
+        """
         self.seen += 1
         if self.seen == self.target:
-            self.applied = kind
+            line = getattr(node, "lineno", None)
+            self.applied = "%s, line %d" % (kind, line) if line else kind
             return True
         return False
 
@@ -93,7 +101,7 @@ class _Mutator(ast.NodeTransformer):
             return node
         if len(node.ops) == 1 and type(node.ops[0]) in _CMP_SWAP:
             old = type(node.ops[0])
-            if self._hit(f"{old.__name__} -> {_CMP_SWAP[old].__name__}"):
+            if self._hit(f"{old.__name__} -> {_CMP_SWAP[old].__name__}", node):
                 node.ops = [_CMP_SWAP[old]()]
         return node
 
@@ -103,7 +111,7 @@ class _Mutator(ast.NodeTransformer):
             return node
         if type(node.op) in _BOOL_SWAP:
             old = type(node.op)
-            if self._hit(f"{old.__name__} -> {_BOOL_SWAP[old].__name__}"):
+            if self._hit(f"{old.__name__} -> {_BOOL_SWAP[old].__name__}", node):
                 node.op = _BOOL_SWAP[old]()
         return node
 
@@ -111,10 +119,10 @@ class _Mutator(ast.NodeTransformer):
     def visit_Constant(self, node):
         if self.family == "arithmetic":
             if isinstance(node.value, bool):
-                if self._hit(f"bool {node.value} -> {not node.value}"):
+                if self._hit(f"bool {node.value} -> {not node.value}", node):
                     return ast.copy_location(ast.Constant(value=not node.value), node)
             elif isinstance(node.value, int):
-                if self._hit(f"int {node.value} -> {node.value + 1}"):
+                if self._hit(f"int {node.value} -> {node.value + 1}", node):
                     return ast.copy_location(ast.Constant(value=node.value + 1), node)
             return node
 
@@ -122,7 +130,7 @@ class _Mutator(ast.NodeTransformer):
         # malformed value with a valid fragment inside it starts passing.
         if _looks_like_regex(node.value):
             loosened = node.value.lstrip("^").rstrip("$")
-            if loosened != node.value and self._hit("regex anchors stripped"):
+            if loosened != node.value and self._hit("regex anchors stripped", node):
                 return ast.copy_location(ast.Constant(value=loosened), node)
         return node
 
@@ -132,7 +140,7 @@ class _Mutator(ast.NodeTransformer):
         if self.family != "validation":
             return node
         if _is_guard(node):
-            if self._hit("guard disabled"):
+            if self._hit("guard disabled", node):
                 node.test = ast.copy_location(ast.Constant(value=False), node.test)
         return node
 
@@ -143,14 +151,14 @@ class _Mutator(ast.NodeTransformer):
         # x.strip() -> x, so one code path stops normalising while others do.
         if (isinstance(node.func, ast.Attribute) and node.func.attr in _NORMALISERS
                 and not node.args and not node.keywords):
-            if self._hit(f".{node.func.attr}() dropped"):
+            if self._hit(f".{node.func.attr}() dropped", node):
                 return node.func.value
         return node
 
     def visit_Raise(self, node):
         if self.family != "validation":
             return node
-        if self._hit("raise swallowed"):
+        if self._hit("raise swallowed", node):
             return ast.copy_location(ast.Pass(), node)
         return node
 
