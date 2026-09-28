@@ -18,6 +18,16 @@ packaging tools would read as `1.1`.
   because it has a `.github/`, which almost every repository does.
 
 ### Changed
+- **What `--install-skill` prints, in four ways.** "No agent directory here
+  yet" read as "your agent is not supported" to somebody sitting in one; it
+  now says nothing here says which agent you use. The alternatives for Cursor
+  and Copilot moved below the result, because advice about tools you do not
+  use is a strange thing to read before finding out what happened. Copilot
+  "reads neither" became "reads none of these", there being more than two. And
+  it now says what to do when the agent does not pick it up: name it once, and
+  it is usually found on its own next time, because the listing is ranked by
+  how often each skill has been used and one never invoked sorts below every
+  one that has.
 - **A suite score now says what it cannot tell you**, under the number: it
   reports how much of the code that is there your tests would notice being
   changed, and nothing about a rule nobody implemented, because there is

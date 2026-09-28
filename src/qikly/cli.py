@@ -1421,18 +1421,17 @@ def _do_install_skill(agent, force, dry_run):
     # somebody silently is only an improvement if they can see what was
     # chosen: a Cursor user who gets .claude/ and no explanation has been
     # given a directory their editor does not read.
+    other_hosts = False
     if agent == "auto":
         found = detect(root)
         if found:
             print("This project already uses %s, so that is where it goes."
                   % ", ".join("." + host + "/" for host in found))
         else:
-            print("No agent directory here yet, so this covers Claude Code "
-                  "and the cross-agent path Codex and Gemini CLI read.")
-            print("For Cursor, which reads only its own: "
-                  "qikly --install-skill cursor")
-            print("For GitHub Copilot, which reads neither: "
-                  "qikly --install-skill copilot")
+            print("Nothing here says which agent you use, so this covers "
+                  "Claude Code and the cross-agent path Codex and Gemini CLI "
+                  "read.")
+            other_hosts = True
 
     results = install_all(root, [agent], force=force, dry_run=dry_run)
 
@@ -1485,6 +1484,19 @@ def _do_install_skill(agent, force, dry_run):
         print("Your agent loads it when what you ask matches its description. "
               "Try asking for tests for one of your own modules without naming "
               "qikly, and see whether it reaches for it.")
+        # The first invocation is the only hard one: the listing is ranked by
+        # how often each skill has been used, so one that has never been
+        # invoked sorts below every one that has. Naming it once moves it
+        # above them, and nothing said so at the point somebody finds out.
+        print("If it does not, name it once: \"use the qikly skill to write "
+              "tests for src/yours.py\". That is usually enough for it to be "
+              "found on its own next time.")
+        if other_hosts:
+            print()
+            print("Using something else? For Cursor, which reads only its own "
+                  "path: qikly --install-skill cursor")
+            print("For GitHub Copilot, which reads none of these: "
+                  "qikly --install-skill copilot")
         # Built from the hosts actually written, never from what was asked
         # for. `all` and `auto` are targets rather than agents, and
         # substituting one produced "the path all documents for skills", then
