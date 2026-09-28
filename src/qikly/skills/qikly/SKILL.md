@@ -43,6 +43,39 @@ things that do work, and let the user choose:
   part only they can write, and the whole value is in that being a separate act
   from writing the code.
 
+## Ask economically, or you will lose them
+
+Every decision you surface costs the user attention, and there is no version of
+this where nobody has to decide anything. So the cost has to come out of the
+**shape** of the asking, not out of the number of decisions.
+
+**Propose a complete draft and invite corrections. Never interrogate.** One
+decision, wait, next decision, wait, is how a ten-line module produces four
+modal questions and a user who closes the window. Instead:
+
+> Here is what I am going to assume, all of it going into `requirements` where
+> the coding agent will read it:
+> - percent is between 0 and 100 inclusive
+> - quantity, unit price and subtotal are zero or more
+> - money is not rounded to the cent
+>
+> Tell me which of those is wrong, or say go ahead.
+
+The discipline is identical: the decisions are still stated, still in the half
+the coding agent reads, still the user's. What changes is that agreeing costs
+one keystroke, and disagreeing is easier too, because somebody reading a list
+spots the wrong line faster than somebody three dialogs deep.
+
+**And only raise a decision the tests actually turn on.** If no criterion you
+are going to write would differ between the two answers, you are spending their
+attention for nothing. The question earns its place when you can say which test
+changes.
+
+**Two you should always raise, because they are silent and expensive:** the
+rounding rule wherever money appears, since "nearest cent" settles nothing at a
+half cent, and the inclusive or exclusive end of any boundary. Those two account
+for most of the decisions that get hidden in the wrong half.
+
 **If they insist on tests now**, write them, and then say plainly which lines
 of the implementation you had to treat as correct: every boundary, every
 tie-break, every validation rule you copied rather than were told. Those are

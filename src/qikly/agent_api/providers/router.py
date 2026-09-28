@@ -240,7 +240,15 @@ def validate_config():
         problems.append("environment variable(s) " + ", ".join(missing))
 
     if problems:
-        raise RuntimeError(f"LLM_PROVIDER={provider!r} requires " + " and ".join(problems) + ".")
+        # Say where to get one. This message is the moment somebody needs the
+        # setup page, and it named what was missing and nothing about how to
+        # fix it, which left the answer only on a landing page they had
+        # already left.
+        raise RuntimeError(
+            f"LLM_PROVIDER={provider!r} requires " + " and ".join(problems)
+            + ".\nHow to get a key and set it, for all three providers: "
+            "https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md"
+            "\nOr run something free first: qikly --explain CALC_TAX")
     return provider
 
 

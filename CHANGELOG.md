@@ -42,6 +42,24 @@ packaging tools would read as `1.1`.
   watched it work is standing in something that looks exactly like a working
   project. Reported by a first-time user.
 
+### Changed
+- **The agent Skill now says what to do when there is no specification**, which
+  is how the request almost always arrives. Asked to write tests for a module,
+  an agent was writing them from the code and explaining the limitation
+  afterwards, which is the failure the tool exists to prevent, done in the
+  right order of honesty and the wrong order of work. It now declines to open
+  with tests, offers `--score-code` for a suite that exists and `--scaffold`
+  for one that should, and if the user still wants tests now, names every line
+  of the implementation it had to treat as correct.
+- **And says to ask economically.** The first version of that change produced
+  four modal questions for a ten-line module, which is how you lose somebody.
+  The decisions cannot be skipped, so the cost comes out of the shape: propose
+  a complete draft of the assumptions and invite corrections, rather than
+  asking one at a time, and only raise a decision the tests actually turn on.
+- **The missing-key error says where to get one.** It named what was absent and
+  nothing about how to fix it, so the answer lived only on a page the reader
+  had already left.
+
 ### Fixed
 - **Two identical rows in a suite-score report now say which line each is on.**
   A module with two `100`s in it produced two rows reading `int 100 -> 101`,
