@@ -57,6 +57,9 @@ two to start from.
 
 Then [five steps from your module to a first run](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md).
 
+[qikly.com](https://test.qikly.com) is the two minute version of this page, and
+the one to send to somebody else.
+
 ## The idea
 
 Imagine a student who writes the exam paper, writes the answer key, and then
