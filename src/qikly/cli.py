@@ -1464,6 +1464,22 @@ def _do_install_skill(agent, force, dry_run):
                       f"--force to replace it, or delete it first if you have "
                       f"edited it.")
             continue
+        if outcome == "blocked":
+            print(f"{relative} was not written: something that is not a file "
+                  f"is sitting at .github/instructions/qikly.instructions.md, "
+                  f"which is the file Copilot opens. Move it and run this "
+                  f"again. Nothing has been changed.")
+            continue
+        if outcome == "pointer":
+            wrote = True
+            print(f"{relative} was already there, but the file Copilot opens "
+                  f"was missing, so qikly.instructions.md was written beside "
+                  f"it. Pass --force to replace the Skill itself.")
+            continue
+        if outcome == "would write pointer":
+            print(f"{relative} exists; would write the missing "
+                  f"qikly.instructions.md beside it")
+            continue
         if outcome == "would write":
             print(f"Would write {len(files_in(bundled_dir()))} files to {relative}")
             continue

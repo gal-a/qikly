@@ -17,6 +17,25 @@ packaging tools would read as `1.1`.
   `.github/instructions/` or a `copilot-instructions.md`, and not merely
   because it has a `.github/`, which almost every repository does.
 
+### Fixed
+- **`--install-skill copilot` destroyed a file somebody else had written.**
+  The Copilot target writes two things, the Skill folder and the pointer file
+  Copilot opens, and only the folder was covered by the promise this module
+  makes about not overwriting. An existing
+  `.github/instructions/qikly.instructions.md` was replaced by a bare
+  `open(path, "w")`: no `--force`, no backup, no message. That directory is
+  one people write their own instruction files into. The pointer is now moved
+  to a timestamped copy first, and the install says where it went.
+- **A blocked pointer left the Skill folder on disk and reported that nothing
+  was written.** Something that is not a file sitting at the pointer's path
+  raised after `copytree` had already run, so the state was partial and the
+  message said total failure, and every re-run then said "already exists".
+  It is found before anything is copied and named in the message.
+- **A Copilot folder with no pointer beside it reported as fine.** Copilot
+  reads the pointer, so that install cannot load, and "already exists, so
+  nothing was changed" was true of the folder and false of the installation.
+  The missing pointer is now written and said so.
+
 ### Changed
 - **What `--install-skill` prints, in four ways.** "No agent directory here
   yet" read as "your agent is not supported" to somebody sitting in one; it

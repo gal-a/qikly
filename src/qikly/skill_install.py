@@ -43,6 +43,13 @@ created config two folders away with one easily missed line of output.
 **It never overwrites without being asked.** A Skill you have edited is yours;
 `--force` replaces it, and without that flag an existing folder is left alone
 and reported.
+
+**The Copilot pointer is the one exception, and it is backed up rather than
+left alone.** That file is generated, it has to describe the folder beside it,
+and a stale one points at a Skill that has moved. So it is rewritten on every
+install, and anything already under that name is moved to a timestamped copy
+first, because `.github/instructions/` is a directory people write their own
+files into and the name is ours by convention rather than by right.
 """
 import os
 import shutil
@@ -141,7 +148,7 @@ def is_stale(destination):
 
 # What a bare `--install-skill` writes when the project shows no sign of which
 # agent is in use. Claude Code's own path, plus the cross-agent one that Codex
-# and Gemini CLI both read, which is three of the four runtimes for two
+# and Gemini CLI both read, which is three of the five runtimes for two
 # directories. Cursor is left out on purpose: it reads only its own path, and
 # writing a directory for a tool somebody may not have is worse than telling
 # them the flag exists.
@@ -219,14 +226,34 @@ def install(root, force=False, dry_run=False, host="claude"):
     """
     source = bundled_dir()
     destination = os.path.join(root, TARGETS[host])
+    # Copilot is the one host that writes two things: the folder, and the file
+    # Copilot actually opens. Both have to be considered together, or every
+    # promise this module makes about the folder is broken for the file.
+    pointer = os.path.join(root, POINTER) if host == "copilot" else None
 
     if not os.path.isfile(os.path.join(source, "SKILL.md")):
         return destination, "missing", None
+
+    # Found before anything is copied. A directory sitting where the pointer
+    # goes cannot be written, and discovering that after copytree left the
+    # Skill folder on disk while the command reported that nothing was
+    # written: partial state, described as failure.
+    if pointer and os.path.exists(pointer) and not os.path.isfile(pointer):
+        return destination, "blocked", None
+
     # `exists` has to mean "something is already there", not "a directory is
     # already there". A plain file at that path fell through both branches
     # below and reached copytree, which raised FileExistsError as a raw
     # traceback where every other outcome is a sentence.
     if os.path.exists(destination) and not force:
+        # A Copilot folder with no pointer beside it is an install that cannot
+        # load, and it reported as "already exists, nothing was changed",
+        # which is accurate about the folder and wrong about the install.
+        if pointer and not os.path.isfile(pointer):
+            if dry_run:
+                return destination, "would write pointer", None
+            _write_pointer(root)
+            return destination, "pointer", None
         return destination, "exists", None
     if dry_run:
         return destination, "would write", None
@@ -234,26 +261,40 @@ def install(root, force=False, dry_run=False, host="claude"):
     saved = _backup(destination)
     os.makedirs(os.path.dirname(destination), exist_ok=True)
     shutil.copytree(source, destination)
-    if host == "copilot":
-        _write_pointer(root)
+    if pointer:
+        saved = _write_pointer(root, force=force) or saved
     return destination, "written", saved
 
 
-def _write_pointer(root):
+def _write_pointer(root, force=False):
     """
-    The one file Copilot opens, beside the folder it points at.
+    The one file Copilot opens, beside the folder it points at. Returns where
+    anything already there was moved, or None.
 
     Copilot does not read a skills directory, so copying the folder alone
-    would put files on disk that nothing ever opens. It is written every time
-    rather than only when absent, because it is generated, it is ours, and it
-    has to describe the Skill sitting next to it. Anything a user wrote lives
-    in `.github/copilot-instructions.md`, which this never touches.
+    would put files on disk that nothing ever opens.
+
+    **It backs up whatever was there**, for the same reason `_backup` exists
+    for the folder: this path is inside `.github/instructions/`, which is a
+    directory people write their own instruction files into, and a bare
+    `open(path, "w")` destroyed one with no `--force`, no warning and no
+    recovery. The name is ours by convention, not by right.
     """
     path = os.path.join(root, POINTER)
+    saved = None
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as handle:
+                already = handle.read()
+        except Exception:
+            already = None
+        # Rewriting our own generated file is not an overwrite worth a backup.
+        if already != POINTER_TEXT:
+            saved = _backup(path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(POINTER_TEXT)
-    return path
+    return saved
 
 
 def _backup(destination):

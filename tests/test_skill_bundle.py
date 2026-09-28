@@ -412,6 +412,81 @@ def test_the_copilot_install_writes_the_file_copilot_actually_reads():
         shutil.rmtree(root, ignore_errors=True)
 
 
+def test_an_instruction_file_already_there_is_backed_up_not_destroyed(tmp_path):
+    """
+    `.github/instructions/` is a directory people write their own files into.
+
+    The first version of the Copilot target wrote the pointer with a bare
+    `open(path, "w")`: no `--force`, no backup, no message. A file somebody
+    had written under that name was gone, which is the exact failure `_backup`
+    was added to the folder path to prevent, repeated one file along.
+    """
+    from qikly.skill_install import POINTER, install
+
+    pointer = tmp_path / POINTER
+    pointer.parent.mkdir(parents=True)
+    pointer.write_text("MY OWN NOTES\n", encoding="utf-8")
+
+    _destination, outcome, backup = install(str(tmp_path), host="copilot")
+
+    assert outcome == "written"
+    assert backup, "nothing was moved aside, so the file was overwritten"
+    assert "MY OWN NOTES" in _read(backup), "the backup is not what was there"
+    assert "applyTo" in _read(str(pointer)), "the pointer was not written"
+
+
+def test_rewriting_our_own_pointer_does_not_leave_a_backup(tmp_path):
+    """
+    A backup per install would litter the directory it is trying to respect.
+    Identical content is not an overwrite worth keeping.
+    """
+    from qikly.skill_install import POINTER, install
+
+    install(str(tmp_path), host="copilot")
+    _destination, _outcome, backup = install(str(tmp_path), host="copilot",
+                                             force=True)
+    assert backup is None or "instructions" not in os.path.basename(backup), (
+        "an identical pointer was backed up anyway")
+
+
+def test_something_blocking_the_pointer_stops_before_anything_is_written(tmp_path):
+    """
+    A directory where the pointer goes cannot be written to.
+
+    Discovering that after `copytree` left the Skill folder on disk while the
+    command reported that nothing had been written: partial state, described
+    as total failure, and a re-run then said "already exists" forever.
+    """
+    from qikly.skill_install import POINTER, TARGETS, install
+
+    blocked = tmp_path / POINTER
+    blocked.mkdir(parents=True)
+
+    _destination, outcome, _backup = install(str(tmp_path), host="copilot")
+
+    assert outcome == "blocked", outcome
+    assert not (tmp_path / TARGETS["copilot"]).exists(), (
+        "the Skill folder was written even though the install was reported "
+        "as not written")
+
+
+def test_a_folder_without_its_pointer_is_repaired_rather_than_called_fine(tmp_path):
+    """
+    Copilot reads the pointer. A folder with none beside it cannot load, and
+    the install reported "already exists, so nothing was changed", which is
+    true of the folder and false of the installation.
+    """
+    from qikly.skill_install import POINTER, install
+
+    install(str(tmp_path), host="copilot")
+    os.remove(str(tmp_path / POINTER))
+
+    _destination, outcome, _backup = install(str(tmp_path), host="copilot")
+
+    assert outcome == "pointer", outcome
+    assert os.path.isfile(str(tmp_path / POINTER))
+
+
 def test_copilot_is_not_detected_by_a_github_directory_alone():
     """
     Almost every repository has `.github/`, and finding one there proves
