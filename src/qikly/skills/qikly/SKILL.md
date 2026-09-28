@@ -5,7 +5,7 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.2.0
+  version: 0.3.0
   requires: qikly >= 0.5.4
 ---
 
@@ -20,6 +20,39 @@ suite goes green and the green means nothing.
 **Python modules only.** qikly scaffolds from Python signatures and generates
 pytest suites; this Skill says nothing about any other language, and you should
 say so rather than guess if asked.
+
+## The request this arrives as, and what to do with it
+
+**"Write tests for `my_module.py`", with no specification anywhere.** That is
+how this almost always begins, and answering it literally is the mistake this
+whole tool exists to prevent. Tests read off an implementation can only
+describe what it already does: they pass by construction, they encode every
+choice the code happened to make as though it were intended, and they cannot
+disagree with a bug because the bug is what they were written from.
+
+So do not open by writing tests. Say that in one sentence, then offer the two
+things that do work, and let the user choose:
+
+- **`qikly --score-code my_module.py --score-tests their_tests.py`** if any
+  suite already exists. Free, no model call, nothing of theirs modified, and it
+  answers "is the suite we have worth anything" with named faults it missed.
+  This is usually the right first move on somebody else's project.
+- **`qikly --scaffold my_module.py`**, then fill in `requirements` and
+  `acceptance_criteria` together, if what they actually want is tests that
+  could fail. The scaffold reads their real signatures; the two halves are the
+  part only they can write, and the whole value is in that being a separate act
+  from writing the code.
+
+**If they insist on tests now**, write them, and then say plainly which lines
+of the implementation you had to treat as correct: every boundary, every
+tie-break, every validation rule you copied rather than were told. Those are
+the decisions nothing has settled, and naming them is the difference between a
+suite that is honest about its foundation and one that looks authoritative.
+
+A real session got this half right: it wrote seventeen tests from the code,
+checked they could fail by planting faults, and only then said "I wrote these
+by reading your code, so where the code made a choice, the tests assume that
+choice was right". The saying so was correct. The order was backwards.
 
 qikly splits one specification in two. Test generation reads the whole thing.
 The coding agent receives the same file with the `acceptance_criteria` section

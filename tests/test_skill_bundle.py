@@ -452,7 +452,13 @@ def test_an_older_installed_skill_is_reported_as_older(tmp_path):
     skill = destination / "SKILL.md"
     text = skill.read_text(encoding="utf-8")
     assert "version: 0." in text
-    skill.write_text(text.replace("version: 0.2.0", "version: 0.1.0"),
+    # Derived, not hardcoded. These tests broke the first time the Skill's
+    # version moved, which is a thing it is supposed to do whenever its
+    # instructions change.
+    current = re.search(r"^  version: (\S+)$", text, re.M).group(1)
+    older = "0.0.1"
+    assert older < current
+    skill.write_text(text.replace("version: %s" % current, "version: %s" % older),
                      encoding="utf-8")
     assert is_stale(str(destination)) is True, "an older copy read as current"
 
@@ -576,7 +582,13 @@ def test_a_stale_installed_skill_is_mentioned_by_any_command(tmp_path):
 
     skill = tmp_path / ".claude" / "skills" / "qikly" / "SKILL.md"
     text = skill.read_text(encoding="utf-8")
-    skill.write_text(text.replace("version: 0.2.0", "version: 0.1.0"),
+    # Derived, not hardcoded. These tests broke the first time the Skill's
+    # version moved, which is a thing it is supposed to do whenever its
+    # instructions change.
+    current = re.search(r"^  version: (\S+)$", text, re.M).group(1)
+    older = "0.0.1"
+    assert older < current
+    skill.write_text(text.replace("version: %s" % current, "version: %s" % older),
                      encoding="utf-8")
 
     aged = run()
