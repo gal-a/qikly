@@ -322,6 +322,13 @@ number.** A suite cannot catch a fault in behaviour no input row exercises, so
 unreachable criteria lower the score for a reason that is about the fixtures
 and not about the tests. Fix the data first, then score.
 
+**A high score is not a clean bill of health, and say so before they read it
+as one.** Mutation scoring asks whether their tests notice changes to the code
+that exists. It cannot ask about a rule nobody implemented, because there is
+nothing there to break. In a real session a seventeen-test suite caught 8 of 8
+planted faults while a suite written from the specification found four genuine
+bugs in the same file. The number is a floor, not a verdict.
+
 **`--score-code` prints no such warning, and you must not imply it does.**
 There is no task file and therefore no criteria to be unreachable, so the
 report carries the score and nothing above it. The underlying problem has not

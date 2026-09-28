@@ -399,6 +399,16 @@ def render(result, gaps):
     if total:
         lines += [f"**{caught} of {total} planted faults caught "
                   f"({caught * 100 // total}%).**", ""]
+        # The sentence that stops the number being read as a grade. A suite
+        # scored 8 of 8 here while a suite written from the specification found
+        # four real bugs in the same file: mutation scoring asks whether your
+        # tests notice changes to the code that exists, and nothing can plant a
+        # fault in a rule nobody implemented.
+        lines += ["Read that as a floor rather than a verdict. It says how much "
+                  "of the code that **is** here your tests would notice being "
+                  "changed. It cannot say anything about a rule nobody "
+                  "implemented, because there is nothing there to break, so a "
+                  "high score is not a clean bill of health.", ""]
 
     if gaps is None:
         lines += ["Reachability could not be checked for this task, so read "
