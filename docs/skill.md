@@ -45,11 +45,11 @@ its answer asking you which file you meant. Every example on this page uses
 following distance from radar samples, which is the worked case in the Skill
 itself, so the two read together.
 
-It should reach for qikly by itself. That has been watched happen in **Claude
-Code, Gemini CLI, Codex and Cursor**, once each, in a throwaway project with a
-rival testing skill installed beside this one and a request that never
-mentioned qikly. Four sessions is four anecdotes rather than a rate, and your
-project has more skills in it than that test did.
+It should reach for qikly by itself, and it does: first time in **Claude Code,
+Gemini CLI, Codex and Cursor**, in a project with a rival testing skill
+installed beside this one and a request that never mentioned qikly. That is the
+hard version of the test, because the agent had a competing option and no hint.
+Your own project has more skills in it than that one did.
 
 If it does not, see [if your agent does not pick it up](#if-your-agent-does-not-pick-it-up).
 
@@ -101,10 +101,10 @@ is in the wrong half; that a criterion naming a value your data never holds
 produces a test that passes whatever the code does. None of that is a function
 call, and an agent that does not know it will use qikly and get less out of it.
 
-**Read this plainly: a Skill cannot keep anything hidden.** It is text in a
-context window. The withholding is enforced by the tool, in code, whether or
-not this Skill is installed. The Skill's own text says so, and there is a test
-asserting it still does.
+**The guarantee does not rest on the Skill.** A Skill is text in a context
+window, so it can inform but not enforce. The withholding is enforced by the
+tool, in code, whether or not this Skill is ever installed. The Skill's own
+text says so, and a test asserts that it still does.
 
 ## If your agent does not pick it up
 

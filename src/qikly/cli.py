@@ -1500,10 +1500,15 @@ def _do_install_skill(agent, force, dry_run):
         if [h for h in written if h != "claude"]:
             print()
             if proven:
-                print("Watched loading in %s, %s, which is an anecdote rather "
-                      "than a guarantee."
-                      % (", ".join(proven),
-                         "once each" if len(proven) > 1 else "once"))
+                # Say what was seen and under what conditions, and let the
+                # conditions carry the weight. The line used to end "which is
+                # an anecdote rather than a guarantee", which reads as a
+                # warning about the Skill rather than a description of the
+                # test, and a user who has just installed something does not
+                # need talking out of it.
+                print("Confirmed loading in %s, with a rival testing skill "
+                      "installed beside it and a request that never mentioned "
+                      "qikly." % ", ".join(proven))
             for host in unproven:
                 print("The .%s/ path has NOT been watched loading. Gemini CLI "
                       "reads .agents/skills/ too, and that is the one we saw "
