@@ -64,6 +64,39 @@ def test_the_frontmatter_has_a_name_and_a_description():
         "the description must say when to use it, not only what it is")
 
 
+def test_the_description_fits_the_budget_a_host_gives_it():
+    """
+    The description is the only part of a Skill an agent reads before deciding,
+    and a host does not show all of it.
+
+    Claude Code builds its skill listing from a character budget: a fraction of
+    the context window for the whole listing, and a per-skill cap of 1536
+    characters. A description over that cap is truncated, and what is lost is
+    the end of it, which is where the trigger phrases live: "Use when they ask
+    whether a specification is testable", "whenever qikly or spec-driven
+    testing is mentioned". Losing those loses the loading, silently, with the
+    first half still reading perfectly.
+
+    So this guards the cap with room to spare rather than at it. Every
+    character here is also one fewer for somebody else's skills in the same
+    listing, which is the reason to keep it short beyond the limit itself.
+    """
+    text = _read(os.path.join(SKILL_DIR, "SKILL.md"))
+    front = text.split("---", 2)[1]
+    described = re.search(r"^description:\s*(.+)$", front, re.MULTILINE).group(1)
+
+    assert len(described) <= 800, (
+        "the description is %d characters. The per-skill cap is 1536 and the "
+        "trigger phrases are at the end, so they are what a truncation takes. "
+        "Cut it back under 800." % len(described))
+
+    # And it has to still carry the phrases that do the loading.
+    for phrase in ("Use when", "qikly"):
+        assert phrase in described, (
+            "%r left the description, which is where loading is decided"
+            % phrase)
+
+
 def test_the_skill_does_not_claim_to_enforce_the_withholding():
     """
     The claim that would be false, and is the easiest one to write.

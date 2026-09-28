@@ -135,6 +135,12 @@ arrive as a bare name with nothing to match against. Raising
 room, and that single change turned four failed routing attempts into a clean
 one during testing.
 
+**Which is why naming it once is more than a workaround.** That ranking is by
+how often you have used each skill, decaying over about a week, so a skill you
+have never invoked sorts below every skill you have. Name it in one request and
+it moves above them, and the next neutral request has a much better chance of
+finding it by itself. The first invocation is the only hard one.
+
 ## Checking that it works
 
 A Skill either loads or it does not, and it never tells you which, so it is
