@@ -443,15 +443,33 @@ def test_an_instruction_file_already_there_is_backed_up_not_destroyed(tmp_path):
 def test_rewriting_our_own_pointer_does_not_leave_a_backup(tmp_path):
     """
     A backup per install would litter the directory it is trying to respect.
-    Identical content is not an overwrite worth keeping.
+
+    And "differs from the current text" is the wrong test for whether a file
+    is ours: the pointer's wording changes between releases, so an upgrade
+    backed up a file the user had never touched. What is kept is a file
+    somebody else wrote, recognised by the opening qikly always generates.
     """
     from qikly.skill_install import POINTER, install
 
     install(str(tmp_path), host="copilot")
+
+    # Identical: no backup.
     _destination, _outcome, backup = install(str(tmp_path), host="copilot",
                                              force=True)
     assert backup is None or "instructions" not in os.path.basename(backup), (
         "an identical pointer was backed up anyway")
+
+    # An older release's pointer: ours, different body, still no backup.
+    pointer = tmp_path / POINTER
+    from qikly.skill_install import _POINTER_SIGNATURE
+
+    pointer.write_text(_POINTER_SIGNATURE + "\nAn older release wrote this.\n",
+                       encoding="utf-8")
+    _destination, _outcome, backup = install(str(tmp_path), host="copilot",
+                                             force=True)
+    assert backup is None or "instructions" not in os.path.basename(backup), (
+        "a pointer from an earlier release was backed up, which litters the "
+        "directory on every upgrade")
 
 
 def test_something_blocking_the_pointer_stops_before_anything_is_written(tmp_path):

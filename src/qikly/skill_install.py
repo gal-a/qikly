@@ -80,6 +80,11 @@ HOSTS = ("claude", "agents", "cursor", "gemini", "copilot")
 # pattern Copilot looks for and a file one level down is never opened.
 POINTER = os.path.join(".github", "instructions", SKILL_NAME + ".instructions.md")
 
+# How a pointer qikly wrote is told apart from one somebody else did. The body
+# changes between releases; this opening does not, and it is what decides
+# whether rewriting the file is an upgrade or an overwrite.
+_POINTER_SIGNATURE = '---\napplyTo: "**"\n---\n\n# qikly\n'
+
 POINTER_TEXT = """---
 applyTo: "**"
 ---
@@ -293,8 +298,13 @@ def _write_pointer(root, force=False):
                 already = handle.read()
         except Exception:
             already = None
-        # Rewriting our own generated file is not an overwrite worth a backup.
-        if already != POINTER_TEXT:
+        # Rewriting our own generated file is not an overwrite worth a backup,
+        # and "differs from the current text" is the wrong test for that: the
+        # text changes between releases, so an upgrade backed up a file the
+        # user had never touched, in the directory the backup rule exists to
+        # respect. What is worth keeping is a file somebody else wrote, and
+        # the opening of one qikly generated is the same in every version.
+        if already is None or not already.startswith(_POINTER_SIGNATURE):
             saved = _backup(path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
