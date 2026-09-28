@@ -14,7 +14,7 @@ metadata:
 ## What this is for
 
 If you write a module and then write its tests, both come from one reading of
-the same ambiguous sentences, so the tests cannot disagree with the code. The
+the same ambiguous sentences. The
 suite goes green and the green means nothing.
 
 **Python modules only.** qikly scaffolds from Python signatures and generates
@@ -169,18 +169,15 @@ at any code. Copying a criterion's boundary value into the requirements to get
 a run green is the opposite: it tells both agents the answer, and the test that
 checks it then passes first try and proves nothing.
 
-**Both mistakes have a signature, and you should recognise them.**
+**Both mistakes have a signature.**
 
-A *decision* hidden in the criteria leaves the coding agent guessing something
-nobody told it. It shows up as repetition: the same test failing while each FIX
-and PATCH comes back nearly identical, or two tests disagreeing where every
-patch fixes one and breaks the other. Sometimes it guesses right and the run
-goes green, which is worse, because nothing then tells you the line was in the
-wrong half.
+A *decision* hidden in the criteria shows up as repetition: near-identical FIX
+and PATCH each round, or two tests disagreeing where every patch fixes one and
+breaks the other. Sometimes it guesses right and the run goes green, which is
+worse, because nothing then tells you the line was in the wrong half.
 
-A *consequence* left in the requirements is quieter. Both agents read the same
-boundary, the test for it passes first try, and nothing was learned. The run
-looks entirely normal.
+A *consequence* left in the requirements is quieter: the test for it passes
+first try, nothing was learned, and the run looks entirely normal.
 
 **Spotting one is your job; settling it is not.** You can tell a decision from
 a consequence by applying the question above to the words on the page, and you
@@ -245,9 +242,9 @@ this look like, and which criterion catches it? A requirement with no answer is
 a requirement nothing is testing.
 
 **And read your own requirements back against the word list above.** This
-applies to wording you wrote yourself, which is where it gets missed: an agent
-that writes "rounded to the nearest cent" has just created the ambiguity it
-knows how to spot in somebody else's spec. If a requirement you drafted uses
+applies to your own wording too, which is where it gets missed: writing
+"rounded to the nearest cent" creates the same ambiguity you would flag in
+somebody else's spec. If a requirement you drafted uses
 one of those words, say so and ask which way the boundary falls, rather than
 writing criteria that quietly avoid the case. A tie nobody decided is not a
 withheld consequence, it is a decision nobody made, and it will surface as a
@@ -316,7 +313,7 @@ writing anything. This has already cost a first-time user an afternoon.
 | `qikly --validate --tasks X` | free | always, before any run. Catches a missing input file, a leftover TODO, a criterion made of adjectives, a requirement restating a criterion, and criteria the data cannot reach |
 | `qikly --explain X` | free | to show the user exactly what each agent receives, criteria present on one side and absent on the other |
 | `qikly --score-suite --tasks X` | free, and slow | after a run converges, to find what the suite would not have noticed. It plants one fault at a time in the code and reports which ones the tests missed. Free because every fault is an edit to the code's syntax tree and no model is asked anything; slow because each fault means running your whole suite again |
-| `qikly --score-code PATH --score-tests PATH` | free, and slow | **for a suite qikly did not write**, which is what somebody already has before they have anything else. Point it at a module or package and the tests for it, and it reports which planted faults the tests did not notice. No task file, no run, no model call, nothing of theirs modified, and the report lands beside their code. This is usually the right first thing to run on a stranger's project |
+| `qikly --score-code PATH --score-tests PATH` | free, and slow | **for a suite qikly did not write**, which is what somebody already has before they have anything else. Point it at a module or package and the tests for it, and it reports which planted faults the tests did not notice. No task file, no run, no model call, and the report lands beside their code |
 | `qikly --check-criteria --tasks X` | one model call | when a spec may contradict itself, before spending a run on it |
 | `qikly --propose-fixtures --tasks X` | one model call | when `--validate` says a criterion's values are missing from the data, to get the rows it would take |
 
@@ -351,9 +348,8 @@ Then, in order:
 Then the cheap levers: a larger model, and more attempts. And never loosen a
 criterion to get green, for the reason given above.
 
-**On macOS, if no patch ever applies**, install GNU patch: `brew install
-gpatch`. The system `patch` is BSD and rejects the options qikly sends, so
-every generated diff fails for a reason that looks like the model's fault.
+If no patch ever applies at all, and you are on macOS, that is section 12 of
+`references/TROUBLESHOOTING.md`.
 
 **What the agent sees when a test fails, exactly.** pytest's output for the
 failing test: its name, its own source and docstring, and the assertion error.

@@ -36,6 +36,7 @@ what happened, then fixes to the task file, and only then more attempts.
 | **Nothing has run yet, and files you were told about are missing** | [Before a run](#before-a-run-where-did-my-files-go) | Read the first line of the command's output: it names the directory it worked in, and says when the project root is somewhere else |
 | **You are in a `demo/<timestamp>/` folder** | [Before a run](#before-a-run-where-did-my-files-go) | That is a throwaway copy. Start your own project somewhere else |
 | `--score-code` says the suite does not pass | [Before a run](#before-a-run-where-did-my-files-go) | Usually pytest collected no tests at the path given to `--score-tests` |
+| **On macOS, no patch ever applies, on any task** | [12. On macOS, no patch ever applies](#12-on-macos-no-patch-ever-applies) | `brew install gpatch`. The system `patch` is BSD and rejects the options qikly sends |
 | Integration and system pass, unit does not | [11. Expect the unit stage to be where it fails](#11-expect-the-unit-stage-to-be-where-it-fails) | Expected. Accept it, or leave the unit stage out with `orchestrator.test_order` |
 
 ---
@@ -297,6 +298,23 @@ has the full explanation.
 
 If behavioural verification is what you need, `orchestrator.test_order` in
 settings can leave it out.
+
+## 12. On macOS, no patch ever applies
+
+Every generated diff fails, on every task, from the first iteration, for a
+reason that reads like the model's fault and is not.
+
+The system `patch` on macOS is BSD, and it rejects the options qikly sends.
+Install GNU patch and the same run goes through:
+
+```bash
+brew install gpatch
+```
+
+Nothing else changes. If patches apply on one machine and fail on all of them
+on another, this is the first thing to check.
+
+---
 
 ---
 

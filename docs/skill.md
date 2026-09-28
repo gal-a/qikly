@@ -11,7 +11,23 @@ to keep running.
 
 ## Install it
 
-From the directory of the project you want it in:
+**First, make sure the qikly you are about to run is the current one.** The
+Skill ships inside the package, so an old qikly writes an old Skill, and it
+then describes commands that do not exist yet.
+
+```bash
+pip uninstall qikly -y
+pip install qikly
+qikly --version
+```
+
+Uninstall first rather than `--upgrade`: an interrupted or repeated upgrade can
+leave more than one version's metadata behind, and pip then reports one version
+while the files on disk are another's. The clean pair takes seconds and removes
+the question. Compare what `--version` prints against
+[the latest release](https://pypi.org/project/qikly/).
+
+Then, from the directory of the project you want the Skill in:
 
 ```bash
 qikly --install-skill
