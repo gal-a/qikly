@@ -500,6 +500,43 @@ def write(result, gaps, out_dir=OUT_DIR):
     return path
 
 
+def _invite_a_report(result):
+    """
+    Ask at the one moment the user has just learned something they did not
+    know, and only then.
+
+    The Skill is built to make qikly invisible: it installs into an agent
+    somebody already uses, so adopting it is not adopting a tool. Good for
+    adoption, bad for hearing anything back, because a user whose agent
+    quietly scored their suite has no reason to think about this project at
+    all. Until now the only place that asked for anything was the Copilot
+    install, which is the moment a user knows least.
+
+    A fault their own tests did not notice is the exception. It is a surprise,
+    it is about their code rather than about qikly, and it is the most useful
+    thing anyone outside this project can send it: the generated suites are
+    measured against what real suites miss, and there is no other source for
+    that.
+
+    Silent when nothing was missed, because an invitation after good news is
+    an advertisement. `QIKLY_NO_INVITE=1` turns it off.
+    """
+    if os.environ.get("QIKLY_NO_INVITE"):
+        return None
+    if not (result or {}).get("missed"):
+        return None
+    message = chr(10).join([
+        "",
+        "The faults your tests did not notice are the most useful thing this",
+        "project can be sent. The generated suites are measured against what",
+        "real suites miss, and there is no other source for that. The shape of",
+        "one is enough and none of your code has to leave your machine:",
+        "  https://github.com/gal-a/qikly/discussions",
+    ])
+    print(message)
+    return message
+
+
 def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
     """The command's body: score, report, and say what the number is worth."""
     if isinstance(target, str):
@@ -532,6 +569,7 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
         else:
             print(f"[{task_id}] the suite does not pass your current code, so a "
                   f"score would mean nothing. Report at {path}")
+        _invite_a_report(result)
         return path
 
     total, caught = result["total"], len(result["caught"])
@@ -545,4 +583,5 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
               f"never triggers: a suite cannot catch what no row exercises. "
               f"Run --propose-fixtures --tasks {task_id} first.")
     print(f"[{task_id}] what it missed, one line each: {path}")
+    _invite_a_report(result)
     return path
