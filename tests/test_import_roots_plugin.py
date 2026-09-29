@@ -67,6 +67,44 @@ def test_the_plugin_does_nothing_without_its_variable(monkeypatch):
     assert sys.path == before
 
 
+def test_importing_the_plugin_module_changes_nothing(monkeypatch):
+    """
+    Found by audit 2026-09-29. This module used to call `_install` at import
+    time, and `run_tests` imported it to read its name, and the orchestrator
+    imports `run_tests`, so every qikly command imported it. An ambient
+    `QIKLY_IMPORT_ROOTS`, which the fixtures in this very file export, then
+    reordered `sys.path` in the CLI's own process on `--version`.
+    """
+    import importlib
+
+    monkeypatch.setenv(ENV_VAR, os.path.abspath("should-not-be-installed"))
+    before = list(sys.path)
+    importlib.reload(importlib.import_module("qikly._pytest_import_roots"))
+    assert sys.path == before, "importing the plugin must have no side effect"
+
+
+def test_run_tests_names_the_plugin_without_importing_it():
+    """
+    The two strings are literals in `run_tests`, so nothing about a normal
+    qikly process pulls the plugin in. Pinned here so a rename cannot quietly
+    break the link that is no longer an import.
+    """
+    from qikly.agent_tools import run_tests as rt
+    from qikly import _pytest_import_roots as plugin
+
+    assert rt.IMPORT_ROOTS_PLUGIN == plugin.__name__
+    assert rt.IMPORT_ROOTS_ENV == plugin.ENV_VAR
+    assert not hasattr(rt, "import_roots_plugin"), (
+        "run_tests must name the plugin, not import it")
+
+
+def test_the_plugin_exposes_pytest_s_own_hook():
+    """It is a hook that installs the roots, which is why an import cannot."""
+    from qikly import _pytest_import_roots as plugin
+
+    assert callable(plugin.pytest_configure)
+
+
 # --- what it does when it is on ----------------------------------------------
 
 def test_a_package_task_names_the_plugin_and_sets_the_variable(monkeypatch, tmp_path):

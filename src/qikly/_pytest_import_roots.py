@@ -64,4 +64,21 @@ def _install(value):
     return [os.path.abspath(r) for r in roots]
 
 
-_install(os.environ.get(ENV_VAR))
+def pytest_configure(config):
+    """
+    pytest's own hook, and deliberately not module-level code.
+
+    An earlier version called `_install` on import. An audit on 2026-09-29
+    showed that claim about "never imported otherwise" to be simply wrong:
+    `run_tests.py` imported this module to read its name, `orchestrator.py`
+    imports `run_tests`, and every qikly invocation imports the orchestrator.
+    So `QIKLY_IMPORT_ROOTS` left in a shell, which the tests of this very
+    feature export, reordered `sys.path` in the CLI's own process on any
+    command at all, `--version` included.
+
+    A hook cannot do that. It runs only when pytest has actually loaded this
+    as a plugin, which is only when qikly put `-p` on the command line, and
+    it runs before collection, which is before any test module is imported.
+    Importing this module now has no effect whatsoever.
+    """
+    _install(os.environ.get(ENV_VAR))

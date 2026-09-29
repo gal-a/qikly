@@ -3,9 +3,14 @@ import re
 import subprocess
 import sys
 
-from qikly import _pytest_import_roots as import_roots_plugin
-
 REPORT_DIR = "outputs/reports/iterations"
+
+# Named rather than imported. Importing the plugin here would pull it into
+# every qikly process, which is what let an ambient environment variable
+# reorder the CLI's own sys.path. `test_import_roots_plugin.py` pins both
+# strings against the module, so a rename cannot silently break the link.
+IMPORT_ROOTS_PLUGIN = "qikly._pytest_import_roots"
+IMPORT_ROOTS_ENV = "QIKLY_IMPORT_ROOTS"
 
 
 def _parse_counts(combined_output):
@@ -192,8 +197,8 @@ def run_tests(stage, tests_dir, task_id=None, iteration=None, run_timestamp=None
         # installed: the suite imports the user's code, the agent repairs a
         # copy nobody imports, and no patch can change a test outcome. The
         # plugin runs before collection and puts these roots in front.
-        env[import_roots_plugin.ENV_VAR] = os.pathsep.join(roots)
-        cmd += ["-p", import_roots_plugin.__name__]
+        env[IMPORT_ROOTS_ENV] = os.pathsep.join(roots)
+        cmd += ["-p", IMPORT_ROOTS_PLUGIN]
 
     try:
         proc = subprocess.run(

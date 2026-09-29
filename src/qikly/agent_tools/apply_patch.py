@@ -113,7 +113,12 @@ def _resolve_targets(patch_path, code_dir=None):
             # All or nothing. Repairing some paths and not others would apply
             # some hunks and leave the rest, which is the non-atomic state the
             # dry run exists to prevent.
-            if len(repairs) != len(missing):
+            #
+            # Counted against the DISTINCT missing paths. `repairs` is keyed by
+            # path, so a diff naming the same file twice collapsed to one key
+            # and then failed this comparison, discarding a repair that was
+            # complete. Found by audit 2026-09-29.
+            if len(repairs) != len({m.replace("\\", "/") for m in missing}):
                 repairs = {}
             else:
                 resolved = [repairs.get(r.replace("\\", "/"), r) for r in resolved]
@@ -178,7 +183,15 @@ def _repair_destination(named, existing):
     fail exactly as it did before this existed.
     """
     parts = [p for p in named.replace("\\", "/").split("/") if p not in ("", ".")]
-    for length in range(len(parts), 0, -1):
+    # A bare filename is never enough evidence, so the shortest suffix tried
+    # is two components. Raised from one after an audit on 2026-09-29 pointed
+    # out the case it opens: a FIX that means to *create* `helpers.py`, while
+    # an unrelated `helpers.py` already exists somewhere else under the task,
+    # would have its new file silently repointed at the old one. Two
+    # components is what the case this exists for actually needs
+    # (`salespkg/etl.py`), and it costs only the flat shape `etl.py`, which
+    # never had this repair and converged without it for many releases.
+    for length in range(len(parts), 1, -1):
         suffix = "/".join(parts[-length:])
         matches = [f for f in existing
                    if f == suffix or f.endswith("/" + suffix)]
