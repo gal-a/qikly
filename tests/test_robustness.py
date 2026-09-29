@@ -48,6 +48,71 @@ def test_a_missing_patch_binary_says_how_to_install_one(monkeypatch):
         assert platform_hint in message
 
 
+@pytest.mark.parametrize("banner, expected", [
+    # 2.7 says GNU on the first line.
+    ("GNU patch 2.7.6\nCopyright (C) 1988 Larry Wall\n", (2, 7, 6)),
+    # 2.5.9 does not, and it is the one version this has to recognise. A
+    # matcher anchored on "GNU patch" reads this as unknown and lets it
+    # through, which is the whole defect.
+    ("patch 2.5.9\nCopyright (C) 1988 Larry Wall\n", (2, 5, 9)),
+    # Apple's, which is both ancient and not GNU.
+    ("patch 2.0-12u11-Apple\n", (2, 0)),
+    ("some other tool 9.9\n", None),
+    ("", None),
+])
+def test_the_patch_version_is_read_from_the_banner_shapes_that_exist(banner, expected):
+    assert ap._parse_patch_version(banner) == expected
+
+
+def test_a_patch_too_old_to_write_into_a_subdirectory_is_stepped_over(monkeypatch):
+    """
+    GNU patch 2.5.9 aborts on an assertion when a hunk writes into a
+    subdirectory, and Strawberry Perl puts it on PATH ahead of Git's copy on
+    Windows. It is GNU and takes --fuzz, so the flavour check cannot see it.
+    The search must carry on to the good one rather than return the first
+    thing it finds.
+    """
+    monkeypatch.setattr(ap.shutil, "which",
+                        lambda name: {"patch": r"C:\Strawberry\c\bin\patch.EXE",
+                                      "git": r"C:\Program Files\Git\cmd\git.exe"}.get(name))
+    monkeypatch.setattr(ap.os.path, "exists", lambda path: "Git" in path)
+    monkeypatch.setattr(ap, "_probe_patch_version",
+                        lambda exe: (2, 5, 9) if "Strawberry" in exe else (2, 7, 6))
+
+    assert "Git" in ap._find_patch_exe()
+
+
+def test_when_every_patch_is_too_old_the_error_names_it_and_its_version(monkeypatch):
+    """
+    The failure it replaces was an assertion dialog from a binary the user
+    never chose, naming a C source file and a line number.
+    """
+    monkeypatch.setattr(ap.shutil, "which",
+                        lambda name: "/usr/bin/patch" if name == "patch" else None)
+    monkeypatch.setattr(ap, "_probe_patch_version", lambda exe: (2, 5, 9))
+
+    with pytest.raises(RuntimeError) as caught:
+        ap._find_patch_exe()
+    message = str(caught.value)
+    assert "/usr/bin/patch" in message and "2.5.9" in message
+    for platform_hint in ("apt install patch", "brew install gpatch",
+                          "Git for Windows"):
+        assert platform_hint in message
+
+
+def test_a_patch_whose_version_cannot_be_read_is_still_used(monkeypatch):
+    """
+    The gate knows about one defect. A binary it cannot identify is not
+    thereby broken, and rejecting it here would turn the flavour check's
+    specific message into a guess made before anything was tried.
+    """
+    monkeypatch.setattr(ap.shutil, "which",
+                        lambda name: "/usr/bin/patch" if name == "patch" else None)
+    monkeypatch.setattr(ap, "_probe_patch_version", lambda exe: None)
+
+    assert ap._find_patch_exe() == "/usr/bin/patch"
+
+
 def test_a_non_gnu_patch_is_told_apart_from_a_failed_hunk():
     """
     These reach the caller identically and mean opposite things. A hunk that
@@ -86,6 +151,14 @@ def test_the_installed_patch_is_gnu_and_takes_the_flags_we_send():
     assert "GNU" in banner, (
         f"{exe} is not GNU patch ({banner.splitlines()[:1]}), so --fuzz will be "
         f"rejected and no generated diff will apply")
+    # And current enough to be usable. This assertion is the one that would
+    # have named the problem on the Windows runners directly, instead of
+    # leaving seven tests in another file to fail with an assertion dialog
+    # from patch's own C source.
+    version = ap._parse_patch_version(banner)
+    assert version is not None and version >= ap.MIN_PATCH_VERSION, (
+        f"{exe} is patch {version}, older than {ap.MIN_PATCH_VERSION}, which "
+        f"aborts when a hunk writes into a subdirectory")
 
 
 def test_a_diff_that_would_escape_the_sandbox_is_refused(tmp_path):

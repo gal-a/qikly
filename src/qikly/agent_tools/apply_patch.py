@@ -1,7 +1,60 @@
 import os
 import posixpath
+import re
 import shutil
 import subprocess
+
+
+# GNU patch 2.5.9 aborts on an internal assertion, "Expression: hunk" at
+# patch.c line 354, when a hunk writes into a subdirectory. A package-seeded
+# implementation is nothing but subdirectories, so every repair in such a task
+# dies there. It is from 2002; 2.7 is the first series without it.
+#
+# The version has to be asked for rather than inferred from a failure, because
+# this binary is GNU and accepts --fuzz and --dry-run, so the flavour check
+# below has nothing to catch. Strawberry Perl, the usual Perl for Windows,
+# puts it on PATH ahead of Git's, which is how it took down seven tests on
+# GitHub's own Windows runners in 0.5.5 while passing everywhere else.
+MIN_PATCH_VERSION = (2, 7)
+
+_VERSION_CACHE = {}
+
+
+def _parse_patch_version(banner):
+    """
+    The release tuple from a `patch --version` banner, or None.
+
+    Searched anywhere in the output rather than anchored, because the banner
+    has changed shape: 2.7 opens "GNU patch 2.7.6", while 2.5.9 opens "patch
+    2.5.9" and only names GNU further down in the copyright. Anchoring on
+    "GNU patch" would therefore read the one version this exists to reject as
+    unknown, and wave it through.
+
+    None means the question has no answer here, not that the binary is fine.
+    """
+    found = re.search(r"(?:GNU\s+)?patch\s+(\d+)\.(\d+)(?:\.(\d+))?",
+                      banner or "", re.I)
+    if not found:
+        return None
+    return tuple(int(part) for part in found.groups() if part is not None)
+
+
+def _probe_patch_version(exe):
+    """
+    Cached per path, because discovery runs on every patch and a subprocess
+    per apply buys nothing: a binary's version cannot change during a run.
+    """
+    if exe not in _VERSION_CACHE:
+        try:
+            done = subprocess.run([exe, "--version"], capture_output=True,
+                                  text=True, timeout=10)
+            _VERSION_CACHE[exe] = _parse_patch_version(done.stdout or done.stderr)
+        except Exception:
+            # A binary that cannot even be asked is left alone. The flavour
+            # check reports what actually goes wrong when a patch is applied,
+            # and that is a better error than a guess made here.
+            _VERSION_CACHE[exe] = None
+    return _VERSION_CACHE[exe]
 
 
 def _find_patch_exe():
@@ -20,19 +73,54 @@ def _find_patch_exe():
 
     It is also rarely on PATH on Windows even when Git is installed, since Git
     for Windows ships it under usr\\bin, not cmd\\.
+
+    Candidates are then ranked by what they can do rather than by where they
+    came from. One too old to be usable is stepped over and the search
+    continues, so Git for Windows' copy is still found when Strawberry Perl's
+    2.5.9 shadows it on PATH. Preferring Git's unconditionally would have done
+    the same for that case and quietly overridden a user who had installed a
+    good `patch` on purpose, which is the opposite of what they asked for.
     """
+    candidates = []
     for name in ("gpatch", "patch"):
         found = shutil.which(name)
-        if found:
-            return found
+        if found and found not in candidates:
+            candidates.append(found)
 
     git_exe = shutil.which("git")
     if git_exe:
         candidate = os.path.join(
             os.path.dirname(os.path.dirname(git_exe)), "usr", "bin", "patch.exe"
         )
-        if os.path.exists(candidate):
+        if os.path.exists(candidate) and candidate not in candidates:
+            candidates.append(candidate)
+
+    too_old = []
+    for candidate in candidates:
+        version = _probe_patch_version(candidate)
+        # An unreadable version is not a reason to reject. The gate knows
+        # about one specific defect; anything it cannot identify goes through
+        # and fails, if it fails, with the flavour check's own message.
+        if version is None or version >= MIN_PATCH_VERSION:
             return candidate
+        too_old.append((candidate, version))
+
+    if too_old:
+        listed = "\n".join(
+            "  %s is patch %s" % (exe, ".".join(str(n) for n in version))
+            for exe, version in too_old)
+        raise RuntimeError(
+            "Every `patch` found is older than GNU patch %s, which is the "
+            "first version that can write a hunk into a subdirectory without "
+            "aborting. A package-seeded implementation is all subdirectories, "
+            "so these would fail on every repair:\n%s\n"
+            "  Debian/Ubuntu:  apt install patch\n"
+            "  macOS:          brew install gpatch  (Apple's own patch is "
+            "both non-GNU and far older than this)\n"
+            "  Windows:        install Git for Windows, which ships a current "
+            "GNU patch under usr\\bin; qikly finds it there without any PATH "
+            "change, even when another one comes first on PATH."
+            % (".".join(str(n) for n in MIN_PATCH_VERSION), listed))
 
     # Naming the fix, not just the fact. This is the first thing a user on a
     # fresh machine hits, it stops every run dead, and "could not locate" on

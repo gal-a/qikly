@@ -4,6 +4,27 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## 0.5.6
+
+> The `patch` a machine happens to have is now checked for being new enough, not just for being GNU
+
+### Fixed
+- **An old `patch` on PATH aborted on every repair inside a package, and
+  nothing said why.** GNU patch 2.5.9 fails an internal assertion when a hunk
+  writes into a subdirectory, which is what a package-seeded implementation is
+  made of. It is from 2002, and Strawberry Perl, the usual Perl distribution
+  for Windows, installs it ahead of Git's copy on PATH. The existing guard
+  only asks whether a `patch` is GNU, which this one is: it takes `--fuzz` and
+  `--dry-run` without complaint and then dies with a dialog naming a line in
+  patch's own C source, so a Windows user saw every FIX fail for a reason no
+  message connected to the binary they never chose. qikly now asks each
+  candidate for its version and steps over anything below 2.7, which finds the
+  current GNU patch that Git for Windows ships under `usr\bin` even when
+  another one comes first. A `patch` whose version cannot be read is still
+  used, so nothing that works today stops working; if every candidate is too
+  old, the error names each one, its version, and the fix for the platform.
+  Found on GitHub's own Windows runners, which preinstall Strawberry Perl.
+
 ## 0.5.5
 
 > A Skill for GitHub Copilot, an implementation that can be a whole package, and a fault outside one that says so instead of being worked around
