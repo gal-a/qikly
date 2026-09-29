@@ -72,14 +72,23 @@ def test_a_patch_too_old_to_write_into_a_subdirectory_is_stepped_over(monkeypatc
     The search must carry on to the good one rather than return the first
     thing it finds.
     """
+    # Joined rather than written as Windows literals. A backslash is not a
+    # separator on POSIX, so a hard-coded Windows path makes `dirname` return
+    # "" on Linux, the bundled candidate is never formed, and this fails on CI
+    # for a reason unrelated to what it checks. Found on CI on 2026-09-29, and
+    # it is the same platform assumption as the `altsep` bug two commits back.
+    strawberry = os.path.join("C:", "Strawberry", "c", "bin", "patch.EXE")
+    git_exe = os.path.join("C:", "Program Files", "Git", "cmd", "git.exe")
+    bundled = os.path.join(os.path.dirname(os.path.dirname(git_exe)),
+                           "usr", "bin", "patch.exe")
+
     monkeypatch.setattr(ap.shutil, "which",
-                        lambda name: {"patch": r"C:\Strawberry\c\bin\patch.EXE",
-                                      "git": r"C:\Program Files\Git\cmd\git.exe"}.get(name))
-    monkeypatch.setattr(ap.os.path, "exists", lambda path: "Git" in path)
+                        lambda name: {"patch": strawberry, "git": git_exe}.get(name))
+    monkeypatch.setattr(ap.os.path, "exists", lambda path: path == bundled)
     monkeypatch.setattr(ap, "_probe_patch_version",
                         lambda exe: (2, 5, 9) if "Strawberry" in exe else (2, 7, 6))
 
-    assert "Git" in ap._find_patch_exe()
+    assert ap._find_patch_exe() == bundled
 
 
 def test_when_every_patch_is_too_old_the_error_names_it_and_its_version(monkeypatch):
