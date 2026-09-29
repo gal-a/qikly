@@ -21,9 +21,14 @@ packaging tools would read as `1.1`.
   candidate for its version and steps over anything below 2.7, which finds the
   current GNU patch that Git for Windows ships under `usr\bin` even when
   another one comes first. A `patch` whose version cannot be read is still
-  used, so nothing that works today stops working; if every candidate is too
-  old, the error names each one, its version, and the fix for the platform.
-  Found on GitHub's own Windows runners, which preinstall Strawberry Perl.
+  used, so nothing that works today stops working. The version is a
+  preference rather than a veto: where no candidate is new enough, the first
+  is still used, because an older `patch` refuses these flags outright and
+  says so, and on macOS without `gpatch` that is Apple's own. The one refusal
+  is a `patch` between 2.5 and 2.7, which accepts the flags and then aborts;
+  there the error names each binary, its version, and the fix for the
+  platform, since nothing else would connect the crash to the cause. Found on
+  GitHub's own Windows runners, which preinstall Strawberry Perl.
 
 ## 0.5.5
 
