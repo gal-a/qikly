@@ -136,6 +136,14 @@ def check_skill_floor(version):
         return check("the Skill names a minimum qikly version", False,
                      "no 'requires: qikly >= X.Y.Z' in the frontmatter")
 
+    # Printed, not checked. The Skill carries its own version on purpose: it
+    # moves when the instructions move, not when the tool releases, and a test
+    # holds it to that. What was missing is anybody being told the pairing on
+    # the day, so "0.5.7 ships Skill 0.3.2" stops being a surprise later.
+    shipped = re.search(r"^\s*version:\s*(\S+)", text, re.M)
+    print("        this release ships Skill %s"
+          % (shipped.group(1) if shipped else "unknown"))
+
     floor = found.group(1)
     # Compare only the leading numeric components. A pre-release or build tag,
     # `0.5.3rc1` or `0.5.3+build2`, is a legal version here and used to raise

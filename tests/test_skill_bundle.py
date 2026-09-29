@@ -227,6 +227,52 @@ def test_the_frontmatter_carries_the_metadata_directories_sort_on():
         "the Skill reaches 1.0.0 when it has survived real use, not before")
 
 
+# The body of each released Skill, by the version that shipped it. A version
+# is only worth reading if it moves when the instructions move, and nothing
+# else makes that true: the Skill is bumped by hand, in a file that is edited
+# for reasons unrelated to releasing, by whoever happens to be editing it.
+#
+# Git would answer this more directly, and cannot: CI checks out at depth one
+# with no tags, so a test that diffs against the last release passes locally
+# and is vacuous on every runner. A hash is self-contained and says the same
+# thing.
+#
+# 2026-09-29: 0.3.1 was edited twice in one session, and the bump to 0.3.2
+# happened because somebody remembered. This exists so the next one does not
+# depend on that.
+SKILL_BODY_HASHES = {
+    "0.3.2": "ff71bda1a1be618ed8050bb4a60ba1d28bba1eb13130c8e3b20580d41ad408cf",
+}
+
+
+def test_the_skill_version_moves_when_the_instructions_move():
+    """
+    A Skill version that has not changed while the text has is worse than no
+    version at all: a directory that holds a cached copy has no way to know
+    it is stale, and a user comparing two installs is told they match.
+    """
+    import hashlib
+    import yaml
+
+    text = _read(os.path.join(SKILL_DIR, "SKILL.md"))
+    front = yaml.safe_load(text.split("---", 2)[1])
+    version = str((front.get("metadata") or {}).get("version"))
+    body = text.split("---", 2)[2]
+    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+    known = SKILL_BODY_HASHES.get(version)
+    assert known is not None, (
+        "SKILL.md declares version %s, which SKILL_BODY_HASHES does not know. "
+        "If the instructions changed, that is the right thing to have done: "
+        "add %r: %r to the table. If they did not, the version moved for no "
+        "reason." % (version, version, digest))
+    assert digest == known, (
+        "SKILL.md's body changed while metadata.version stayed at %s. Bump "
+        "the version and add %r: %r to SKILL_BODY_HASHES in the same edit, so "
+        "the number keeps meaning what it says."
+        % (version, version, digest))
+
+
 def test_every_frontmatter_key_is_one_the_spec_allows():
     """
     An unknown key fails the validators several directories run on submission.
