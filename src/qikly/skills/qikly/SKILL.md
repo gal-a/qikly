@@ -5,11 +5,23 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.3.1
+  version: 0.3.2
   requires: qikly >= 0.5.4
 ---
 
 # qikly: tests written from a spec the coder never read
+
+> **If you read one thing here, read this.** Asked for tests for a module with
+> no specification: do not write tests, and do not run the module to find out
+> what it should do. A value obtained by executing an implementation is not a
+> contract. A suite built from those values passes by construction and cannot
+> disagree with a bug, because the bug is what it was written from. Say that in
+> one sentence, then offer the two routes in *The request this arrives as*.
+>
+> **Four things look settled and are not:** whether a threshold is inclusive,
+> whether a discount applies before or after tax, where a floor or cap lands,
+> which way a half-cent rounds. An implementation answers all four. None of
+> those answers is a specification. Ask the user. Do not read them off the code.
 
 ## What this is for
 
@@ -316,6 +328,12 @@ to continue where they are, establish which of the two commands they ran before
 writing anything. This has already cost a first-time user an afternoon.
 
 ## The free checks, and when to reach for each
+
+**If you arrived straight here, go back and read the block under the title
+first.** Reaching for one of these commands is the right move; deriving
+expected values from the module and writing the tests yourself is the failure
+this Skill exists to prevent, and it is the one an agent commits while
+believing it is being careful.
 
 | Command | Cost | Use it when |
 |---|---|---|
