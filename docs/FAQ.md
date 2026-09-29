@@ -101,6 +101,27 @@ module could not be imported`, and no amount of iterating fixes it because the
 problem is the path rather than the code. Put the directory on `PYTHONPATH`, or
 `pip install -e .` your own package, and it resolves.
 
+**What the coding agent can read, and what it can write, are different
+things, and the difference decides what a run can fix.**
+
+| | Today |
+|---|---|
+| Your helper modules **import** at runtime | Yes, if they are on `sys.path`, as above |
+| The coding agent **sees their source** while reasoning about a failure | No. It is shown its own module and pytest's output, so it reasons about your helpers from their behaviour rather than their code |
+| The coding agent **writes** to them | No. It writes the module the task's `interface` block names, and nothing else |
+
+**So a fault in a helper is detected but not repaired.** A test that fails
+because your `utils.py` is wrong does fail, correctly, which is the point. But
+the agent cannot patch `utils.py`, so it will either fail to converge or
+change the module it does own to work around a bug that is somewhere else,
+which is worse than not converging. If a run keeps patching the same file
+against a failure you believe is elsewhere, that is the signature, and the fix
+is to scope the task at the module that actually has the defect.
+
+**`--score-code` has no such limit**, because it neither writes code nor calls
+a model. Point it at a package and it plants faults throughout it, helpers
+included, and tells you which ones your suite noticed.
+
 **One thing worth knowing before you start.** The loop reruns pytest on every
 iteration, so it suits the deterministic layer best. Protocol parsing is a good
 fit: bytes in, structured records out, driven from recorded captures. Code
