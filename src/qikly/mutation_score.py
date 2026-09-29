@@ -66,9 +66,22 @@ def implementation(task_id, root=CODE_ROOT):
     directory = os.path.join(root, task_id)
     if not os.path.isdir(directory):
         return []
-    return [(os.path.join(directory, name), os.path.join(CODE_ROOT, task_id, name))
-            for name in sorted(os.listdir(directory))
-            if name.endswith(".py") and not name.startswith("__")]
+    # Walked, not listed. An implementation seeded as a package sits one level
+    # down, under the folder's own name, so a flat `os.listdir` found no `.py`
+    # files at all and the score reported "nothing to score" for a perfectly
+    # ordinary two-module implementation. Indistinguishable from a trivial
+    # one, which is the worst way for a measurement to fail. Found by audit
+    # 2026-09-29. `load_codebase` has always walked; this now agrees with it.
+    found = []
+    for folder, dirs, files in sorted(os.walk(directory)):
+        dirs[:] = sorted(d for d in dirs if d != "__pycache__")
+        for name in sorted(files):
+            if not name.endswith(".py") or name.startswith("__"):
+                continue
+            real = os.path.join(folder, name)
+            relative = os.path.relpath(real, directory)
+            found.append((real, os.path.join(CODE_ROOT, task_id, relative)))
+    return found
 
 
 def suite_dirs(task_id, root=TEST_ROOT):

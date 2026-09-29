@@ -162,9 +162,15 @@ acceptance_criteria:                  # THE CONSEQUENCES. Withheld from the codi
   - "Each rejected row names the specific field that caused rejection, not a generic message"
 ```
 
-`interface.module` is a dotted path under `outputs.agent_src.code.<task_id>.`,
-which is where the implementation gets written. Pick the final component
-freely; the rest is fixed by where outputs live.
+`interface.module` is the dotted path the generated tests will import. With
+no seed, or with a single-file seed, that is
+`outputs.agent_src.code.<task_id>.<name>`: the implementation is written
+there, so pick the final component freely and the rest is fixed by where
+outputs live.
+
+**A package seed is the exception**, because the package keeps its own name
+and becomes importable by it: write `interface.module: "mypkg.pricing"`, the
+path your own code already uses. See "Seeding a package" below.
 
 ### 4. Run it
 
@@ -261,6 +267,7 @@ The optional `seed:` block:
 seed:
   # A file or a directory, copied into outputs/agent_src/code/<task_id>/.
   # A single file keeps its own name, which must match interface.module.
+  # A directory is treated as a package: see "Seeding a package" below.
   implementation: "seeds/MY_TASK/calc.py"
 
   # Per stage. Seeding a stage suppresses generation for that stage only.
@@ -291,6 +298,64 @@ Three things to know:
 - **A seeded run measures something different from an unseeded one.** Do not
   pool them in a single rate. The orchestrator prints a NOTE on every seeded
   run to keep that visible.
+
+### Seeding a package, when the implementation is more than one module
+
+**New in 0.5.5.** Point `seed.implementation` at a directory and it is treated
+as a package: it is copied in **under its own name**, and the task's code
+directory is put on the path for the test run, so the package resolves by the
+name your code already uses.
+
+```yaml
+interface:
+  module: "mypkg.pricing"   # the module under test, by its real import path
+
+seed:
+  implementation: "mypkg"   # the package it lives in, copied in whole
+```
+
+Inside `mypkg/`, write imports exactly as you already do. All three shapes
+work: `from mypkg.money import to_cents`, `from .money import to_cents`, and
+`from .utils.rounding import half_up`. No `__init__.py` is required, and one
+that is there is kept.
+
+**Every module in the package is visible to the coding agent and every one is
+repairable**, and a single patch may change more than one of them. That is the
+difference the package form makes: with a single-file seed, a defect in a
+helper is found by the tests and cannot be fixed, and the run tells you so
+rather than working around it.
+
+**The directory you name is the boundary.** qikly does not follow imports and
+decide for itself which of your files an agent may rewrite, because the
+transitive closure of a real package has no natural edge and "it rewrote a
+shared module I never named" is a worse outcome than naming a folder. So put
+inside the seed what you want worked on, and leave a vendor library or a
+module you do not want touched outside it.
+
+Data files inside the package are copied too, since your code may open them.
+`__pycache__` and `.pyc` files are not: they are stale copies of the very
+modules the run is about to rewrite.
+
+Four limits worth knowing before you start:
+
+- **Before 0.5.5 a seeded directory was flattened**, dropping the folder's
+  name. If you wrote a task against that behaviour, `interface.module` needs
+  the package name adding to it.
+- **Modules that import each other circularly at the top level fail**, the
+  same way they do in plain Python. This is not something a run can repair.
+- **The package's name may not be a standard-library module's name.** A
+  package called `json` would shadow the real one for everything the run
+  imports, so a seed naming one is refused with a message rather than
+  discovered halfway through a stage. Names that clash with an *installed
+  third-party* package are not checked, because what is installed varies by
+  environment: if your package is called `yaml` or `requests`, rename it or
+  seed the single module instead.
+- **`seed.implementation` must name the folder itself**, not a path that
+  resolves to `.` or `..`. Those are refused too, because the install would
+  land outside the task's own directory.
+
+The full matrix of import shapes, including the ones that do not work, is
+pinned in `tests/test_multi_module_seed.py`.
 
 ## Where things live
 

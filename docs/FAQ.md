@@ -4,7 +4,7 @@ Questions people have actually asked, with the answer checked against the code
 rather than remembered. Where an answer has a boundary, the boundary is stated:
 a qualified yes is more use than an unqualified one.
 
-## Does it run locally or in the cloud?
+## 1. Does it run locally or in the cloud?
 
 Locally. It is a `pip install` and a command line tool on your machine, or in
 CI through the bundled GitHub Action. There is no qikly service in the middle
@@ -14,14 +14,14 @@ The only thing that leaves your machine is the prompt sent to whichever model
 provider you configure, using your own API key. Gemini, OpenAI and Anthropic
 are supported; see [PROVIDER_KEY_SETUP.md](PROVIDER_KEY_SETUP.md).
 
-## Does my code or my data go to you?
+## 2. Does my code or my data go to you?
 
 No. Nothing is sent to the project, and the tool collects no telemetry. What
 reaches your model provider is what the prompts contain: the task file as each
 agent receives it, and the test failures the loop is working through. Your
 provider's own terms then govern that traffic.
 
-## Is there anything I can run before committing an API key?
+## 3. Is there anything I can run before committing an API key?
 
 Yes, three things, all offline and free:
 
@@ -29,12 +29,18 @@ Yes, three things, all offline and free:
 qikly --explain MERGE_SALES          # what each agent is shown, and the difference
 qikly --explain MERGE_SALES --html   # the same as one page you can share
 qikly --validate                     # check your task files
+qikly --score-code src/yours.py --score-tests tests/test_yours.py
 ```
 
-`--explain` is the one worth running first. It makes no model call and takes
-about a second.
+`--explain` is the one worth running first: no model call, about a second.
 
-## Does the coding agent really never see the acceptance criteria?
+`--score-code` is the one that runs on **your** code rather than on a bundled
+task. It plants one fault at a time and reports which ones your existing tests
+did not notice. No task file, no run, no key, and nothing of yours is modified.
+Read the score as a floor: it says how much of the code that is there your
+tests would notice changing, and nothing about a rule nobody implemented.
+
+## 4. Does the coding agent really never see the acceptance criteria?
 
 That is what `--explain` exists to show, on your own task rather than on a
 claim in a README: it prints the task file as test generation receives it, then
@@ -46,7 +52,7 @@ The property is also held by the test suite: no call site in the codebase can
 pass a criterion to the coding agent, so the removal cannot be undone by a
 later change without a test failing.
 
-## What does one passing run prove?
+## 5. What does one passing run prove?
 
 That this task converged this once. A run is a loop with a variable trip count,
 so one run is an artifact and never a rate. If you want a number you can quote,
@@ -54,77 +60,39 @@ repeat the run and report the spread. The project's own performance figures are
 in [design_2_performance.md](design_2_performance.md), with the sample sizes
 they rest on.
 
-## What will a run cost?
+## 6. What will a run cost?
 
 Every run prints a projection before it starts: the expected number of model
 calls, tokens in and out, and a price from a static table rather than from your
 bill. Treat it as a projection, because the trip count varies.
 
-## Can I use it commercially?
+## 7. Can I use it commercially?
 
 Yes. qikly is Apache 2.0, which permits commercial use, modification and
 redistribution. Note that the licence grants no trademark rights, so building a
 service on it is fine and naming that service after the project is a separate
 conversation.
 
-## Can I drive it from an editor or an agent?
+## 8. Can I drive it from an editor or an agent?
 
 Yes, it ships an MCP server, so Claude Code, VS Code and other MCP hosts can
 call it. See [mcp.md](mcp.md). The server deliberately never returns acceptance
 criteria, for the same reason the coding agent never receives them.
 
 
-## Does qikly know about the classes I already have, such as hardware drivers or protocol parsers?
+## 9. Does qikly know about the classes I already have, such as hardware drivers or protocol parsers?
 
-Not by discovery. qikly does not scan your repository and work out what is
-available, so it will not find your driver and parser classes on its own. What
-the test-writing agent targets is what the task file's `interface` block
-declares, plus the requirements and the acceptance criteria. You describe the
-surface; it does not go looking for one.
+Not by discovery: it targets what your task file's `interface` block declares,
+and `qikly --scaffold your_module.py` writes that block from the real
+signatures. Your other classes import normally at run time as long as they are
+importable from your project root.
 
-Two things make that less manual than it sounds:
+What it may **change** is a separate question from what it can import, and the
+answer is the seed: `seed.implementation` can name a single module or a whole
+package, and everything inside it is visible to the coding agent and
+repairable. A defect in a helper you left outside the seed is caught by the
+tests, cannot be repaired, and the run now says so rather than working around
+it.
 
-- `qikly --scaffold path/to/module.py` reads the real signatures out of a file
-  you point it at and writes the `interface` block for you.
-- `seed.tests` keeps a suite you already trust, per stage, so the loop repairs
-  code against your tests rather than against generated ones. `seed.implementation`
-  points the run at code you already have. Both are in
-  [QUICK_START_ON_YOUR_OWN_DATA.md](QUICK_START_ON_YOUR_OWN_DATA.md).
-
-**Can the tests import those classes once they exist?** Yes, with one condition.
-Each stage runs as `python -m pytest` from your project root, which puts the
-project root on `sys.path`. So a package sitting at the project root, or one
-installed into the same virtualenv, imports normally from both the generated
-tests and the generated implementation. A package in a subdirectory that is not
-on the path does not: the run stops with a collection error, `no test ran: the
-module could not be imported`, and no amount of iterating fixes it because the
-problem is the path rather than the code. Put the directory on `PYTHONPATH`, or
-`pip install -e .` your own package, and it resolves.
-
-**What the coding agent can read, and what it can write, are different
-things, and the difference decides what a run can fix.**
-
-| | Today |
-|---|---|
-| Your helper modules **import** at runtime | Yes, if they are on `sys.path`, as above |
-| The coding agent **sees their source** while reasoning about a failure | No. It is shown its own module and pytest's output, so it reasons about your helpers from their behaviour rather than their code |
-| The coding agent **writes** to them | No. It writes the module the task's `interface` block names, and nothing else |
-
-**So a fault in a helper is detected but not repaired.** A test that fails
-because your `utils.py` is wrong does fail, correctly, which is the point. But
-the agent cannot patch `utils.py`, so it will either fail to converge or
-change the module it does own to work around a bug that is somewhere else,
-which is worse than not converging. If a run keeps patching the same file
-against a failure you believe is elsewhere, that is the signature, and the fix
-is to scope the task at the module that actually has the defect.
-
-**`--score-code` has no such limit**, because it neither writes code nor calls
-a model. Point it at a package and it plants faults throughout it, helpers
-included, and tells you which ones your suite noticed.
-
-**One thing worth knowing before you start.** The loop reruns pytest on every
-iteration, so it suits the deterministic layer best. Protocol parsing is a good
-fit: bytes in, structured records out, driven from recorded captures. Code
-talking to live hardware is better left behind the test doubles you already
-have, because a suite that needs a rig attached is a suite the loop cannot rerun
-freely.
+The full picture, including what a run prints in each case, is in
+[EXISTING_CODE_AND_HELPERS.md](EXISTING_CODE_AND_HELPERS.md).

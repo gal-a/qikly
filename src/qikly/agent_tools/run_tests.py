@@ -115,7 +115,7 @@ TB_FULL = "auto"
 
 def run_tests(stage, tests_dir, task_id=None, iteration=None, run_timestamp=None,
               stage_number=None, total_stages=None, junit_path=None,
-              traceback_mode=TB_FULL):
+              traceback_mode=TB_FULL, import_roots=None):
     """
     Run pytest for the given stage's tests under <tests_dir>/<stage>/ and
     return a structured result:
@@ -165,11 +165,30 @@ def run_tests(stage, tests_dir, task_id=None, iteration=None, run_timestamp=None
         # path, which would turn a reporting problem into a test failure.
         cmd += [f"--junitxml={junit_path}", "-o", "junit_family=xunit2"]
 
+    # Directories the implementation's own imports resolve against, prepended
+    # to PYTHONPATH for this one subprocess.
+    #
+    # Passed only for a task whose implementation was seeded as a package, so
+    # for every other run the environment is untouched and nothing new becomes
+    # importable. That restriction is the point: anything on PYTHONPATH sits
+    # ahead of the standard library, so a directory added here could shadow a
+    # stdlib module of the same name. Confined to a seeded package, the only
+    # name it can introduce is the package's own, which is exactly the name
+    # the user is asking to have resolve.
+    env = None
+    if import_roots:
+        env = dict(os.environ)
+        existing = env.get("PYTHONPATH", "")
+        roots = [os.path.abspath(r) for r in import_roots]
+        env["PYTHONPATH"] = os.pathsep.join(
+            roots + ([existing] if existing else []))
+
     try:
         proc = subprocess.run(
             cmd,
             capture_output=True,
-            text=True
+            text=True,
+            env=env
         )
     except Exception as e:
         return {

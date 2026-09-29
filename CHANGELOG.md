@@ -6,7 +6,7 @@ packaging tools would read as `1.1`.
 
 ## 0.5.5
 
-> A Skill for GitHub Copilot, a score that says what it cannot tell you, and a demo folder that admits what it is
+> A Skill for GitHub Copilot, an implementation that can be a whole package, and a fault outside one that says so instead of being worked around
 
 ### Added
 - **`qikly --install-skill copilot`.** GitHub Copilot reads none of the four
@@ -18,6 +18,30 @@ packaging tools would read as `1.1`.
   reads. `--install-skill auto` picks it up when a project already has
   `.github/instructions/` or a `copilot-instructions.md`, and not merely
   because it has a `.github/`, which almost every repository does.
+- **`seed.implementation` pointing at a directory now seeds a package.** It is
+  copied in under its own name and the task's code directory goes on the path
+  for the test run, so `from mypkg.money import to_cents`, the way most real
+  packages refer to themselves, resolves exactly as it does in your own tree.
+  Every module in the package is visible to the coding agent, every one can be
+  repaired, and a single patch may change several at once. `interface.module`
+  becomes the real import path, `mypkg.pricing`. Before this a directory seed
+  was flattened, which dropped the package's name and broke every
+  self-referencing import inside it, so this is the shape that makes an
+  implementation of more than one file work at all. A file seed and an
+  unseeded run are untouched: they get no import root and an unmodified
+  environment. `docs/TASK_FILE_REFERENCE.md` has the limits, and the full
+  matrix of import shapes, including the ones that do not work, is pinned in
+  `tests/test_multi_module_seed.py`.
+- **A run says when a fault is somewhere it may not write.** A task owns one
+  directory. Until now a defect in a helper module outside it was found by the
+  tests and silently unfixable, so the run either stopped with a generic
+  "exceeded 10 attempts" or, worse, changed a module it did own to work around
+  a defect still sitting there. Three messages replace that: the imports it
+  cannot repair are named at the start, a stall names the file rather than the
+  count, and **a run that goes green after a failure was traced into such a
+  file says so**, because that green may be a workaround. Nothing here stops,
+  shortens or alters a run; a project with shared helpers is normal and the
+  guard only speaks up.
 
 ### Fixed
 - **`--install-skill copilot` destroyed a file somebody else had written.**
@@ -37,6 +61,17 @@ packaging tools would read as `1.1`.
   reads the pointer, so that install cannot load, and "already exists, so
   nothing was changed" was true of the folder and false of the installation.
   The missing pointer is now written and said so.
+- **`--score-suite` scored nothing for an implementation of more than one
+  file.** It listed one directory level, so a package's modules were invisible
+  to it and the report read exactly like a trivial implementation rather than
+  like a failure. It now walks the tree, which is what the coding agent's own
+  view of the code has always done.
+- **A `seed.implementation` resolving to `..` installed outside the task's own
+  directory**, into the one every task shares, and the copy then recursed into
+  what it had just written. Refused now, with a message naming the fix. A
+  package whose name is also a standard-library module's is refused for the
+  same reason: seeding a `json/` would shadow the real one for everything the
+  run imports.
 
 ### Changed
 - **The Skill now sets the model rather than only warning about it** (Skill
@@ -69,6 +104,8 @@ packaging tools would read as `1.1`.
   hands somebody a percentage.
 
 ---
+- The README test badge reads **1,700+ tests**, a floor the suite clears with
+  1,756 passing.
 
 ## 0.5.4
 

@@ -5,6 +5,7 @@ import uuid
 import os
 import re
 import shutil
+import sys
 from datetime import datetime
 
 import yaml
@@ -21,6 +22,10 @@ from qikly.agent_tools import run_tests as run_tests_mod
 from qikly.agent_tools.run_tests import run_tests
 from qikly.agent_api.usage import BudgetExceeded
 from qikly.agent_tools.inspect_code import inspect_failure, failure_signature
+from qikly.orchestrator.write_scope import (
+    blocked_fault_message, implicated_files, unreachable_import_hint,
+    unwritable_imports, workaround_warning,
+)
 from qikly.paths import (
     PUBLIC_INPUTS_DIR, ensure_task_data, list_input_dir, private_input_path, private_inputs_dir,
     project_root,
@@ -508,7 +513,7 @@ def load_seed_spec(task_id):
         )
     return implementation, tests
 
-def install_seed(src, dest_dir, filename=None):
+def install_seed(src, dest_dir, filename=None, keep_directory_name=False):
     """
     Copy a seed file or directory into dest_dir, which the caller has already
     reset. Copying *after* the reset rather than skipping the reset is
@@ -529,6 +534,42 @@ def install_seed(src, dest_dir, filename=None):
             f"seed path not found: {src} (paths are relative to the project "
             f"root, {project_root()})"
         )
+    # A seeded *package* keeps its own folder name, because the name is part
+    # of the code: `from mypkg.money import to_cents`, which is how most real
+    # packages refer to themselves, stops resolving the moment `mypkg/` is
+    # flattened away. Seeded test directories do not do this, and neither did
+    # implementations before 0.5.5; see the matrix in
+    # tests/test_multi_module_seed.py for what each shape does.
+    if keep_directory_name and os.path.isdir(src):
+        name = os.path.basename(os.path.normpath(src))
+        # Validated rather than trusted. `seed.implementation: ".."` is an
+        # easy thing to write, paths here are relative to the project root,
+        # and `basename(normpath(".."))` is `".."`, which would send the
+        # install one level up into outputs/agent_src/code/ itself, the
+        # directory every task shares. Worse, the destination then contains
+        # the source, so the walk below recurses into what it has just
+        # written and copies until the path length runs out. Found by audit
+        # 2026-09-29, before release.
+        if name in ("", ".", "..") or os.sep in name or (os.altsep or "") in name:
+            raise ValueError(
+                f"seed.implementation must name a directory, not a path that "
+                f"resolves to {name!r}: {src}. Point it at the package folder "
+                f"itself, for example `implementation: \"mypkg\"`."
+            )
+        # A package seed makes this name importable for the whole test
+        # subprocess, and PYTHONPATH sits ahead of the standard library. A
+        # package called `json` or `types` would therefore shadow the real one
+        # for every module in the run, including pytest's own imports, and the
+        # failures that follow name anything except their cause. Refused here,
+        # where the message can say what to do, rather than discovered later.
+        if name in sys.stdlib_module_names:
+            raise ValueError(
+                f"seed.implementation names a package called {name!r}, which is "
+                f"also a standard-library module. Seeding it would shadow the "
+                f"real one for everything the run imports. Rename the package, "
+                f"or seed the single module instead of the directory."
+            )
+        dest_dir = os.path.join(dest_dir, name)
     os.makedirs(dest_dir, exist_ok=True)
     written = []
 
@@ -733,7 +774,8 @@ def agent_src_has_code(agent_src_dir):
             return True
     return False
 
-def check_for_regressions(prior_stages, tests_dir, task_id, run_timestamp, total_stages, attempt_label):
+def check_for_regressions(prior_stages, tests_dir, task_id, run_timestamp, total_stages,
+                          attempt_label, import_roots=None):
     """
     Re-run every stage that already passed earlier in this run, to catch a
     later stage's patch silently breaking one of them -- nothing else in the
@@ -746,6 +788,7 @@ def check_for_regressions(prior_stages, tests_dir, task_id, run_timestamp, total
             prior_stage, tests_dir, task_id=task_id, iteration=attempt_label, run_timestamp=run_timestamp,
             stage_number=idx, total_stages=total_stages,
             junit_path=junit.stage_path(task_id, run_timestamp, prior_stage),
+            import_roots=import_roots,
         )
         log_transaction({
             "action": "test_run", "stage": prior_stage, "iteration": attempt_label, "stage_number": idx,
@@ -1169,12 +1212,25 @@ def orchestrate(task_id, seed=None, resume=False):
 
     if not reusable["implementation"]:
         backup_and_clear_agent_src(run_timestamp, agent_src_dir)
+    # A directory seed is a package: it keeps its folder name, and the task's
+    # code directory becomes importable so that name resolves. Only then, so
+    # that a file seed and an unseeded run behave exactly as they always have
+    # and nothing new becomes importable for them.
+    seeded_package = bool(seed_implementation) and os.path.isdir(seed_implementation)
     if seed_implementation and not reusable["implementation"]:
-        installed = install_seed(seed_implementation, agent_src_dir)
+        installed = install_seed(seed_implementation, agent_src_dir,
+                                 keep_directory_name=True)
         log_transaction({
             "action": "seed_installed", "kind": "implementation",
             "source": seed_implementation, "files": installed,
+            "package": seeded_package,
         })
+    # Read from the task's own declaration rather than from the installed
+    # tree, so a resumed run, where the seed is not reinstalled, reaches the
+    # same answer as the run that installed it. The one case that misses is a
+    # `seed.implementation` edited between a run and its resume, which changes
+    # what the task means and is visible in the config either way.
+    import_roots = [agent_src_dir] if seeded_package else None
 
     if not agent_src_has_code(agent_src_dir):
         # No implementation: outputs/agent_src/code/<task_id>/ was just reset
@@ -1199,6 +1255,7 @@ def orchestrate(task_id, seed=None, resume=False):
             stages[0], tests_dir, task_id=task_id, iteration=0, run_timestamp=run_timestamp,
             stage_number=1, total_stages=len(stages),
             junit_path=junit.stage_path(task_id, run_timestamp, stages[0]),
+            import_roots=import_roots,
         )
         log_transaction({
             "action": "test_run", "stage": stages[0], "iteration": 0, "stage_number": 1,
@@ -1221,6 +1278,23 @@ def orchestrate(task_id, seed=None, resume=False):
         print(f"[{task_id}] diagnostic feedback: {feedback_mode}. The coding agent "
               f"starts at pytest's '{run_tests_mod.TB_LADDER[0]}' traceback and is "
               f"shown more only after a patch leaves the failure unchanged.")
+
+    # Modules this task imports from outside the one directory it may write.
+    # Read once, before any stage: a patch can change the implementation but
+    # only inside that directory, so an import reaching outside it is a
+    # property of the task rather than of any one attempt. Empty for every
+    # bundled task, and empty is the normal answer.
+    owned = agent_src_dir.replace(os.sep, "/")
+    unwritable = unwritable_imports(agent_src_dir)
+    if unwritable:
+        print(f"[{task_id}] this task imports {', '.join(unwritable)} from outside "
+              f"{owned}. Those import normally at run time; it is repairs that "
+              f"are limited to the files this task owns.", flush=True)
+        log_transaction({"action": "unwritable_imports", "files": unwritable,
+                         "code_dir": owned})
+    # Files a failure was actually traced into, accumulated over the whole run
+    # so that a stage which recovered still leaves the evidence behind.
+    blocked_files = []
 
     for stage_number, stage in enumerate(stages, start=1):
         if stage == "unit" and stage not in seed_tests:
@@ -1266,7 +1340,7 @@ def orchestrate(task_id, seed=None, resume=False):
                 stage, tests_dir, task_id=task_id, iteration=attempts, run_timestamp=run_timestamp,
                 stage_number=stage_number, total_stages=len(stages),
                 junit_path=junit.stage_path(task_id, run_timestamp, stage),
-                traceback_mode=tb_mode,
+                traceback_mode=tb_mode, import_roots=import_roots,
             )
             log_transaction({
                 "action": "test_run", "stage": stage, "iteration": attempts, "stage_number": stage_number,
@@ -1284,7 +1358,7 @@ def orchestrate(task_id, seed=None, resume=False):
             if result["status"] == "pass" and stage_number > 1:
                 regressed_stage, regressed_result = check_for_regressions(
                     stages[:stage_number - 1], tests_dir, task_id, run_timestamp, len(stages),
-                    attempt_label=f"{attempts}-regcheck"
+                    attempt_label=f"{attempts}-regcheck", import_roots=import_roots,
                 )
 
             if result["status"] == "pass" and regressed_stage is None:
@@ -1298,16 +1372,39 @@ def orchestrate(task_id, seed=None, resume=False):
             hint = _disagreement_hint(failure_trail)
             hint_text = f" {hint}" if hint else ""
 
+            # Which project file this failure actually points into. Only an
+            # exception propagating out of a helper puts one here: a helper
+            # that quietly returns the wrong value leaves no frame of its own
+            # at any traceback rung, which is why `unwritable` above exists as
+            # well. Accumulated rather than tested, because nothing here stops
+            # a run: a task that imports a helper is normal, and refusing work
+            # that would have succeeded is the worse failure.
+            failing = result if result["status"] != "pass" else (regressed_result or {})
+            for path in implicated_files(failing.get("raw_output", ""),
+                                         agent_src_dir, tests_dir):
+                if path in blocked_files:
+                    continue
+                blocked_files.append(path)
+                print(f"[{task_id}] this failure was traced into {path}, which this "
+                      f"task may not write", flush=True)
+                log_transaction({"action": "fault_outside_write_scope", "stage": stage,
+                                 "iteration": attempts, "file": path,
+                                 "code_dir": owned})
+
+            # Evidence first, then the weaker static signal, then neither.
+            scope_text = (blocked_fault_message(blocked_files, agent_src_dir)
+                          or unreachable_import_hint(unwritable, agent_src_dir))
+
             if attempts > max_attempts_per_stage:
                 if regressed_stage is not None:
                     raise RuntimeError(
                         f"Exceeded {max_attempts_per_stage} attempts on stage '{stage}': "
                         f"stage '{regressed_stage}', which previously passed, keeps "
-                        f"regressing after each fix.{hint_text}"
+                        f"regressing after each fix.{hint_text}{scope_text}"
                     )
                 raise RuntimeError(
                     f"Exceeded {max_attempts_per_stage} attempts on stage '{stage}' "
-                    f"without passing tests.{hint_text}"
+                    f"without passing tests.{hint_text}{scope_text}"
                 )
 
             stuck = _stuck_reason(applied_patch_hashes)
@@ -1317,7 +1414,8 @@ def orchestrate(task_id, seed=None, resume=False):
                 raise RuntimeError(
                     f"Stopped on stage '{stage}' after {attempts - 1} attempts: {stuck}. "
                     f"Every further attempt would cost a model call and produce the same "
-                    f"diff. The report names the tests that never passed.{hint_text}"
+                    f"diff. The report names the tests that never passed."
+                    f"{hint_text}{scope_text}"
                 )
 
             # Capture failure -- either this stage's own, or a regression in
@@ -1396,3 +1494,13 @@ def orchestrate(task_id, seed=None, resume=False):
 
     # All stages passed
     log_transaction({"action": "all_tests_passed"})
+
+    # The quiet case, and the only one here worth a warning. A run that went
+    # green *after* a failure was traced into a file it could not write may be
+    # green because the implementation was bent around a defect that is still
+    # there, which is worse than not converging because nothing else says so.
+    if blocked_files:
+        warning = workaround_warning(blocked_files, agent_src_dir)
+        print(f"[{task_id}] {warning}", flush=True)
+        log_transaction({"action": "converged_with_fault_outside_write_scope",
+                         "files": blocked_files, "code_dir": owned})

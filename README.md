@@ -7,7 +7,7 @@
 <!-- mcp-name: io.github.gal-a/qikly -->
 
 [![Agent Skill](https://img.shields.io/badge/Agent_Skill-qikly%20--install--skill-7e22ce)](https://github.com/gal-a/qikly/blob/main/docs/skill.md)
-[![1,500+ tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=1%2C500%2B%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
+[![1,700+ tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=1%2C700%2B%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
 [![pypi](https://img.shields.io/pypi/v/qikly?color=blue)](https://pypi.org/project/qikly/)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/gal-a/qikly/blob/main/LICENSE)
@@ -292,7 +292,10 @@ says which command each one needs:
 1. **Verify code you did not write.** Supply an implementation through `seed:`
    and the suite is written from your acceptance criteria by an agent that
    never reads that code. A suite generated from the same context as the code
-   is a model agreeing with itself.
+   is a model agreeing with itself. **A module or a whole package**: point
+   `seed.implementation` at a directory and it is copied in under its own
+   name, so `from mypkg.money import to_cents` resolves as it does in your
+   own tree and every module in it can be repaired.
 
    **The limit is worth saying plainly: qikly cannot know what the author of
    supplied code saw.** Withholding is a property of a run qikly performed, not
@@ -421,9 +424,13 @@ same patch repeating (a criterion fighting the model's priors), and run
 **Each of those, with the signature to look for and the fix:**
 [docs/TROUBLESHOOTING.md](https://github.com/gal-a/qikly/blob/main/docs/TROUBLESHOOTING.md).
 
-**Questions people ask before they start**, including whether it can use the
-classes you already have and whether anything leaves your machine:
+**Questions people ask before they start**, including what runs before you
+commit an API key and whether anything leaves your machine:
 [docs/FAQ.md](https://github.com/gal-a/qikly/blob/main/docs/FAQ.md).
+
+**Pointing it at code you already have**, including which of your modules it
+may change and what a run says when the defect turns out to be in one it may
+not: [docs/EXISTING_CODE_AND_HELPERS.md](https://github.com/gal-a/qikly/blob/main/docs/EXISTING_CODE_AND_HELPERS.md).
 
 ## Output
 
