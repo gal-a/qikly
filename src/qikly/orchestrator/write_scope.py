@@ -54,26 +54,30 @@ import os
 import re
 
 
-# The tail of a frame, which is how pytest names one at every traceback rung:
-# "code\\pricing.py:5" for a frame under the rootdir, and an absolute
-# "C:\\...\\utils.py:2" for one reached through a relative sys.path entry.
+# A frame, as pytest prints one at every traceback rung. This is the whole of
+# the parsing, and it is one line-anchored pattern on purpose.
 #
-# Only the tail. The path itself is found by walking backwards from here,
-# never by a pattern, and that is a correctness requirement rather than a
-# style. A pattern like `[^\s:]+?\.py:` has to retry at every offset inside
-# any long run of characters holding neither a space nor a colon, which is
-# quadratic: measured on this machine at 0.21s for 5,000 characters and
-# 15.6s for 40,000, four times the work for twice the input. pytest's
-# assertion rewriting prints exactly that when it compares two long strings,
-# `raw_output` is never truncated on its way here, and this runs on every
-# attempt of the convergence loop. A diagnostic that can stall a run for
-# minutes is a worse defect than the one it was written to report.
-_FRAME_TAIL = re.compile(r"\.py:\d+")
-
-# How many space-separated tokens to absorb leftwards before giving up on a
-# path that contains spaces. "C:\Program Files\app\utils.py" needs one; the
-# bound stops a line of prose being glued onto a filename.
-_MAX_SPACE_TOKENS = 3
+# Two earlier versions searched the whole output for `.py:` and then worked
+# backwards to find where the path began. One used a lazy pattern and went
+# quadratic, 15.6s on 40,000 characters and 315s on 200,000, because it had to
+# retry at every offset inside any long run of characters holding no space or
+# colon, which is exactly what pytest's assertion rewriting prints when it
+# compares two long strings. The other walked backwards by hand and needed
+# special cases for drive letters and for paths containing spaces.
+#
+# Both were solving a problem that does not exist. **pytest puts the path at
+# the start of the line**, at every rung:
+#
+#     line    C:\proj\utils.py:2: ValueError: bad amount
+#     short   utils.py:2: in to_cents
+#     auto    code\pricing.py:5: in total_cents
+#
+# Anchoring at `^` leaves exactly one place per line where a match can start,
+# so the work is linear in the length of the output and no input shape can
+# make it otherwise. A drive letter's colon and a space inside a path both
+# fall out of `.+?` without being mentioned, which is why the special cases
+# they needed are gone rather than fixed.
+_FRAME_LINE = re.compile(r"^[ \t]*(.+?\.py):\d+[:\s]", re.MULTILINE)
 
 # Test infrastructure is never the subject of this check, whatever directory
 # it is found in.
@@ -106,50 +110,6 @@ def _inside(path, directory, base="."):
     path = _absolute(path, base)
     directory = _absolute(directory, base)
     return path == directory or path.startswith(directory + os.sep)
-
-
-def _frame_candidates(text):
-    """
-    Every `<path>.py:<line>` in `text`, as candidate paths, shortest first.
-
-    One left-to-right pass over the tails, and a bounded backward walk from
-    each. Linear in the length of the input, which is the whole point: see
-    `_FRAME_TAIL` above for what the obvious pattern costs instead.
-
-    Several candidates per frame, because a path may contain spaces and the
-    walk has no way to know where such a path begins. The shortest candidate
-    is the one that stops at the first space, and each one after it absorbs
-    another token to its left. The caller picks the first that is a file, so
-    a path without spaces costs exactly one check and nothing changes for it.
-    """
-    for match in _FRAME_TAIL.finditer(text or ""):
-        end = match.start()
-        start = end
-        while start > 0 and not text[start - 1].isspace() and text[start - 1] != ":":
-            start -= 1
-        # A Windows drive letter carries the one colon that belongs to the
-        # path, so it is the one the walk above is allowed to step over.
-        if (start >= 2 and text[start - 1] == ":" and text[start - 2].isalpha()
-                and (start == 2 or text[start - 3].isspace())):
-            start -= 2
-        if end == start:
-            continue
-        yield text[start:end] + ".py"
-        # Now the same frame with more of the line in front of it, for a path
-        # that has spaces in it. Never crosses a line break.
-        absorbed = start
-        for _ in range(_MAX_SPACE_TOKENS):
-            probe = absorbed - 1
-            while probe > 0 and text[probe - 1] == " ":
-                probe -= 1
-            if probe <= 0 or text[probe - 1] in "\r\n":
-                break
-            while probe > 0 and not text[probe - 1].isspace():
-                probe -= 1
-            if probe == absorbed:
-                break
-            absorbed = probe
-            yield text[absorbed:end] + ".py"
 
 
 def _module_files(name, project_root):
@@ -240,22 +200,16 @@ def implicated_files(raw_output, code_dir, tests_dir, project_root="."):
     Anything outside the project root is ignored, which is what keeps pytest's
     own frames and every installed dependency out of the answer.
     """
+    # Collected into a set before anything touches the filesystem. The same
+    # file appears in frame after frame, because a helper called once per row
+    # fails once per row, so the distinct paths are far fewer than the frames:
+    # 40,000 repeated frames cost one `isfile` rather than 40,000.
+    candidates = {m.group(1) for m in _FRAME_LINE.finditer(raw_output or "")}
+
     found = set()
-    # The same file appears in frame after frame, because a helper called in a
-    # loop fails once per row, so deciding each distinct candidate once turns
-    # the filesystem work from per-frame into per-path. Measured on 40,000
-    # repeated frames: 3.3s before, and the stats were all of it.
-    seen = {}
-    for candidate in _frame_candidates(raw_output or ""):
-        if candidate in seen:
-            if seen[candidate]:
-                found.add(seen[candidate])
-            continue
-        seen[candidate] = None
+    for candidate in candidates:
         path = _absolute(os.path.normpath(candidate), project_root)
         if not os.path.isfile(path):
-            # Not a file, so this candidate is the wrong slice of the line.
-            # The next one for the same frame absorbs another token.
             continue
         if not _inside(path, project_root, project_root):
             continue
@@ -263,9 +217,7 @@ def implicated_files(raw_output, code_dir, tests_dir, project_root="."):
                 or _inside(path, tests_dir, project_root)
                 or _is_test_file(path)):
             continue
-        relative = os.path.relpath(path, os.path.abspath(project_root)).replace("\\", "/")
-        seen[candidate] = relative
-        found.add(relative)
+        found.add(os.path.relpath(path, os.path.abspath(project_root)).replace("\\", "/"))
     return sorted(found)
 
 

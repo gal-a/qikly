@@ -73,7 +73,13 @@ def implementation(task_id, root=CODE_ROOT):
     # one, which is the worst way for a measurement to fail. Found by audit
     # 2026-09-29. `load_codebase` has always walked; this now agrees with it.
     found = []
-    for folder, dirs, files in sorted(os.walk(directory)):
+    # Not `sorted(os.walk(...))`. That drains the generator before the body
+    # runs, so it has already descended into every subdirectory and the
+    # `dirs[:]` pruning below is a no-op: the in-place trick only steers a
+    # live walk. Found by audit 2026-09-29, which put a stray `.py` inside a
+    # `__pycache__` and watched it come back. Sorting `dirs` in place gives
+    # the deterministic order the seeded fault sample needs, and prunes.
+    for folder, dirs, files in os.walk(directory):
         dirs[:] = sorted(d for d in dirs if d != "__pycache__")
         for name in sorted(files):
             if not name.endswith(".py") or name.startswith("__"):

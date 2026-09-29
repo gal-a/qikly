@@ -104,8 +104,8 @@ packaging tools would read as `1.1`.
   hands somebody a percentage.
 
 ---
-- The README test badge reads **1,700+ tests**, a floor the suite clears with
-  1,756 passing.
+- The README test badge floor moves to **1,700+ tests**. It is a floor rather
+  than a count, so it is deliberately behind what the suite actually runs.
 
 ## 0.5.4
 

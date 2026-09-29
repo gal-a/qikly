@@ -202,6 +202,27 @@ def test_a_long_unbroken_line_does_not_stall_the_loop(project):
     assert elapsed < 2.0, "took %.1fs on 200k characters" % elapsed
 
 
+def test_many_frame_shaped_fragments_on_one_line_do_not_stall_the_loop(project):
+    """
+    The shape that defeated the previous two scanners, and that neither of
+    their tests exercised: many `.py:<digits>` fragments on a single line with
+    no whitespace between them. An audit on 2026-09-29 measured the
+    backward-walking version at 9.7s for 4,000 of them and 162s for 16,000,
+    the same four-times-per-doubling signature as the regex before it.
+
+    The line-anchored pattern cannot do this: `^` gives one starting point per
+    line, so a line yields at most one candidate however many fragments it
+    holds.
+    """
+    import time
+
+    raw = "a.py:1:" * 200_000
+    started = time.time()
+    assert implicated_files(raw, project["code"], project["tests"]) == []
+    elapsed = time.time() - started
+    assert elapsed < 2.0, "took %.1fs on 200,000 fragments in one line" % elapsed
+
+
 def test_one_helper_named_in_thousands_of_frames_stays_cheap(project):
     """
     The normal shape of a bad run, not a pathological one: a helper called

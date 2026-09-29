@@ -570,6 +570,26 @@ def install_seed(src, dest_dir, filename=None, keep_directory_name=False):
                 f"or seed the single module instead of the directory."
             )
         dest_dir = os.path.join(dest_dir, name)
+
+    if os.path.isdir(src):
+        # The condition that actually matters, and the one a name check
+        # cannot see. If the destination lies inside the source, the walk
+        # below recurses into the files it has just written and copies until
+        # the path length runs out, having meanwhile pulled other tasks'
+        # implementations into the nest. Rejecting `..` by name caught one
+        # spelling of that; an audit on 2026-09-29 pointed
+        # `seed.implementation` at `outputs/agent_src`, whose basename is
+        # perfectly ordinary, and reproduced the whole thing. So the check
+        # asks about the relationship rather than about the name.
+        source = os.path.normcase(os.path.abspath(src))
+        target = os.path.normcase(os.path.abspath(dest_dir))
+        if target == source or target.startswith(source + os.sep):
+            raise ValueError(
+                f"seed.implementation points at {src}, which contains the "
+                f"directory the run installs into ({dest_dir}). Copying it "
+                f"would copy the copy. Point it at the package holding your "
+                f"code, somewhere outside outputs/."
+            )
     os.makedirs(dest_dir, exist_ok=True)
     written = []
 

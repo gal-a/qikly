@@ -139,6 +139,65 @@ def test_a_package_keeps_its_data_files_and_drops_its_caches(tmp_path):
     assert not os.path.exists(str(dest / "mypkg" / "stale.pyc"))
 
 
+@pytest.mark.parametrize("seed_path", [
+    "outputs/agent_src",          # an ancestor whose basename is ordinary
+    "outputs",
+    "outputs/agent_src/code",
+])
+def test_a_seed_containing_the_install_directory_is_refused(tmp_path, monkeypatch, seed_path):
+    """
+    Found by audit 2026-09-29, and it defeated the first guard entirely.
+
+    That guard rejected a basename of `..`. Pointing the seed at
+    `outputs/agent_src` passes that check, since its basename is a perfectly
+    ordinary word, and then reproduces the whole defect: the destination lies
+    inside the source, so the walk copies what it has just written, pulling
+    another task's implementation into the nest on the way. The question is
+    the relationship between the two paths, not the spelling of one.
+    """
+    root = tmp_path / "proj"
+    code = root / "outputs" / "agent_src" / "code" / TASK
+    os.makedirs(str(code))
+    _write(str(root / "outputs" / "agent_src" / "code" / "OTHER" / "theirs.py"), "X = 1\n")
+    monkeypatch.chdir(str(root))
+
+    with pytest.raises(ValueError) as raised:
+        orch.install_seed(seed_path, str(code), keep_directory_name=True)
+    assert "seed.implementation" in str(raised.value)
+    assert os.listdir(str(code)) == [], "nothing may be written before the refusal"
+    assert os.path.isfile(str(root / "outputs" / "agent_src" / "code" / "OTHER" / "theirs.py"))
+
+
+def test_a_stray_python_file_in_a_cache_directory_is_not_scored(tmp_path):
+    """
+    Found by the same audit. `sorted(os.walk(...))` drains the generator
+    before the body runs, so the `dirs[:]` pruning that excludes
+    `__pycache__` had already been bypassed and was doing nothing.
+    """
+    from qikly import mutation_score
+
+    root = tmp_path / "code"
+    _write(str(root / TASK / "calc.py"), "def f():\n    return 1\n")
+    _write(str(root / TASK / "__pycache__" / "stray.py"), "def g():\n    return 2\n")
+
+    found = mutation_score.implementation(TASK, root=str(root))
+    assert [os.path.basename(real) for real, _rel in found] == ["calc.py"]
+
+
+def test_the_scored_file_order_is_stable(tmp_path):
+    """The fault sample is seeded, so an unstable order breaks --score-seed."""
+    from qikly import mutation_score
+
+    root = tmp_path / "code"
+    for name in ("z.py", "a.py", "m.py"):
+        _write(str(root / TASK / "pkg" / name), "X = 1\n")
+    _write(str(root / TASK / "top.py"), "X = 1\n")
+
+    first = mutation_score.implementation(TASK, root=str(root))
+    assert first == mutation_score.implementation(TASK, root=str(root))
+    assert [os.path.basename(r) for r, _ in first] == ["top.py", "a.py", "m.py", "z.py"]
+
+
 def test_a_package_three_levels_deep_arrives_intact(tmp_path):
     src = tmp_path / "mypkg"
     _write(str(src / "a" / "b" / "c" / "deep.py"), "X = 1\n")
@@ -163,23 +222,32 @@ def test_two_tasks_seeded_from_the_same_package_do_not_share_a_directory(tmp_pat
 
 # --- the import root, which is the part that can reach outside the run ------
 
-def test_no_import_root_means_the_environment_is_untouched(tmp_path):
+@pytest.mark.parametrize("roots", [None, [], ()])
+def test_no_import_root_means_the_environment_is_untouched(monkeypatch, tmp_path, roots):
     """
-    The backward-compatibility guarantee, checked by running a subprocess and
-    asking it what it sees rather than by reading the code that builds it.
+    The backward-compatibility guarantee: a file seed and an unseeded run must
+    get the environment they always got.
+
+    Rewritten after an audit on 2026-09-29 found the first version vacuous. It
+    ran a bare pytest subprocess of its own and asserted that the subprocess
+    inherited this process's PYTHONPATH, which is unconditionally true and
+    never touched `run_tests` at all. It would have passed with the guarantee
+    deleted. `env is None` is the whole claim, so that is what to assert.
     """
-    probe = _write(str(tmp_path / "test_probe.py"), """
-        import os
+    captured = {}
 
+    def fake_run(cmd, **kwargs):
+        captured["env"] = kwargs.get("env", "absent")
+        raise KeyboardInterrupt  # stop before pytest is really launched
 
-        def test_probe():
-            print("PYTHONPATH=[%s]" % os.environ.get("PYTHONPATH", ""))
-    """)
-    before = os.environ.get("PYTHONPATH", "")
-    result = subprocess.run(
-        [sys.executable, "-m", "pytest", probe, "-q", "-s", "-p", "no:cacheprovider",
-         "-o", "addopts="], capture_output=True, text=True, cwd=str(tmp_path))
-    assert "PYTHONPATH=[%s]" % before in result.stdout, result.stdout
+    monkeypatch.setattr("qikly.agent_tools.run_tests.subprocess.run", fake_run)
+    from qikly.agent_tools.run_tests import run_tests
+    with pytest.raises(KeyboardInterrupt):
+        run_tests("integration", str(tmp_path), import_roots=roots)
+
+    assert captured["env"] is None, (
+        "no import root must mean no env argument, so the subprocess inherits "
+        "os.environ exactly as it did before package seeds existed")
 
 
 def test_an_import_root_is_prepended_and_keeps_what_was_there(monkeypatch, tmp_path):
