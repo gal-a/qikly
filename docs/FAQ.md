@@ -40,7 +40,41 @@ did not notice. No task file, no run, no key, and nothing of yours is modified.
 Read the score as a floor: it says how much of the code that is there your
 tests would notice changing, and nothing about a rule nobody implemented.
 
-## 4. Does the coding agent really never see the acceptance criteria?
+## 4. What is the difference between `--score-code` and `--score-tests`?
+
+They are not alternatives. They are the two halves of one command, and it does
+nothing useful without both:
+
+```bash
+qikly --score-code src/pricing.py --score-tests tests/test_pricing.py
+```
+
+`--score-code` is **the code to plant faults in**, a module or a whole package.
+`--score-tests` is **the suite to run against each planted fault**, a file or a
+directory of them. The report names the faults your tests did not notice.
+
+Neither writes anything: the faults go into a temporary copy, and your files
+are not modified. No task file, no run, no API key, no model call.
+
+## 5. What is the difference between `--demo` and `--example`?
+
+`--demo` is for watching, `--example` is for editing.
+
+`qikly --demo` runs a bundled task end to end in a throwaway folder you can
+delete, so you can see a real run before deciding anything. It needs an API
+key, takes about thirty seconds and costs under a cent. It changes nothing in
+your project.
+
+`qikly --example` writes a finished worked example **into your project**: a
+module, its two task files and sample data, at the paths the task files name.
+Nothing is left for you to fill in, so `qikly --tasks MY_METRICS_VERIFY` runs
+immediately, and it is the thing to copy when writing your own. It never
+overwrites an existing file.
+
+If you are deciding which to type first: `--demo` to see whether this is for
+you, `--example` once you have decided it is.
+
+## 6. Does the coding agent really never see the acceptance criteria?
 
 That is what `--explain` exists to show, on your own task rather than on a
 claim in a README: it prints the task file as test generation receives it, then
@@ -52,7 +86,7 @@ The property is also held by the test suite: no call site in the codebase can
 pass a criterion to the coding agent, so the removal cannot be undone by a
 later change without a test failing.
 
-## 5. What does one passing run prove?
+## 7. What does one passing run prove?
 
 That this task converged this once. A run is a loop with a variable trip count,
 so one run is an artifact and never a rate. If you want a number you can quote,
@@ -60,27 +94,27 @@ repeat the run and report the spread. The project's own performance figures are
 in [design_2_performance.md](design_2_performance.md), with the sample sizes
 they rest on.
 
-## 6. What will a run cost?
+## 8. What will a run cost?
 
 Every run prints a projection before it starts: the expected number of model
 calls, tokens in and out, and a price from a static table rather than from your
 bill. Treat it as a projection, because the trip count varies.
 
-## 7. Can I use it commercially?
+## 9. Can I use it commercially?
 
 Yes. qikly is Apache 2.0, which permits commercial use, modification and
 redistribution. Note that the licence grants no trademark rights, so building a
 service on it is fine and naming that service after the project is a separate
 conversation.
 
-## 8. Can I drive it from an editor or an agent?
+## 10. Can I drive it from an editor or an agent?
 
 Yes, it ships an MCP server, so Claude Code, VS Code and other MCP hosts can
 call it. See [mcp.md](mcp.md). The server deliberately never returns acceptance
 criteria, for the same reason the coding agent never receives them.
 
 
-## 9. Does qikly know about the classes I already have, such as hardware drivers or protocol parsers?
+## 11. Does qikly know about the classes I already have, such as hardware drivers or protocol parsers?
 
 Not by discovery: it targets what your task file's `interface` block declares,
 and `qikly --scaffold your_module.py` writes that block from the real
@@ -96,3 +130,30 @@ it.
 
 The full picture, including what a run prints in each case, is in
 [EXISTING_CODE_AND_HELPERS.md](EXISTING_CODE_AND_HELPERS.md).
+
+## 12. My module is not one file. Can qikly work on a package with a nested `utils/`?
+
+Yes, from 0.5.5. Point `seed.implementation` at the directory rather than the
+file, and name the module by the import path your own code already uses:
+
+```yaml
+interface:
+  module: "mypkg.pricing"
+
+seed:
+  implementation: "mypkg"
+```
+
+The package is copied in under its own name, so `from mypkg.utils.money import
+to_cents` resolves exactly as it does in your tree. Relative imports work too,
+at any depth: `from .utils.money import to_cents`. No `__init__.py` is
+required, and one that is there is kept.
+
+**Every module in the package can be repaired**, nested ones included, and a
+single patch may change more than one of them.
+
+Two things that will not work, and both fail loudly rather than quietly: a
+package whose name is also a standard library module's, such as `json`; and
+modules that import each other circularly at the top level, which plain Python
+rejects too. The full matrix, including the import shapes that do not work,
+is in [TASK_FILE_REFERENCE.md](TASK_FILE_REFERENCE.md#seeding-a-package-when-the-implementation-is-more-than-one-module).

@@ -1,6 +1,8 @@
 import os
 
 from qikly.agent_api.code_loader.excerpt import excerpt_file, relevant_names
+# agent_tools imports nothing from agent_api, so this direction is safe.
+from qikly.agent_tools.apply_patch import _existing_files, _repair_destination
 
 def load_codebase(code_dir="outputs/agent_src/code"):
     """
@@ -28,7 +30,18 @@ def load_codebase(code_dir="outputs/agent_src/code"):
                 # having that loop.
                 with open(path, "r", encoding="utf-8-sig", errors="replace") as f:
                     content = f.read()
-                output.append(f"\n# FILE: {path}\n{content}\n")
+                # Forward slashes, always. `os.path.join` on Windows produced
+                # a header mixing both, "outputs/agent_src/code/TASK\pkg\x.py",
+                # because the left half comes from a literal and the right half
+                # from the join. The agent copies that header into the `---`
+                # and `+++` lines of its diff, and a mixed path is one it
+                # transcribes wrong: on a package-seeded task every patch in a
+                # run came back naming `outputs/agent_src/code/pkg/x.py`, with
+                # the task id dropped, so not one of them applied and the same
+                # failure repeated until the attempt budget ran out. A flat
+                # layout hid this by having only one separator to get wrong.
+                # Diff headers are forward-slash by convention anyway.
+                output.append(f"\n# FILE: {path.replace(os.sep, '/')}\n{content}\n")
 
     return "\n".join(output)
 
@@ -60,8 +73,24 @@ def load_target_files(code_dir, target_files, context=None):
     wanted = relevant_names(context) if context else None
     output = []
 
+    # The same repair the patch applier does, for the same reason and against
+    # the same failure. A FIX that names `outputs/agent_src/code/pkg/etl.py`,
+    # with the task's own directory dropped, resolves nowhere, and this loop
+    # skips it *silently*. The PATCH prompt then arrives with no code in it at
+    # all, so the model writes a diff from the FIX text alone and every hunk
+    # fails to apply against a file it never saw. Fixing only the applier left
+    # this half in place and turned "no file to patch" into "4 of 5 hunks
+    # FAILED", which looks like a different problem entirely.
+    existing = None
+
     for rel_path in target_files:
         candidate = os.path.abspath(rel_path)
+        if not os.path.isfile(candidate):
+            if existing is None:
+                existing = _existing_files(code_dir)
+            repaired = _repair_destination(rel_path, existing)
+            if repaired:
+                candidate = os.path.abspath(repaired)
         try:
             inside = os.path.commonpath([candidate, code_dir_abs]) == code_dir_abs
         except ValueError:
@@ -81,6 +110,9 @@ def load_target_files(code_dir, target_files, context=None):
             # load it whole.
             with open(candidate, "r", encoding="utf-8-sig", errors="replace") as f:
                 content = f.read()
-        output.append(f"\n# FILE: {candidate}\n{content}\n")
+        # Forward slashes here too, and for the same reason: this is the
+        # header PATCH generation reads, so it is the one that ends up in the
+        # diff. See the note on the other call site above.
+        output.append(f"\n# FILE: {candidate.replace(os.sep, '/')}\n{content}\n")
 
     return "\n".join(output)

@@ -44,6 +44,26 @@ packaging tools would read as `1.1`.
   guard only speaks up.
 
 ### Fixed
+- **A package-seeded implementation was shadowed by the user's own copy of it,
+  so the tests never ran the code the agent was repairing.** `python -m pytest`
+  puts the working directory at the front of `sys.path`, ahead of anything
+  `PYTHONPATH` adds, and the working directory is the project root where the
+  original package sits. The suite imported that, every patch applied cleanly,
+  and no test outcome ever changed. A pytest plugin loaded only for a
+  package-seeded run now puts the task's own directory first. Nothing is
+  written into your tests directory, so a `seed.tests` `conftest.py` of your
+  own cannot be touched by it.
+- **A diff naming a file that does not exist is now matched, by unique path
+  suffix, against the files that do.** Small models drop a directory from a
+  path they were asked to copy, and a package gives them one more to drop:
+  every patch in a run came back with the task's own directory missing and all
+  ten were rejected. The same repair runs when a FIX names such a path, which
+  previously skipped the file in silence and left PATCH generation with no code
+  in its prompt at all. Only ever reached from the state where the patch was
+  about to be discarded, so a diff whose paths resolve is untouched.
+- **The `# FILE:` headers the coding agent copies into its diffs mixed `\` and
+  `/` on Windows.** Forward slashes throughout now, which is the convention
+  diffs use anyway.
 - **`--install-skill copilot` destroyed a file somebody else had written.**
   The Copilot target writes two things, the Skill folder and the pointer file
   Copilot opens, and only the folder was covered by the promise this module

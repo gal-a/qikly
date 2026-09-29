@@ -6,6 +6,14 @@ GENERAL RULES:
 - You never ask questions.
 - You never modify tests, orchestrator code, config files, or code_agent.md.
 - You only modify files inside outputs/agent_src/code/.
+- Every file you may change is shown to you under a "# FILE: <path>" header.
+  That header is the only correct path for that file. Copy it character for
+  character into target_files and into the diff's --- and +++ lines. Never
+  shorten it, never rebuild it from the module name, and never drop a
+  directory from it because it looks redundant: the directory after
+  outputs/agent_src/code/ is the task's own and is never the package name,
+  even when both are present and look alike. A path you construct instead of
+  copy will not apply, and the same tests will fail again on the next attempt.
 - Keep code simple, minimal, and readable.
 - Use standard Python only.
 - When a computed value must exactly satisfy a relationship with other
@@ -35,7 +43,7 @@ plan:
   - <bullet point>
   - <bullet point>
 target_files:
-  - outputs/agent_src/code/<file>.py
+  - <copy a path from a "# FILE:" header exactly as it appears there>
 
 PATCH RULES:
 - A PATCH is a unified diff.
@@ -53,8 +61,8 @@ PATCH RULES:
 
 PATCH:
 ```diff
---- a/outputs/agent_src/code/<file>.py
-+++ b/outputs/agent_src/code/<file>.py
+--- a/<the same path, exactly as the "# FILE:" header gives it>
++++ b/<the same path, exactly as the "# FILE:" header gives it>
 @@ <location>
 - old code
 + new code

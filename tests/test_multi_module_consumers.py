@@ -302,3 +302,38 @@ def test_a_package_named_like_a_standard_library_module_is_refused(tmp_path):
     with pytest.raises(ValueError) as raised:
         orch.install_seed(str(src), str(dest), keep_directory_name=True)
     assert "json" in str(raised.value)
+
+
+# --- the header the agent copies into its diff ------------------------------
+
+def test_every_file_header_uses_forward_slashes(packaged):
+    r"""
+    Found by running a real pandas package through a task on 2026-09-29.
+
+    `os.path.join` on Windows produced a header mixing both separators,
+    `outputs/agent_src/code/T\mypkg\pricing.py`, because the left half is a
+    literal and the right half is joined. The agent copies that header into
+    the `---` and `+++` lines of its diff, and it transcribed the mixed form
+    wrong every time: every patch in the run named a path with the task id
+    missing, so not one applied, the failure never changed, and the stage
+    burned its whole attempt budget. A flat layout hid it by leaving only one
+    separator to get wrong.
+    """
+    text = load_codebase(packaged["code"])
+    headers = [l for l in text.split("\n") if l.startswith("# FILE:")]
+    assert headers, "no files were loaded, so this test proves nothing"
+    assert any("mypkg/utils/rounding.py" in h for h in headers), headers
+    for header in headers:
+        assert "\\" not in header, (
+            "a diff header is forward-slash by convention and a mixed one is "
+            "transcribed wrong: %s" % header)
+
+
+def test_a_scoped_target_header_uses_forward_slashes_too(packaged):
+    """The same header, on the path PATCH generation actually reads."""
+    target = "outputs/agent_src/code/%s/mypkg/utils/rounding.py" % TASK
+    text = load_target_files(packaged["code"], [target])
+    headers = [l for l in text.split("\n") if l.startswith("# FILE:")]
+    assert headers, "nothing was loaded, so this test proves nothing"
+    for header in headers:
+        assert "\\" not in header, header

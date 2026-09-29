@@ -943,7 +943,10 @@ def run_fix_patch_cycle(task_id, stage, failure_info, run_patch_dir, iteration, 
         return False, fix_id, patch_path, why, "not_applied"
 
     try:
-        apply_patch(patch_path)
+        # The task's own directory, so a diff naming a file that does not
+        # exist can be matched against the files that do. Never wider than
+        # this task: the repair must not be able to reach another's.
+        apply_patch(patch_path, code_dir=agent_src_code_path(task_id))
     except Exception as e:
         log_transaction({
             "iteration": iteration,

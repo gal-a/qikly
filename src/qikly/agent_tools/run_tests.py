@@ -3,6 +3,8 @@ import re
 import subprocess
 import sys
 
+from qikly import _pytest_import_roots as import_roots_plugin
+
 REPORT_DIR = "outputs/reports/iterations"
 
 
@@ -182,6 +184,16 @@ def run_tests(stage, tests_dir, task_id=None, iteration=None, run_timestamp=None
         roots = [os.path.abspath(r) for r in import_roots]
         env["PYTHONPATH"] = os.pathsep.join(
             roots + ([existing] if existing else []))
+        # PYTHONPATH is not enough on its own, and this is the whole reason
+        # the plugin exists. `python -m pytest` puts the working directory at
+        # the *front* of sys.path, ahead of everything PYTHONPATH contributes,
+        # and the working directory is the project root where the user's own
+        # copy of the package sits. So the original shadows the copy the run
+        # installed: the suite imports the user's code, the agent repairs a
+        # copy nobody imports, and no patch can change a test outcome. The
+        # plugin runs before collection and puts these roots in front.
+        env[import_roots_plugin.ENV_VAR] = os.pathsep.join(roots)
+        cmd += ["-p", import_roots_plugin.__name__]
 
     try:
         proc = subprocess.run(
