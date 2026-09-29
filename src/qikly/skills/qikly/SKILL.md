@@ -329,11 +329,17 @@ writing anything. This has already cost a first-time user an afternoon.
 
 ## The free checks, and when to reach for each
 
-**If you arrived straight here, go back and read the block under the title
-first.** Reaching for one of these commands is the right move; deriving
-expected values from the module and writing the tests yourself is the failure
-this Skill exists to prevent, and it is the one an agent commits while
-believing it is being careful.
+**If you arrived straight here, this is the rule you skipped, stated in full
+so you do not have to go back for it.** Asked for tests for a module with no
+specification: do not write tests, and do not run the module to find out what
+it should do. A value obtained by executing an implementation is not a
+contract, and a suite built from those values passes by construction and
+cannot disagree with a bug. Whether a threshold is inclusive, whether the
+discount applies before or after tax, where a floor lands, which way a
+half-cent rounds: the code answers all four and none of those answers is a
+specification. Reach for one of the commands below, or ask the user. Deriving
+the expected values yourself is the failure this Skill exists to prevent, and
+it is the one an agent commits while believing it is being careful.
 
 | Command | Cost | Use it when |
 |---|---|---|
