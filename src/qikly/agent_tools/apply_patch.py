@@ -17,6 +17,12 @@ import subprocess
 # GitHub's own Windows runners in 0.5.5 while passing everywhere else.
 MIN_PATCH_VERSION = (2, 7)
 
+# Below this, a patch is too old to accept `--fuzz` at all, and fails loudly
+# with the flavour check's own message. At or above it, and below
+# MIN_PATCH_VERSION, it takes the flags and then aborts, which is the silent
+# case worth refusing rather than falling back to.
+CRASHES_FROM = (2, 5)
+
 _VERSION_CACHE = {}
 
 
@@ -106,21 +112,35 @@ def _find_patch_exe():
         too_old.append((candidate, version))
 
     if too_old:
-        listed = "\n".join(
-            "  %s is patch %s" % (exe, ".".join(str(n) for n in version))
-            for exe, version in too_old)
-        raise RuntimeError(
-            "Every `patch` found is older than GNU patch %s, which is the "
-            "first version that can write a hunk into a subdirectory without "
-            "aborting. A package-seeded implementation is all subdirectories, "
-            "so these would fail on every repair:\n%s\n"
-            "  Debian/Ubuntu:  apt install patch\n"
-            "  macOS:          brew install gpatch  (Apple's own patch is "
-            "both non-GNU and far older than this)\n"
-            "  Windows:        install Git for Windows, which ships a current "
-            "GNU patch under usr\\bin; qikly finds it there without any PATH "
-            "change, even when another one comes first on PATH."
-            % (".".join(str(n) for n in MIN_PATCH_VERSION), listed))
+        # Refusing outright was wrong, and macOS showed it. Apple's
+        # /usr/bin/patch reports 2.0, so with no gpatch installed every
+        # candidate fails the gate, and raising here replaced a case that was
+        # already handled well: the flavour check names `brew install gpatch`
+        # at the moment a run actually tries to use it. So the gate prefers,
+        # and vetoes only where preferring would be silent.
+        #
+        # The veto is for the range that accepts these flags and then dies on
+        # an internal assertion. Falling back to one of those means a dialog
+        # naming a line in patch's own C source with nothing connecting it to
+        # the binary, which is the failure this function exists to prevent.
+        crashing = [(exe, v) for exe, v in too_old if v >= CRASHES_FROM]
+        if crashing:
+            listed = "\n".join(
+                "  %s is patch %s" % (exe, ".".join(str(n) for n in version))
+                for exe, version in crashing)
+            raise RuntimeError(
+                "Every `patch` found is older than GNU patch %s, which is the "
+                "first version that can write a hunk into a subdirectory "
+                "without aborting. A package-seeded implementation is all "
+                "subdirectories, so these would fail on every repair:\n%s\n"
+                "  Debian/Ubuntu:  apt install patch\n"
+                "  macOS:          brew install gpatch  (Apple's own patch is "
+                "both non-GNU and far older than this)\n"
+                "  Windows:        install Git for Windows, which ships a "
+                "current GNU patch under usr\\bin; qikly finds it there "
+                "without any PATH change, even when another comes first."
+                % (".".join(str(n) for n in MIN_PATCH_VERSION), listed))
+        return too_old[0][0]
 
     # Naming the fix, not just the fact. This is the first thing a user on a
     # fresh machine hits, it stops every run dead, and "could not locate" on

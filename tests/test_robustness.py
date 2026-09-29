@@ -109,6 +109,22 @@ def test_when_every_patch_is_too_old_the_error_names_it_and_its_version(monkeypa
         assert platform_hint in message
 
 
+def test_a_patch_too_old_to_take_the_flags_at_all_is_still_returned(monkeypatch):
+    """
+    Apple's /usr/bin/patch reports 2.0, and on macOS without gpatch it is the
+    only candidate. It was returned before this gate existed and must still be,
+    because the flavour check reports it when a run uses it, with the remedy
+    for that platform. Refusing here instead broke
+    test_the_system_patch_is_still_used_when_gpatch_is_absent on the macOS leg
+    on 2026-09-29, which is what this pins.
+    """
+    monkeypatch.setattr(ap.shutil, "which",
+                        lambda name: "/usr/bin/patch" if name == "patch" else None)
+    monkeypatch.setattr(ap, "_probe_patch_version", lambda exe: (2, 0))
+
+    assert ap._find_patch_exe() == "/usr/bin/patch"
+
+
 def test_a_patch_whose_version_cannot_be_read_is_still_used(monkeypatch):
     """
     The gate knows about one defect. A binary it cannot identify is not
