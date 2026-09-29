@@ -550,7 +550,13 @@ def install_seed(src, dest_dir, filename=None, keep_directory_name=False):
         # the source, so the walk below recurses into what it has just
         # written and copies until the path length runs out. Found by audit
         # 2026-09-29, before release.
-        if name in ("", ".", "..") or os.sep in name or (os.altsep or "") in name:
+        # `os.altsep` is None on POSIX, and `"" in name` is true of every
+        # string, so the obvious `(os.altsep or "") in name` spelling rejects
+        # every package on Linux while passing on Windows, where altsep is
+        # "/". The separator checks are belt-and-braces anyway: `basename`
+        # has already removed anything that could contain one.
+        if (name in ("", ".", "..") or os.sep in name
+                or (os.altsep and os.altsep in name)):
             raise ValueError(
                 f"seed.implementation must name a directory, not a path that "
                 f"resolves to {name!r}: {src}. Point it at the package folder "

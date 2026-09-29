@@ -271,6 +271,34 @@ def test_a_seed_path_that_is_not_a_directory_name_is_refused(tmp_path, seed_path
     assert os.listdir(str(dest)) == []
 
 
+def test_an_ordinary_package_is_accepted_where_there_is_no_alternate_separator(
+        tmp_path, monkeypatch):
+    """
+    The same refusal, spelled so that it fires on every package.
+
+    `os.altsep` is "/" on Windows and None on POSIX, and `"" in name` is true
+    of every string, so the guard above written as `(os.altsep or "") in name`
+    accepted `mypkg` on the machine it was written on and rejected it on CI.
+    Five tests in this area failed there and none here. So altsep is forced to
+    its POSIX value rather than trusted to be whatever this machine has.
+    """
+    from qikly.orchestrator import orchestrator as orch
+
+    monkeypatch.setattr(os, "altsep", None)
+    src = tmp_path / "mypkg"
+    _write(str(src / "money.py"), "X = 1\n")
+    dest = tmp_path / "code" / TASK
+    os.makedirs(str(dest))
+
+    orch.install_seed(str(src), str(dest), keep_directory_name=True)
+    assert os.path.exists(str(dest / "mypkg" / "money.py"))
+
+    # And the refusal it exists for still refuses.
+    with pytest.raises(ValueError):
+        orch.install_seed(str(tmp_path / "mypkg" / ".."), str(dest),
+                          keep_directory_name=True)
+
+
 def test_mutation_scoring_sees_a_package_seeded_implementation(tmp_path):
     """
     Found by the same audit. `implementation()` listed one directory level, so
