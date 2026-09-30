@@ -171,11 +171,11 @@ in a `.env` you source. Do not commit either.
 workflow file:
 
 ```yaml
-- uses: gal-a/qikly@v0.5.6
+- uses: gal-a/qikly@v0.5.7
   with:
     api-key: ${{ secrets.OPENAI_API_KEY }}
     provider: openai
-    qikly-version: "qikly==0.5.6"
+    qikly-version: "qikly==0.5.7"
 ```
 
 A secret is masked in logs. A literal is not, and a key pushed to a public repo
