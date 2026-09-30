@@ -242,6 +242,7 @@ def test_the_frontmatter_carries_the_metadata_directories_sort_on():
 # depend on that.
 SKILL_BODY_HASHES = {
     "0.3.2": "ff71bda1a1be618ed8050bb4a60ba1d28bba1eb13130c8e3b20580d41ad408cf",
+    "0.3.3": "4598a415ca38cbe76fd8cd8520992ad757068ebc6339a83330b4076bb4e468ea",
 }
 
 
@@ -268,9 +269,12 @@ def test_the_skill_version_moves_when_the_instructions_move():
         "reason." % (version, version, digest))
     assert digest == known, (
         "SKILL.md's body changed while metadata.version stayed at %s. Bump "
-        "the version and add %r: %r to SKILL_BODY_HASHES in the same edit, so "
-        "the number keeps meaning what it says."
-        % (version, version, digest))
+        "metadata.version, then add an entry to SKILL_BODY_HASHES keyed on the "
+        "NEW version with this digest: %s\n"
+        "Do not key it on %s. Re-using the current version is what this test "
+        "exists to catch, and an earlier wording of this message suggested "
+        "exactly that."
+        % (version, digest, version))
 
 
 def test_every_frontmatter_key_is_one_the_spec_allows():

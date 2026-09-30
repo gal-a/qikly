@@ -37,23 +37,38 @@ example, checks following distance from forward-radar samples. See [What it is f
 ## Start here
 
 ```bash
-pip install qikly
+pip install --upgrade qikly
 ```
 
-Four ways in. Pick the row that matches what you have, and ignore the rest of
-this page until it has run.
+`--upgrade` rather than a bare install, because the Skill ships inside the
+package: `pip install qikly` on a machine that already has an older one
+prints "Requirement already satisfied", changes nothing, and
+`--install-skill` then writes that older Skill.
+
+**Start on your own code, not on ours.** The first row needs no API key, no
+task file, no specification and no decision from you, and it answers the
+question you probably arrived with.
 
 | If you want to | Run | Costs |
 |---|---|---|
-| **See the split for yourself**, before anything else | `qikly --explain CALC_TAX` | nothing, no API key |
-| **Watch a real run** end to end | `qikly --demo` | needs a key, about half a minute and well under a cent |
+| **Find out what your tests would not have noticed** | `qikly --score-code my_module.py --score-tests tests/` | nothing, no API key |
+| **Point it at your own module** and write tests from a spec | `qikly --scaffold my_module.py` | nothing to set it up |
 | **Start from a finished example** in a project of your own | `qikly --example` | nothing to set it up |
-| **Point it at your own module** | `qikly --scaffold my_module.py` | nothing to set it up |
+| **See the split for yourself**, on a bundled task | `qikly --explain CALC_TAX` | nothing, no API key |
+| **Watch a real run** end to end | `qikly --demo` | needs a key, about half a minute and well under a cent |
+
+**The first row is the one to try in a meeting.** Point it at a module or a
+package, with the tests you already have. It plants one fault at a time in a
+copy of your code, runs those tests against each one, and names the faults
+nothing noticed. Both flags are needed: one says what to break, the other says
+what should notice. No model is called, nothing of yours is
+modified, and no code leaves your machine. It says nothing about qikly and
+everything about the suite you are already trusting.
 
 `--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
 delete. It is for watching, not for building in. `--example` and `--scaffold`
 create a real project in the directory you are standing in, and those are the
-two to start from.
+two to build from.
 
 Then [five steps from your module to a first run](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md).
 

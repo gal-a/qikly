@@ -51,6 +51,23 @@ _NORMALISERS = {"strip", "lstrip", "rstrip", "lower", "upper", "casefold", "titl
 # silent_failure), which the arithmetic family does not touch. Comparing
 # refined criteria against arithmetic faults asks a question refinement was
 # never about; this family is the one that matches the hypothesis.
+# Operators print as operators. These descriptions go straight into the report
+# a user reads, and `GtE -> Gt` is a Python AST class name: the one time it
+# mattered most it was describing a discount tier's `>=`, on the most valuable
+# line in the report, in a notation only somebody who knows the ast module can
+# read. The same report already says "guard disabled" in plain English.
+_SYMBOL = {
+    "Eq": "==", "NotEq": "!=", "Lt": "<", "LtE": "<=", "Gt": ">", "GtE": ">=",
+    "Is": "is", "IsNot": "is not", "In": "in", "NotIn": "not in",
+    "And": "and", "Or": "or",
+}
+
+
+def _reads_as(name):
+    """The operator a reader would recognise, or the node name if unmapped."""
+    return _SYMBOL.get(name, name)
+
+
 FAMILIES = ("arithmetic", "validation")
 
 
@@ -101,7 +118,7 @@ class _Mutator(ast.NodeTransformer):
             return node
         if len(node.ops) == 1 and type(node.ops[0]) in _CMP_SWAP:
             old = type(node.ops[0])
-            if self._hit(f"{old.__name__} -> {_CMP_SWAP[old].__name__}", node):
+            if self._hit(f"{_reads_as(old.__name__)} became {_reads_as(_CMP_SWAP[old].__name__)}", node):
                 node.ops = [_CMP_SWAP[old]()]
         return node
 
@@ -111,7 +128,7 @@ class _Mutator(ast.NodeTransformer):
             return node
         if type(node.op) in _BOOL_SWAP:
             old = type(node.op)
-            if self._hit(f"{old.__name__} -> {_BOOL_SWAP[old].__name__}", node):
+            if self._hit(f"{_reads_as(old.__name__)} became {_reads_as(_BOOL_SWAP[old].__name__)}", node):
                 node.op = _BOOL_SWAP[old]()
         return node
 

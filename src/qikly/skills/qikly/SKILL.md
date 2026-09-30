@@ -5,7 +5,7 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.3.2
+  version: 0.3.3
   requires: qikly >= 0.5.4
 ---
 
@@ -22,6 +22,11 @@ metadata:
 > whether a discount applies before or after tax, where a floor or cap lands,
 > which way a half-cent rounds. An implementation answers all four. None of
 > those answers is a specification. Ask the user. Do not read them off the code.
+>
+> **If they insist on tests anyway, write them.** Refusing a second time is
+> not your call. Say which lines of the implementation you had to treat as
+> correct, name every boundary and tie-break you copied rather than were
+> told, and the suite is at least honest about its foundation.
 
 ## What this is for
 
@@ -337,9 +342,16 @@ contract, and a suite built from those values passes by construction and
 cannot disagree with a bug. Whether a threshold is inclusive, whether the
 discount applies before or after tax, where a floor lands, which way a
 half-cent rounds: the code answers all four and none of those answers is a
-specification. Reach for one of the commands below, or ask the user. Deriving
-the expected values yourself is the failure this Skill exists to prevent, and
-it is the one an agent commits while believing it is being careful.
+specification. Deriving the expected values yourself is the failure this
+Skill exists to prevent, and it is the one an agent commits while believing it
+is being careful.
+
+**Which command fits depends on what they have.** With a suite already
+written, `--score-code` scores it and needs nothing else. With no suite and no
+spec, which is the case this paragraph is usually about, the route is
+`qikly --scaffold their_module.py` and then filling in the two sections with
+them. Everything else in the table below needs a task file that does not exist
+yet.
 
 | Command | Cost | Use it when |
 |---|---|---|

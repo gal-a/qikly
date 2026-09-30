@@ -29,7 +29,7 @@ INVOKED_FROM = os.getcwd()
 PROJECT_ROOT = chdir_to_project_root()
 
 
-def stamp(stream=None):
+def stamp(stream=None, project_root_matters=True):
     """
     One line saying which qikly this is, when it ran, and from where.
 
@@ -63,7 +63,14 @@ def stamp(stream=None):
     # into the repository, a smoke test that scored the wrong project, and a
     # first-time user who could not find files the tool had just reported
     # creating.
-    if os.path.abspath(PROJECT_ROOT) != os.path.abspath(INVOKED_FROM):
+    # Not for commands the project root does not reach. `--score-code` takes
+    # paths relative to where it was typed and writes its report beside them,
+    # so telling that user to set QIKLY_PROJECT_ROOT or cd elsewhere offers a
+    # remedy for a problem they do not have, at the moment they are working
+    # out how qikly finds their module. The "run in <cwd>" line above is the
+    # one that answers them, and it stays.
+    if (project_root_matters
+            and os.path.abspath(PROJECT_ROOT) != os.path.abspath(INVOKED_FROM)):
         target.write("  project root is elsewhere: %s\n"
                      "  (set %s to choose it, or cd there)\n"
                      % (PROJECT_ROOT, ENV_VAR))
@@ -872,7 +879,9 @@ def _parse_args():
     parser.add_argument(
         "--score-code", metavar="PATH", default=None,
         help="Score a suite qikly did not write. The module or package to "
-             "plant faults in, with --score-tests. Needs no task file and no "
+             "plant faults in, with --score-tests. Absolute, or relative to "
+             "where you run the command, not to the project root. Needs no "
+             "task file and no "
              "run: point it at code and tests you already have, and it reports "
              "what your tests would not have noticed. Free, no model call, and "
              "nothing of yours is modified."
@@ -880,7 +889,8 @@ def _parse_args():
     parser.add_argument(
         "--score-tests", metavar="PATH", default=None,
         help="The suite to run against those planted faults: a test file or a "
-             "directory of them. Goes with --score-code."
+             "directory of them, absolute or relative the same way. Goes with "
+             "--score-code, and neither works alone."
     )
     parser.add_argument(
         "--score-mutants", type=int, default=None,
@@ -1583,7 +1593,7 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
     from qikly.mutation_score import DEFAULT_MUTANTS, from_paths, run
     from qikly.orchestrator.orchestrator import discover_task_ids
 
-    stamp()
+    stamp(project_root_matters=not (code or tests))
 
     if code or tests:
         if not (code and tests):

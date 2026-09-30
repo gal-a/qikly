@@ -500,6 +500,12 @@ def write(result, gaps, out_dir=OUT_DIR):
     return path
 
 
+# Once per invocation, not once per task. `--score-suite` loops over every
+# task it was given, and version_check.py settles the rule for unprompted
+# messages in this codebase: a sweep of ten tasks says a thing once.
+_ALREADY_ASKED = False
+
+
 def _invite_a_report(result):
     """
     Ask at the one moment the user has just learned something they did not
@@ -521,10 +527,20 @@ def _invite_a_report(result):
     Silent when nothing was missed, because an invitation after good news is
     an advertisement. `QIKLY_NO_INVITE=1` turns it off.
     """
-    if os.environ.get("QIKLY_NO_INVITE"):
+    global _ALREADY_ASKED
+    if os.environ.get("QIKLY_NO_INVITE") or _ALREADY_ASKED:
         return None
-    if not (result or {}).get("missed"):
+    result = result or {}
+    if not result.get("missed"):
         return None
+    # Only for a suite qikly did not write. `--score-suite --tasks X` scores
+    # the suite qikly generated, and there the message is simply false: the
+    # thing that missed the faults is the generated suite, so asking the user
+    # to send them as evidence of what real suites miss asks for the wrong
+    # thing. Found by audit before 0.5.7.
+    if result.get("generated") is not False:
+        return None
+    _ALREADY_ASKED = True
     message = chr(10).join([
         "",
         "The faults your tests did not notice are the most useful thing this",
@@ -569,7 +585,6 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
         else:
             print(f"[{task_id}] the suite does not pass your current code, so a "
                   f"score would mean nothing. Report at {path}")
-        _invite_a_report(result)
         return path
 
     total, caught = result["total"], len(result["caught"])

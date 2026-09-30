@@ -4,6 +4,49 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## 0.5.7
+
+> A question asked at the one moment a user has just learned something, and the Skill's central rule moved to where an agent will meet it
+
+### Added
+- **`--score-code ... --score-tests ...` now asks for the faults your tests did not notice**, and
+  only when there were some. The generated suites are measured against what
+  real suites miss, and there is no public corpus of that, so it is the one
+  thing nobody outside this project can supply any other way. It is silent
+  when the suite caught everything, because an invitation printed after good
+  news is an advertisement, and `QIKLY_NO_INVITE=1` turns it off. This is the
+  second place in the tool that asks a user for anything, and the first that
+  does it when they have something to say.
+
+### Changed
+- **The Skill states its central rule where an agent will actually meet it.**
+  Asked for tests with no specification, an agent read `SKILL.md` from the
+  middle, never reached the routing instruction in the second section, and
+  wrote a suite whose expected values it had obtained by executing the module.
+  The rule was not missing, so more rules were not the answer: it is now a
+  blockquote above everything, and restated in full at the head of the
+  free-checks table, naming the four things that look settled and are not.
+  Whether a threshold is inclusive, whether the discount applies before or
+  after tax, where a floor lands, which way a half-cent rounds: an
+  implementation answers all four and none of those answers is a
+  specification.
+
+  **Recorded as an improvement rather than a fix**, because it could not be
+  shown to work. Eight benches, including controls carrying the previous
+  Skill, did not separate the two versions: a capable model avoids this
+  unaided, and under time pressure a weaker one declines to open the file at
+  all, which no wording inside it can reach. The measurements are in the
+  research log, including the description rewrite that also changed nothing,
+  so neither is retried as though it were new.
+
+### Fixed
+- **A Skill version that no longer moves when the instructions do.** The
+  number is bumped by hand, in a file edited for reasons unrelated to
+  releasing. A pinned hash of the body now fails the suite when the text
+  changes without it, and `release_check` prints which Skill a release
+  carries, so "0.5.7 ships Skill 0.3.2" is stated on the day rather than
+  discovered later.
+
 ## 0.5.6
 
 > The `patch` a machine happens to have is now checked for being new enough, not just for being GNU

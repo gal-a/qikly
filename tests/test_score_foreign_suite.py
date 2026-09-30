@@ -28,6 +28,8 @@ import sys
 
 import pytest
 
+import qikly.mutation_score as ms
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src")
 
@@ -335,3 +337,93 @@ def test_two_mutations_that_read_the_same_are_told_apart_by_line():
     assert len(set(hundreds)) == 2, (
         "both 100s produced the same row, so the report cannot say which line "
         "is which: %s" % hundreds)
+
+# --------------------------------------------------- the invitation to report --
+#
+# Added after an audit found three defects in a function that had no test:
+# it fired for qikly's own generated suites, where its wording is false; it
+# printed once per task rather than once per invocation; and one of its two
+# call sites could never fire.
+
+
+@pytest.fixture(autouse=True)
+def _forget_that_we_asked(monkeypatch):
+    """Each test starts as a fresh invocation would."""
+    monkeypatch.setattr(ms, "_ALREADY_ASKED", False)
+    monkeypatch.delenv("QIKLY_NO_INVITE", raising=False)
+
+
+def test_it_asks_when_a_suite_of_theirs_missed_something():
+    assert ms._invite_a_report({"missed": ["a"], "generated": False})
+
+
+def test_it_says_nothing_when_the_suite_caught_everything():
+    """An invitation printed after good news is an advertisement."""
+    assert ms._invite_a_report({"missed": [], "generated": False}) is None
+
+
+def test_it_says_nothing_about_a_suite_qikly_wrote_itself():
+    """
+    `--score-suite --tasks X` scores the generated suite. There the message
+    is not merely unnecessary, it is false: it offers the misses as evidence
+    of what *real* suites miss, and the suite that missed them is qikly's.
+    """
+    assert ms._invite_a_report({"missed": ["a"], "generated": True}) is None
+
+
+def test_it_asks_once_per_invocation_and_not_once_per_task():
+    """
+    `--score-suite` loops over every task it was given. The rule for
+    unprompted output in this codebase is set by the version check: a sweep
+    of ten tasks says a thing once.
+    """
+    result = {"missed": ["a"], "generated": False}
+    assert ms._invite_a_report(result)
+    assert ms._invite_a_report(result) is None
+    assert ms._invite_a_report(result) is None
+
+
+def test_the_opt_out_wins():
+    import os
+    os.environ["QIKLY_NO_INVITE"] = "1"
+    try:
+        assert ms._invite_a_report({"missed": ["a"], "generated": False}) is None
+    finally:
+        del os.environ["QIKLY_NO_INVITE"]
+
+
+def test_it_survives_a_result_that_is_missing_its_keys():
+    """It runs at the end of a scoring run; it must never be what fails one."""
+    for result in (None, {}, {"missed": None}, {"missed": ["a"]}):
+        assert ms._invite_a_report(result) is None
+
+
+def test_the_ask_is_ascii_because_it_prints_to_a_windows_console():
+    message = ms._invite_a_report({"missed": ["a"], "generated": False})
+    assert message.isascii(), [c for c in message if not c.isascii()]
+
+def test_the_project_root_line_is_not_shown_where_it_would_be_false(monkeypatch):
+    """
+    `--score-code` resolves its paths against where the command was typed and
+    writes the report beside them, so the project root reaches nothing. The
+    line offering QIKLY_PROJECT_ROOT as the remedy arrives at the moment a
+    first-time user is working out how qikly finds their module, and answers
+    a question they do not have. Every command that reads a task file still
+    gets it.
+    """
+    import io as _io
+    from qikly import cli
+
+    monkeypatch.setattr(cli, "PROJECT_ROOT", "/somewhere/else")
+    monkeypatch.setattr(cli, "INVOKED_FROM", "/where/they/are")
+
+    reads_a_task_file = _io.StringIO()
+    cli.stamp(stream=reads_a_task_file)
+    assert "project root is elsewhere" in reads_a_task_file.getvalue()
+
+    scores_their_own_code = _io.StringIO()
+    cli.stamp(stream=scores_their_own_code, project_root_matters=False)
+    assert "project root is elsewhere" not in scores_their_own_code.getvalue()
+    # The line that does answer them survives.
+    assert "run in" in scores_their_own_code.getvalue()
+
