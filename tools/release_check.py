@@ -468,11 +468,24 @@ def main():
         print("\nStill yours to do, because it spends money:")
         print("  the demo, from a directory that is NOT this repository,")
         print("  using the wheel rather than an editable install.")
+        # One command per line, and no `&&`: Windows PowerShell 5.1 does
+        # not have it, and this list is printed for somebody who is nearly
+        # done and reading quickly. `mcp-publisher` is a release binary
+        # rather than a pip package and is rarely on PATH, so it is named
+        # as something to locate rather than shown as a command to paste.
         print("\nThen, in this order:")
         remote = public_remote() or "public"
         print("  git push %s HEAD:%s" % (remote, DEFAULT_BRANCH))
-        print("  git tag v%s && git push %s v%s" % (version, remote, version))
-        print("  mcp-publisher login github && mcp-publisher publish")
+        print("  wait for every leg of the tests workflow to pass on that")
+        print("    commit. This check runs the suite once, on one OS and")
+        print("    one Python, and 0.5.5 published over two red Windows")
+        print("    legs because nothing here asked.")
+        print("  git tag v%s" % version)
+        print("  git push %s v%s" % (remote, version))
+        print("  mcp-publisher login github")
+        print("  mcp-publisher publish")
+        print("    (a release binary, often not on PATH: call it by full")
+        print("     path if the name does not resolve)")
         print("  python tools/release_check.py --after")
     return 1 if failed else 0
 
