@@ -276,8 +276,13 @@ h1 {
   flex-direction: column;
   gap: 4px;
   overflow-x: auto;
-  max-width: 460px;
+  max-width: 520px;
 }
+
+/* Never wrap a command. Broken across two lines it reads as two
+   commands, and the break lands inside a flag. The overflow above
+   turns that into a scroll on a narrow screen instead. */
+.install span { white-space: nowrap; }
 
 .install .prompt { color: var(--ink-faint); }
 
@@ -665,13 +670,16 @@ footer {
          is what the headline just asked them about. -->
     <div class="install">
       <span><span class="prompt">$</span> pip install --upgrade qikly</span>
-      <span><span class="prompt">$</span> qikly --score-code my_module.py --score-tests tests/</span>
+      <span><span class="prompt">$</span> qikly --score-code pricing.py --score-tests tests/</span>
     </div>
     <p class="route-note">That plants one fault at a time in a copy of your code,
       runs the tests you already have against each one, and names the faults
       nothing noticed. No API key, no model call, nothing of yours modified, and
-      no code leaves your machine. It says nothing about qikly and everything
-      about the suite you are already trusting.</p>
+      no code leaves your machine. It tells you what your tests would notice changing. It cannot tell you
+      whether the code was right to begin with, because it works by breaking
+      code that is there, so anything the code never did is invisible to it. In
+      one session an AI-written suite caught 8 of 8 planted faults and still
+      missed four real bugs that a suite written from a withheld spec found.</p>
     <p class="route-note">To see the withholding itself,
       <code>qikly --explain CALC_TAX</code> prints what each agent is given and the
       difference between them, on a bundled task, in about a second. To watch a

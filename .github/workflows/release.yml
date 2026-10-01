@@ -210,6 +210,61 @@ jobs:
   # release that failed to reach PyPI. Force-moving a tag is normally something
   # to avoid, and is correct here: that is the entire contract of a major alias,
   # and it is stated in the README so nobody is surprised by it.
+  mcp-registry:
+    # The listing installs by pin, so a stale entry hands people old software
+    # rather than merely looking out of date. It sat two releases behind
+    # before anything noticed, which is what this job exists to end.
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      # The whole point, and the same mechanism PyPI trusted publishing uses
+      # above: the registry reads repository_owner out of this token and
+      # grants io.github.<owner>/*. There is no secret here to leak and
+      # nothing outside this workflow can obtain one.
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch mcp-publisher
+        # A release binary rather than a pip package, which is why it is so
+        # often missing from a maintainer's PATH.
+        run: |
+          set -euo pipefail
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      - name: server.json must agree with the tag before anything is published
+        # A listing that advertises one version and installs another is the
+        # failure this check exists for, and three places in that file carry
+        # the version. The suite holds them together; this holds them to the
+        # tag, on the tree being released.
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          ./mcp-publisher validate
+          python - "$TAG" <<'PY'
+          import json, sys
+          tag = sys.argv[1]
+          doc = json.load(open("server.json", encoding="utf-8"))
+          found = {doc["version"]}
+          for package in doc.get("packages") or []:
+              found.add(package.get("version"))
+              for argument in package.get("runtimeArguments") or []:
+                  value = argument.get("value") or ""
+                  if "qikly[mcp]==" in value:
+                      found.add(value.split("==", 1)[1])
+          found.discard(None)
+          if found != {tag}:
+              sys.exit("server.json says %s, the tag says %s" % (sorted(found), tag))
+          print("server.json and the tag agree on", tag)
+          PY
+
+      - name: Authenticate, with no secret and no browser
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish the listing
+        run: ./mcp-publisher publish
+
   major-alias:
     needs: publish
     runs-on: ubuntu-latest

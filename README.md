@@ -61,9 +61,14 @@ question you probably arrived with.
 package, with the tests you already have. It plants one fault at a time in a
 copy of your code, runs those tests against each one, and names the faults
 nothing noticed. Both flags are needed: one says what to break, the other says
-what should notice. No model is called, nothing of yours is
-modified, and no code leaves your machine. It says nothing about qikly and
-everything about the suite you are already trusting.
+what should notice.
+
+It tells you what your tests would notice changing. It cannot tell you whether
+the code was right to begin with, because it works by breaking code that is
+there, so anything the code never did is invisible to it. In one session an
+AI-written suite caught 8 of 8 planted faults and still missed four real bugs
+that a suite written from a withheld spec found. No model is called, nothing of yours is
+modified, and no code leaves your machine.
 
 `--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
 delete. It is for watching, not for building in. `--example` and `--scaffold`
