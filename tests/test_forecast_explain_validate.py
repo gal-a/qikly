@@ -209,6 +209,38 @@ def test_a_criterion_naming_a_boundary_is_not_warned_about(tmp_path):
     assert warnings == []
 
 
+def test_a_verify_task_with_nothing_seeded_is_warned_about(tmp_path):
+    """
+    The suffix means "test the code I already have", and the seed block is
+    what makes that true. Without it a run writes a fresh implementation and
+    tests that, which passes, so the user reads a green suite as a statement
+    about their own module when it describes code qikly wrote a minute
+    earlier. Checked on 2026-10-01: such a task validated as ok, 0 warnings.
+    """
+    _, warnings = validate.check_task(_task(
+        tmp_path, 'task_id: "T_VERIFY"\nrequirements: "r"\n'
+                  'interface: {module: "m"}\n'
+                  'acceptance_criteria:\n  - "100 is accepted and 101 is rejected"\n'))
+    assert any("no seed.implementation" in w for w in warnings), warnings
+
+
+def test_a_verify_task_that_seeds_something_is_not_warned_about(tmp_path):
+    _, warnings = validate.check_task(_task(
+        tmp_path, 'task_id: "T_VERIFY"\nrequirements: "r"\n'
+                  'interface: {module: "m"}\n'
+                  'seed: {implementation: "mine.py"}\n'
+                  'acceptance_criteria:\n  - "100 is accepted and 101 is rejected"\n'))
+    assert not any("no seed.implementation" in w for w in warnings), warnings
+
+
+def test_a_task_not_named_verify_is_left_alone(tmp_path):
+    """Generating an implementation is the other legitimate job."""
+    _, warnings = validate.check_task(_task(
+        tmp_path, 'task_id: "T"\nrequirements: "r"\ninterface: {module: "m"}\n'
+                  'acceptance_criteria:\n  - "100 is accepted and 101 is rejected"\n'))
+    assert not any("no seed.implementation" in w for w in warnings), warnings
+
+
 def _restating_task(task_id):
     """A task whose output requirement fully contains an output criterion."""
     return chr(10).join([

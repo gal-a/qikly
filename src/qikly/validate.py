@@ -197,6 +197,21 @@ def check_task(path):
         if not _input_exists(relative):
             errors.append(f"{name}: input file not found: {relative}")
 
+    # The suffix says "test the code I already have" and the seed block is
+    # what makes that true. Without it the run writes a fresh implementation
+    # and tests that instead, which passes, and reads as a statement about
+    # the user's module when it is a statement about code qikly just wrote.
+    # Quiet failures that do something plausible are worse than loud ones.
+    task_id = str(task.get("task_id") or os.path.splitext(name)[0])
+    if task_id.endswith("_VERIFY") and not (task.get("seed") or {}).get("implementation"):
+        warnings.append(Note(
+            f"{name}: the name says this tests code you already have, but "
+            f"there is no seed.implementation, so a run will write a new "
+            f"implementation from the requirements and test that instead. "
+            f"Add `seed:` with `implementation:` pointing at your module, or "
+            f"rename the task if you meant to generate one.",
+            group=("verify-without-seed", task_id)))
+
     # A requirement that restates a criterion hands that criterion to the
     # coding agent, which reads requirements and must never read criteria. It
     # is the easiest leak in the whole system to create by accident: paste a

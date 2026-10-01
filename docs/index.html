@@ -928,7 +928,7 @@ footer {
   <section class="band">
     <p class="eyebrow">Getting started</p>
     <h2>One command, about thirty seconds, writes nothing outside its own folder</h2>
-    <pre><code>pip install qikly
+    <pre><code>pip install --upgrade qikly
 export GEMINI_API_KEY=...        # or OPENAI_API_KEY, or ANTHROPIC_API_KEY
 qikly --demo</code></pre>
     <figure class="demo">
@@ -1002,7 +1002,7 @@ qikly --demo</code></pre>
           <td>Code someone else wrote, and you want <em>that code</em> verified</td>
           <td></td><td class="yes">Y</td><td></td>
           <td><code>qikly --scaffold &lt;MY_MODULE&gt;.py</code><br>
-          then uncomment <code>seed.implementation</code></td>
+          which writes <code>seed.implementation</code> pointing at that file</td>
           <td>Scaffold reads the real signatures out of the file you point it at and
           fills in <b>#2</b> for you. <b>#1</b> and <b>#3</b> stay yours to
           write: criteria read out of an implementation can only describe what

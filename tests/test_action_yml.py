@@ -181,9 +181,17 @@ def test_every_documented_repo_url_points_at_the_real_one():
         reserved = {"marketplace", "features", "sponsors", "orgs", "topics",
                     "settings", "apps", "collections", "about", "pricing",
                     "security", "enterprise", "login", "join", "site"}
+        # A dependency downloaded by a workflow is the one honest reason to
+        # name somebody else's repository. The registry publishes
+        # mcp-publisher as a release binary rather than a package, so the
+        # release workflow fetches it from there by URL. Listed here rather
+        # than excluded by pattern, so adding a second one is a decision
+        # somebody makes on purpose.
+        allowed = {"modelcontextprotocol/registry"}
         wrong = sorted(
             {m for m in re.findall(r"github\.com/([\w.-]+/[\w.-]+)", text)
-             if not m.startswith(owner + "/") and m.split("/")[0] not in reserved}
+             if not m.startswith(owner + "/") and m.split("/")[0] not in reserved
+             and m not in allowed}
             | {m for m in re.findall(r"uses:\s*([\w.-]+/[\w.-]+)", text)
                if m.split("/")[-1] == "qikly" and not m.startswith(owner + "/")})
         if wrong:
