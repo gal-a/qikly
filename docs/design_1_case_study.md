@@ -11,7 +11,7 @@ all of them.
 **The solution: two agents.** One turns the acceptance criteria into tests.
 The other writes the code and **never sees the acceptance criteria.**
 
-![Qikly: automated code and test generation, kept apart](images/qikly_hero.png)
+![Qikly: the agent that writes the code never sees the criteria its tests come from](images/qikly_hero.png)
 
 Imagine a student who writes the exam paper, writes the answer key, and then sits the exam. They pass. Obviously they pass. Nobody would accept that as evidence the student knows the material, and nobody should.
 

@@ -4,6 +4,56 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## 0.5.8
+
+> The registry listing publishes itself, and a task named for code you already have says so when there is none
+
+### Added
+- **`--validate` warns when a `_VERIFY` task has nothing seeded.** The suffix
+  means "test the code I already have", and `seed.implementation` is what
+  makes that true. Without it a run writes a fresh implementation and tests
+  that, which passes, so a green suite reads as a statement about your module
+  when it describes code qikly wrote a minute earlier. Such a task used to
+  validate clean with no warnings at all. It is a warning rather than an
+  error, because generating from the requirements is a legitimate job and the
+  name is the only thing suggesting otherwise.
+
+### Changed
+- **The MCP registry listing is published by the release workflow, with no
+  human in it.** Publishing needed an interactive device login, so nothing in
+  CI did it or could. It was missed in 0.5.5 and 0.5.6, leaving the listing
+  two versions behind, and on 0.5.7 the login itself failed repeatedly and the
+  listing stayed behind again. A new `mcp-registry` job authenticates with a
+  GitHub OIDC token instead, checks `server.json` against the tag, and
+  publishes after the PyPI upload. The listing installs by pin, so a stale
+  entry hands people old software rather than merely looking out of date.
+
+  **The grant is per account, not per repository.** The registry reads
+  `repository_owner` from the token and grants `io.github.<owner>/*`, which is
+  wider than the PyPI publisher above it. That is written in the workflow
+  beside the permission rather than left to be discovered.
+
+- **`release_check` fails on the cheap things first**, so a wrong version or a
+  dirty tree is reported in about a second rather than after a four minute
+  suite. Nothing is skipped and nothing short-circuits; only the order
+  changed.
+
+- **The printed release steps can be pasted on Windows.** They are run line by
+  line in PowerShell, which carries on past an error, and the "wait for CI"
+  lines were prose at the same indent as the commands. Pasting the block ran
+  straight past the wait into `git tag`, which is how 0.5.5 published over two
+  red Windows legs. The tag commands now sit under their own heading, and the
+  manual registry steps are gone, because following them now races the job
+  above and whichever publishes second fails on a duplicate version.
+
+### Fixed
+- **A malformed `seed:` ended `--validate` with a traceback.** `seed:` written
+  as a string or a list, rather than a mapping, raised `AttributeError` out of
+  the new `_VERIFY` check, and nothing caught it, so one bad task killed the
+  whole command instead of being named by it. It now reports the same message
+  the orchestrator raises at load time. Found by an audit before the tag, so
+  no release carried it.
+
 ## 0.5.7
 
 > A question asked at the one moment a user has just learned something, and the Skill's central rule moved to where an agent will meet it

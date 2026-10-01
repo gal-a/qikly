@@ -101,19 +101,14 @@ description, the GitHub repository name and topics, and the URLs in
   the server version, the package version, and the `qikly[mcp]==` pin inside
   the `--from` argument. It is the MCP Registry listing, so a missed bump
   advertises one version and installs another. A test holds them together.
-- **After the upload, republish the listing**: `mcp-publisher login github`
-  then `mcp-publisher publish`, from the repository root. Nothing in CI does
-  this and nothing can, since it needs a human GitHub login, so it is the one
-  release step with no guard behind it. Skipping it leaves the registry, and
-  therefore VS Code's MCP gallery, offering the previous version: the listing
-  names a version and installs it by pin, so a stale entry installs stale
+- **The listing republishes itself**, from the `mcp-registry` job in
+  `release.yml`. It runs after the PyPI upload, authenticates with a GitHub
+  OIDC token rather than a human login, checks `server.json` against the tag
+  and publishes. **Do not run `mcp-publisher` by hand as well**: the two race,
+  and whichever loses fails on a duplicate version. If the job itself fails,
+  re-run it from the Actions tab. A stale listing matters because it names a
+  version and installs it by pin, so VS Code's MCP gallery hands people old
   software rather than merely looking out of date.
-- **Getting `mcp-publisher`:** it is a release binary, not a pip package.
-  Download the archive for your platform from the `modelcontextprotocol/registry`
-  releases page and unpack it with `tar -xzf`. Run `mcp-publisher validate`
-  first, which needs no login. The login token lasts about five minutes, so
-  publish straight after logging in, and read "cannot publish duplicate
-  version" as already listed rather than as a failure.
 - The Action pins written in prose bump too: `gal-a/qikly@vX.Y.Z` in
   `README.md` and `docs/PROVIDER_KEY_SETUP.md`. Those are examples someone
   copies, so a stale one hands out a tag predating the fix they came for. The
@@ -258,7 +253,7 @@ git ls-remote --heads public | head -2   # main is the released commit
 curl -s https://pypi.org/pypi/qikly/json | grep -o '"version":"[^"]*"' | head -1
 ```
 
-and the registry listing, which has no guard at all behind it:
+and the registry listing, published by the `mcp-registry` job:
 <https://registry.modelcontextprotocol.io/v0/servers?search=qikly> must show
 the new version as latest **and** the matching `qikly[mcp]==` pin. A stale
 entry there installs the old software rather than merely looking out of date.

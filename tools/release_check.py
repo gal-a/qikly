@@ -437,7 +437,8 @@ def check_published(version):
             pins.update(re.findall(r"qikly\[mcp\]==([\d.]+)", body))
         check("the MCP registry lists this version", version in versions,
               "versions listed: " + ", ".join(sorted(versions)),
-              "nothing in CI republishes the registry; it needs a human login")
+              "the release workflow republishes this; if its mcp-registry "
+              "job failed, re-run it from the Actions tab")
         check("the registry's install pin matches", version in pins,
               "pins listed: " + ", ".join(sorted(pins)),
               "the listing installs by pin, so a stale pin installs stale "
@@ -506,12 +507,15 @@ def main():
         print("    commit. This check runs the suite once, on one OS and")
         print("    one Python, and 0.5.5 published over two red Windows")
         print("    legs because nothing here asked.")
+        print("\nOnly once every leg of that run is green:")
         print("  git tag v%s" % version)
         print("  git push %s v%s" % (remote, version))
-        print("  mcp-publisher login github")
-        print("  mcp-publisher publish")
-        print("    (a release binary, often not on PATH: call it by full")
-        print("     path if the name does not resolve)")
+        print("\nThe release workflow then publishes PyPI, the GitHub")
+        print("release, the v0 alias and the MCP registry listing. There")
+        print("is no manual publish step any more: if the mcp-registry job")
+        print("fails, re-run it from the Actions tab rather than running")
+        print("mcp-publisher by hand, which races the job and fails on a")
+        print("duplicate version. Afterwards:")
         print("  python tools/release_check.py --after")
     return 1 if failed else 0
 

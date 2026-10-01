@@ -17,12 +17,76 @@
 
 [![qikly: one spec in, code and tests out, written by a coding agent and a test agent that are kept apart](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_hero.png)](https://test.qikly.com)
 
+**The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
+
+*One logged run. Only the test agent was told a rate may not exceed 100. The
+coding agent worked that bound out from a failing test and wrote `or rate > 100`
+itself, so the 9 of 9 is code meeting a bar it never read.*
+
+A student who writes the exam paper, writes the answer key and then sits the
+exam will pass. That is what happens when one model is given the acceptance
+criteria and asked to produce both the implementation and the suite that checks
+it. Everything goes green, and the green means nothing. **qikly takes the answer
+key away from the student: the coding agent never sees the acceptance criteria.**
+
+In one session, a suite an AI wrote from the code scored 8 out of 8 on a
+fault-planting check and still missed four real bugs. A suite qikly wrote from a
+spec which the coding agent never saw found them. That gap is what qikly is for.
+
+## Start here
+
+```bash
+pip install --upgrade qikly
+```
+
+**Start on your own code, not on ours.** This needs no API key, no task file,
+no specification and no decision from you, and it answers the question you
+probably arrived with.
+
+```bash
+qikly --score-code my_module.py --score-tests tests/
+```
+
+### Other ways in
+
+| If you want to | Run | Costs |
+|---|---|---|
+| **Point it at your own module** and write tests from a spec | `qikly --scaffold my_module.py` | nothing to set it up |
+| **Start from a finished example** in a project of your own | `qikly --example` | nothing to set it up |
+| **See the split for yourself**, on a bundled task | `qikly --explain CALC_TAX` | nothing, no API key |
+| **Watch a real run** end to end | `qikly --demo` | needs a key, about half a minute and well under a cent |
+
+**`--score-code` is the one to try in a meeting.** Point it at a module or a
+package, with the tests you already have. It plants one fault at a time in a
+copy of your code, runs those tests against each one, and names the faults
+nothing noticed. Both flags are needed: one says what to break, the other says
+what should notice.
+
+It tells you what your tests would notice changing. It cannot tell you whether
+the code was right to begin with, because it works by breaking code that is
+there, so anything the code never did is invisible to it. That is the gap
+above: the suite that scored 8 out of 8 was thorough about the code that was
+there and blind to what the code should have done. No model is called, nothing
+of yours is modified, and no code leaves your machine.
+
+`--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
+delete. It is for watching, not for building in. `--example` and `--scaffold`
+create a real project in the directory you are standing in, and those are the
+two to build from.
+
+`--upgrade` rather than a bare install, because the Skill ships inside the
+package: `pip install qikly` on a machine that already has an older one
+prints "Requirement already satisfied", changes nothing, and
+`--install-skill` then writes that older Skill.
+
+Then [five steps from your module to a first run](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md).
+
+[test.qikly.com](https://test.qikly.com) is the two minute version of this page, and
+the one to send to somebody else.
+
 > **New: an agent Skill.** `qikly --install-skill` teaches Claude Code, Gemini
 > CLI, Codex, Cursor or GitHub Copilot how to drive qikly.
 > [What the Skill contains](https://github.com/gal-a/qikly/blob/main/docs/skill.md).
-
-**The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
-
 
 **Who it is for:** a developer or team pointing an AI coding agent at a
 self-contained Python module that transforms data, for example an ETL step, a
@@ -34,59 +98,7 @@ most naturally where verification already has to be independent, such as
 automotive, medical devices, fintech and defence: `ADAS_HEADWAY`, a bundled
 example, checks following distance from forward-radar samples. See [What it is for](#what-it-is-for).
 
-## Start here
-
-```bash
-pip install --upgrade qikly
-```
-
-`--upgrade` rather than a bare install, because the Skill ships inside the
-package: `pip install qikly` on a machine that already has an older one
-prints "Requirement already satisfied", changes nothing, and
-`--install-skill` then writes that older Skill.
-
-**Start on your own code, not on ours.** The first row needs no API key, no
-task file, no specification and no decision from you, and it answers the
-question you probably arrived with.
-
-| If you want to | Run | Costs |
-|---|---|---|
-| **Find out what your tests would not have noticed** | `qikly --score-code my_module.py --score-tests tests/` | nothing, no API key |
-| **Point it at your own module** and write tests from a spec | `qikly --scaffold my_module.py` | nothing to set it up |
-| **Start from a finished example** in a project of your own | `qikly --example` | nothing to set it up |
-| **See the split for yourself**, on a bundled task | `qikly --explain CALC_TAX` | nothing, no API key |
-| **Watch a real run** end to end | `qikly --demo` | needs a key, about half a minute and well under a cent |
-
-**The first row is the one to try in a meeting.** Point it at a module or a
-package, with the tests you already have. It plants one fault at a time in a
-copy of your code, runs those tests against each one, and names the faults
-nothing noticed. Both flags are needed: one says what to break, the other says
-what should notice.
-
-It tells you what your tests would notice changing. It cannot tell you whether
-the code was right to begin with, because it works by breaking code that is
-there, so anything the code never did is invisible to it. In one session an
-AI-written suite caught 8 of 8 planted faults and still missed four real bugs
-that a suite written from a withheld spec found. No model is called, nothing of yours is
-modified, and no code leaves your machine.
-
-`--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
-delete. It is for watching, not for building in. `--example` and `--scaffold`
-create a real project in the directory you are standing in, and those are the
-two to build from.
-
-Then [five steps from your module to a first run](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md).
-
-[qikly.com](https://test.qikly.com) is the two minute version of this page, and
-the one to send to somebody else.
-
 ## The idea
-
-Imagine a student who writes the exam paper, writes the answer key, and then
-sits the exam. They pass, and nobody would accept that as evidence they know the
-material. That is what happens when one model gets a specification containing
-the acceptance criteria and writes both the code and the suite that checks it:
-everything goes green, and the green means nothing.
 
 qikly takes the answer key away from the student. It generates a test suite
 from the acceptance criteria, then writes an implementation and repairs it
@@ -672,7 +684,7 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.5.7`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.5.8`, uploading the suite, the code and the JUnit XML |
 
 ## Use it in CI
 
@@ -715,7 +727,7 @@ a run.
 
 **Two ways to pin, and the choice is yours.** `@v0` is a moving alias that
 this project repoints at every release, so you receive fixes without receiving
-a breaking change. `@v0.5.7` is an exact pin that never moves, so nothing
+a breaking change. `@v0.5.8` is an exact pin that never moves, so nothing
 changes under you and nothing reaches you either. The templates use `@v0`
 because most people want the fixes; use the exact form if your policy requires
 it.

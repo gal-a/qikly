@@ -203,7 +203,16 @@ def check_task(path):
     # the user's module when it is a statement about code qikly just wrote.
     # Quiet failures that do something plausible are worse than loud ones.
     task_id = str(task.get("task_id") or os.path.splitext(name)[0])
-    if task_id.endswith("_VERIFY") and not (task.get("seed") or {}).get("implementation"):
+    seed = task.get("seed") or {}
+    if not isinstance(seed, dict):
+        # The orchestrator raises on this at load time. Saying it here is the
+        # whole point of a check that runs before anything is spent, and it
+        # names the task rather than ending the command with a traceback.
+        errors.append(
+            f"{name}: `seed:` must be a mapping with optional "
+            f"`implementation:` and `tests:` keys, got {type(seed).__name__}")
+        seed = {}
+    if task_id.endswith("_VERIFY") and not seed.get("implementation"):
         warnings.append(Note(
             f"{name}: the name says this tests code you already have, but "
             f"there is no seed.implementation, so a run will write a new "

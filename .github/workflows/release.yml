@@ -217,10 +217,12 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     permissions:
-      # The whole point, and the same mechanism PyPI trusted publishing uses
-      # above: the registry reads repository_owner out of this token and
-      # grants io.github.<owner>/*. There is no secret here to leak and
-      # nothing outside this workflow can obtain one.
+      # The whole point: the registry reads repository_owner out of this
+      # token and grants io.github.<owner>/*. There is no secret here to
+      # leak. Note the grant is per owner, not per repository: any workflow
+      # in any repository under this account that requests id-token: write
+      # could publish this listing. That is wider than the PyPI publisher
+      # above, which is bound to repository, workflow and environment.
       id-token: write
       contents: read
     steps:
@@ -231,9 +233,9 @@ jobs:
         # often missing from a maintainer's PATH.
         run: |
           set -euo pipefail
-          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
-      - name: server.json must agree with the tag before anything is published
+      - name: server.json must agree with the tag before the listing goes out
         # A listing that advertises one version and installs another is the
         # failure this check exists for, and three places in that file carry
         # the version. The suite holds them together; this holds them to the

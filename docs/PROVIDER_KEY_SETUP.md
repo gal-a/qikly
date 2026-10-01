@@ -171,7 +171,7 @@ in a `.env` you source. Do not commit either.
 workflow file:
 
 ```yaml
-- uses: gal-a/qikly@v0.5.7
+- uses: gal-a/qikly@v0.5.8
   with:
     api-key: ${{ secrets.OPENAI_API_KEY }}
     provider: openai

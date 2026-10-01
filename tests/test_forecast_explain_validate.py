@@ -233,6 +233,23 @@ def test_a_verify_task_that_seeds_something_is_not_warned_about(tmp_path):
     assert not any("no seed.implementation" in w for w in warnings), warnings
 
 
+def test_a_verify_task_with_a_seed_that_is_not_a_mapping_is_an_error(tmp_path):
+    """
+    `seed: "mine.py"` is the natural mistake, and the warning above reached
+    into it with .get before asking what it was. That raised AttributeError
+    out of check_task, which check_all does not catch, so one malformed task
+    ended `--validate` with a traceback instead of a message naming it.
+    Checked on 2026-10-01: a string seed and a list seed both crashed.
+    """
+    for bad in ('"mine.py"', '["mine.py"]'):
+        errors, _ = validate.check_task(_task(
+            tmp_path, 'task_id: "T_VERIFY"\n'
+                      'requirements: "r"\n'
+                      'interface: {module: "m"}\n'
+                      'seed: %s\n' % bad +
+                      'acceptance_criteria:\n  - "100 is accepted"\n'))
+        assert any("must be a mapping" in e for e in errors), (bad, errors)
+
 def test_a_task_not_named_verify_is_left_alone(tmp_path):
     """Generating an implementation is the other legitimate job."""
     _, warnings = validate.check_task(_task(
