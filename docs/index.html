@@ -644,19 +644,6 @@ footer {
       <strong>qikly takes the answer key away from the student: the coding
       agent never sees the acceptance criteria.</strong>
     </p>
-    <aside class="whats-new">
-      <p class="tag">New</p>
-      <!-- Two sentences and a command. This box used to carry a third line,
-           first a caveat about instructions not being enforcement, then the
-           list of runtimes it was tested in. Both are true and both are one
-           click away; neither earns a line in the hero. -->
-      <p><strong>An agent Skill.</strong> One command teaches Claude Code,
-      Gemini CLI, Codex or Cursor how to drive qikly, and writes the
-      instruction file GitHub Copilot reads.
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/skill.md"
-         data-goatcounter-click="hero-skill">What the Skill contains</a>.</p>
-      <p><code>qikly --install-skill</code></p>
-    </aside>
 
     <!-- The first command asks nothing of the reader. It was `pip install`,
          then `export GEMINI_API_KEY=...`, then `qikly --demo`, which asked a
@@ -690,11 +677,29 @@ footer {
       <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="hero-quick-start">five
       steps from your own module to a first run</a>.</p>
 
+    <!-- Moved below the command on 2026-10-01. It sat between the headline
+         and the one command this page wants run, offering a second command
+         for a product the reader does not understand yet. Nothing was cut:
+         the Skill is how somebody adopts this without adopting a tool,
+         which is worth saying once the question has been answered. -->
+    <aside class="whats-new">
+      <p class="tag">New</p>
+      <!-- Two sentences and a command. This box used to carry a third line,
+           first a caveat about instructions not being enforcement, then the
+           list of runtimes it was tested in. Both are true and both are one
+           click away; neither earns a line in the hero. -->
+      <p><strong>An agent Skill.</strong> One command teaches Claude Code,
+      Gemini CLI, Codex or Cursor how to drive qikly, and writes the
+      instruction file GitHub Copilot reads.
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/skill.md"
+         data-goatcounter-click="hero-skill">What the Skill contains</a>.</p>
+      <p><code>qikly --install-skill</code></p>
+    </aside>
+
     <p class="eyebrow">Who it is for</p>
-    <p class="route-note">A developer or team pointing an AI coding agent at a self-contained
-      Python module, for example an ETL step, a merge, a calculation or a validation routine,
-      who does not want to trust a green suite when the same agent wrote both the code and the
-      tests. It suits one module at a time in small to mid-sized repositories: when a test
+    <p class="route-note">You point an AI coding agent at a Python module that transforms
+      data, an ETL step, a merge, a calculation or a validation routine, and you do not want
+      to trust a green suite when the same agent wrote both the code and the tests. It suits one module at a time in small to mid-sized repositories: when a test
       fails, only the files that failure names are loaded, so runs stay small and quick.
       It fits most naturally where verification already has to be independent of the people
       who build the thing: automotive, medical devices, fintech and defence.</p>

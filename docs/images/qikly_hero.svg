@@ -68,13 +68,13 @@
   <text x="96" y="606" font-family="'Segoe UI', Arial, Helvetica, sans-serif" font-size="32"
         fill="#98a5a3">the same thing.</text>
 
-  <g transform="translate(96, 668)">
-    <rect x="0" y="0" width="270" height="58" rx="29" fill="#112f2e" stroke="#2b8f95" stroke-width="1.5"/>
-    <text x="26" y="38" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="25"
-          fill="#8fdcdc">$ qikly --demo</text>
-  </g>
-  <text x="392" y="706" font-family="Consolas, 'DejaVu Sans Mono', monospace" font-size="24"
-        fill="#6d7b79">38s &#183; 11 model calls</text>
+  <!-- A terminal pill offering the demo command, and its timing caption,
+       lived here and were removed on 2026-10-01. The page below this image
+       carries the command a visitor should run, and that one needs no API
+       key. Two commands a few hundred pixels apart, offering different
+       things, left the hero with no single action. The panels stay: they are
+       the argument. (No double hyphen in this comment: XML forbids it, which
+       is how the first attempt broke the file.) -->
 
   <!-- ================= right: two files, kept apart ================= -->
   <g transform="translate(880, 96) rotate(-2.2)">

@@ -387,10 +387,26 @@ def check_remote_ready(version):
 
 # -------------------------------------------------------------- after it --
 
-def fetch_json(url):
+def fetch_json(url, timeout=30, attempts=1):
+    """
+    `attempts` exists for the MCP registry, which is slow rather than down.
+
+    On 2026-09-30 it answered in 40 seconds against a 30-second timeout, so
+    the check reported "could not reach the registry" about a registry that
+    was reachable and two releases out of date. Those two states call for
+    opposite responses, and printing the same line for both hid the one that
+    mattered. PyPI keeps the single short attempt: it is fast, and a slow
+    PyPI is worth knowing about.
+    """
     request = urllib.request.Request(url, headers={"User-Agent": "qikly-release-check"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return json.load(response)
+    last = None
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return json.load(response)
+        except Exception as exc:
+            last = exc
+    raise last
 
 
 def check_published(version):
@@ -409,7 +425,11 @@ def check_published(version):
         check("PyPI serves this version", False, "could not reach PyPI: %s" % exc)
 
     try:
-        data = fetch_json("https://registry.modelcontextprotocol.io/v0/servers?search=qikly")
+        # Slow, not down: 40 seconds observed. Two attempts at 90 so a
+        # timeout here means unreachable rather than merely unhurried.
+        data = fetch_json(
+            "https://registry.modelcontextprotocol.io/v0/servers?search=qikly",
+            timeout=90, attempts=2)
         pins, versions = set(), set()
         for server in data.get("servers", data if isinstance(data, list) else []):
             body = json.dumps(server)
@@ -448,16 +468,22 @@ def main():
         check_published(version)
         check_remote_ready(version)
     else:
+        # Cheap and read-only first, expensive last. Every check here ran in
+        # this order for 0.5.7: the remote check costs about a second, failed
+        # every time, and sat behind a 232-second suite and a 27-second wheel
+        # build. Four minutes per attempt to be told something known at the
+        # start. Nothing is skipped and no bar moves; the slow ones simply
+        # stop gating the fast ones.
         check_prose_pins(version)
         check_skill_floor(version)
         check_changelog(version)
         check_tree_clean()
         check_no_experiment_leftovers()
         check_stale_names()
+        check_remote_ready(version)
         check_suite()
         if not args.skip_wheel:
             check_wheel(version)
-        check_remote_ready(version)
 
     failed = [name for name, ok, _, _ in _results if not ok]
     print("\n%d checks, %d failed" % (len(_results), len(failed)))

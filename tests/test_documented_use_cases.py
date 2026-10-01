@@ -538,10 +538,17 @@ def test_the_hero_image_quotes_the_same_run_as_the_article():
     """
     docs/images/qikly_hero.png is the blog header, and it is rasterised from
     docs/images/qikly_hero.svg, so the SVG is the source and the only copy worth
-    checking. It carries three things that can go stale independently of the
-    prose beside them: the run's cost, the passing count, and the command a
-    reader is invited to type. An image is the worst place for a stale number,
-    because nobody greps a picture.
+    checking. An image is the worst place for a stale number, because nobody
+    greps a picture.
+
+    It used to carry three such things: the run's cost, the passing count, and
+    a terminal pill offering the demo command. The pill and the cost caption
+    were removed on 2026-10-01. The page under this image carries the command a
+    visitor should run, and that one needs no API key, so two commands a few
+    hundred pixels apart left the hero with no single action.
+
+    The passing count is still in the picture, so it is still checked here.
+    The cost is not, and asserting its absence would only invite it back.
     """
     import os
 
@@ -558,16 +565,22 @@ def test_the_hero_image_quotes_the_same_run_as_the_article():
     assert "![" in design and "images/qikly_hero.png" in design, (
         "the article no longer shows the header image")
 
-    # The same run the worked example is lifted from.
-    assert "38s" in hero and "11 model calls" in hero
-    assert "38 seconds and 11 model calls" in design, (
-        "the article and the header image disagree about the run's cost")
-    assert "9/9 passed" in hero and "9/9 passed" in design
+    # The one claim the picture still makes, and the prose it must match.
+    assert "9/9 passed" in hero and "9/9 passed" in design, (
+        "the article and the header image disagree about what passed")
+
+    # And the pill stays gone: a second command in the image competes with
+    # the one the page is asking a visitor to run.
+    assert "qikly " + chr(45) * 2 + "demo" not in hero, (
+        "the demo pill is back in the hero image")
 
     # The rule the coding agent had to reconstruct, on the code card.
     assert "rate &gt; 100" in hero
 
-    # And the command on the image has to be one the tool actually has.
-    assert "$ qikly --demo" in hero
-    assert "qikly --demo" in readme, (
-        "the header image offers a command the README does not document")
+    # The image no longer offers a command, so there is nothing here to keep
+    # in step with the README. The check that mattered, that a command shown
+    # in the picture is one the tool actually has and the README documents,
+    # is kept alive by the "stays gone" assertion above: the day a command
+    # comes back into the image, that fails and this block is rewritten
+    # rather than quietly reintroduced.
+    assert readme, "the README is empty"
