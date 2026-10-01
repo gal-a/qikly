@@ -839,3 +839,32 @@ def test_a_stale_installed_skill_is_mentioned_by_any_command(tmp_path):
         "an upgrade can leave a stale Skill in place and say nothing")
     assert "--install-skill --force" in (aged.stdout + aged.stderr), (
         "the notice must say what to do about it")
+
+
+def test_the_repository_carries_the_skill_where_a_crawler_looks():
+    """
+    The directories that index Skills crawl GitHub, and the convention they
+    follow is `.claude/skills/<name>/SKILL.md` at the repository root. The
+    packaged copy under src/ ships in the wheel and is what `--install-skill`
+    writes, but nothing at the conventional path meant a crawler following it
+    found no Skill in this repository at all.
+
+    The packaged copy stays canonical. This holds the root copy to it, because
+    two copies of a document that may not differ is the arrangement that
+    drifts, and this one carries a version number bumped by hand.
+    """
+    import os
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    packaged = os.path.join(root, "src", "qikly", "skills", "qikly", "SKILL.md")
+    discoverable = os.path.join(root, ".claude", "skills", "qikly", "SKILL.md")
+
+    assert os.path.exists(discoverable), (
+        "no Skill at the path a crawler reads: .claude/skills/qikly/SKILL.md")
+    with open(packaged, "rb") as handle:
+        want = handle.read()
+    with open(discoverable, "rb") as handle:
+        got = handle.read()
+    assert got == want, (
+        "the root copy has drifted from the packaged one. The packaged copy "
+        "is canonical: copy it over .claude/skills/qikly/SKILL.md")
