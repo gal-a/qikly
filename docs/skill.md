@@ -93,15 +93,23 @@ different halves of the same problem, and neither replaces the other.
 | | MCP server | Skill |
 |---|---|---|
 | What it ships | a running process exposing typed tools | a folder of Markdown |
-| What it gives the model | the ability to call `qikly_scaffold`, `qikly_validate`, `qikly_run`, `qikly_explain` | the judgement around those calls |
+| What it gives the model | the ability to call `qikly_run`, `qikly_status`, `qikly_validate` and `qikly_scaffold` | the judgement around those calls |
 | Setup | `qikly --install-mcp`, then host configuration | `qikly --install-skill` |
 | Can enforce a rule | **yes**, in server code | no, it is instructions |
 | Works when the agent has no shell | yes | no |
 
-**The MCP server is the one that can enforce things.** `qikly_run` is built so
-it cannot return the acceptance criteria, and a test in qikly's own suite fails
-the build if any code path lets a criterion through. That guarantee lives in
-code, and it is why the server exists.
+**The MCP server is the one that can refuse.** No qikly tool returns the
+acceptance criteria, whatever an agent asks, and a test in qikly's own suite
+fails the build if any response lets one through. That is a rule enforced in
+server code.
+
+**The withholding itself is not the server's, though.** It happens in context
+assembly, where the criteria are cut out of the task before the coding agent's
+prompt is built, so it holds whether qikly is started from a shell or from a
+tool call. The server's only job on that rule is to avoid undoing it. What the
+server is for is the shape of a run: a run takes minutes to hours and a tool
+call cannot block for that long, so `qikly_run` starts one and returns an id
+while `qikly_status` reports what became of it.
 
 **The Skill is the one that can teach.** Which line of your spec is a decision
 and which is a consequence; that a repeating identical patch means a decision

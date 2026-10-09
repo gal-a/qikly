@@ -672,6 +672,7 @@ left holding afterwards.
 | **Document plus code, in one command** | `--scaffold module.py --from-doc feature.md` writes the task file with the criteria taken from the document and the interface read from the module. `requirements` is left for you on purpose: the coding agent reads it, and a feature page usually restates its own criteria in the prose above them. |
 | **Fixture proposals** | A separate agent names the criteria no input row can trigger and proposes the smallest row that would. It never edits your data |
 | **Convergence trends** | `--trends` shows each task's rate over time from summaries already on disk, marking any period where the model or settings changed |
+| **Did editing a prompt help?** | `--compare-prompts TASK` groups that task's runs by the prompts that produced them and prints both arms. Free, and reads what is already on disk. `--repeats N` runs N more of each arm first, alternating. Counts and ranges only, and it declines to compare arms too small to mean anything |
 | **Machine-readable output** | `--json` on `--explain` and `--validate` |
 
 ### What you keep
@@ -798,6 +799,16 @@ breaks your converged code one place at a time, re-runs the suite against each
 break, and lists what went unnoticed. Nothing of yours is modified. Read the
 score beside the reachability warning printed above it: a suite cannot catch a
 fault in behaviour no row exercises.
+
+## Examples of what qikly has actually caught
+
+Specific findings, each with what was run, what it found, and what the result
+does not show: money rounded half to even where the criteria said half up, a
+boundary decision nobody had made, a seven-test suite that passed everything and
+missed half the planted faults, and the two thirds of planted faults that no
+suite could have caught because the data never reached them.
+
+[docs/FINDINGS.md](https://github.com/gal-a/qikly/blob/main/docs/FINDINGS.md)
 
 ## Using qikly? Show it
 

@@ -243,6 +243,10 @@ def test_the_frontmatter_carries_the_metadata_directories_sort_on():
 SKILL_BODY_HASHES = {
     "0.3.2": "ff71bda1a1be618ed8050bb4a60ba1d28bba1eb13130c8e3b20580d41ad408cf",
     "0.3.3": "4598a415ca38cbe76fd8cd8520992ad757068ebc6339a83330b4076bb4e468ea",
+    # 0.3.4 corrects one sentence: staged feedback was described as
+    # widening "only when a patch stops making progress", which the
+    # every-third-attempt backstop in traceback_mode_for makes untrue.
+    "0.3.4": "d3baed8ff0f46b2cac72a4611174e08ccf2fe285ae362aae3ed555802aaca6dc",
 }
 
 

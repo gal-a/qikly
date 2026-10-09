@@ -64,8 +64,13 @@ Z_95 = 1.959963985
 # 4 adds a `provenance` block and 5 adds `criteria_independence`, which is
 # populated only for seeded runs. Neither changes an existing field, so 3, 4
 # and 5 pool safely. `tests/test_aggregate_schema.py` fails the build if the
-# writer ever moves ahead of this set again.
-SUPPORTED_SCHEMAS = frozenset({3, 4, 5, 6})
+# writer ever moves ahead of this set again, and it did its job: 7 was
+# missing from this set for exactly as long as it took to run the suite.
+#
+# 6 adds `criteria_coverage` and 7 adds `prompt_overrides`, which names the
+# agent_defs files a run did not take from the shipped set. Both are new
+# keys that no older reader looks at, so every version here still pools.
+SUPPORTED_SCHEMAS = frozenset({3, 4, 5, 6, 7})
 
 
 def load_summaries(task_ids=None, run_timestamps=None, last=None):

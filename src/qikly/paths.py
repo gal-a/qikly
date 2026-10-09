@@ -51,6 +51,11 @@ DEFAULT_PRIVATE_DIR = "inputs_private"
 # inputs_public/ sits next to this file, inside the package.
 PUBLIC_INPUTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inputs_public")
 
+# Set to off/0/no to make agent_defs/ lookups skip your overrides for the
+# lifetime of one process. Unset, which is every ordinary run, changes nothing.
+PROMPT_OVERRIDES_ENV = "QIKLY_PROMPT_OVERRIDES"
+_OFF = ("off", "0", "no", "false", "stock")
+
 
 def _walk_up(start, predicate):
     """Nearest directory at or above start satisfying predicate, else None."""
@@ -132,9 +137,30 @@ def resolve_input(relative_path, root=None):
     relative_path = relative_path.replace("/", os.sep)
     base = root if root is not None else project_root()
     private = os.path.join(base, private_inputs_dir(), relative_path)
-    if os.path.exists(private):
+    if os.path.exists(private) and not _prompt_override_suppressed(relative_path):
         return private
     return os.path.join(PUBLIC_INPUTS_DIR, relative_path)
+
+
+def _prompt_override_suppressed(relative_path):
+    """
+    Whether this one lookup should ignore an override and take the shipped
+    file instead.
+
+    Only ever true for `agent_defs/`, and only when QIKLY_PROMPT_OVERRIDES is
+    set to off. `--compare-prompts` needs to run the same task twice, once on
+    your edited prompts and once on the stock ones, and the alternative was
+    moving your files out of the way between runs. A failed move on Windows
+    is not atomic, and the files it would be moving are the ones you wrote,
+    so the arm is selected per process instead and nothing on disk is touched.
+
+    Deliberately narrow. Task configs, fixture data and settings.yaml keep
+    overriding exactly as they always have, because an arm that also swapped
+    the task would not be measuring the prompt.
+    """
+    if not relative_path.startswith("agent_defs" + os.sep):
+        return False
+    return os.environ.get(PROMPT_OVERRIDES_ENV, "").strip().lower() in _OFF
 
 
 def private_input_path(relative_path, root=None):

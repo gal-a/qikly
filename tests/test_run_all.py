@@ -305,6 +305,7 @@ def test_the_schema_version_moved_with_the_new_field():
     from qikly.orchestrator import run_summary
 
     source = inspect.getsource(run_summary.build_payload)
-    assert '"schema_version": 6' in source
+    assert '"schema_version": 7' in source
     assert '"criteria_independence"' in source
     assert '"criteria_coverage"' in source
+    assert '"prompt_overrides"' in source

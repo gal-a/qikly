@@ -146,6 +146,44 @@ def _provenance():
     return out
 
 
+def _prompt_fingerprint():
+    """
+    Which agent_defs prompts this run actually used.
+
+    `_provenance` already records the model, the retry budget and how much of
+    a failing test the agent was shown, on the principle that a rate belongs
+    to a configuration and not only to a tool. The prompts were the one input
+    it never recorded, which left a gap its own docstring describes: when a
+    sweep came back at 25% against a stored 59%, the thing that had changed
+    was a line in a local override, and no summary on disk said so.
+
+    `{}` means the shipped prompts, which is information rather than an
+    absence. A name maps to the first eight hex of the sha256 of the file
+    that was read, so two runs can be told apart without the override text
+    itself, which is the user's and does not belong in a report.
+
+    Never raises, for the same reason as the rest of provenance.
+    """
+    import hashlib
+
+    out = {}
+    try:
+        from qikly.paths import PUBLIC_INPUTS_DIR, resolve_input
+        shipped_dir = os.path.join(PUBLIC_INPUTS_DIR, "agent_defs")
+        for name in sorted(os.listdir(shipped_dir)):
+            if not name.endswith(".md"):
+                continue
+            used = resolve_input("agent_defs/" + name)
+            if os.path.abspath(used) == os.path.abspath(
+                    os.path.join(shipped_dir, name)):
+                continue
+            with open(used, "rb") as handle:
+                out[name] = hashlib.sha256(handle.read()).hexdigest()[:8]
+    except Exception:
+        pass
+    return out
+
+
 def build_payload(task_id, run_timestamp=None):
     """
     Raises FileNotFoundError if no transaction log exists yet for task_id
@@ -172,8 +210,13 @@ def build_payload(task_id, run_timestamp=None):
     # bulk by a later script; the fields below are free to change shape, and a
     # reader needs to know which shape it got.
     return {
-        "schema_version": 6,
+        "schema_version": 7,
         "provenance": _provenance(),
+        # Which prompts were in force, empty when they were the shipped ones.
+        # Additive, so schema 7 pools safely with 3, 4, 5 and 6: a reader that
+        # wants to separate prompt arms can, and one that does not is
+        # unaffected.
+        "prompt_overrides": _prompt_fingerprint(),
         # How many tests named each criterion, self-reported by test
         # generation. Additive, so schema 6 pools safely with 3, 4 and 5.
         "criteria_coverage": _criteria_coverage(task_id),

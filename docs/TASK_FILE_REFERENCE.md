@@ -372,6 +372,23 @@ everything else in place. Nothing is ever written back into the package.
 | `config/settings.yaml` | Retry budget, stage order, patch size limit. A private copy is overlaid section by section, so state only what you change. |
 | `agent_defs/*.md` | The prompts. `code_agent.md` and `test_agent.md` are the two system prompts; the rest are per-mode fragments. Not per-task: editing these changes every task's behaviour. |
 
+Editing the **coding agent's** prompts cannot leak the acceptance criteria.
+`code_agent.md`, `fix_prompt.md`, `patch_prompt.md` and the patch retries are
+handed a task that has already had the criteria cut out of it, so the template
+never receives them and no rewording of it can put them back. Reword those as
+freely as you like.
+
+The **test generation** prompts are a different matter. `test_agent.md` and the
+`*_test_prompt.md` files are given the criteria on purpose, that being their
+job, and the coding agent reads the source of any test that fails. So a prompt
+telling test generation to quote each criterion in a comment would put that
+text in front of the coding agent by a route the stripping never sees. Edit
+those with the split in mind.
+
+To find out whether an edit actually helped, `qikly --compare-prompts TASK` groups
+that task's runs by the prompts that produced them. Reading what is already on
+disk is free; `--repeats N` runs N more of each arm first.
+
 ## Proposing fixture rows
 
 A criterion no input row can trigger produces a test that passes whatever the

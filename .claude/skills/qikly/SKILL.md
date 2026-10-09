@@ -5,7 +5,7 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.3.3
+  version: 0.3.4
   requires: qikly >= 0.5.4
 ---
 
@@ -411,8 +411,9 @@ case, and the project says so rather than pretending otherwise. It does not
 undo the split: the suite was written first, from criteria the coder never
 read, and nothing learned afterwards changes a test already on disk. There is
 a setting that narrows this, `diagnostic_feedback: staged` under `agent:` in
-settings.yaml, which starts the agent at a one-line error and widens only when
-a patch stops making progress. **It is off by default**, because every
+settings.yaml, which starts the agent at a one-line error and climbs
+towards the full traceback, a rung for every patch that changes nothing and a
+rung every third attempt whatever happens. **It is off by default**, because every
 published convergence figure was measured with the full traceback and nobody
 has measured what starting narrow costs.
 
