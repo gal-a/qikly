@@ -488,3 +488,57 @@ def test_no_hit_file_is_left_behind(tmp_path):
     leftovers = [n for _, _, names in os.walk(root) for n in names
                  if n.endswith(mutation_score.HIT)]
     assert leftovers == []
+
+
+def test_a_non_editable_install_of_the_package_is_caught(tmp_path,
+                                                        monkeypatch):
+    """
+    `pip install .` copies the package to site-packages, so the file the
+    suite loads is neither the workspace copy nor the user's own path. The
+    release-gate audit found the invented 0 of 3 surviving exactly this.
+    """
+    import shutil
+    root = str(tmp_path)
+    pkg = os.path.join(root, "src", "acme", "widgets")
+    _write(os.path.join(pkg, "__init__.py"), "from .calc import rate\n")
+    _write(os.path.join(pkg, "calc.py"),
+           "def rate(x):\n    return x if x <= 100 else 100\n")
+    _write(os.path.join(pkg, "tests", "__init__.py"), "")
+    _write(os.path.join(pkg, "tests", "test_calc.py"),
+           "from acme.widgets import rate\n\n\ndef test_caps():\n"
+           "    assert rate(150) == 100\n    assert rate(5) == 5\n")
+    site = os.path.join(root, "site-packages")
+    shutil.copytree(os.path.join(root, "src", "acme"), os.path.join(site, "acme"),
+                    ignore=shutil.ignore_patterns("tests"))
+    monkeypatch.setenv("PYTHONPATH", site)
+    with pytest.raises(ValueError) as caught:
+        mutation_score.score(
+            mutation_score.from_paths(pkg, os.path.join(pkg, "tests")),
+            mutants=4, seed=1)
+    assert "never ran" in str(caught.value)
+
+
+def test_every_bytecode_cache_is_gone_before_each_suite_run(tmp_path,
+                                                            monkeypatch):
+    """
+    Checked directly rather than through a score, which depends on two
+    mutants landing in one second and so only failed some of the time when
+    the cleanup was removed.
+    """
+    ws = str(tmp_path)
+    for where in ("__pycache__", os.path.join("pkg", "__pycache__"),
+                  os.path.join("pkg", "deep", "__pycache__")):
+        _write(os.path.join(ws, where, "calc.cpython-310.pyc"), "stale")
+    _write(os.path.join(ws, "tests", "test_x.py"), "def test_x():\n    pass\n")
+    seen = []
+
+    def fake_run(*a, **k):
+        seen.append([b for b, d, _ in os.walk(ws) if "__pycache__" in d])
+        class Done(object):
+            returncode = 0
+        return Done()
+
+    monkeypatch.setattr(mutation_score.subprocess, "run", fake_run)
+    target = mutation_score.Target("t", [], ["tests"], ws)
+    assert mutation_score._suite_verdict(ws, target) == "pass"
+    assert seen == [[]], "a cache survived into the suite run: %s" % seen

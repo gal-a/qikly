@@ -615,12 +615,12 @@ def _unreached(workspace, target, env=None):
         except OSError:
             loaded = set()
         never = []
+        n = os.path.normcase
+        inside = n(os.path.realpath(workspace)) + os.sep
+        outside = [p for p in loaded if not n(p).startswith(inside)]
         for path, relative in target.files:
             hit = os.path.exists(os.path.join(workspace, relative) + HIT)
-            # The user's own file, loaded in place of the copy: the suite ran
-            # the original, whatever the copy's marker says.
-            shadowed = os.path.realpath(path) in loaded
-            if not hit or shadowed:
+            if not hit or _shadowed(path, outside):
                 never.append(relative)
         return never
     finally:
@@ -632,6 +632,43 @@ def _unreached(workspace, target, env=None):
             except OSError:
                 pass
         shutil.rmtree(marks, ignore_errors=True)
+
+
+def _shadowed(original, loaded_outside):
+    """
+    Whether the suite loaded this file from somewhere other than the copy.
+
+    A marker firing says the copy ran; it cannot say the copy was the one the
+    tests used. Two ways the original turns up instead: the user's own file,
+    loaded in place, as an editable install or a path entry does; and a copy
+    of it elsewhere on the path, as a plain `pip install .` leaves in
+    site-packages. The second is found by content, since its path has nothing
+    in common with the original's: a loaded file with the same name and the
+    same bytes is the same module. Paths are compared case-insensitively where
+    the filesystem is, because realpath does not normalise case on every
+    volume.
+    """
+    n = os.path.normcase
+    real = n(os.path.realpath(original))
+    name = n(os.path.basename(original))
+    same_name = [p for p in loaded_outside if n(os.path.basename(p)) == name]
+    if not same_name:
+        return False
+    if any(n(p) == real for p in same_name):
+        return True
+    try:
+        with open(original, "rb") as handle:
+            mine = handle.read()
+    except OSError:
+        return False
+    for p in same_name:
+        try:
+            with open(p, "rb") as handle:
+                if handle.read() == mine:
+                    return True
+        except OSError:
+            continue
+    return False
 
 
 class NeverRan(ValueError):
