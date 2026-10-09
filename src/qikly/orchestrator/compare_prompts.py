@@ -23,9 +23,9 @@ Two halves, and the free one is the default:
 **On not overclaiming.** A run is an artifact, never a rate, and the whole
 reason this exists is that the project has been bitten before by reading one
 run as a number. So this prints counts and ranges, says "3 of 5" rather than
-"60%", and refuses to name a winner. Two arms that differ by less than their
-own spread have not been shown to differ at all, and the report says so in
-those words rather than leaving the reader to notice.
+"60%", and refuses to name a winner. Two arms whose medians differ by less
+than their own interquartile range have not been shown to differ at all, and
+the report says so in those words rather than leaving the reader to notice.
 
 Arms are alternated rather than run in blocks, because a provider having a
 bad hour would otherwise land entirely on whichever arm went second.
@@ -33,6 +33,7 @@ bad hour would otherwise land entirely on whichever arm went second.
 import glob
 import json
 import os
+import statistics
 import subprocess
 import sys
 
@@ -88,6 +89,22 @@ def _median(values):
     return (ordered[mid - 1] + ordered[mid]) / 2.0
 
 
+def _iqr(values):
+    """
+    The spread of the middle half, or None below three values.
+
+    The noise yardstick, chosen over max minus min. The full range can only
+    widen as runs are added, so the more evidence someone collected, the
+    harder the verdict became to reach, and a single outlying run could veto
+    any difference at all. The interquartile range settles as runs accumulate
+    and ignores the one run where the provider had a bad hour.
+    """
+    if len(values) < 3:
+        return None
+    q1, _, q3 = statistics.quantiles(values, n=4, method="inclusive")
+    return q3 - q1
+
+
 def group(rows):
     """{arm: [summary, ...]}, with pre-schema-7 runs under None."""
     out = {}
@@ -108,6 +125,7 @@ def stats(rows):
         "attempts_median": _median(attempts),
         "attempts_min": min(attempts) if attempts else None,
         "attempts_max": max(attempts) if attempts else None,
+        "attempts_iqr": _iqr(attempts),
         "seconds_median": _median(seconds),
     }
 
@@ -178,23 +196,23 @@ def verdict(by_arm):
                             for name, (c, n) in sorted(converged.items())),
                    tail))
 
-    spans, medians = [], []
+    spreads, medians = [], []
     for rows in arms.values():
         s = stats(rows)
-        if s["attempts_median"] is None:
+        if s["attempts_iqr"] is None:
             return ("Not every run recorded its fix attempts, so no "
                     "comparison is made.%s" % tail)
         medians.append(s["attempts_median"])
-        spans.append((s["attempts_max"] or 0) - (s["attempts_min"] or 0))
+        spreads.append(s["attempts_iqr"])
     gap = max(medians) - min(medians)
-    if gap <= max(spans):
-        return ("The medians differ by %s fix attempts and the wider arm "
-                "spans %s on its own. That is a difference smaller than the "
-                "noise, which is not evidence either way.%s"
-                % (_fmt(gap), _fmt(max(spans)), tail))
-    return ("The medians differ by %s fix attempts, more than either arm's "
-            "own spread. That is worth following up with more runs; it is "
-            "not yet a measurement.%s" % (_fmt(gap), tail))
+    if gap <= max(spreads):
+        return ("The medians differ by %s fix attempts and the middle half "
+                "of the wider arm spans %s on its own. That is a difference "
+                "smaller than the noise, which is not evidence either way.%s"
+                % (_fmt(gap), _fmt(max(spreads)), tail))
+    return ("The medians differ by %s fix attempts, more than the middle half "
+            "of either arm spans. That is worth following up with more runs; "
+            "it is not yet a measurement.%s" % (_fmt(gap), tail))
 
 
 def incommensurable(arms):

@@ -96,6 +96,7 @@ def test_stats_report_counts_and_the_spread(tmp_path):
     s = cp.stats(rows)
     assert (s["n"], s["converged"]) == (3, 2)
     assert (s["attempts_median"], s["attempts_min"], s["attempts_max"]) == (4, 2, 8)
+    assert s["attempts_iqr"] == 3
 
 
 # ------------------------------------------------------- the refusals ------
@@ -125,6 +126,21 @@ def test_a_difference_inside_the_noise_is_not_called_a_result(tmp_path):
     out = cp.verdict(cp.group(cp.load("T", root=str(tmp_path))))
     assert "smaller than the noise" in out
     assert "not evidence" in out
+
+
+def test_one_outlying_run_does_not_veto_a_difference(tmp_path):
+    """
+    The reason the yardstick is the interquartile range. Under max minus min,
+    the 30 below made the stock arm span 28, so a consistent six-attempt gap
+    read as noise, and every run added could only widen the range further.
+    """
+    for i, a in enumerate([2, 2, 2, 2, 30]):
+        write(tmp_path, "T", "10%d" % i, attempts=a)
+    for i, a in enumerate([8, 8, 8, 9, 8]):
+        write(tmp_path, "T", "20%d" % i, attempts=a,
+              overrides={"f.md": "aaaaaaaa"})
+    out = cp.verdict(cp.group(cp.load("T", root=str(tmp_path))))
+    assert "worth following up" in out
 
 
 def test_a_difference_beyond_the_noise_is_still_not_a_measurement(tmp_path):
