@@ -4,6 +4,53 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## Unreleased
+
+> Mutation scores you can trust, criteria drafted from prose, and a way to tell whether editing a prompt helped
+
+### Fixed
+- **`--score-code` and `--score-suite` could print a wrong score, in either
+  direction, on any project.** Each planted fault rewrites a file, and many
+  rewrites, such as `==` to `!=`, leave it the same size. Python reuses a
+  cached .pyc when a file's size and whole-second modification time match,
+  so two such faults written within one second ran the first one's bytecode,
+  and the second was given the first one's verdict. The same suite scored 2,
+  3 or 4 of 8 depending on timing, including with a fixed `--score-seed`;
+  with the fix, ten runs of it score 3 of 8 every time. Every cache in the
+  workspace is now deleted before each suite run and none is written.
+  **Scores printed by earlier versions should be re-measured before they are
+  quoted.**
+- **A score is refused when the suite never ran the code being scored.**
+  When the suite imported an installed copy of the package rather than the
+  workspace copy, every planted fault ran against untouched code and the
+  score read near 0%. That happened with a `src/` layout and an editable
+  install, a namespace package, and a suite living inside its own package. The
+  suite is now run once with a marker in each scored file and with the files
+  it loaded recorded, and the score is refused when none of the scored code
+  was run. Files the suite never ran are named in the report.
+- **A suite inside the code directory is no longer mutated itself.** Its
+  broken tests were counted as faults caught.
+
+### Added
+- **`--criteria-from-docs DOC...`**, the fifth starting point, for a project
+  whose rules exist only as prose. One model call reads only the documents
+  named and prints the acceptance criteria they imply as YAML to paste into a
+  task file, each above the sentence it came from, plus the sentences too
+  vague to test. A quote must be found as whole sentences of one paragraph,
+  list item, table row or code line, or its criterion is dropped, because a
+  model will invent a citation. Only the quote is checked: the criterion is
+  the model's wording of it.
+- **`--compare-prompts TASK`** groups a task's run summaries by the prompts
+  that produced them and compares the arms, without a model call. `--repeats
+  N` runs N more of each arm first, alternating. It refuses to compare arms
+  with fewer than three runs, arms that converged differently, or arms that
+  differ in model or settings, and it judges noise by the interquartile range.
+  To make that possible, a run summary now records which prompts were
+  overridden and a digest of each (schema 7), and `QIKLY_PROMPT_OVERRIDES=0`
+  makes one process use the shipped prompts while overrides stay on disk.
+- **Skill 0.3.5** mentions `--criteria-from-docs`, and the Skill now also sits
+  at `.claude/skills/qikly/SKILL.md`, the path Skill directories crawl.
+
 ## 0.5.8
 
 > The registry listing publishes itself, and a task named for code you already have says so when there is none

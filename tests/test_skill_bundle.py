@@ -247,6 +247,10 @@ SKILL_BODY_HASHES = {
     # widening "only when a patch stops making progress", which the
     # every-third-attempt backstop in traceback_mode_for makes untrue.
     "0.3.4": "d3baed8ff0f46b2cac72a4611174e08ccf2fe285ae362aae3ed555802aaca6dc",
+    # 0.3.5 adds --criteria-from-docs, and drops "8 of 8" from the
+    # mutation-score caution: that count came from a scorer later found to
+    # reuse stale bytecode, and has not been re-measured.
+    "0.3.5": "c3bab99fcf283fe1efa7ad31d9b49c09eda56d06148dfc77ff942acf4a389786",
 }
 
 
