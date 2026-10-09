@@ -831,7 +831,7 @@ def _parse_args():
     )
     parser.add_argument(
         "--init", action="store_true",
-        help="STARTING POINT 1 of 4, for your own code with a blank form. "
+        help="STARTING POINT 1 of 5, for your own code with a blank form. "
              "Create the inputs_private/ layout and a commented starter task in the "
              "current directory, then stop. A fresh install has nowhere to put a task "
              "until this has been run. Never overwrites an existing file. See also "
@@ -841,7 +841,7 @@ def _parse_args():
     )
     parser.add_argument(
         "--example", action="store_true",
-        help="STARTING POINT 2 of 4, and the one to pick first. Copy a finished "
+        help="STARTING POINT 2 of 5, and the one to pick first. Copy a finished "
              "worked example into the project, at the paths its task files name, "
              "creating the inputs_private/ layout first if it is not there yet. "
              "Lays down my_metrics.py, its two task files, and sample data, so "
@@ -914,7 +914,7 @@ def _parse_args():
     )
     parser.add_argument(
         "--scaffold", metavar="FILE", default=None,
-        help="STARTING POINT 3 of 4, for code you already have. Read a Python file "
+        help="STARTING POINT 3 of 5, for code you already have. Read a Python file "
              "and write the task YAML for it: module path, the real "
              "signatures of its public functions, and a guessed entrypoint. Leaves "
              "requirements and acceptance_criteria for you, because criteria derived "
@@ -1116,12 +1116,24 @@ def _parse_args():
     )
     parser.add_argument(
         "--demo", action="store_true",
-        help=f"STARTING POINT 4 of 4, to watch before committing to anything. "
+        help=f"STARTING POINT 4 of 5, to watch before committing to anything. "
              f"Run one task end to end in a throwaway "
              f"{DEMO_DIR}/{DEMO_PREFIX}<timestamp>/ directory and print "
              f"where the code, tests, and full record landed. Defaults to {DEMO_TASK}; combine with "
              f"--tasks to demo a different one. Writes nothing outside that directory, and you "
              f"delete the directory afterwards: do not start your own project inside it."
+    )
+    parser.add_argument(
+        "--criteria-from-docs", metavar="DOC", nargs="+", default=None,
+        help="STARTING POINT 5 of 5, for a project whose rules were never "
+             "written down as rules. Read prose documentation and print the "
+             "acceptance criteria it implies, each quoting the sentence it "
+             "came from, plus the sentences that cannot be tested as written "
+             "and why. One model call, which needs a key. The model is shown "
+             "only the files you name, so name documentation rather than "
+             "source and nothing it produces is derived from the "
+             "implementation. The output is valid YAML: paste it into a task "
+             "file's acceptance_criteria."
     )
     return parser.parse_args()
 
@@ -1263,7 +1275,7 @@ def _do_init(with_example=False):
         print("  never do. Your own code instead:")
         print("    qikly --scaffold path/to/module.py")
         print()
-        # The one page that disambiguates the four starting points was
+        # The one page that disambiguates the five starting points was
         # reachable from neither --help nor from here, which is where somebody
         # who has just run one of them is standing.
         print("  The rest, including which starter is which:")
@@ -1674,6 +1686,60 @@ def _do_propose_fixtures(tasks):
         for line in USAGE.breakdown():
             print(line)
     except Exception:                                   # noqa: BLE001
+        pass
+    return 0
+
+
+def _do_criteria_from_docs(paths, seed=None):
+    """
+    Criteria out of prose, with the quote that justifies each one.
+
+    Advisory, and it needs no task file, no run and no code of yours.
+
+    Paths are resolved against the directory the command was typed in, not
+    the project root. `chdir_to_project_root()` has already run by this
+    point, so a bare `README.md` would otherwise find qikly's own README,
+    send that to the model, and report success. A silently wrong document
+    and a paid call.
+
+    The rejections are printed as prominently as the criteria, because a
+    sentence that cannot be tested is usually the more useful finding, and
+    because printing them is how a reader sees the rule was applied rather
+    than skipped.
+    """
+    from qikly.criteria_from_docs import extract, render
+
+    paths = [p if os.path.isabs(p) else os.path.join(INVOKED_FROM, p)
+             for p in paths]
+    missing = [p for p in paths if not os.path.isfile(p)]
+    if missing:
+        print("no document at: %s" % ", ".join(missing), file=sys.stderr)
+        return 2
+    import contextlib
+
+    # stdout is the paste-ready report, so anything printed during the call,
+    # such as the note about a slow model, goes to stderr instead of landing
+    # inside the YAML.
+    try:
+        with contextlib.redirect_stdout(sys.stderr):
+            criteria, rejected, unquoted = extract(paths, seed=seed)
+    except Exception as exc:
+        # A missing key, a provider error or a reply that will not parse all
+        # end here. A traceback reads as a crash in qikly; the message is the
+        # part a reader can act on.
+        print("--criteria-from-docs: %s" % exc, file=sys.stderr)
+        return 2
+    print(render(paths, criteria, rejected, unquoted))
+
+    # One call, but a paid one, and the siblings all say what it cost.
+    # stderr, for the same reason as above.
+    try:
+        from qikly.agent_api.usage import USAGE
+        print(file=sys.stderr)
+        print(USAGE.summary(), file=sys.stderr)
+        for line in USAGE.breakdown():
+            print(line, file=sys.stderr)
+    except Exception:
         pass
     return 0
 
@@ -2488,6 +2554,8 @@ def main():
         return _do_explain(args.explain, args.json, args.html)
     if args.validate:
         return _do_validate(args.tasks, args.json)
+    if args.criteria_from_docs:
+        return _do_criteria_from_docs(args.criteria_from_docs, _seed())
     if args.check_criteria:
         return _do_check_criteria(args.tasks)
     if args.propose_fixtures:

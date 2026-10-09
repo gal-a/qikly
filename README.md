@@ -7,7 +7,7 @@
 <!-- mcp-name: io.github.gal-a/qikly -->
 
 [![Agent Skill](https://img.shields.io/badge/Agent_Skill-qikly%20--install--skill-7e22ce)](https://github.com/gal-a/qikly/blob/main/docs/skill.md)
-[![1,700+ tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=1%2C700%2B%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
+[![1,700+ tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=1%2C800%2B%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
 [![pypi](https://img.shields.io/pypi/v/qikly?color=blue)](https://pypi.org/project/qikly/)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/gal-a/qikly/blob/main/LICENSE)
@@ -668,6 +668,7 @@ left holding afterwards.
 | **Score a drafted bar against yours** | `--compare-criteria TASK` drafts criteria from your requirements alone, then reports what a generated bar would have missed, treating yours as ground truth |
 | **Contradiction check** | `--check-criteria` asks whether any implementation could satisfy the description, the requirements and the criteria at once, and whether the criteria agree with each other, before a stage budget is spent |
 | **Import criteria from a ticket** | `--criteria-from FILE` reads bullet lists, an "Acceptance Criteria" section, or Gherkin scenarios out of a ticket you paste into a file |
+| **Criteria from prose docs** | `--criteria-from-docs README.md` reads the documentation you name and prints the criteria it implies, each above the sentence it came from, and drops any whose quote is not in the document word for word. The sentences too vague to test are listed separately. One model call |
 | **Jira import** | `--criteria-from-jira PROJ-412` reads criteria from a named field or the issue description, through the same parser the file importer uses |
 | **Document plus code, in one command** | `--scaffold module.py --from-doc feature.md` writes the task file with the criteria taken from the document and the interface read from the module. `requirements` is left for you on purpose: the coding agent reads it, and a feature page usually restates its own criteria in the prose above them. |
 | **Fixture proposals** | A separate agent names the criteria no input row can trigger and proposes the smallest row that would. It never edits your data |
