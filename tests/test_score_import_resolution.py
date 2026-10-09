@@ -151,12 +151,12 @@ def test_a_non_package_directory_is_not_put_ahead_of_the_stdlib(tmp_path):
 
 # ------------------------------------------- what the suite actually ran ---
 #
-# The checks above probe an import by name. That cannot see two layouts an
-# audit reproduced on 2026-10-08, and in both the tool printed a score that
-# was invented rather than refusing. Every mutant ran against untouched code.
-# What is pinned below is the observation that replaced the guess: the suite
-# is run once with a marker in each scored file, and a file whose marker never
-# fired was never executed by the suite.
+# Probing an import by name cannot see two layouts an audit reproduced on
+# 2026-10-08, and in both the tool printed a score that was invented rather
+# than refusing. Every mutant ran against untouched code. What is pinned below
+# is observation instead of a guess: the suite is run once with a marker in
+# each scored file, and a file whose marker never fired was never executed by
+# the suite. The second audit's cases, on 2026-10-10, follow at the end.
 
 
 def _write(path, text):
@@ -244,3 +244,152 @@ def test_a_file_the_suite_never_runs_is_named(tmp_path):
     assert result["baseline"] is True
     assert [os.path.basename(p) for p in result["unreached"]] == ["unused.py"]
     assert "unused.py" in mutation_score.render(result, [])
+
+
+# ------------------------------------------------ the second audit, 10-10 ---
+
+def _two_functions(root):
+    """`f` is tested, `g` is not, and both have same-size mutants."""
+    _write(os.path.join(root, "calc.py"),
+           "def f(x):\n    if x == 3:\n        return 1\n    return 2\n\n\n"
+           "def g(y):\n    if y == 5:\n        return 7\n    return 0\n")
+    _write(os.path.join(root, "tests", "test_f.py"),
+           "from calc import f\n\n\ndef test_f():\n"
+           "    assert f(3) == 1\n    assert f(4) == 2\n")
+    return mutation_score.from_paths(os.path.join(root, "calc.py"),
+                                     os.path.join(root, "tests"))
+
+
+def test_the_suite_runs_without_a_bytecode_cache(tmp_path):
+    """
+    Mutants such as `==` to `!=` leave a file the same size, and Python
+    accepts a cached .pyc when size and whole-second mtime match. Two written
+    within a second, and the second ran the first one's bytecode: four seeds
+    gave four different "missed" sets, including faults the tests catch.
+    """
+    env = mutation_score._suite_env(str(tmp_path), _two_functions(str(tmp_path)))
+    assert env.get("PYTHONDONTWRITEBYTECODE") == "1"
+
+
+def test_only_untested_code_is_ever_reported_missed(tmp_path):
+    """The behaviour the cache broke: every miss is in `g`, lines 7 to 10."""
+    for seed in (0, 1):
+        root = str(tmp_path / str(seed))
+        result = mutation_score.score(_two_functions(root), mutants=8,
+                                      seed=seed)
+        lines = [int(m["change"].rsplit("line ", 1)[1])
+                 for m in result["missed"]]
+        assert all(line >= 7 for line in lines), result["missed"]
+
+
+def test_a_failed_watching_run_does_not_print_an_invented_zero(tmp_path,
+                                                               monkeypatch):
+    """
+    The guard used to read a failed watching run as "everything ran". A
+    line-length test fails on any marker, and the namespace layout above
+    came back as 0 of 3 with no refusal and no caveat.
+    """
+    root = str(tmp_path)
+    _write(os.path.join(root, "src", "acme", "widgets", "__init__.py"),
+           "from .calc import rate\n")
+    _write(os.path.join(root, "src", "acme", "widgets", "calc.py"),
+           "def rate(x):\n    return x if x <= 100 else 100\n")
+    tests = os.path.join(root, "tests")
+    _write(os.path.join(tests, "test_calc.py"),
+           "from acme.widgets import rate\n\n\n"
+           "def test_caps():\n    assert rate(150) == 100\n")
+    # Fails on the marker however short it is, as a snapshot test would.
+    _write(os.path.join(tests, "test_snapshot.py"),
+           "import glob, os\n\nHERE = os.path.dirname(__file__)\n\n\n"
+           "def test_untouched():\n"
+           "    for p in glob.glob(os.path.join(HERE, '..', 'src', '**', '*.py'),\n"
+           "                       recursive=True):\n"
+           "        assert '_qikly_mark' not in open(p, encoding='utf-8').read()\n")
+    monkeypatch.setenv("PYTHONPATH", os.path.join(root, "src"))
+    target = mutation_score.from_paths(
+        os.path.join(root, "src", "acme", "widgets"), tests)
+    with pytest.raises(ValueError) as caught:
+        mutation_score.score(target, mutants=4, seed=1)
+    assert "0 of" not in str(caught.value)
+
+
+def test_an_unconfirmed_run_is_flagged_above_the_score():
+    result = {"task": "t", "baseline": True, "caught": [{"file": "a.py",
+              "family": "int", "change": "x"}], "missed": [], "unscorable": 0,
+              "total": 1, "generated": False, "unreached": [],
+              "unverified": True}
+    text = mutation_score.render(result, [])
+    assert text.index("Could not confirm") < text.index("planted faults caught")
+
+
+def test_a_stray_init_in_a_flat_project_still_scores(tmp_path):
+    """
+    `myrepo/__init__.py`, empty, with a suite doing `from calc import ...`.
+    Climbing out of the "package" widened the copy and made `calc`
+    unimportable, so untouched code was reported as failing its own suite.
+    """
+    where = str(tmp_path / "myrepo")
+    _write(os.path.join(where, "__init__.py"), "")
+    _write(os.path.join(where, "calc.py"),
+           "def rate(x):\n    return x if x <= 100 else 100\n")
+    tests = os.path.join(where, "tests")
+    _write(os.path.join(tests, "test_calc.py"),
+           "from calc import rate\n\n\ndef test_caps():\n"
+           "    assert rate(150) == 100\n")
+    result = mutation_score.score(mutation_score.from_paths(where, tests),
+                                  mutants=3, seed=1)
+    assert result["baseline"] is True
+    assert result["caught"]
+
+
+def test_a_script_run_as_a_subprocess_counts_as_run(tmp_path):
+    """
+    A script ending in `sys.exit(main())` exits before an appended marker
+    runs, so it was reported as never run while its faults were caught.
+    """
+    root = str(tmp_path)
+    _write(os.path.join(root, "tool", "cli.py"),
+           '"""A tiny command."""\nimport sys\n\n\ndef main():\n'
+           '    print(int(sys.argv[1]) * 2)\n    return 0\n\n\n'
+           'if __name__ == "__main__":\n    sys.exit(main())\n')
+    _write(os.path.join(root, "tests", "test_cli.py"),
+           "import os, subprocess, sys\n\nHERE = os.path.dirname(__file__)\n\n\n"
+           "def test_doubles():\n"
+           "    out = subprocess.run([sys.executable, os.path.join(\n"
+           "        HERE, '..', 'tool', 'cli.py'), '21'],\n"
+           "        capture_output=True, text=True).stdout\n"
+           "    assert out.strip() == '42'\n")
+    result = mutation_score.score(
+        mutation_score.from_paths(os.path.join(root, "tool"),
+                                  os.path.join(root, "tests")),
+        mutants=4, seed=1)
+    assert result["unreached"] == []
+    assert result["caught"]
+
+
+def test_the_marker_keeps_a_coding_line_and_a_future_import_first():
+    source = ('# -*- coding: latin-1 -*-\n"""Doc."""\n'
+              'from __future__ import annotations\nX = 1\n')
+    assert mutation_score._marker_line(source) == 3
+
+
+def test_the_same_directory_for_code_and_tests_says_so(tmp_path):
+    root = str(tmp_path)
+    _write(os.path.join(root, "test_calc.py"), "def test_x():\n    pass\n")
+    with pytest.raises(ValueError) as caught:
+        mutation_score.from_paths(root, root)
+    assert "same directory" in str(caught.value)
+
+
+@pytest.mark.skipif(os.path.normcase("A") == "A",
+                    reason="only a case-insensitive filesystem can mismatch")
+def test_the_tests_folder_is_excluded_whatever_its_case(tmp_path):
+    root = str(tmp_path)
+    _pkg(root, "pkg")
+    _write(os.path.join(root, "pkg", "Tests", "test_calc.py"),
+           "def test_x():\n    pass\n")
+    # Lowercase on the command line, capitalised on disk.
+    target = mutation_score.from_paths(
+        os.path.join(root, "pkg"), os.path.join(root, "pkg", "tests"))
+    scored = [os.path.basename(rel) for _, rel in target.files]
+    assert "test_calc.py" not in scored
