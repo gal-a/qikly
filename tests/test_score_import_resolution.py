@@ -304,7 +304,7 @@ def test_a_failed_watching_run_does_not_print_an_invented_zero(tmp_path,
            "def test_untouched():\n"
            "    for p in glob.glob(os.path.join(HERE, '..', 'src', '**', '*.py'),\n"
            "                       recursive=True):\n"
-           "        assert '_qikly_mark' not in open(p, encoding='utf-8').read()\n")
+           "        assert 'qkhit' not in open(p, encoding='utf-8').read()\n")
     monkeypatch.setenv("PYTHONPATH", os.path.join(root, "src"))
     target = mutation_score.from_paths(
         os.path.join(root, "src", "acme", "widgets"), tests)
@@ -393,3 +393,98 @@ def test_the_tests_folder_is_excluded_whatever_its_case(tmp_path):
         os.path.join(root, "pkg"), os.path.join(root, "pkg", "tests"))
     scored = [os.path.basename(rel) for _, rel in target.files]
     assert "test_calc.py" not in scored
+
+
+# ------------------------------------------------- the third pass, 10-10 ---
+
+# The suite runs the code in a child with an environment of its own, so the
+# child inherits neither PYTHONPATH nor PYTHONDONTWRITEBYTECODE.
+_CHILD_TEST = (
+    "import os, subprocess, sys\n\nHERE = os.path.dirname(__file__)\n"
+    "ENV = {k: os.environ[k] for k in ('SYSTEMROOT', 'PATH') if k in os.environ}\n"
+    "\n\ndef run(x):\n"
+    "    code = ('import sys; sys.path.insert(0, sys.argv[1]); import calc; '\n"
+    "            'print(calc.f(int(sys.argv[2])))')\n"
+    "    return subprocess.run([sys.executable, '-c', code,\n"
+    "                           os.path.join(HERE, '..'), str(x)],\n"
+    "                          capture_output=True, text=True,\n"
+    "                          env=ENV).stdout.strip()\n\n\n"
+    "def test_f():\n    assert run(3) == '1'\n    assert run(4) == '2'\n")
+
+
+def test_code_run_by_a_child_with_its_own_env_is_scored(tmp_path):
+    """
+    Two failures in one layout. The marker used to import a helper off
+    PYTHONPATH, which the child never had, so this was refused as "never
+    ran"; and the child wrote a bytecode cache that PYTHONDONTWRITEBYTECODE
+    could not reach, so same-size mutants ran each other's bytecode.
+    """
+    for seed in (0, 1):
+        root = str(tmp_path / str(seed))
+        _write(os.path.join(root, "calc.py"),
+               "def f(x):\n    if x == 3:\n        return 1\n    return 2\n\n\n"
+               "def g(y):\n    if y == 5:\n        return 7\n    return 0\n")
+        _write(os.path.join(root, "tests", "test_f.py"), _CHILD_TEST)
+        result = mutation_score.score(
+            mutation_score.from_paths(os.path.join(root, "calc.py"),
+                                      os.path.join(root, "tests")),
+            mutants=8, seed=seed)
+        assert result["unreached"] == []
+        lines = [int(m["change"].rsplit("line ", 1)[1])
+                 for m in result["missed"]]
+        assert all(line >= 7 for line in lines), result["missed"]
+
+
+def test_a_file_saved_with_a_bom_is_watched(tmp_path):
+    """ast.parse refused the U+FEFF, the marker went in front of it."""
+    root = str(tmp_path)
+    with open(os.path.join(root, "calc.py"), "w", encoding="utf-8-sig") as fh:
+        fh.write("def cap(x):\n    return x if x <= 100 else 100\n")
+    _write(os.path.join(root, "tests", "test_cap.py"),
+           "from calc import cap\n\n\ndef test_cap():\n"
+           "    assert cap(150) == 100\n")
+    result = mutation_score.score(
+        mutation_score.from_paths(os.path.join(root, "calc.py"),
+                                  os.path.join(root, "tests")),
+        mutants=2, seed=1)
+    assert result["unverified"] is False
+
+
+def test_the_marker_steps_over_a_statement_sharing_the_docstring_line():
+    source = '"""D."""; X = (1,\n     2)\nY = 3\n'
+    assert mutation_score._marker_line(source) == 2
+
+
+def test_a_namespace_package_with_its_suite_inside_is_refused(tmp_path,
+                                                             monkeypatch):
+    """
+    pytest's collection ran the copy's `widgets/__init__.py` and fired its
+    marker, while the test imported `acme.widgets` from the original. Both
+    earlier versions printed 0 of 3 for a suite that catches 2 of 3.
+    """
+    root = str(tmp_path)
+    pkg = os.path.join(root, "src", "acme", "widgets")
+    _write(os.path.join(pkg, "__init__.py"), "from .calc import rate\n")
+    _write(os.path.join(pkg, "calc.py"),
+           "def rate(x):\n    return x if x <= 100 else 100\n")
+    _write(os.path.join(pkg, "tests", "__init__.py"), "")
+    _write(os.path.join(pkg, "tests", "test_calc.py"),
+           "from acme.widgets import rate\n\n\ndef test_caps():\n"
+           "    assert rate(150) == 100\n    assert rate(5) == 5\n")
+    monkeypatch.setenv("PYTHONPATH", os.path.join(root, "src"))
+    with pytest.raises(ValueError) as caught:
+        mutation_score.score(
+            mutation_score.from_paths(pkg, os.path.join(pkg, "tests")),
+            mutants=4, seed=1)
+    assert "never ran" in str(caught.value)
+
+
+def test_no_hit_file_is_left_behind(tmp_path):
+    root = str(tmp_path)
+    where = _pkg(root, "widget")
+    mutation_score.score(
+        mutation_score.from_paths(where, _suite(root, "widget")),
+        mutants=1, seed=1)
+    leftovers = [n for _, _, names in os.walk(root) for n in names
+                 if n.endswith(mutation_score.HIT)]
+    assert leftovers == []

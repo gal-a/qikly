@@ -411,7 +411,23 @@ def _suite_passes(workspace, target, env=None):
     return _suite_verdict(workspace, target, env) == "pass"
 
 
-def _suite_verdict(workspace, target, env=None):
+def _drop_bytecode(workspace):
+    """
+    Delete every cached .pyc in the workspace before a suite run.
+
+    PYTHONDONTWRITEBYTECODE alone was not enough: a test that starts a child
+    process with an environment of its own does not pass it on, the child
+    writes a cache, and a later same-size mutant written within the same
+    second ran that cache. An audit reproduced faults in tested code reported
+    missed in four of six seeds that way.
+    """
+    for base, dirs, _ in os.walk(workspace):
+        if "__pycache__" in dirs:
+            shutil.rmtree(os.path.join(base, "__pycache__"), ignore_errors=True)
+            dirs.remove("__pycache__")
+
+
+def _suite_verdict(workspace, target, env=None, plugin=None):
     """
     "pass", "fail" or "error" for the suite in this workspace.
 
@@ -421,6 +437,7 @@ def _suite_verdict(workspace, target, env=None):
     "the suite noticed" credits a mutant that broke collection as a fault
     caught, when no assertion ever ran.
     """
+    _drop_bytecode(workspace)
     for directory in target.suites:
         where = os.path.join(workspace, directory)
         if not os.path.exists(where):
@@ -430,7 +447,8 @@ def _suite_verdict(workspace, target, env=None):
              # The project's own addopts already carry -q, and -qq suppresses
              # the count line entirely, so every parsed count reads as zero,
              # which looks exactly like a suite that ran and passed.
-             "-o", "addopts=", "-p", "no:cacheprovider"],
+             "-o", "addopts=", "-p", "no:cacheprovider"]
+            + (["-p", plugin] if plugin else []),
             cwd=workspace, capture_output=True, text=True, env=env)
         if result.returncode >= 2:
             return "error"
@@ -463,24 +481,36 @@ def _import_roots(target):
     return sorted(roots)
 
 
-# Appended to each scored file for one watching run. builtins, because a
-# module is free to shadow `open`.
-# Put into each scored file for one watching run. It names a helper module
-# rather than a path. A path made the line long enough to fail a suite's
-# line-length check, and a non-ASCII temp path written into a file declaring
-# latin-1 named a directory that does not exist; both made the watching run
-# fail. ImportError is swallowed so a subprocess started with its own
-# environment runs normally rather than crashing on the marker.
+# Put into each scored file for one watching run. It leaves a hit file beside
+# the module, named from its own `__file__`, so it needs nothing from the
+# environment. A version that imported a helper off PYTHONPATH never fired in
+# a subprocess the suite started with its own environment, and a version that
+# embedded a path was long enough to fail a line-length check and named a
+# missing directory when the path was not ASCII. builtins, because a module is
+# free to shadow `open`; every failure is swallowed so the marker can never be
+# the thing that breaks a run.
 MARKER = ("try:\n"
-          "    __import__('_qikly_mark').hit(%d)\n"
-          "except ImportError:\n"
+          "    __import__('builtins').open(__file__ + '.qkhit', 'w').close()\n"
+          "except Exception:\n"
           "    pass\n")
+HIT = ".qkhit"
 
-_MARK_MODULE = (
-    "import os\n"
-    "def hit(n):\n"
-    "    here = os.path.dirname(os.path.abspath(__file__))\n"
-    "    open(os.path.join(here, str(n)), 'w').close()\n")
+# A pytest plugin for the watching run, recording every file the suite's own
+# process loaded. A marker firing says the copy ran; it cannot say the copy
+# was the one the tests used. With a namespace package whose suite lives
+# inside it, pytest's collection ran the copy's `__init__.py` and fired its
+# marker, while the test imported `acme.widgets` from the user's original.
+_WATCH_PLUGIN = (
+    "import os, sys\n"
+    "def pytest_sessionfinish(session, exitstatus):\n"
+    "    out = os.environ.get('QIKLY_LOADED')\n"
+    "    if not out:\n"
+    "        return\n"
+    "    with open(out, 'w', encoding='utf-8') as handle:\n"
+    "        for module in list(sys.modules.values()):\n"
+    "            name = getattr(module, '__file__', None)\n"
+    "            if name:\n"
+    "                handle.write(os.path.realpath(name) + '\\n')\n")
 
 
 def _marker_line(source):
@@ -512,6 +542,11 @@ def _marker_line(source):
         i += 1
     if i:
         at = body[i - 1].end_lineno
+        # `"""D."""; X = (1,` with the rest on later lines: the next
+        # statement starts on the docstring's line and must be stepped over.
+        while i < len(body) and body[i].lineno <= at:
+            at = body[i].end_lineno
+            i += 1
     while at < 2 and at < len(lines) and lines[at].lstrip().startswith("#"):
         at += 1
     return at
@@ -537,7 +572,7 @@ def _unreached(workspace, target, env=None):
     """
     marks = tempfile.mkdtemp()
     try:
-        for n, (_, relative) in enumerate(target.files):
+        for _, relative in target.files:
             planted = os.path.join(workspace, relative)
             # Bytes, so a file in any declared encoding gets an ASCII line
             # inserted rather than a re-encoding of everything around it.
@@ -547,31 +582,55 @@ def _unreached(workspace, target, env=None):
             except OSError:
                 # Nothing to watch means nothing confirmed, not a crash.
                 return None
-            text = raw.decode("utf-8", errors="replace")
-            at = _marker_line(text)
+            # A byte-order mark stays first. ast.parse refuses a leading
+            # U+FEFF, which put the marker in front of the mark, and Python
+            # then refused the file.
+            bom = b"\xef\xbb\xbf" if raw.startswith(b"\xef\xbb\xbf") else b""
+            raw = raw[len(bom):]
+            at = _marker_line(raw.decode("utf-8", errors="replace"))
             chunks = raw.splitlines(keepends=True)
             if at and chunks and not chunks[min(at, len(chunks)) - 1].endswith(
                     (b"\n", b"\r")):
                 chunks[min(at, len(chunks)) - 1] += b"\n"
-            chunks.insert(at, (MARKER % n).encode("ascii"))
+            chunks.insert(at, MARKER.encode("ascii"))
             with open(planted, "wb") as handle:
-                handle.write(b"".join(chunks))
-        with open(os.path.join(marks, "_qikly_mark.py"), "w",
+                handle.write(bom + b"".join(chunks))
+        with open(os.path.join(marks, "_qikly_watch.py"), "w",
                   encoding="utf-8") as handle:
-            handle.write(_MARK_MODULE)
-        # The marks directory holds only the helper and the hit files, so
-        # putting it first cannot shadow anything else.
+            handle.write(_WATCH_PLUGIN)
+        loaded_list = os.path.join(marks, "loaded.txt")
+        # The marks directory holds only the plugin, so putting it first on
+        # the path cannot shadow anything the suite imports.
         watching = dict(env if env is not None else os.environ)
         existing = watching.get("PYTHONPATH", "")
         watching["PYTHONPATH"] = os.pathsep.join(
             [marks] + ([existing] if existing else []))
-        if _suite_verdict(workspace, target, watching) != "pass":
+        watching["QIKLY_LOADED"] = loaded_list
+        if _suite_verdict(workspace, target, watching,
+                          plugin="_qikly_watch") != "pass":
             return None
-        return [relative for n, (_, relative) in enumerate(target.files)
-                if not os.path.exists(os.path.join(marks, str(n)))]
+        try:
+            with open(loaded_list, encoding="utf-8") as handle:
+                loaded = set(handle.read().splitlines())
+        except OSError:
+            loaded = set()
+        never = []
+        for path, relative in target.files:
+            hit = os.path.exists(os.path.join(workspace, relative) + HIT)
+            # The user's own file, loaded in place of the copy: the suite ran
+            # the original, whatever the copy's marker says.
+            shadowed = os.path.realpath(path) in loaded
+            if not hit or shadowed:
+                never.append(relative)
+        return never
     finally:
         for path, relative in target.files:
-            shutil.copy2(path, os.path.join(workspace, relative))
+            planted = os.path.join(workspace, relative)
+            shutil.copy2(path, planted)
+            try:
+                os.remove(planted + HIT)
+            except OSError:
+                pass
         shutil.rmtree(marks, ignore_errors=True)
 
 
