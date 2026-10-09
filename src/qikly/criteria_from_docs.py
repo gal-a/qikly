@@ -143,7 +143,8 @@ _ESCAPE = re.compile(r'\\(?:(["\\/bfnrt]|u[0-9a-fA-F]{4})|)')
 # `\b` arrives as a backspace and a literal `\n` in prose as a line break, so
 # the quote no longer matches the document, and an honest criterion would be
 # reported as a fabricated citation.
-_UNESCAPE = {"\x08": r"\b", "\x0c": r"\f", "\n": r"\n", "\t": r"\t"}
+_UNESCAPE = {"\x08": r"\b", "\x0c": r"\f", "\r": r"\r", "\n": r"\n",
+             "\t": r"\t"}
 
 
 def _loads(text):
@@ -187,14 +188,21 @@ def _first_reply(text):
     the wrong place and lost the whole reply.
     """
     decoder = json.JSONDecoder()
+    best, best_size = None, -1
     for match in re.finditer(r"\{", text):
         try:
             obj, _ = decoder.raw_decode(text, match.start())
         except ValueError:
             continue
         if isinstance(obj, dict) and ("criteria" in obj or "rejected" in obj):
-            return obj
-    return None
+            # The largest, not the first: a model that restates the format
+            # as `{"criteria": []}` before answering made the empty example
+            # the reply, reported as "no testable claim found".
+            size = sum(len(v) for v in (obj.get("criteria"), obj.get("rejected"))
+                       if isinstance(v, list))
+            if size > best_size:
+                best, best_size = obj, size
+    return best
 
 
 def _salvage(text):
@@ -232,6 +240,18 @@ def _squash(s):
     return " ".join((s or "").split())
 
 
+def _shown(s):
+    """
+    `_squash`, then any character YAML refuses written as an escape.
+
+    For the report only, never for matching. An ANSI colour code in a quoted
+    line, or a DEL in the model's reason, made the whole output unparseable.
+    """
+    return "".join(ch if ch.isprintable() else "\\x%02x" % ord(ch)
+                   if ord(ch) < 0x100 else "\\u%04x" % ord(ch)
+                   for ch in _squash(s))
+
+
 def _as_quoted(quote, bodies):
     """
     The form of `quote` found in the documents, or None.
@@ -241,9 +261,13 @@ def _as_quoted(quote, bodies):
     """
     if _is_quoted(quote, bodies):
         return quote
-    restored = "".join(_UNESCAPE.get(ch, ch) for ch in quote)
-    if restored != quote and _is_quoted(restored, bodies):
-        return restored
+    # The rare escapes first on their own, because a real line break in the
+    # same quote as a regex `\b` must stay a line break; then everything.
+    for keep in ("\n\t", ""):
+        restored = "".join(ch if ch in keep else _UNESCAPE.get(ch, ch)
+                           for ch in quote)
+        if restored != quote and _is_quoted(restored, bodies):
+            return restored
     return None
 
 
@@ -260,25 +284,160 @@ def _is_quoted(quote, bodies, min_words=4):
       - "### a.md", which is qikly's own file header rather than the document
       - a fragment spanning the end of one file and the start of the next
 
-    So the match has to begin where a sentence does, end where one does, sit
-    inside one document, and be long enough to mean something. Whitespace is
-    flexible because prose wraps, and both sides are NFC-normalised so a
-    composed character is not mistaken for a fabrication.
+    So each document is first cut into units, `_units`, and a quote must be
+    one or more whole sentences of a single unit. A line break is not a
+    sentence boundary: hard-wrapped prose made "raise on empty input" a line
+    of its own, and an earlier version that treated every line start as a
+    sentence start accepted it without the "never" on the line above. Nor is
+    a colon: "The following is no longer true: the default is 30" must not
+    yield "the default is 30".
+
+    Whitespace is flexible because prose wraps, and both sides are
+    NFC-normalised so a composed character is not mistaken for a fabrication.
+    A line of code is the one unit that may be quoted with fewer than
+    `min_words` words, because `>>> add(1, 2)` is exactly what the prompt
+    asks for, and it must then be the whole line.
     """
-    words = unicodedata.normalize("NFC", quote or "").split()
-    if len(words) < min_words:
+    quote = unicodedata.normalize("NFC", quote or "")
+    lines = [_squash(l) for l in quote.splitlines() if l.strip()]
+    if not lines:
         return False
-    body_re = r"\s+".join(map(re.escape, words))
-    pattern = re.compile(
-        # Start of the body, after a sentence end, or at the head of a line,
-        # optionally past a bullet, a list number, or a table-cell quote.
-        r"(?:^|(?<=[.!?:])\s+|\n[ \t]*(?:[-*+>#|'\"]+[ \t]*|\d+[.)][ \t]+)?)"
-        + body_re
-        # End of the body, end of a line, a sentence boundary, or the end of
-        # a table cell.
-        + r"(?=\s*$|\s*\n|(?<=[.!?:])\s|['\"],)")
-    return any(pattern.search(unicodedata.normalize("NFC", b))
-               for b in bodies)
+    for body in bodies:
+        units = _units(unicodedata.normalize("NFC", body))
+        texts = [text for text, _ in units]
+        # An input line and the output shown beneath it, quoted together:
+        # consecutive code lines, each matched whole.
+        if len(lines) > 1:
+            for i in range(len(units) - len(lines) + 1):
+                if (texts[i:i + len(lines)] == lines
+                        and any(code for _, code in units[i:i + len(lines)])):
+                    return True
+        wanted = _strip_marker(_squash(quote))
+        for text, code in units:
+            if code:
+                if wanted == text and len(wanted.replace(" ", "")) >= 3:
+                    return True
+                continue
+            if len(wanted.split()) < min_words:
+                continue
+            for candidate in (wanted, _unwrap_quotes(wanted)):
+                if candidate and _whole_sentences(candidate, text):
+                    return True
+    return False
+
+
+_MARKER = re.compile(r"^(?:[-*+]|\d+[.)])\s+")
+_SENTENCE_END = re.compile(r"""[.!?]["')\]]*$""")
+
+
+def _strip_marker(text):
+    return _MARKER.sub("", text, count=1)
+
+
+def _unwrap_quotes(text):
+    """`'Use raw strings.'` as a table cell often comes back with its quotes."""
+    if len(text) > 2 and text[0] == text[-1] and text[0] in "'\"":
+        return text[1:-1].strip()
+    return None
+
+
+def _whole_sentences(quote, text):
+    """Whether `quote` sits in `text` starting and ending on sentence edges."""
+    start = text.find(quote)
+    while start >= 0:
+        end = start + len(quote)
+        starts = start == 0 or _SENTENCE_END.search(text[:start].rstrip()) \
+            and text[start - 1] == " "
+        ends = end == len(text) or (_SENTENCE_END.search(quote)
+                                    and text[end] == " ")
+        if starts and ends:
+            return True
+        start = text.find(quote, start + 1)
+    return False
+
+
+def _units(body):
+    """
+    A document as [(text, is_code)], each a place a sentence cannot cross.
+
+    Paragraphs are joined across their wrapped lines; a list item, a heading,
+    each table row and each of its cells, and each line of a code block or a
+    doctest stand alone. Text is whitespace-squashed.
+    """
+    import csv
+
+    units, para = [], []
+    fence = indented = doctest = False
+
+    def flush():
+        if para:
+            units.append((_squash(" ".join(para)), False))
+            del para[:]
+
+    previous_blank = True
+    for raw in body.splitlines():
+        line = raw.strip()
+        if line.startswith(("```", "~~~")):
+            flush()
+            fence = not fence
+            previous_blank = False
+            continue
+        if fence:
+            if line:
+                units.append((_squash(line), True))
+            continue
+        if not line:
+            flush()
+            doctest = indented = False
+            previous_blank = True
+            continue
+        if raw.startswith(("    ", "\t")) and (indented or previous_blank) \
+                and not para:
+            # An indented block after a blank line: Markdown code, or an
+            # RST literal block after `::`.
+            indented = True
+            units.append((_squash(line), True))
+            continue
+        indented = False
+        previous_blank = False
+        if line.startswith((">>>", "...")) or doctest:
+            # A doctest prompt, and the output lines under it until a blank.
+            flush()
+            doctest = True
+            units.append((_squash(line), True))
+            continue
+        if line.startswith("|") or line.count("|") >= 2:
+            flush()
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            if not all(set(c) <= set("-:= ") for c in cells):
+                units.append((_squash(" ".join(cells)), False))
+                units.extend((_squash(c), False) for c in cells if c)
+            continue
+        if line[0] in "'\"" and "," in line:
+            # A row of an RST csv-table, such as a requirements table.
+            flush()
+            try:
+                cells = next(csv.reader([line], skipinitialspace=True,
+                                        quotechar=line[0]))
+            except (csv.Error, StopIteration):
+                cells = []
+            units.append((_squash(line), False))
+            units.extend((_squash(c), False) for c in cells if c.strip())
+            continue
+        if line.startswith("#") or set(line) <= set("=-~^*+#"):
+            flush()
+            heading = line.lstrip("#").strip()
+            if heading:
+                units.append((_squash(heading), False))
+            continue
+        if _MARKER.match(line):
+            flush()
+            para.append(_strip_marker(line))
+            continue
+        para.append(line.lstrip("> ").strip() if line.startswith(">")
+                    else line)
+    flush()
+    return units
 
 
 def extract(paths, seed=None):
@@ -315,9 +474,19 @@ def extract(paths, seed=None):
             "the few pages that make behavioural claims rather than the "
             "whole set." % (len(docs), _MAX_CHARS))
 
-    data = _loads(call_llm("test_system", PROMPT.format(docs=docs), seed=seed))
+    reply = call_llm("test_system", PROMPT.format(docs=docs), seed=seed)
+    data = _loads(reply)
 
     criteria, unquoted = [], []
+    # A criterion the parser lost, through a truncated reply or a quote
+    # ending in a backslash, otherwise vanished without appearing in either
+    # list. It is counted, so the report can at least say so.
+    parsed = data.get("criteria") if isinstance(data.get("criteria"),
+                                                list) else []
+    lost = reply.count('"criterion"') - len(parsed)
+    if lost > 0:
+        unquoted.append({"criterion": "(%d more in the model's reply could "
+                                      "not be parsed)" % lost, "source": ""})
     for item in data.get("criteria") or []:
         # A reply is a model's output, not a contract: an item may be a bare
         # string, or carry a number where a sentence belongs.
@@ -332,8 +501,8 @@ def extract(paths, seed=None):
                 # The criterion went through the same JSON decoding, so the
                 # same backspace or form feed is in it. Line breaks and tabs
                 # are left alone: in a criterion they are only whitespace.
-                criterion = "".join(_UNESCAPE[ch] if ch in "\x08\x0c" else ch
-                                    for ch in criterion)
+                criterion = "".join(_UNESCAPE[ch] if ch in "\x08\x0c\r"
+                                    else ch for ch in criterion)
             criteria.append({"criterion": criterion, "source": found})
         else:
             unquoted.append({"criterion": criterion,
@@ -386,9 +555,14 @@ def render(paths, criteria, rejected, unquoted):
         for item in criteria:
             # The quote travels with the criterion, so the citation survives
             # into the task file rather than being left behind in a terminal.
-            lines.append("  # > %s" % _squash(item["source"]))
-            lines.append("  - %s" % json.dumps(_squash(item["criterion"]),
-                                               ensure_ascii=False))
+            lines.append("  # > %s" % _shown(item["source"]))
+            # json.dumps escapes C0 controls but leaves DEL and C1 raw, which
+            # YAML refuses, so those are escaped as well.
+            dumped = json.dumps(_squash(item["criterion"]),
+                                ensure_ascii=False)
+            lines.append("  - %s" % "".join(
+                "\\u%04x" % ord(ch) if 0x7f <= ord(ch) <= 0x9f else ch
+                for ch in dumped))
     else:
         lines.append("# No testable claim found. That is a finding about the "
                      "documentation rather than an error.")
@@ -404,8 +578,8 @@ def render(paths, criteria, rejected, unquoted):
                      ", plus %d sentences that make no claim" % other
                      if other else "")]
         for item in ambiguous:
-            lines.append("#   > %s" % _squash(item.get("sentence")))
-            lines.append("#     %s" % _squash(item.get("why")))
+            lines.append("#   > %s" % _shown(item.get("sentence")))
+            lines.append("#     %s" % _shown(item.get("why")))
 
     if unquoted:
         lines += ["", "# Dropped because the quote could not be found as a "
@@ -414,17 +588,18 @@ def render(paths, criteria, rejected, unquoted):
                       "an unverifiable criterion is not reported:"
                   % len(unquoted)]
         for item in unquoted:
-            lines.append("#   %s" % _squash(item.get("criterion")))
+            lines.append("#   %s" % _shown(item.get("criterion")))
             # The claimed source, so a reader can tell a fabricated citation
             # from a real passage this check could not match. Without it the
             # two are indistinguishable, and that hid a serious fault: every
             # requirement in a project's formal requirements table was
             # dropped, because a table row is not a sentence.
             lines.append("#     claimed: %s"
-                         % (_squash(item.get("source")) or "(none given)"))
+                         % (_shown(item.get("source")) or "(none given)"))
 
     lines += ["", "# Each criterion is the model's wording of the quote above "
                   "it, and only the quote is checked. Read the two together "
-                  "before using them. Nothing here was derived from your "
-                  "implementation."]
+                  "before using them. Only the files named at the top were "
+                  "sent; if any of them is source code, these criteria "
+                  "describe that code rather than a standard for it."]
     return "\n".join(lines)

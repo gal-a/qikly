@@ -12,6 +12,7 @@ These tests pin the enforcement, not the model. The model is stubbed, so they
 run offline and cost nothing.
 """
 import json
+import os
 
 import pytest
 import yaml
@@ -297,3 +298,127 @@ def test_chatter_during_the_call_stays_out_of_the_yaml(tmp_path, monkeypatch,
     assert "that call took" in captured.err
     assert yaml.safe_load(captured.out)["acceptance_criteria"] == [
         "the default format is simple"]
+
+
+# ------------------------------------------------- the second audit, 10-10 --
+
+WRAPPED = ("The parser will never\nraise on empty input or on whitespace.\n\n"
+           "The following is no longer true: the default timeout is 30 "
+           "seconds.\n")
+
+
+@pytest.mark.parametrize("quote", [
+    "raise on empty input or on whitespace.",   # a wrapped line, minus "never"
+    "the default timeout is 30 seconds.",       # after a colon
+    "The parser will never",                    # stops mid-sentence
+])
+def test_a_line_break_or_a_colon_is_not_a_sentence_edge(quote):
+    assert cfd._as_quoted(quote, [WRAPPED]) is None
+
+
+def test_a_wrapped_sentence_quoted_whole_is_accepted():
+    whole = "The parser will never raise on empty input or on whitespace."
+    assert cfd._as_quoted(whole, [WRAPPED]) == whole
+
+
+def test_a_short_code_line_and_its_output_are_accepted():
+    doc = "Example:\n\n```\n>>> add(1, 2)\n3\n>>> add(-1)\nTypeError\n```\n"
+    assert cfd._as_quoted(">>> add(1, 2)", [doc]) == ">>> add(1, 2)"
+    assert cfd._as_quoted(">>> add(-1)\nTypeError", [doc])
+    assert cfd._as_quoted("add", [doc]) is None, "a fragment of a code line"
+
+
+def test_a_table_row_and_a_cell_are_accepted():
+    doc = ("| option | default |\n|---|---|\n"
+           "| width | 80 columns unless set otherwise |\n")
+    assert cfd._as_quoted("80 columns unless set otherwise", [doc])
+    csv_doc = """' PEP_257_2','Use r\"\"\"raw triple double quotes\"\"\" if you use backslashes.',' Convention'\n"""
+    assert cfd._as_quoted(
+        'Use r"""raw triple double quotes""" if you use backslashes.',
+        [csv_doc])
+
+
+def test_a_windows_path_holding_backslash_r_is_restored():
+    doc = r"Reports are written to C:\reports\daily.csv by default." + "\n"
+    decoded = "Reports are written to C:\reports\\daily.csv by default."
+    assert cfd._as_quoted(decoded, [doc]) == doc.strip()
+
+
+def test_control_characters_never_make_the_yaml_invalid():
+    text = cfd.render(["a.md"],
+                      [{"criterion": "red \x1b[31m or \x7f here",
+                        "source": "a \x1b[0m b"}],
+                      [{"sentence": "x", "kind": "ambiguous_claim",
+                        "why": "esc \x1b"}], [])
+    assert yaml.safe_load(text)["acceptance_criteria"]
+
+
+def test_a_criterion_that_looks_like_a_mapping_stays_a_string():
+    """Plain YAML would read `key: value # x` as a mapping and a comment."""
+    text = cfd.render(["a.md"], [{"criterion": "key: value # x",
+                                  "source": "s"}], [], [])
+    assert yaml.safe_load(text)["acceptance_criteria"] == ["key: value # x"]
+
+
+def test_a_restated_empty_example_does_not_replace_the_real_reply():
+    reply = ('Format: {"criteria": []}\n\n'
+             '{"criteria": [{"criterion": "ok", "source": "s"}]}')
+    assert cfd._loads(reply)["criteria"][0]["criterion"] == "ok"
+
+
+def test_a_truncated_reply_with_a_stray_backslash_keeps_its_criteria():
+    """The repair has to run before the salvage, or this item is lost."""
+    reply = (r'{"criteria": [{"criterion": "a \d b", "source": "s"},'
+             r' {"criterion": "cut off')
+    kept = cfd._loads(reply)["criteria"]
+    assert [k["criterion"] for k in kept] == [r"a \d b"]
+
+
+def test_a_lost_criterion_is_counted_rather_than_vanishing(tmp_path,
+                                                           monkeypatch):
+    _stub(monkeypatch, '{"criteria": [{"criterion": "x", "source": "y"}, '
+                       '{"criterion": "z", "source": "C:\\out\\"}]}')
+    _, _, unquoted = cfd.extract([_doc(tmp_path)])
+    assert any("could not be parsed" in u["criterion"] for u in unquoted)
+
+
+def test_the_update_notice_cannot_reach_the_yaml(tmp_path, monkeypatch,
+                                                 capsys):
+    import sys as _sys
+    from qikly import cli
+    _doc(tmp_path)
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    monkeypatch.setattr(_sys, "argv",
+                        ["qikly", "--criteria-from-docs", "README.md"])
+    monkeypatch.setattr("qikly.criteria_from_docs.extract",
+                        lambda paths, seed=None: ([], [], []))
+    monkeypatch.setattr("qikly.version_check.check_for_update",
+                        lambda *a, **k: print("qikly 99.0 is available"))
+    cli.main()
+    assert "available" not in capsys.readouterr().out
+
+
+def test_a_directory_is_named_as_one(tmp_path, monkeypatch, capsys):
+    cli = _cli(monkeypatch, tmp_path, lambda paths, seed=None: ([], [], []))
+    assert cli._do_criteria_from_docs(["."]) == 2
+    assert "is a directory" in capsys.readouterr().err
+
+
+def test_an_unexpanded_glob_is_expanded(tmp_path, monkeypatch, capsys):
+    _doc(tmp_path, name="a.md")
+    _doc(tmp_path, name="b.md")
+    seen = []
+    cli = _cli(monkeypatch, tmp_path,
+               lambda paths, seed=None: seen.extend(paths) or ([], [], []))
+    assert cli._do_criteria_from_docs(["*.md"]) == 0
+    assert sorted(os.path.basename(p) for p in seen) == ["a.md", "b.md"]
+
+
+def test_source_code_is_flagged_and_the_report_does_not_deny_it(
+        tmp_path, monkeypatch, capsys):
+    _doc(tmp_path, text="def f():\n    return 1\n", name="impl.py")
+    cli = _cli(monkeypatch, tmp_path, lambda paths, seed=None: ([], [], []))
+    assert cli._do_criteria_from_docs(["impl.py"]) == 0
+    captured = capsys.readouterr()
+    assert "looks like source code" in captured.err
+    assert "Nothing here was derived" not in captured.out

@@ -1131,9 +1131,9 @@ def _parse_args():
              "came from, plus the sentences that cannot be tested as written "
              "and why. One model call, which needs a key. The model is shown "
              "only the files you name, so name documentation rather than "
-             "source and nothing it produces is derived from the "
-             "implementation. The output is valid YAML: paste it into a task "
-             "file's acceptance_criteria."
+             "source: criteria read out of code describe that code. The "
+             "output is valid YAML: paste it into a task file's "
+             "acceptance_criteria."
     )
     return parser.parse_args()
 
@@ -1709,13 +1709,39 @@ def _do_criteria_from_docs(paths, seed=None):
     """
     from qikly.criteria_from_docs import extract, render
 
-    paths = [p if os.path.isabs(p) else os.path.join(INVOKED_FROM, p)
-             for p in paths]
+    import contextlib
+    import glob
+
+    resolved = []
+    for p in paths:
+        p = p if os.path.isabs(p) else os.path.join(INVOKED_FROM, p)
+        # Windows shells do not expand `docs/*.md`, so it arrives literally.
+        matches = sorted(glob.glob(p)) if glob.has_magic(p) else [p]
+        resolved.extend(matches or [p])
+    paths = resolved
+    folders = [p for p in paths if os.path.isdir(p)]
+    if folders:
+        print("%s is a directory; name the documents in it instead, for "
+              "example %s" % (", ".join(folders),
+                              os.path.join(folders[0], "*.md")),
+              file=sys.stderr)
+        return 2
     missing = [p for p in paths if not os.path.isfile(p)]
     if missing:
         print("no document at: %s" % ", ".join(missing), file=sys.stderr)
         return 2
-    import contextlib
+    source = [p for p in paths if os.path.splitext(p)[1].lower() in (
+        ".py", ".js", ".ts", ".java", ".go", ".rs", ".c", ".cpp", ".cs",
+        ".rb", ".php", ".kt", ".swift")]
+    if source:
+        # Allowed, because a docstring-heavy module can be the only written
+        # rules a project has, but said: criteria read out of code describe
+        # what the code does, which is the bar this project argues against.
+        print("note: %s looks like source code. Criteria read out of an "
+              "implementation describe that implementation, so a suite "
+              "written from them passes it by construction."
+              % ", ".join(os.path.basename(p) for p in source),
+              file=sys.stderr)
 
     # stdout is the paste-ready report, so anything printed during the call,
     # such as the note about a slow model, goes to stderr instead of landing
@@ -2393,6 +2419,12 @@ def main():
     if args.install_mcp:
         return _do_install_mcp(args.install_mcp, args.dry_run, args.force)
 
+    # Before the update check for the same reason as --mcp-config: stdout is
+    # YAML to be pasted, and an audit showed the notice landing in it as a
+    # junk key that yaml.safe_load accepted silently.
+    if args.criteria_from_docs:
+        return _do_criteria_from_docs(args.criteria_from_docs, _seed())
+
     # Once per invocation, before any work, and before the early returns below.
     # It sat after them, which quietly exempted --scaffold and --check-criteria:
     # two commands someone uses repeatedly, and therefore two of the better
@@ -2554,8 +2586,6 @@ def main():
         return _do_explain(args.explain, args.json, args.html)
     if args.validate:
         return _do_validate(args.tasks, args.json)
-    if args.criteria_from_docs:
-        return _do_criteria_from_docs(args.criteria_from_docs, _seed())
     if args.check_criteria:
         return _do_check_criteria(args.tasks)
     if args.propose_fixtures:
