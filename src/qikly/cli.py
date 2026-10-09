@@ -977,6 +977,19 @@ def _parse_args():
         help="Period for --trends. Default day."
     )
     parser.add_argument(
+        "--compare-prompts", metavar="TASK", default=None,
+        help="Did editing a prompt help? Groups this task's run summaries by "
+             "the prompts that produced them and prints both arms. No model "
+             "call and nothing written. Add --repeats N to run N more of each "
+             "arm first, alternating, which does spend a model budget. Counts "
+             "and ranges only: a run is an artifact, not a rate."
+    )
+    parser.add_argument(
+        "--repeats", type=int, default=0, metavar="N",
+        help="With --compare-prompts, run N of each arm before reporting. "
+             "Each is a full run, so this costs minutes to hours apiece."
+    )
+    parser.add_argument(
         "--explain", metavar="TASK", default=None,
         help="Print what test generation sees and what the coding agent sees for "
              "one task, and the difference between them, then stop. No model call "
@@ -1757,6 +1770,35 @@ def _do_compare_criteria(task_id, as_json):
     return 1 if result["summary"]["missed"] else 0
 
 
+def _do_compare_prompts(task_id, repeats):
+    """
+    Whether your edited prompts did anything, measured rather than felt.
+
+    Reading is free and is the default. Running is opt-in through --repeats
+    because each run costs minutes to hours and a model budget, and the
+    number of them is a judgement the user has to make, not one this should
+    make for them.
+    """
+    from qikly.orchestrator import compare_prompts
+
+    if repeats < 0:
+        print("--repeats cannot be negative.", file=sys.stderr)
+        return 2
+    if repeats:
+        overrides = compare_prompts.load_overrides_present()
+        if not overrides:
+            print("Nothing to compare: no prompts are overridden. Copy one "
+                  "out of the shipped agent_defs/ into "
+                  "inputs_private/agent_defs/ and edit it first.",
+                  file=sys.stderr)
+            return 2
+        print("Running %d of each arm for %s, alternating. %d runs in all, "
+              "each one a full run." % (repeats, task_id, repeats * 2))
+        compare_prompts.run_arms(task_id, repeats)
+    compare_prompts.report(task_id)
+    return 0
+
+
 def _do_trends(tasks, grain, as_json):
     """Convergence over time, from summaries already on disk. No model call."""
     from qikly.orchestrator.reports.trend_report import collect, render, write_json
@@ -2383,6 +2425,10 @@ def main():
         # The fourth, found by the audit of the test written to catch the
         # third. See the test's own note on why it did not.
         ("--by", args.by is not None, "--trends", "qikly --trends --by week"),
+        # The fifth. --repeats is the only option here that spends a model
+        # budget on its own, so an unattached one is worse than a no-op.
+        ("--repeats", args.repeats, "--compare-prompts",
+         "qikly --compare-prompts CALC_TAX --repeats 3"),
     ):
         if not given:
             continue
@@ -2405,6 +2451,7 @@ def main():
             "--json": bool(args.validate or args.explain or args.trends
                            or args.compare_criteria),
             "--by": bool(args.trends),
+            "--repeats": bool(args.compare_prompts),
         }[flag]
         if not attached:
             print(f"{flag} goes with {wants}, as in: {example}", file=sys.stderr)
@@ -2429,6 +2476,8 @@ def main():
         return _do_compare_criteria(args.compare_criteria, args.json)
     if args.trends:
         return _do_trends(args.tasks, args.by, args.json)
+    if args.compare_prompts:
+        return _do_compare_prompts(args.compare_prompts, args.repeats)
     if args.pr_comment:
         return _do_pr_comment(args.tasks, args.artifacts_url)
     if args.html is not None and not args.explain:
