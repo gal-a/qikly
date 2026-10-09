@@ -167,6 +167,17 @@ def from_paths(code, tests):
             f"directory holding both to copy.\n  code:  {code}\n"
             f"  tests: {tests}")
 
+    # The directory holding both can be a package itself, when the suite lives
+    # inside it: `--score-code src/widget --score-tests src/widget/tests`.
+    # Copying only that directory left no `widget` in the workspace to import,
+    # so the suite imported the original and every mutant ran against
+    # untouched code. Climb until the copy holds the package, not its insides.
+    while os.path.isfile(os.path.join(root, "__init__.py")):
+        parent = os.path.dirname(root)
+        if parent == root:
+            break
+        root = parent
+
     if os.path.isfile(code):
         sources = [code]
     else:
@@ -175,8 +186,13 @@ def from_paths(code, tests):
             # In place, so os.walk does not descend into them.
             dirs[:] = [d for d in dirs if d not in _SKIP]
             for name in names:
-                if name.endswith(".py") and not name.startswith("__"):
-                    sources.append(os.path.join(base, name))
+                path = os.path.join(base, name)
+                # A suite inside the code directory is not code. Its files
+                # were planted with faults too, and a broken test reads as a
+                # fault caught, which inflated the score.
+                if (name.endswith(".py") and not name.startswith("__")
+                        and not _inside(path, tests)):
+                    sources.append(path)
         sources.sort()
 
     if not sources:
@@ -187,6 +203,14 @@ def from_paths(code, tests):
                   suites=[os.path.relpath(tests, root)],
                   root=root,
                   task_id=None)
+
+
+def _inside(path, directory):
+    """Whether `path` is `directory` or somewhere under it."""
+    try:
+        return os.path.commonpath([path, directory]) == directory
+    except ValueError:
+        return False
 
 
 def sites(source):
@@ -255,12 +279,86 @@ def _workspace(target, tmp, code_root=CODE_ROOT):
     return workspace
 
 
-def _suite_passes(workspace, target):
+def _resolves_into(workspace, name, env):
+    """
+    Whether `import name` already lands inside the workspace copy.
+
+    Returns None when the name cannot be imported at all, which is not
+    evidence either way: plenty of packages need extras that are not
+    installed here.
+    """
+    if not name.isidentifier() or not os.path.isdir(workspace):
+        return None
+    try:
+        probe = subprocess.run(
+            [sys.executable, "-c",
+             "import importlib, sys; m = importlib.import_module(sys.argv[1]);"
+             " sys.stdout.buffer.write((getattr(m, '__file__', None) or '')"
+             ".encode('utf-8'))", name],
+            cwd=workspace, capture_output=True, env=env,
+            stdin=subprocess.DEVNULL, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        # A probe that cannot even start says nothing about the import, and
+        # must not take the whole run down with it.
+        return None
+    resolved = probe.stdout.decode("utf-8", "replace").strip()
+    if probe.returncode != 0 or not resolved:
+        return None
+    return os.path.realpath(resolved).startswith(
+        os.path.realpath(workspace) + os.sep)
+
+
+def _suite_env(workspace, target):
+    """
+    The environment the suite runs in, adding a source root only where the
+    suite cannot already reach the code being mutated.
+
+    pytest is invoked with cwd=workspace, which puts only the workspace root
+    on sys.path. That is enough for a flat layout and not enough for a src/
+    one, where the package sits a directory down and the import falls through
+    to whatever is installed.
+
+    **Only roots that are not already reachable are prepended**, because a
+    prepended directory puts every module in it ahead of the standard
+    library. A flat project with a non-package `utils/` holding both `calc.py`
+    and `logging.py` would otherwise shadow the real `logging` for the whole
+    pytest process, and the suite dies on untouched code. That breaks projects
+    that scored correctly before, which is worse than the src/ case this
+    exists to fix.
+    """
+    env = dict(os.environ)
+    roots = []
+    for name, parent in _import_roots(target):
+        if not parent:
+            # The workspace root is already sys.path[0] under `python -m`.
+            continue
+        # Only a real package earns a path entry. That is precisely the src/
+        # layout this exists for: `src/mdformat/` is a package, so `src` has
+        # to be importable from. A loose module such as `utils/calc.py` is
+        # not, and adding `utils` would expose every other file beside it,
+        # including one named after a standard library module.
+        if not os.path.isfile(os.path.join(
+                target.root, *(parent.split("/") + [name, "__init__.py"]))):
+            continue
+        if _resolves_into(workspace, name, env):
+            continue
+        where = os.path.join(workspace, *parent.split("/"))
+        if where not in roots:
+            roots.append(where)
+    if not roots:
+        return env
+    existing = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = os.pathsep.join(
+        roots + ([existing] if existing else []))
+    return env
+
+
+def _suite_passes(workspace, target, env=None):
     """True only when every stage of the suite passes in this workspace."""
-    return _suite_verdict(workspace, target) == "pass"
+    return _suite_verdict(workspace, target, env) == "pass"
 
 
-def _suite_verdict(workspace, target):
+def _suite_verdict(workspace, target, env=None):
     """
     "pass", "fail" or "error" for the suite in this workspace.
 
@@ -280,12 +378,75 @@ def _suite_verdict(workspace, target):
              # the count line entirely, so every parsed count reads as zero,
              # which looks exactly like a suite that ran and passed.
              "-o", "addopts=", "-p", "no:cacheprovider"],
-            cwd=workspace, capture_output=True, text=True)
+            cwd=workspace, capture_output=True, text=True, env=env)
         if result.returncode >= 2:
             return "error"
         if result.returncode != 0:
             return "fail"
     return "pass"
+
+
+def _import_roots(target):
+    """
+    Each top-level package or module the mutated files belong to, with the
+    directory it has to be imported from, both relative to the workspace.
+
+    A file climbs out of its package by following `__init__.py` upwards, so
+    `src/mdformat/_cli.py` yields ("mdformat", "src") and `sqlparse/sql.py`
+    yields ("sqlparse", "").
+    """
+    roots = set()
+    for _, relative in target.files:
+        parts = relative.replace("\\", "/").split("/")
+        if not parts[-1].endswith(".py"):
+            continue
+        # Climb while the directory above is still a package.
+        i = len(parts) - 1
+        while i > 0 and os.path.exists(
+                os.path.join(target.root, *(parts[:i] + ["__init__.py"]))):
+            i -= 1
+        name = parts[i][:-3] if parts[i].endswith(".py") else parts[i]
+        roots.add((name, "/".join(parts[:i])))
+    return sorted(roots)
+
+
+# Appended to each scored file for one watching run. builtins, because a
+# module is free to shadow `open`.
+MARKER = "\n__import__('builtins').open(%r, 'w').close()\n"
+
+
+def _unreached(workspace, target, env=None):
+    """
+    The scored files the suite never executed, found by watching it once.
+
+    Returns a list of paths relative to the workspace, or None when the
+    watching run did not pass and so says nothing either way.
+
+    This replaced a check that probed each package by name, and a name is a
+    guess about what the suite imports. Two layouts got past it, and in both
+    the tool printed a score that was invented: a namespace package, where the
+    probed name resolved in the workspace while the suite imported
+    `acme.widgets` from an installed copy, and a suite living inside its own
+    package. Observing beats guessing: a marker appended to each scored file
+    writes a file when that module runs, and the suite is run once.
+
+    Appending is safe where prepending is not, since `from __future__` must
+    come first. The originals are copied back afterwards whatever happens.
+    """
+    marks = tempfile.mkdtemp()
+    try:
+        for n, (_, relative) in enumerate(target.files):
+            with open(os.path.join(workspace, relative), "a",
+                      encoding="utf-8") as handle:
+                handle.write(MARKER % os.path.join(marks, str(n)))
+        if _suite_verdict(workspace, target, env) != "pass":
+            return None
+        return [relative for n, (_, relative) in enumerate(target.files)
+                if not os.path.exists(os.path.join(marks, str(n)))]
+    finally:
+        for path, relative in target.files:
+            shutil.copy2(path, os.path.join(workspace, relative))
+        shutil.rmtree(marks, ignore_errors=True)
 
 
 def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
@@ -330,10 +491,30 @@ def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
         # the reason the original does.
         for path, relative in files:
             shutil.copy2(path, os.path.join(workspace, relative))
-        if not _suite_passes(workspace, target):
+        env = _suite_env(workspace, target)
+        if not _suite_passes(workspace, target, env):
             return {"task": target.label, "baseline": False, "caught": [],
                     "missed": [], "unscorable": 0, "total": 0,
                     "generated": target.task_id is not None}
+
+        # A green baseline is not enough on its own: a suite that imports an
+        # installed copy also passes, and then reports every mutant missed.
+        unreached = _unreached(workspace, target, env) or []
+        if unreached and len(unreached) == len(files):
+            raise ValueError(
+                "the suite never ran the code being scored.\n"
+                "  planting faults in: %s\n"
+                "The suite passed, so it imported this code from somewhere "
+                "else: usually an installed copy of the package, which a src/ "
+                "layout, a namespace package or an editable install can all "
+                "lead to. Every planted fault would run against untouched "
+                "code and read as missed, which would be wrong rather than "
+                "alarming. Score from an environment where the package is "
+                "not installed."
+                % ", ".join(sorted(unreached)[:5]))
+        # Kept in the score, which stays a floor: a module no test imports
+        # really is untested. Named, so its misses are not read as weak tests.
+        never_ran = sorted(unreached)
 
         for path, relative, source, family, index, described in candidates:
             mutant, _ = make_mutant(source, index, family)
@@ -343,7 +524,7 @@ def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
             planted = os.path.join(workspace, relative)
             with open(planted, "w", encoding="utf-8", newline="\n") as handle:
                 handle.write(mutant)
-            verdict = _suite_verdict(workspace, target)
+            verdict = _suite_verdict(workspace, target, env)
             if verdict == "error":
                 # pytest could not run the suite at all, so nothing was
                 # demonstrated about it. Counting this as caught would credit
@@ -359,7 +540,8 @@ def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
     return {"task": target.label, "baseline": True, "caught": caught,
             "missed": missed, "unscorable": unscorable,
             "total": len(caught) + len(missed),
-            "generated": target.task_id is not None}
+            "generated": target.task_id is not None,
+            "unreached": never_ran}
 
 
 def unreachable_criteria(task_id):
@@ -446,6 +628,15 @@ def render(result, gaps):
             lines.append(f"- criterion {index} names {', '.join(missing[:3])} "
                          f"for {' or '.join(fields[:2])}: {criterion[:70]}")
         lines.append("")
+
+    if result.get("unreached"):
+        # A miss in a file the suite never ran says the file is untested, not
+        # that the tests in it are weak, and the two call for different work.
+        lines += [f"**The suite never ran {len(result['unreached'])} of the "
+                  f"scored files**, so every fault planted in them was "
+                  f"missed: {', '.join(result['unreached'][:5])}. Those "
+                  f"misses are in the score, which stays a floor, but they "
+                  f"mean the file has no tests at all.", ""]
 
     if result["missed"]:
         lines += ["## What it missed", "",
