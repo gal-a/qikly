@@ -2419,12 +2419,6 @@ def main():
     if args.install_mcp:
         return _do_install_mcp(args.install_mcp, args.dry_run, args.force)
 
-    # Before the update check for the same reason as --mcp-config: stdout is
-    # YAML to be pasted, and an audit showed the notice landing in it as a
-    # junk key that yaml.safe_load accepted silently.
-    if args.criteria_from_docs:
-        return _do_criteria_from_docs(args.criteria_from_docs, _seed())
-
     # Once per invocation, before any work, and before the early returns below.
     # It sat after them, which quietly exempted --scaffold and --check-criteria:
     # two commands someone uses repeatedly, and therefore two of the better
@@ -2437,19 +2431,28 @@ def main():
     # to stdout, and `qikly --version` is the one command a script is likely to
     # parse, so adding a second line to it would break callers to tell them
     # something they did not ask for.
-    try:
-        from qikly.version_check import check_for_update, repeat_notice
-        check_for_update()
-        # And the same courtesy for the Skill, which pip cannot upgrade
-        # because it lives in the user's project rather than in the package.
-        stale_skill_notice()
-        # And again on the way out. A run prints for minutes, so the opening
-        # line has scrolled away by the time anyone reads the result. atexit
-        # rather than a wrapper around the body below, because main() returns
-        # from a dozen places and one of them would eventually be missed.
-        atexit.register(repeat_notice)
-    except Exception:
-        pass
+    #
+    # Skipped for --criteria-from-docs for the same reason: its stdout is YAML
+    # to be pasted, and an audit showed the notice landing in it as a junk key
+    # that yaml.safe_load accepted silently. Only the notice is skipped. An
+    # earlier fix dispatched the command above this point, which also skipped
+    # the misattached-flag guard below.
+    if not args.criteria_from_docs:
+        try:
+            from qikly.version_check import check_for_update, repeat_notice
+            check_for_update()
+            # And the same courtesy for the Skill, which pip cannot upgrade
+            # because it lives in the user's project rather than in the
+            # package.
+            stale_skill_notice()
+            # And again on the way out. A run prints for minutes, so the
+            # opening line has scrolled away by the time anyone reads the
+            # result. atexit rather than a wrapper around the body below,
+            # because main() returns from a dozen places and one of them
+            # would eventually be missed.
+            atexit.register(repeat_notice)
+        except Exception:
+            pass
 
     # These run before anything else and exit: they exist to make a project
     # runnable, so they must work when nothing is configured yet and must not
@@ -2562,6 +2565,8 @@ def main():
     if args.demo and args.demo_dir is None and _refuse_inside_demo():
         return 2
 
+    if args.criteria_from_docs:
+        return _do_criteria_from_docs(args.criteria_from_docs, _seed())
     if args.init or args.example:
         return _do_init(with_example=args.example)
     if args.scaffold:

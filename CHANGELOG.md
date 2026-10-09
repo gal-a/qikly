@@ -16,18 +16,23 @@ packaging tools would read as `1.1`.
   so two such faults written within one second ran the first one's bytecode,
   and the second was given the first one's verdict. The same suite scored 2,
   3 or 4 of 8 depending on timing, including with a fixed `--score-seed`;
-  with the fix, ten runs of it score 3 of 8 every time. Every cache in the
-  workspace is now deleted before each suite run and none is written.
+  with the fix, ten runs of it score 3 of 8 every time. Every `__pycache__`
+  in the workspace is now deleted before each suite run, so no run can read
+  a cache an earlier one wrote.
   **Scores printed by earlier versions should be re-measured before they are
   quoted.**
 - **A score is refused when the suite never ran the code being scored.**
   When the suite imported an installed copy of the package rather than the
   workspace copy, every planted fault ran against untouched code and the
   score read near 0%. That happened with a `src/` layout and an editable
-  install, a namespace package, and a suite living inside its own package. The
-  suite is now run once with a marker in each scored file and with the files
-  it loaded recorded, and the score is refused when none of the scored code
-  was run. Files the suite never ran are named in the report.
+  install, a plain `pip install .`, a namespace package, and a suite living
+  inside its own package. The suite is now run once with a marker in each
+  scored file and with the files it loaded recorded. A scored file counts as
+  never run when its marker did not fire, or when the suite loaded the
+  original or an identical copy of it instead, and the score is refused when
+  that is true of every scored file. Files the suite never ran are named in
+  the report. When the check itself cannot complete, the report says so above
+  the score, and a run in which nothing was caught is refused.
 - **A suite inside the code directory is no longer mutated itself.** Its
   broken tests were counted as faults caught.
 
@@ -37,9 +42,12 @@ packaging tools would read as `1.1`.
   named and prints the acceptance criteria they imply as YAML to paste into a
   task file, each above the sentence it came from, plus the sentences too
   vague to test. A quote must be found as whole sentences of one paragraph,
-  list item, table row or code line, or its criterion is dropped, because a
-  model will invent a citation. Only the quote is checked: the criterion is
-  the model's wording of it.
+  list item, heading or table cell, as a table row exactly as written, or as
+  a whole line of code, or its criterion is dropped, because a model will
+  invent a citation. That catches a fragment lifted from a wrapped line or
+  after a colon, which drops the "never" or the "unless" before it; it cannot
+  catch a whole list item whose lead-in sets the condition. Only the quote is
+  checked: the criterion is the model's wording of it.
 - **`--compare-prompts TASK`** groups a task's run summaries by the prompts
   that produced them and compares the arms, without a model call. `--repeats
   N` runs N more of each arm first, alternating. It refuses to compare arms

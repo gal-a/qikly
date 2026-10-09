@@ -332,10 +332,73 @@ def test_a_table_row_and_a_cell_are_accepted():
     doc = ("| option | default |\n|---|---|\n"
            "| width | 80 columns unless set otherwise |\n")
     assert cfd._as_quoted("80 columns unless set otherwise", [doc])
-    csv_doc = """' PEP_257_2','Use r\"\"\"raw triple double quotes\"\"\" if you use backslashes.',' Convention'\n"""
+    # The row exactly as written, which is what the prompt asks for. An
+    # earlier version refused it and accepted a pipe-free join instead,
+    # which appears nowhere in the document.
+    row = "| width | 80 columns unless set otherwise |"
+    assert cfd._as_quoted(row, [doc]) == row
+    assert cfd._as_quoted("width 80 columns unless set otherwise", [doc]) is None
+    csv_doc = (".. csv-table:: Requirements\n   :header: id, text, kind\n\n"
+               """   ' PEP_257_2','Use r\"\"\"raw triple double quotes\"\"\" if you use backslashes.',' Convention'\n""")
     assert cfd._as_quoted(
         'Use r"""raw triple double quotes""" if you use backslashes.',
         [csv_doc])
+
+
+@pytest.mark.parametrize("doc, quote", [
+    # An indented directive body is prose, not a literal block.
+    (".. note::\n\n    When the option is not given, Click does not\n"
+     "    prompt for a value and the default is used.\n",
+     "prompt for a value and the default is used."),
+    # RST `#.` items are list items, not headings.
+    ("#. The parser does not\n   treat empty strings as missing values.\n",
+     "treat empty strings as missing values."),
+    # Two pipes in a code span do not make a table row.
+    ("The parser accepts `a|b|c` and does not\nraise on empty input.\n",
+     "raise on empty input."),
+    # A quoted, comma-holding line outside a csv-table is ordinary prose.
+    ("The reader does not count\n\"NA\", \"null\" and empty cells as missing values.\n",
+     "\"NA\", \"null\" and empty cells as missing values."),
+    # A full stop in an abbreviation is not a sentence end.
+    ("Unless --strict is set (see Sec. 3.) the parser ignores unknown keys.\n",
+     "the parser ignores unknown keys."),
+    # A comment wrapped across two lines of code.
+    ("```\n# The parser does not\n# raise on empty input.\nparse('')\n```\n",
+     "raise on empty input."),
+    # The first line of a grid-table cell that continues below.
+    ("+---------+------------------------------+\n"
+     "| strict  | Unknown options raise errors |\n"
+     "|         | only when this flag is given.|\n"
+     "+---------+------------------------------+\n",
+     "Unknown options raise errors"),
+])
+def test_a_fragment_that_drops_a_condition_is_refused(doc, quote):
+    assert cfd._as_quoted(quote, [doc]) is None
+
+
+@pytest.mark.parametrize("doc, quote", [
+    (".. note::\n\n    When the option is not given, Click does not\n"
+     "    prompt for a value and the default is used.\n",
+     "When the option is not given, Click does not prompt for a value and "
+     "the default is used."),
+    (".. code-block:: text\n\nExample::\n\n    $ python hello.py --count=3\n",
+     "$ python hello.py --count=3"),
+    (":param count: Number of greetings to print before exiting.\n",
+     "Number of greetings to print before exiting."),
+    ("**Fast.** The first pass consumes it entirely.\n",
+     "The first pass consumes it entirely."),
+    ("> [!WARNING]\n> Passing a negative width raises ValueError.\n",
+     "Passing a negative width raises ValueError."),
+    ('<p align="center">\nMissing values are shown as an empty string.\n</p>\n',
+     "Missing values are shown as an empty string."),
+    ("+---------+------------------------------+\n"
+     "| strict  | Unknown options raise errors |\n"
+     "|         | only when this flag is given.|\n"
+     "+---------+------------------------------+\n",
+     "Unknown options raise errors only when this flag is given."),
+])
+def test_an_honest_quote_in_common_markup_is_accepted(doc, quote):
+    assert cfd._as_quoted(quote, [doc]) == quote
 
 
 def test_a_windows_path_holding_backslash_r_is_restored():
@@ -422,3 +485,31 @@ def test_source_code_is_flagged_and_the_report_does_not_deny_it(
     captured = capsys.readouterr()
     assert "looks like source code" in captured.err
     assert "Nothing here was derived" not in captured.out
+
+
+def test_a_misattached_flag_is_still_refused(tmp_path, monkeypatch, capsys):
+    """
+    Dispatching this command early, to keep the update notice out of its
+    output, also skipped the guard that refuses a flag given to the wrong
+    command. `--score-mutants` was then accepted and ignored.
+    """
+    import sys as _sys
+    from qikly import cli
+    _doc(tmp_path)
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    monkeypatch.setattr(_sys, "argv", ["qikly", "--criteria-from-docs",
+                                       "README.md", "--score-mutants", "5"])
+    monkeypatch.setattr("qikly.criteria_from_docs.extract",
+                        lambda paths, seed=None: ([], [], []))
+    assert cli.main() == 2
+    assert "--score-mutants goes with" in capsys.readouterr().err
+
+
+def test_a_restated_example_is_not_reported_as_a_loss(tmp_path, monkeypatch):
+    _stub(monkeypatch,
+          'The format is {"criteria": [{"criterion": "...", "source": "..."}]}'
+          '\n\n{"criteria": [{"criterion": "the default format is simple", '
+          '"source": "``simple`` is the default format."}]}')
+    kept, _, unquoted = cfd.extract([_doc(tmp_path)])
+    assert len(kept) == 1
+    assert not any("could not be parsed" in u["criterion"] for u in unquoted)

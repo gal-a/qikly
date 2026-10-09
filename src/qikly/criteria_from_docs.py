@@ -200,7 +200,9 @@ def _first_reply(text):
             # the reply, reported as "no testable claim found".
             size = sum(len(v) for v in (obj.get("criteria"), obj.get("rejected"))
                        if isinstance(v, list))
-            if size > best_size:
+            # A tie goes to the later object: the answer follows the
+            # restatement, and the restated example usually has one item.
+            if size >= best_size:
                 best, best_size = obj, size
     return best
 
@@ -326,8 +328,14 @@ def _is_quoted(quote, bodies, min_words=4):
     return False
 
 
-_MARKER = re.compile(r"^(?:[-*+]|\d+[.)])\s+")
-_SENTENCE_END = re.compile(r"""[.!?]["')\]]*$""")
+# A bullet, a numbered or `#.` item, or an RST field such as `:param count:`.
+_MARKER = re.compile(r"^(?:[-*+]|\d+[.)]|#\.|:[^:\s][^:]*:)\s+")
+_SENTENCE_END = re.compile(r"""[.!?]["')\]*_`]*$""")
+# What a sentence can begin with. A lowercase word mid-paragraph is not a
+# sentence start, whatever precedes it: "etc." or "(see Sec. 3.)" end in a
+# full stop, and lifting "the parser ignores unknown keys." from after
+# "Unless --strict is set (see Sec. 3.)" drops the condition.
+_SENTENCE_START = re.compile(r"""^[^a-z]""")
 
 
 def _strip_marker(text):
@@ -346,8 +354,9 @@ def _whole_sentences(quote, text):
     start = text.find(quote)
     while start >= 0:
         end = start + len(quote)
-        starts = start == 0 or _SENTENCE_END.search(text[:start].rstrip()) \
-            and text[start - 1] == " "
+        starts = start == 0 or (_SENTENCE_END.search(text[:start].rstrip())
+                                and text[start - 1] == " "
+                                and _SENTENCE_START.match(quote))
         ends = end == len(text) or (_SENTENCE_END.search(quote)
                                     and text[end] == " ")
         if starts and ends:
@@ -367,54 +376,86 @@ def _units(body):
     import csv
 
     units, para = [], []
-    fence = indented = doctest = False
+    fence = literal = doctest = csv_table = False
+    # A line ending in `::` opens an RST literal block. Indentation alone does
+    # not: an indented prose paragraph, such as a `.. note::` body or a loose
+    # list's continuation, was taken for code, and code lines are accepted
+    # whole, so "prompt for a value and the default is used." got through
+    # without the "does not" on the line above.
+    opens_literal = False
+
+    grid, in_grid = [], False
 
     def flush():
         if para:
             units.append((_squash(" ".join(para)), False))
             del para[:]
 
-    previous_blank = True
+    def flush_grid():
+        # An RST grid-table row: its cells can wrap over several physical
+        # lines, and a cell's first line alone dropped "only when this flag
+        # is given" from "Unknown options raise errors". Columns are joined
+        # across the lines before anything is a unit.
+        if grid:
+            columns = [l.strip().strip("|").split("|") for l in grid]
+            width = max(len(c) for c in columns)
+            cells = [_squash(" ".join(c[i] for c in columns if i < len(c)))
+                     for i in range(width)]
+            units.append((_squash(" ".join(cells)), False))
+            units.extend((cell, False) for cell in cells if cell)
+            del grid[:]
+
     for raw in body.splitlines():
         line = raw.strip()
         if line.startswith(("```", "~~~")):
             flush()
             fence = not fence
-            previous_blank = False
             continue
         if fence:
+            if line.startswith("#"):
+                # A comment inside code is prose and wraps like prose, so
+                # consecutive comment lines are one unit rather than lines
+                # each accepted whole.
+                para.append(line.lstrip("#").strip())
+                continue
+            flush()
             if line:
                 units.append((_squash(line), True))
             continue
+        if re.match(r"^\+[-=+]+\+$", line):
+            flush()
+            flush_grid()
+            in_grid = True
+            continue
+        if in_grid and line.startswith("|"):
+            grid.append(line)
+            continue
+        flush_grid()
+        in_grid = False
         if not line:
             flush()
-            doctest = indented = False
-            previous_blank = True
+            doctest = False
+            literal = opens_literal or literal
             continue
-        if raw.startswith(("    ", "\t")) and (indented or previous_blank) \
-                and not para:
-            # An indented block after a blank line: Markdown code, or an
-            # RST literal block after `::`.
-            indented = True
+        indented = raw.startswith((" ", "\t"))
+        if literal and indented:
             units.append((_squash(line), True))
             continue
-        indented = False
-        previous_blank = False
-        if line.startswith((">>>", "...")) or doctest:
-            # A doctest prompt, and the output lines under it until a blank.
+        literal = opens_literal = False
+        if line.startswith(".. csv-table::"):
             flush()
-            doctest = True
-            units.append((_squash(line), True))
+            csv_table = True
             continue
-        if line.startswith("|") or line.count("|") >= 2:
+        if line.startswith(".. ") and "::" in line:
+            # Any other directive, such as `.. note::`: the line itself is
+            # markup, and its body starts a paragraph of its own.
             flush()
-            cells = [c.strip() for c in line.strip("|").split("|")]
-            if not all(set(c) <= set("-:= ") for c in cells):
-                units.append((_squash(" ".join(cells)), False))
-                units.extend((_squash(c), False) for c in cells if c)
             continue
-        if line[0] in "'\"" and "," in line:
-            # A row of an RST csv-table, such as a requirements table.
+        if csv_table and not indented:
+            csv_table = False
+        if csv_table and line[0] in "'\"" and "," in line:
+            # A row of an RST csv-table, such as a requirements table, which
+            # is the one place a quoted, comma-separated line is a row.
             flush()
             try:
                 cells = next(csv.reader([line], skipinitialspace=True,
@@ -424,19 +465,51 @@ def _units(body):
             units.append((_squash(line), False))
             units.extend((_squash(c), False) for c in cells if c.strip())
             continue
+        if line.startswith((">>>", "...")) or doctest:
+            # A doctest prompt, and the output lines under it until a blank.
+            flush()
+            doctest = True
+            units.append((_squash(line), True))
+            continue
+        if line.startswith("|"):
+            # A Markdown table row: the row exactly as written, which is what
+            # the prompt asks to be quoted, and each cell on its own. Not a
+            # line that merely holds two pipes, such as a code span `a|b|c`.
+            flush()
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            if not all(set(c) <= set("-:= ") for c in cells):
+                units.append((_squash(line), False))
+                units.extend((_squash(c), False) for c in cells if c)
+            continue
+        if re.match(r"^<[^>]+>$", line):
+            # A line that is only an HTML tag, such as `<p align="center">`,
+            # ends a paragraph and is not part of one.
+            flush()
+            continue
+        if _MARKER.match(line):
+            # Before the heading branch, because RST's `#.` list marker
+            # starts with the same character as a Markdown heading.
+            flush()
+            para.append(_strip_marker(line))
+            continue
         if line.startswith("#") or set(line) <= set("=-~^*+#"):
             flush()
             heading = line.lstrip("#").strip()
             if heading:
                 units.append((_squash(heading), False))
             continue
-        if _MARKER.match(line):
-            flush()
-            para.append(_strip_marker(line))
-            continue
-        para.append(line.lstrip("> ").strip() if line.startswith(">")
-                    else line)
+        if line.startswith(">"):
+            line = line.lstrip("> ").strip()
+            # A GitHub alert label, `> [!WARNING]`, is not part of the text.
+            if re.match(r"^\[![A-Z]+\]$", line):
+                flush()
+                continue
+        para.append(line)
+        # `Example::` opens a literal block; `.. note::` opens a directive
+        # whose indented body is prose.
+        opens_literal = line.endswith("::") and not line.startswith("..")
     flush()
+    flush_grid()
     return units
 
 
@@ -481,9 +554,13 @@ def extract(paths, seed=None):
     # A criterion the parser lost, through a truncated reply or a quote
     # ending in a backslash, otherwise vanished without appearing in either
     # list. It is counted, so the report can at least say so.
+    # Only counted when the reply had to be repaired or salvaged. A reply that
+    # parsed as it came lost nothing, and counting keys in it also counted a
+    # format example the model restated, reporting a loss that never happened.
     parsed = data.get("criteria") if isinstance(data.get("criteria"),
                                                 list) else []
-    lost = reply.count('"criterion"') - len(parsed)
+    recovered = _first_reply(reply) is None
+    lost = reply.count('"criterion"') - len(parsed) if recovered else 0
     if lost > 0:
         unquoted.append({"criterion": "(%d more in the model's reply could "
                                       "not be parsed)" % lost, "source": ""})
