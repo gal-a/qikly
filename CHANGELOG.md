@@ -6,7 +6,7 @@ packaging tools would read as `1.1`.
 
 ## 0.5.9
 
-> Mutation scores you can trust, and a way to tell whether editing a prompt helped
+> Fix: --score-code results from earlier versions could be wrong; re-measure them
 
 ### Fixed
 - **`--score-code` and `--score-suite` could print a wrong score, in either
