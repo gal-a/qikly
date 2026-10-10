@@ -641,20 +641,26 @@ footer {
   <header class="hero">
     <p class="eyebrow">Independent test generation for AI-written code</p>
     <h1>Functional tests for backend Python code, written from a spec the coding agent never sees</h1>
-    <p class="lede">
-      When one AI writes both the code and its tests, a green suite proves
-      little: the tests were written to pass.
-      <strong>qikly keeps the acceptance criteria away from the agent that
-      writes the code, so its tests can disagree with it.</strong>
-    </p>
+    <!-- The image straight under the headline, then the explanation, then the
+         run in the image as its example: one argument read top to bottom,
+         rather than a caption standing apart from it. -->
     <figure class="shot">
       <img src="images/qikly_hero.png" width="3200" height="1680"
            alt="The coder never sees the answer key. Its tests come from criteria it was never shown, so they can disagree with it. Two code panels kept apart: calc.py written by the coding agent, and test_calc.py written by the test agent, which asserts a tax rate limit the coding agent was never given. The suite passes 9 of 9.">
-      <figcaption>One logged run. Only the test agent was told a rate may not
-        exceed 100. The coding agent figured that bound out from a failing test and
-        added <code>or rate &gt; 100</code> itself, so the 9 of 9 is code passing an
-        acceptance bar it never saw.</figcaption>
     </figure>
+    <p class="lede">
+      When one AI writes both the code and its tests, a green suite proves
+      little: the tests were written to pass.
+      <strong>qikly splits the work between two agents. A test agent reads the
+      acceptance criteria and writes the tests. A coding agent writes the code
+      and never sees those criteria, so the tests can disagree with it.</strong>
+    </p>
+    <p class="lede">
+      In the run shown above, only the test agent was told a rate may not
+      exceed 100. The coding agent figured that bound out from a failing test
+      and added <code style="white-space:nowrap">or rate &gt; 100</code> itself, so the 9 of 9 is code
+      passing an acceptance bar it never saw.
+    </p>
 
     <!-- The first command is free and needs no key: it shows the withholding,
          which is the claim the headline makes. -->
@@ -844,20 +850,6 @@ footer {
   </section>
 
   <section class="band">
-    <p class="eyebrow">What it has shown</p>
-    <h2>Measured, and where it stops</h2>
-    <p>
-      Across three sweeps, 967 runs in all, roughly 8 runs in 10 finish with
-      the code passing every integration and system test, and roughly 6 in 10
-      pass the unit stage as well. A run that cannot converge exits non-zero
-      and ships nothing. Whether withholding the criteria makes a suite catch
-      more bugs than one written with the code in view has not yet been
-      measured.
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="limits-performance">The numbers in full</a>.
-    </p>
-  </section>
-
-  <section class="band">
     <p class="eyebrow">Start</p>
     <h2>Pick the command that fits what you already have</h2>
     <ul class="designs">
@@ -874,7 +866,7 @@ footer {
       <a href="https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have" data-goatcounter-click="start-which-command">Every
       command, by what you already have</a>, and the design write-up:
       <a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">the case</a>,
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">how well it works</a> and
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">how well it works, with the measured results</a> and
       <a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md" data-goatcounter-click="design-3">how it is built</a>.
     </p>
   </section>
