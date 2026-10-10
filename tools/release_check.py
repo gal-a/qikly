@@ -17,8 +17,10 @@ has actually happened before.
 Every check names the release it is defending against, because a check whose
 reason nobody remembers is a check somebody eventually deletes.
 
-The demo is not automated here. It needs an API key and spends real money, and
-a script that quietly spends money is worse than one that reminds you to.
+The demo runs only when asked, with `--demo N`. It needs an API key and spends
+real money, and a script that quietly spends money is worse than one that
+reminds you to. Release day asks for it: `--demo 3` before tagging, and
+`--after --demo 3` once PyPI has the version.
 """
 import argparse
 import json
@@ -257,7 +259,7 @@ def check_suite():
 
 # ------------------------------------------------------------- the wheel ---
 
-def check_wheel(version):
+def check_wheel(version, demos=0):
     """
     Build, then install into a throwaway venv and look at what shipped.
 
@@ -313,6 +315,77 @@ def check_wheel(version):
         check("it is a real install, not editable", not editable, ", ".join(editable),
               "an editable venv imports the source tree and reports the release "
               "version while exercising nothing that ships")
+        if demos:
+            check_demo(python, demos, "the built wheel")
+    finally:
+        shutil.rmtree(venv, ignore_errors=True)
+
+
+def check_demo(python, runs, source):
+    """
+    Run `qikly --demo` `runs` times from `python`, each in a fresh directory
+    outside the repository, and require most of them to converge.
+
+    Opt-in because it spends money, about a cent a run. Most rather than all,
+    because one run is an artifact and not a rate: the demo converges roughly
+    eight times in ten, so demanding every run would block about half of good
+    releases on chance. Two thirds is the bar, and every run that stalls has
+    its blocking test printed, because a stall is sometimes the generated test
+    being wrong rather than the code. 0.5.9 shipped after one such run, a
+    rounding test that expected 0.42 where round-half-up gives 0.41.
+    """
+    import math
+    import re
+
+    needed = int(math.ceil(runs * 2 / 3.0))
+    converged = 0
+    for n in range(runs):
+        where = tempfile.mkdtemp(prefix="qikly-demo-")
+        try:
+            done = subprocess.run([python, "-m", "qikly", "--demo"], cwd=where,
+                                  capture_output=True, text=True,
+                                  timeout=900)
+            out = done.stdout or ""
+            ok = done.returncode == 0 and "Converged" in out
+            converged += ok
+            # The per-iteration "FAILED:" lines can arrive on either stream,
+            # so both are searched; reading stdout alone reported a stalled
+            # run as "an error" with no test named.
+            blocked = re.findall(r"FAILED: ([^\n]+)",
+                                 out + "\n" + (done.stderr or ""))
+            print("        demo %d of %d from %s: %s%s" % (
+                n + 1, runs, source, "converged" if ok else "did not converge",
+                "" if ok else ", last blocked by " + (blocked[-1] if blocked
+                                                     else "an error, see below")))
+            if not ok and not blocked:
+                print("          " + (done.stderr or out).strip()[-300:])
+        except subprocess.TimeoutExpired:
+            print("        demo %d of %d from %s: timed out after 15 minutes"
+                  % (n + 1, runs, source))
+        finally:
+            shutil.rmtree(where, ignore_errors=True)
+    check("the demo converges from %s" % source, converged >= needed,
+          "%d of %d runs converged, %d needed" % (converged, runs, needed),
+          "the demo is the first thing a new user runs, so a release on which "
+          "it rarely converges is broken whatever the suite says. Read the "
+          "blocking test of any stalled run before deciding: if the test is "
+          "wrong, that is a test-generation fault to fix, not chance")
+
+
+def check_published_demo(version, runs):
+    """The demo again, from the version on PyPI rather than a local build."""
+    venv = tempfile.mkdtemp(prefix="qikly-published-")
+    try:
+        subprocess.run([sys.executable, "-m", "venv", venv], check=True,
+                       capture_output=True)
+        binary = "Scripts" if os.name == "nt" else "bin"
+        python = os.path.join(venv, binary, "python" + (".exe" if os.name == "nt" else ""))
+        done = subprocess.run([python, "-m", "pip", "install", "-q",
+                               "--no-cache-dir", "qikly==%s" % version],
+                              capture_output=True, text=True)
+        if check("qikly %s installs from PyPI" % version, done.returncode == 0,
+                 (done.stderr or "").strip()[-300:]):
+            check_demo(python, runs, "PyPI")
     finally:
         shutil.rmtree(venv, ignore_errors=True)
 
@@ -456,6 +529,12 @@ def main():
     parser.add_argument("--skip-wheel", action="store_true",
                         help="skip the build and clean-venv install, which is "
                              "the slow part")
+    parser.add_argument("--demo", type=int, default=0, metavar="N",
+                        help="also run `qikly --demo` N times, from the built "
+                             "wheel before tagging or from PyPI with --after, "
+                             "and require two thirds to converge. Spends "
+                             "about a cent a run on your provider key, so it "
+                             "is opt-in; 3 is the release-day number")
     args = parser.parse_args()
 
     print("\nqikly release check, %s\n" % ("after release" if args.after else "before tagging"))
@@ -468,6 +547,8 @@ def main():
     if args.after:
         check_published(version)
         check_remote_ready(version)
+        if args.demo:
+            check_published_demo(version, args.demo)
     else:
         # Cheap and read-only first, expensive last. Every check here ran in
         # this order for 0.5.7: the remote check costs about a second, failed
@@ -484,7 +565,7 @@ def main():
         check_remote_ready(version)
         check_suite()
         if not args.skip_wheel:
-            check_wheel(version)
+            check_wheel(version, demos=args.demo)
 
     failed = [name for name, ok, _, _ in _results if not ok]
     print("\n%d checks, %d failed" % (len(_results), len(failed)))
@@ -492,9 +573,11 @@ def main():
         print("  FAILED: " + name)
 
     if not args.after and not failed:
-        print("\nStill yours to do, because it spends money:")
-        print("  the demo, from a directory that is NOT this repository,")
-        print("  using the wheel rather than an editable install.")
+        if not args.demo:
+            print("\nStill yours to do, because it spends money:")
+            print("  python tools/release_check.py --demo 3")
+            print("    runs the demo three times from the built wheel, outside")
+            print("    this repository, and needs two of them to converge.")
         # One command per line, and no `&&`: Windows PowerShell 5.1 does
         # not have it, and this list is printed for somebody who is nearly
         # done and reading quickly. `mcp-publisher` is a release binary

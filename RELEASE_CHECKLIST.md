@@ -72,15 +72,25 @@ nothing that ships. An MCP host pointed at such a venv looks verified and is
 not, which nearly happened on 0.4.3. An `__editable__.qikly-*.pth` in
 `site-packages` is the tell.
 
-## 4. The demo runs end to end
+## 4. The demo converges
 
 ```bash
-cd /tmp && /tmp/fresh/bin/qikly --demo
+python tools/release_check.py --demo 3
 ```
 
-From a directory that is **not** the repository, so a path bug that silently
-resolves against the source tree has nowhere to hide. It should finish in about
-thirty seconds and write only inside its own output directory.
+It builds the wheel, installs it into a clean environment, and runs
+`qikly --demo` three times, each from a fresh directory that is **not** the
+repository, so a path bug that silently resolves against the source tree has
+nowhere to hide. **Two of the three must converge.** Each run takes about
+thirty seconds and a cent.
+
+Two of three rather than three, because one run is an artifact and not a
+rate: the demo converges roughly eight times in ten, so demanding all three
+would block about half of good releases on chance. **But read every stalled
+run's blocking test**, which the check prints. A stall is sometimes the
+generated test being wrong rather than the code: on 0.5.9, a rounding test
+expected 0.42 where round-half-up gives 0.41, and no code could pass it. A
+wrong test is a test-generation fault to fix, not bad luck.
 
 ## 5. No stale names
 
@@ -263,10 +273,15 @@ Why `main` matters beyond tidiness: the README's images are served from
 render the new README around the old diagrams, and the CI badge reads
 `?branch=main`, so it reports a run that predates the release.
 
-**Then** install from PyPI in yet another clean environment and run the demo
-once more.
-That is the only check that exercises the actual published artefact rather than
-a local build of it.
+**Then** run the demo again, from what PyPI actually serves:
+
+```bash
+python tools/release_check.py --after --demo 3
+```
+
+It installs the released version from PyPI into a clean environment and needs
+two of three demos to converge, as before tagging. That is the only check that
+exercises the actual published artefact rather than a local build of it.
 
 **Glance at the Marketplace box.** Open the release on GitHub and click Edit:
 "Publish this Action to the GitHub Marketplace" has been ticked already on the
