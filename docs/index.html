@@ -197,7 +197,7 @@ a { color: var(--accent); }
 /* ------------------------------------------------------------- hero -- */
 
 .hero {
-  padding: 72px 0 56px;
+  padding: 36px 0 56px;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -446,6 +446,9 @@ footer {
   color: var(--ink-soft);
 }
 .hero .eyebrow { margin-top: 28px; }
+/* Not for the eyebrow that opens the hero: there the padding already does
+   it, and the two together left a gap under the bar. */
+.hero .eyebrow:first-child { margin-top: 0; }
 .hero .eyebrow + .route-note { margin-top: 0; }
 /* The hero is a flex column with its own 22px gap, so a note's paragraph
    margins stacked on top of it and put two blank lines between the two short
@@ -853,12 +856,12 @@ footer {
     <p class="eyebrow">Start</p>
     <h2>Pick the command that fits what you already have</h2>
     <ul class="designs">
-      <li><code>qikly --scaffold your_module.py</code> writes a task file from code
-        you already have, for you to fill in the requirements and criteria.</li>
-      <li><code>qikly --init</code> starts a task from nothing.</li>
       <li><code>qikly --score-code your_module.py --score-tests tests/</code> checks
         a suite you already have by planting faults in the code, free and with no
         model call.</li>
+      <li><code>qikly --scaffold your_module.py</code> writes a task file from code
+        you already have, for you to fill in the requirements and criteria.</li>
+      <li><code>qikly --init</code> starts a task from nothing.</li>
       <li><code>qikly --install-skill</code> teaches Claude Code, Gemini CLI, Codex
         or Cursor how to drive qikly.</li>
     </ul>
