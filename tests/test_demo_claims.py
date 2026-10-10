@@ -163,7 +163,10 @@ def test_the_demo_states_the_withholding(capsys):
 
     cli._print_demo_note([cli.DEMO_TASK], converged=True)
     out = capsys.readouterr().out
-    assert "never been shown the rule" in out
+    # "the acceptance criteria", not "the rule": the agent does see the
+    # failing test's source, which often states the rule it checks, so the
+    # earlier wording claimed more than the tool does.
+    assert "never been shown the acceptance criteria" in out
 
 
 # ------------------------------------------------------------- parsing ----
