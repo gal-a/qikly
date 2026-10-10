@@ -166,13 +166,14 @@ def _loads(text):
                          "%s" % _squash(text)[:300])
     repaired = _ESCAPE.sub(
         lambda m: m.group(0) if m.group(1) else r"\\", text)
-    for candidate in (text, repaired):
-        found = _first_reply(candidate)
-        if found is not None:
-            return found
-    salvaged = _salvage(repaired)
-    if salvaged is not None:
-        return salvaged
+    # The largest of everything that parses, not the first thing that does.
+    # A restated format example always parses, so returning the first hit
+    # handed back the example whenever the real answer after it was
+    # truncated or held a stray backslash, and the real criteria were lost.
+    options = [o for o in (_first_reply(text), _first_reply(repaired),
+                           _salvage(repaired)) if o is not None]
+    if options:
+        return max(options, key=_size)
     # The call has been paid for, so show what came back rather than only
     # that it failed.
     raise ValueError("the model's reply is not valid JSON. It began: %s"
@@ -187,24 +188,34 @@ def _first_reply(text):
     prose before the JSON, and prose mentioning `{criteria}` put the start in
     the wrong place and lost the whole reply.
     """
-    decoder = json.JSONDecoder()
     best, best_size = None, -1
+    for obj in _reply_objects(text):
+        # The largest, not the first: a model that restates the format as
+        # `{"criteria": []}` before answering made the empty example the
+        # reply, reported as "no testable claim found". A tie goes to the
+        # later object: the answer follows the restatement.
+        if _size(obj) >= best_size:
+            best, best_size = obj, _size(obj)
+    return best
+
+
+def _reply_objects(text):
+    """Every `{...}` in `text` that parses as a reply object, in order."""
+    decoder = json.JSONDecoder()
+    found = []
     for match in re.finditer(r"\{", text):
         try:
             obj, _ = decoder.raw_decode(text, match.start())
         except ValueError:
             continue
         if isinstance(obj, dict) and ("criteria" in obj or "rejected" in obj):
-            # The largest, not the first: a model that restates the format
-            # as `{"criteria": []}` before answering made the empty example
-            # the reply, reported as "no testable claim found".
-            size = sum(len(v) for v in (obj.get("criteria"), obj.get("rejected"))
-                       if isinstance(v, list))
-            # A tie goes to the later object: the answer follows the
-            # restatement, and the restated example usually has one item.
-            if size >= best_size:
-                best, best_size = obj, size
-    return best
+            found.append(obj)
+    return found
+
+
+def _size(obj):
+    return sum(len(v) for v in (obj.get("criteria"), obj.get("rejected"))
+               if isinstance(v, list))
 
 
 def _salvage(text):
@@ -233,7 +244,11 @@ def _salvage(text):
             obj, _ = decoder.raw_decode(text, match.start())
         except ValueError:
             continue
-        if isinstance(obj, dict):
+        # An item, never a whole reply object: after an empty
+        # `"criteria": []` the next `{` can be the real reply, which would
+        # otherwise be counted as one criterion with no criterion in it.
+        if isinstance(obj, dict) and not ("criteria" in obj
+                                          or "rejected" in obj):
             out[key].append(obj)
     return out if (out["criteria"] or out["rejected"]) else None
 
@@ -441,15 +456,22 @@ def _units(body):
         if literal and indented:
             units.append((_squash(line), True))
             continue
+        if opens_literal and indented and line.startswith(":"):
+            # A directive's options, `:linenos:`, sit between it and its body.
+            continue
         literal = opens_literal = False
         if line.startswith(".. csv-table::"):
             flush()
             csv_table = True
             continue
         if line.startswith(".. ") and "::" in line:
-            # Any other directive, such as `.. note::`: the line itself is
-            # markup, and its body starts a paragraph of its own.
+            # Any other directive: the line itself is markup. The body of a
+            # code directive is code, like a literal block after `::`; the
+            # body of any other, such as `.. note::`, is a paragraph of its
+            # own.
             flush()
+            opens_literal = bool(re.match(
+                r"^\.\. (?:code-block|code|sourcecode)::", line))
             continue
         if csv_table and not indented:
             csv_table = False
@@ -554,13 +576,18 @@ def extract(paths, seed=None):
     # A criterion the parser lost, through a truncated reply or a quote
     # ending in a backslash, otherwise vanished without appearing in either
     # list. It is counted, so the report can at least say so.
-    # Only counted when the reply had to be repaired or salvaged. A reply that
-    # parsed as it came lost nothing, and counting keys in it also counted a
-    # format example the model restated, reporting a loss that never happened.
-    parsed = data.get("criteria") if isinstance(data.get("criteria"),
-                                                list) else []
-    recovered = _first_reply(reply) is None
-    lost = reply.count('"criterion"') - len(parsed) if recovered else 0
+    #
+    # Against everything that parsed, not only the object kept: a restated
+    # format example holds a "criterion" key too, and counting it as lost
+    # reported a loss that never happened. An earlier fix skipped the count
+    # whenever anything parsed, which hid real losses behind that example.
+    def criteria_in(obj):
+        items = obj.get("criteria")
+        return len(items) if isinstance(items, list) else 0
+
+    kept_count = criteria_in(data)
+    seen = max(sum(criteria_in(o) for o in _reply_objects(reply)), kept_count)
+    lost = reply.count('"criterion"') - seen
     if lost > 0:
         unquoted.append({"criterion": "(%d more in the model's reply could "
                                       "not be parsed)" % lost, "source": ""})

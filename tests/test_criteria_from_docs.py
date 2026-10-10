@@ -505,6 +505,28 @@ def test_a_misattached_flag_is_still_refused(tmp_path, monkeypatch, capsys):
     assert "--score-mutants goes with" in capsys.readouterr().err
 
 
+def test_a_code_block_directive_body_is_code():
+    doc = (".. code-block:: python\n   :linenos:\n\n"
+           "   result = tabulate(rows, tablefmt=\"plain\")\n   print(result)\n")
+    assert cfd._as_quoted("print(result)", [doc]) == "print(result)"
+
+
+def test_a_restated_example_cannot_hide_a_truncated_reply(tmp_path,
+                                                          monkeypatch):
+    """
+    A restated format example always parses, so the parser handed it back as
+    the reply and the real, truncated one after it vanished unreported.
+    """
+    _stub(monkeypatch,
+          'Format: {"criteria": [{"criterion": "<one>", "source": "x"}]}\n\n'
+          '{"criteria": [{"criterion": "the default format is simple", '
+          '"source": "``simple`` is the default format."}, '
+          '{"criterion": "cut off')
+    kept, _, unquoted = cfd.extract([_doc(tmp_path)])
+    assert [k["criterion"] for k in kept] == ["the default format is simple"]
+    assert any("1 more" in u["criterion"] for u in unquoted)
+
+
 def test_a_restated_example_is_not_reported_as_a_loss(tmp_path, monkeypatch):
     _stub(monkeypatch,
           'The format is {"criteria": [{"criterion": "...", "source": "..."}]}'
