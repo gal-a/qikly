@@ -362,6 +362,50 @@ def test_too_short_or_empty_trails_give_no_hint():
     assert orch._disagreement_hint([("s", ()), ("s", ("b",)), ("s", ())]) is None
 
 
+# ------------------------------------------- the unit stage, stuck on one --
+
+def test_a_unit_test_that_never_passes_is_named_as_possibly_wrong(tmp_path):
+    """
+    The 0.5.9 demo: a rounding test expected 0.42 where round-half-up gives
+    0.41, it failed on every attempt, and the stop message pointed the reader
+    at the code. It now names the test and the criterion to check it against.
+    """
+    unit = tmp_path / "unit"
+    unit.mkdir()
+    (unit / "test_calc_unit.py").write_text(
+        "def test_rounding_half_up():\n"
+        '    """Round half up.\n'
+        "    # Criteria: 9\n"
+        '    """\n'
+        "    assert 1 == 2\n", encoding="utf-8")
+    trail = [("unit", ("test_rounding_half_up",))] * 3
+    hint = orch._unit_stall_hint("unit", trail, str(tmp_path))
+    assert "test_rounding_half_up (criterion 9)" in hint
+    assert "may itself be wrong" in hint
+
+
+def test_the_unit_hint_needs_the_same_failure_three_times():
+    assert orch._unit_stall_hint("unit", [("unit", ("a",))] * 2) is None
+    trail = [("unit", ("a",)), ("unit", ("b",)), ("unit", ("a",))]
+    assert orch._unit_stall_hint("unit", trail) is None
+    assert orch._unit_stall_hint("unit", [("unit", ())] * 3) is None
+
+
+def test_the_unit_hint_is_only_for_the_unit_stage():
+    """
+    Integration and system tests are written from the criteria before any
+    code exists, so a persistent failure there is the bar doing its job.
+    """
+    trail = [("integration", ("test_x",))] * 3
+    assert orch._unit_stall_hint("integration", trail) is None
+
+
+def test_the_unit_hint_works_without_a_criteria_line(tmp_path):
+    trail = [("unit", ("test_y",))] * 3
+    hint = orch._unit_stall_hint("unit", trail, str(tmp_path))
+    assert "test_y" in hint and "criterion" in hint
+
+
 def test_the_router_sends_the_check_to_the_review_agent():
     from qikly.agent_api.providers import router as R
     assert R._MODE_ROLE["suite_consistency"] == "review"

@@ -1048,6 +1048,70 @@ def _disagreement_hint(failure_trail):
             f"case. Compare them with the acceptance criteria before changing the spec.")
 
 
+def _unit_stall_hint(stage, failure_trail, tests_dir=None):
+    """
+    A sentence for the stop message when the unit stage keeps failing on the
+    same tests, or None.
+
+    Unit tests are the one stage written from the code, after the
+    integration and system suites already pass on it. So a unit test that
+    fails on every attempt is either a real fault the earlier suites missed,
+    or a test that is wrong itself, and the coding agent cannot tell which.
+    Seen on the 0.5.9 demo: `test_rounding_half_up` expected a 4.125% tax on
+    10.00 to round to "0.42", where round-half-up of 0.4125 gives 0.41. No
+    code could pass it, the run spent its budget, and the stop message said
+    only that attempts ran out, which sent the reader to the code.
+
+    Names the criterion the test cites when it can find the test's
+    `# Criteria:` line, because that is what the expected value has to be
+    checked against. This is the stop message, which goes to the user, never
+    to the coding agent.
+    """
+    if stage != "unit" or len(failure_trail) < 3:
+        return None
+    recent = [tests for _, tests in failure_trail[-3:]]
+    if not recent[0] or any(t != recent[0] for t in recent):
+        return None
+    names = list(recent[0])
+    cited = _cited_criteria(names, os.path.join(tests_dir, stage)) if tests_dir else {}
+    parts = []
+    for name in names[:3]:
+        parts.append("%s (criterion %s)" % (name, cited[name]) if name in cited
+                     else name)
+    return ("The unit stage failed on the same test%s every time: %s. Unit tests "
+            "are written from code that already passes the integration and system "
+            "suites, so a test that never passes may itself be wrong. Check its "
+            "expected value against the criterion it cites before changing the "
+            "code or the spec." % ("s" if len(names) > 1 else "", ", ".join(parts)))
+
+
+def _cited_criteria(test_names, directory):
+    """{test name: the criteria its `# Criteria:` line cites}, best effort."""
+    found = {}
+    try:
+        files = [os.path.join(directory, f) for f in os.listdir(directory)
+                 if f.endswith(".py")]
+    except OSError:
+        return found
+    wanted = {n.split("::")[-1].split("[")[0]: n for n in test_names}
+    for path in files:
+        try:
+            with open(path, encoding="utf-8", errors="replace") as handle:
+                lines = handle.read().splitlines()
+        except OSError:
+            continue
+        for i, line in enumerate(lines):
+            m = re.match(r"\s*def (test_\w+)\(", line)
+            if not m or m.group(1) not in wanted:
+                continue
+            for after in lines[i + 1:i + 8]:
+                c = re.search(r"#\s*Criteria:\s*([\w ,]+)", after)
+                if c:
+                    found[wanted[m.group(1)]] = c.group(1).strip()
+                    break
+    return found
+
+
 # Added to the run seed when a suite is written again after a failed check. A
 # same-seed rewrite reproduces the same file, and the finding with it.
 REGENERATION_SEED_OFFSET = 7919
@@ -1398,7 +1462,8 @@ def orchestrate(task_id, seed=None, resume=False):
             else:
                 failure_trail.append((regressed_stage,
                                       tuple((regressed_result or {}).get("failed_tests") or ())))
-            hint = _disagreement_hint(failure_trail)
+            hint = (_disagreement_hint(failure_trail)
+                    or _unit_stall_hint(stage, failure_trail, tests_dir))
             hint_text = f" {hint}" if hint else ""
 
             # Which project file this failure actually points into. Only an

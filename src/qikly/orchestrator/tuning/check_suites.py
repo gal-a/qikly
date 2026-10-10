@@ -15,8 +15,9 @@ the run: each patch made one test pass and the other fail, and no code could
 ever pass both. The whole budget went on a fault that was in the tests.
 
 **Why it has to sit here, between test generation and the first line of code.**
-The coding agent never sees the criteria or the test source, only failure
-output, so it cannot tell a wrong test from a right one. Test generation cannot
+The coding agent never sees the criteria. It sees a failing test's source and
+its error, but with nothing to check the test against it cannot tell a wrong
+test from a right one. Test generation cannot
 check itself either: the same reading that produced the wrong test would approve
 it. A separate look at the suites next to the criteria is the only point where
 the error is visible and nothing has been spent on it yet.
