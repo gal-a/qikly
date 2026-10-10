@@ -1,8 +1,10 @@
 """
-Every row of the use-case table on the landing page actually works.
+Every row of the use-case table actually works.
 
-`docs/index.html` tells a reader which command to run based on which parts of
-a task file they already have. Seven rows, seven promises, and until now they
+`docs/TASK_FILE_REFERENCE.md` tells a reader which command to run based on
+which parts of a task file they already have. The table lived on the landing
+page until 2026-10-10, when the page was cut to what a first visit needs and
+the table moved to the reference, which already carried it. Seven rows, seven promises, and until now they
 were covered unevenly: `--scaffold` and `--resume` had their own files while
 `--generate-criteria` was tested only for defaulting to off, which says
 nothing about whether it does the thing the table claims.
@@ -26,6 +28,7 @@ from qikly import cli
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(ROOT, "docs", "index.html")
+REFERENCE = os.path.join(ROOT, "docs", "TASK_FILE_REFERENCE.md")
 
 
 # ------------------------------------------------------- row: just looking --
@@ -191,16 +194,24 @@ def test_resume_reads_the_disk_rather_than_trusting_the_flag():
 # ------------------------------------------------- the table cannot outgrow us --
 
 def _documented_commands():
-    with open(PAGE, encoding="utf-8") as handle:
-        page = handle.read()
-    table = re.search(r'<table class="uses">.*?</table>', page, re.S)
-    assert table, "the use-case table is gone from the landing page"
-    rows = re.findall(r"<tr[^>]*>(.*?)</tr>", table.group(0), re.S)
+    """The `qikly ...` command in each row of the reference's use-case table."""
+    with open(REFERENCE, encoding="utf-8") as handle:
+        text = handle.read()
+    start = text.index("| Where you are starting |")
+    rows = []
+    for line in text[start:].splitlines()[2:]:
+        if not line.startswith("|"):
+            break
+        rows.append(line)
     out = []
-    for row in rows[1:]:                       # skip the header
-        code = re.search(r"<code>(.*?)</code>", row, re.S)
-        if code:
-            out.append(re.sub(r"\s+", " ", code.group(1)).strip())
+    for row in rows:
+        cells = row.split("|")
+        # The fifth column, "Run". A command can continue in a second code
+        # span after a line break, `qikly --tasks X`<br>`--resume`, so every
+        # span in the cell is joined.
+        spans = re.findall(r"`([^`]*)`", cells[5] if len(cells) > 5 else "")
+        if spans and spans[0].startswith("qikly"):
+            out.append(re.sub(r"\s+", " ", " ".join(spans)).strip())
     return out
 
 
@@ -220,7 +231,8 @@ def test_every_row_of_the_table_names_a_flag_that_exists():
                 args.append(flag)
                 if flag in ("--tasks", "--scaffold", "--task-id", "--demo-dir",
                             "--criteria-from", "--criteria-from-jira",
-                            "--explain", "--compare-criteria", "--artifacts-url"):
+                            "--explain", "--compare-criteria", "--artifacts-url",
+                            "--criteria-from-docs"):
                     args.append("X")
             sys.argv = ["qikly"] + args
             try:
@@ -399,20 +411,20 @@ def test_scaffold_says_which_code_a_run_will_test():
     assert "--fresh" in printed, "and the reader has to be told how to get the other"
 
 
-def test_the_landing_page_marks_the_three_parts_consistently():
+def test_the_reference_marks_the_three_parts_consistently():
     """
-    The table's columns are #1, #2 and #3, and the definitions above it have to
-    carry the same marks or the table is three unlabelled ticks.
+    The table's columns are #1, #2 and #3, and the numbered definitions above
+    it have to name the same three parts or the table is three unlabelled
+    ticks.
     """
-    import os
-
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    with open(os.path.join(root, "docs", "index.html"), encoding="utf-8") as handle:
-        page = handle.read()
-    for mark in ("#1", "#2", "#3"):
-        assert page.count(mark) >= 2, f"{mark} appears in fewer than two places"
-    assert 'title="requirements">#1' in page
-    assert 'title="acceptance_criteria">#3' in page
+    with open(REFERENCE, encoding="utf-8") as handle:
+        text = handle.read()
+    assert "| #1 | #2 | #3 |" in text, "the table's columns lost their marks"
+    definitions = text[:text.index("| Where you are starting |")]
+    for number, part in (("1.", "requirements"), ("2.", "interface"),
+                         ("3.", "acceptance_criteria")):
+        assert "%s **`%s`**" % (number, part) in definitions, (
+            "part %s is not defined as %s above the table" % (number, part))
 
 
 def test_the_page_answers_the_two_models_objection():

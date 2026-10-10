@@ -630,17 +630,23 @@ footer {
 
 <div class="wrap" id="top">
 
+  <!-- 2026-10-10: simplified from about 2,800 words to about 700. Leads with
+       what qikly is and its scope, then the hero image, then one free command.
+       The command table, the three concepts, the code-derived versus
+       spec-derived comparison and the design write-up list moved to
+       TASK_FILE_REFERENCE.md and the design docs, which already carried them.
+       The "8 out of 8" anecdote was dropped: it is a caution about mutation
+       scores, and its count came from a scorer later found to reuse stale
+       bytecode. -->
   <header class="hero">
-    <h1>Your AI writes both the code and its tests. How do you know the tests are really valid?</h1>
-    <!-- A lede-answer paragraph sat here, restating the mechanism between the
-         headline and the image. Removed on 2026-10-01 as clutter: the .lede
-         below ends on the same sentence in bold, so the reader met the claim
-         twice before reaching a command. The headline asks the question, the
-         image answers it, and the analogy explains why the answer matters. -->
-    <!-- The image sits directly under the claim, before the analogy and before
-         "Who it is for", on purpose: a visual hook earns the reading that
-         follows. An audit suggested moving the audience line above it to match
-         the README's order; the order here is deliberate. -->
+    <p class="eyebrow">Independent test generation for AI-written code</p>
+    <h1>Functional tests for backend Python code, written from a spec the coding agent never sees</h1>
+    <p class="lede">
+      When one AI writes both the code and its tests, a green suite proves
+      little: the tests were written to pass.
+      <strong>qikly keeps the acceptance criteria away from the agent that
+      writes the code, so its tests can disagree with it.</strong>
+    </p>
     <figure class="shot">
       <img src="images/qikly_hero.png" width="3200" height="1680"
            alt="The coder never sees the answer key. Its tests come from criteria it was never shown, so they can disagree with it. Two code panels kept apart: calc.py written by the coding agent, and test_calc.py written by the test agent, which asserts a tax rate limit the coding agent was never given. The suite passes 9 of 9.">
@@ -649,81 +655,19 @@ footer {
         wrote <code>or rate &gt; 100</code> itself, so the 9 of 9 is code meeting a
         bar it never read.</figcaption>
     </figure>
-    <p class="lede">
-      A student who writes the exam paper, writes the answer key and then sits
-      the exam will pass. That is what happens when one model is given the
-      acceptance criteria and asked to produce both the implementation and the
-      suite that checks it. Everything goes green, and the green means nothing.
-      <strong>qikly takes the answer key away from the student: the coding
-      agent never sees the acceptance criteria.</strong>
-    </p>
 
-    <!-- The first command asks nothing of the reader. It was `pip install`,
-         then `export GEMINI_API_KEY=...`, then `qikly --demo`, which asked a
-         stranger for an API key before offering any evidence and read as
-         though the tool required one provider. The free check is the
-         strongest thing on this page and goes first.
-
-         2026-09-30: it was the wrong free check. `--explain CALC_TAX` runs a
-         bundled task, so a stranger's first command told them about qikly.
-         `--score-code` is equally free and runs on their own module, which
-         is what the headline just asked them about. -->
+    <!-- The first command is free and needs no key: it shows the withholding,
+         which is the claim the headline makes. -->
     <div class="install">
       <span><span class="prompt">$</span> pip install --upgrade qikly</span>
-      <span><span class="prompt">$</span> qikly --score-code pricing.py --score-tests tests/</span>
+      <span><span class="prompt">$</span> qikly --explain CALC_TAX</span>
     </div>
-    <!-- 2026-10-01: the order of argument was backwards. The anecdote led,
-         and the page then named this command as its earlier half, the one
-         that returned a clean result and was wrong. So the one
-         command this page wants run was introduced by a story about that
-         check reassuring somebody, with the limit arriving four sentences
-         later. What it does, what it cannot say, then the evidence for that,
-         then the handoff. -->
-    <p class="route-note">It plants one fault at a time in a copy of your code, runs
-      the tests you already have against each one, and names the faults nothing
-      noticed. No API key, no model call, nothing of yours modified, and no code
-      leaves your machine. A good score here means your tests notice code
-      changing, and that is all it means.</p>
-    <p class="route-note"><strong>In one session, a suite an AI wrote from the
-      code scored 8 out of 8 on this fault-planting check and still missed four
-      real bugs. A suite qikly wrote from a spec which the coding agent never saw found
-      them. That gap is what qikly is for.</strong></p>
-    <p class="route-note">To see the withholding itself,
-      <code>qikly --explain CALC_TAX</code> prints what each agent is given and the
-      difference between them, on a bundled task, in about a second. To watch a
-      real run, <code>qikly --demo</code> takes a key from Gemini, OpenAI or
-      Anthropic and costs well under a cent.</p>
-    <p class="route-note"><a href="https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have" data-goatcounter-click="hero-which-command">Which
-      command fits what you already have</a>, and
+    <p class="route-note">That prints a bundled task twice, once as each agent
+      receives it, and the difference between them. No API key, no model call,
+      about a second. Then <code>qikly --demo</code> runs a task end to end with a
+      Gemini, OpenAI or Anthropic key for well under a cent, and
       <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="hero-quick-start">five
-      steps from your own module to a first run</a>.</p>
-
-    <!-- Moved below the command on 2026-10-01. It sat between the headline
-         and the one command this page wants run, offering a second command
-         for a product the reader does not understand yet. Nothing was cut:
-         the Skill is how somebody adopts this without adopting a tool,
-         which is worth saying once the question has been answered. -->
-    <aside class="whats-new">
-      <p class="tag">New</p>
-      <!-- Two sentences and a command. This box used to carry a third line,
-           first a caveat about instructions not being enforcement, then the
-           list of runtimes it was tested in. Both are true and both are one
-           click away; neither earns a line in the hero. -->
-      <p><strong>An agent Skill.</strong> One command teaches Claude Code,
-      Gemini CLI, Codex or Cursor how to drive qikly, and writes the
-      instruction file GitHub Copilot reads.
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/skill.md"
-         data-goatcounter-click="hero-skill">What the Skill contains</a>.</p>
-      <p><code>qikly --install-skill</code></p>
-    </aside>
-
-    <p class="eyebrow">Who it is for</p>
-    <p class="route-note">You point an AI coding agent at a Python module that transforms
-      data, an ETL step, a merge, a calculation or a validation routine, and you do not want
-      to trust a green suite when the same agent wrote both the code and the tests. It suits one module at a time in small to mid-sized repositories: when a test
-      fails, only the files that failure names are loaded, so runs stay small and quick.
-      It fits most naturally where verification already has to be independent of the people
-      who build the thing: automotive, medical devices, fintech and defence.</p>
+      steps</a> take your own module to a first run.</p>
     <div class="links">
       <a class="btn btn-primary" href="https://github.com/gal-a/qikly" data-goatcounter-click="hero-github">Source on GitHub</a>
       <a class="btn" href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="hero-how-it-works">How it works, with one repair end to end</a>
@@ -731,13 +675,41 @@ footer {
   </header>
 
   <section class="band">
-    <p class="eyebrow">The idea</p>
-    <h2>A passing test suite is only evidence if the author could not read the answer key</h2>
+    <p class="eyebrow">What it is for</p>
+    <h2>The behaviour of backend logic, one module at a time</h2>
+    <div class="split">
+      <div class="half sees-all">
+        <span class="tag">It tests</span>
+        <p>
+          What a Python module does with its inputs: data transforms and ETL
+          steps, calculations, validation rules, merges and business logic.
+          Integration, system and unit tests, in pytest, for small to
+          mid-sized repositories.
+        </p>
+      </div>
+      <div class="half sees-spec">
+        <span class="tag">It does not test</span>
+        <p>
+          User interfaces, performance, load, security or any other
+          non-functional property, and it does not run end-to-end tests
+          across services.
+        </p>
+      </div>
+    </div>
+    <p class="route-note">It fits most naturally where verification already
+      has to be independent of the people who build the thing: automotive,
+      medical devices, fintech and defence.</p>
+  </section>
+
+  <section class="band">
+    <p class="eyebrow">How it works</p>
+    <h2>The coding agent never sees the acceptance criteria</h2>
     <p>
-      Give a model the acceptance criteria and ask it to write both the code and
-      the tests, and it will write tests that pass. That is not verification,
-      it is a model agreeing with itself. The only way the agreement means
-      anything is if the two halves are kept apart.
+      One task file holds the requirements, the interface and the acceptance
+      criteria. The test agent reads all three and writes the integration and
+      system tests before any code exists. The coding agent gets the same file
+      with the criteria cut out, and works from failing tests until the suite
+      passes.
     </p>
     <figure class="flow">
       <svg viewBox="0 0 820 392" role="img"
@@ -746,7 +718,8 @@ footer {
         <desc id="flow-d">One task file feeds two agents. The test generation
         agent sees all three sections. The coding agent sees only the first
         two, never the acceptance criteria. Both meet at pytest. A failing run
-        returns to the coding agent carrying the error text alone. Once the
+        returns to the coding agent with the failing test and its error,
+        never the criteria. Once the
         integration and system stages pass, the test generation agent writes
         the unit stage, and that is the only point at which it is allowed to
         read the implementation.</desc>
@@ -821,7 +794,7 @@ footer {
         <path d="M 610 228 L 610 380 L 370 380 L 370 360" fill="none"
               stroke="var(--code)" stroke-width="1.4" stroke-dasharray="5 3"
               marker-end="url(#ar-w)"/>
-        <text x="490" y="374" class="n-e n-strip n-mid">fail: the error text, never the rule</text>
+        <text x="490" y="374" class="n-e n-strip n-mid">fail: the failing test, never the criteria</text>
 
         <!-- the outer loop: unit tests written later, from the code -->
         <path d="M 610 172 L 610 16 L 370 16 L 370 42" fill="none"
@@ -831,132 +804,36 @@ footer {
       </svg>
       <figcaption>
         The main flow consists of two loops. The dashed purple one is the repair cycle: a failing run
-        returns the error text and nothing else, so the coding agent cannot
-        write code shaped to a rule it was shown. The dashed teal one is the
+        returns the failing test and its error, never the criteria, so the
+        coding agent can only learn the bar one failed test at a time. The dashed teal one is the
         staged expansion: integration and system tests are written before any
         code exists, and only once they pass is the unit stage written, which
         is the single point where test generation may read the implementation.
       </figcaption>
     </figure>
 
-    <div class="split">
-      <div class="half sees-all">
-        <span class="tag">Test generation sees</span>
-        <p>
-          The requirements, the input and output contract, and every acceptance
-          criterion in full. It writes integration, system and unit tests
-          against the standard.
-        </p>
-      </div>
-      <div class="half sees-spec">
-        <span class="tag">The coding agent sees</span>
-        <p>
-          The same specification with the criteria section removed, plus the
-          text of whatever test just failed. The same vague brief a developer
-          usually works from.
-        </p>
-      </div>
-    </div>
-
     <h3 class="sub">Two obvious objections</h3>
     <p class="counter">
-      <b>1.</b> You might argue, <b>"just use one model for the code and another for the tests."</b>
-      That helps a little. It does not fix the underlying issue.
+      <b>"Just use one model for the code and another for the tests."</b>
+      That helps a little. It does not fix the underlying issue: both models
+      still read the same criteria, so the code is still built to the standard
+      it is about to be judged by. Changing who types it does not change
+      what they were shown. qikly removes the criteria from the coding agent's
+      prompt, <code>qikly --explain</code> shows the cut, and a test fails the
+      build if any call site lets a criterion through.
     </p>
     <p class="counter">
-      Both models still read the same criteria, so both still write to them.
-      The code is still built to satisfy the standard it is about to be judged
-      by. Changing who types it does not change what they were shown.
+      <b>"Doesn't a failing test give the criteria away?"</b> It shows the
+      coding agent that one test, its source and its error, and the test often
+      states the rule it checks. It cannot change a test already written:
+      the integration and system suites exist before any code does, so what
+      the agent learns from a failure can shape the code, never the bar.
     </p>
-    <p class="counter">
-      It is also a habit rather than a mechanism. Nothing checks that the two
-      models stayed different, and a config change a year from now undoes it
-      with no test to notice.
-    </p>
-    <p class="counter">
-      Withholding the acceptance criteria works differently. They are cut out
-      of the task file before the coding agent is handed it, so there is no
-      channel left for them to arrive through, whichever model is writing.
-      <code>qikly --explain</code> prints what each side received, so you can
-      see the cut rather than trust it, and
-      <code>tests/test_withholding.py</code> fails the build if any call site
-      ever lets a criterion through
-      (<a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md"
-          data-goatcounter-click="explain-detail">how it works, in full</a>). <em>You can also do both</em>: qikly
-      picks a model per agent role.
-</p>
-    <p class="counter">
-      <b>2.</b> You might also ask, <b>"doesn't a failing test give the criteria away?"</b>
-      It gives away one case: the test name and the assertion error. Never the
-      rule behind it, and never the tests the agent has not failed yet.
-    </p>
-    <p class="counter">
-      That does not undo the separation. Independence is a property of how the
-      suite was written, not of how much feedback follows: the integration and
-      system suites are generated from the criteria before any code exists, and
-      nothing the coding agent learns later can reshape a test already written.
-    </p>
-
-
-    <h3 class="sub">Two ways to generate a test suite, and what each can prove</h3>
-    <table class="uses compare">
-      <thead>
-        <tr>
-          <th></th>
-          <th>Code-derived suite<br><span class="eg">most commercial test generators,<br>and qikly's own unit tests</span></th>
-          <th>Spec-derived suite<br><span class="eg">qikly's integration and system tests</span></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Written from</td>
-          <td data-col="Code-derived">The code as it is today</td>
-          <td data-col="Spec-derived">The acceptance criteria you wrote</td>
-        </tr>
-        <tr>
-          <td>You supply</td>
-          <td data-col="Code-derived">Nothing but the repository</td>
-          <td data-col="Spec-derived">A written statement of what correct means</td>
-        </tr>
-        <tr>
-          <td>Catches</td>
-          <td data-col="Code-derived">Behaviour changing tomorrow</td>
-          <td data-col="Spec-derived">Behaviour being wrong today</td>
-        </tr>
-        <tr>
-          <td>Cannot catch</td>
-          <td data-col="Code-derived">The code being wrong now: today's bug becomes tomorrow's assertion</td>
-          <td data-col="Spec-derived">Anything nobody wrote down</td>
-        </tr>
-        <tr>
-          <td>Right choice when</td>
-          <td data-col="Code-derived">Nobody wrote the intent down and you need a safety net</td>
-          <td data-col="Spec-derived">The intent exists in a ticket, a spec page or a Gherkin file</td>
-        </tr>
-        <tr>
-          <td>Evidence it was independent</td>
-          <td data-col="Code-derived">None available. The suite was derived from the
-          implementation, so the question does not arise</td>
-          <td data-col="Spec-derived">Every run reports one of
-          <code>criteria_first</code>, <code>not_evidenced</code>,
-          <code>no_history</code> or <code>unavailable</code>, read from git:
-          whether your criteria file was last changed before the implementation's
-          first commit. <code>criteria_first</code> means the bar cannot have been
-          fitted to the code, because the code did not exist yet. It is not proof
-          of independence and does not claim to be, since code can sit in a working
-          tree for weeks before its first commit</td>
-        </tr>
-      </tbody>
-    </table>
-
   </section>
 
   <section class="band">
-    <p class="eyebrow">Getting started</p>
-    <h2>One command, about thirty seconds, writes nothing outside its own folder</h2>
-    <pre><code>pip install --upgrade qikly
-export GEMINI_API_KEY=...        # or OPENAI_API_KEY, or ANTHROPIC_API_KEY
-qikly --demo</code></pre>
+    <p class="eyebrow">See it run</p>
+    <h2>One command, about thirty seconds, nothing written outside its folder</h2>
     <figure class="demo">
       <img src="images/qikly_demo.gif" width="811" height="820" loading="lazy"
            alt="A qikly --demo run: the acceptance criteria are withheld from the coding agent, three test suites are generated, a test fails, a patch is applied, and the suite goes green.">
@@ -964,226 +841,42 @@ qikly --demo</code></pre>
         are withheld, the suites are generated, a test fails, a patch lands, and
         it goes green. 38 seconds on gemini-3.5-flash-lite, not sped up.</figcaption>
     </figure>
-    <p>
-      The demo runs one task end to end in a throwaway directory and prints
-      where the code, the tests, and the full record of every FIX and PATCH
-      landed. Bring your own model key; the provider is configurable per agent
-      and per test stage.
-    </p>
-    <h3>Three concepts</h3>
-    <p>
-      A <strong>task file</strong> is one YAML file and it holds everything.
-      It has three parts, and the split above is a split between them:
-    </p>
-    <dl class="terms">
-      <dt>#1 <code>requirements</code></dt>
-      <dd>What the code must do, in the words a person would use. The coding
-      agent reads this.</dd>
-      <dt>#2 <code>interface</code></dt>
-      <dd>The contract, and a description rather than code: the function
-      signatures, and the dotted path where the module will live. Both
-      agents read it. Neither is given an implementation to read from
-      it, because when integration and system tests are written there is
-      not one yet.</dd>
-      <dt>#3 <code>acceptance_criteria</code></dt>
-      <dd>What counts as correct, each one checkable and naming its boundary
-      value. <strong>Only test generation reads this.</strong></dd>
-    </dl>
-    <h3 class="spaced">Which qikly command depends on which parts you already have</h3>
-    <p>
-      A tick means you already have it. Everything without a tick is either
-      written for you or is what you sit down to write.
-    </p>
+  </section>
 
-    <div class="tablewrap">
-    <table class="uses">
-      <thead>
-        <tr>
-          <th>Where you are starting</th>
-          <th title="requirements">#1</th>
-          <th title="interface">#2</th>
-          <th title="acceptance_criteria">#3</th>
-          <th>Run</th>
-          <th>What happens</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Before anything else: see what is withheld</td>
-          <td></td><td></td><td></td>
-          <td><code>qikly --explain &lt;MY_TASK&gt;</code><br><span class="eg">e.g. <code>qikly --explain CALC_TAX</code></span></td>
-          <td>Prints a task file twice, once as each agent receives it, and the
-          difference between them. No API key, no model call, about a second.
-          <b>You get:</b> the acceptance criteria on one side and the same file
-          with them cut out on the other, which is the claim everything else
-          here rests on. <b>Shown in full below this table.</b></td>
-        </tr>
-        <tr>
-          <td>Just looking</td>
-          <td></td><td></td><td></td>
-          <td><code>qikly --demo</code></td>
-          <td>A bundled task end to end in a throwaway folder. Needs an API key, because this one really does call a model. Thirty seconds, under a cent. <b>You get:</b> a working implementation, three test suites, and the full record of every FIX and PATCH, in a directory you can delete.</td>
-        </tr>
-        <tr>
-          <td>Code someone else wrote, and you want <em>that code</em> verified</td>
-          <td></td><td class="yes">Y</td><td></td>
-          <td><code>qikly --scaffold &lt;MY_MODULE&gt;.py</code><br>
-          which writes <code>seed.implementation</code> pointing at that file</td>
-          <td>Scaffold reads the real signatures out of the file you point it at and
-          fills in <b>#2</b> for you. <b>#1</b> and <b>#3</b> stay yours to
-          write: criteria read out of an implementation can only describe what
-          that implementation already does, which is a bar it passes by
-          construction. <b>You get:</b> one task file that tests the code you already have. Add <code>--fresh</code> for one that writes a fresh implementation of the same interface instead. Then
-          a suite built from a standard your code was never measured against,
-          and a list of what it fails.</td>
-        </tr>
-        <tr>
-          <td>You know what it must do, not yet how to check it</td>
-          <td class="yes">Y</td><td></td><td></td>
-          <td><code>qikly --init</code></td>
-          <td>Creates the directory layout and one starter task to edit. Its criteria
-          show the habit that matters most: name the value, not the quality.
-          &quot;100 is accepted and 101 is rejected&quot; forces a test at the
-          boundary; &quot;amounts must be reasonable&quot; does not.
-          <b>You get:</b> a task file to fill in, with your fixtures where a
-          run will look for them.</td>
-        </tr>
-        <tr>
-          <td>Same, but you want a first draft of the bar</td>
-          <td class="yes">Y</td><td class="yes">Y</td><td></td>
-          <td><code>qikly --tasks &lt;MY_TASKS&gt;
---generate-criteria</code></td>
-          <td>Drafts <b>#3</b> from <b>#1</b> alone, then runs. <b>You get:</b> a first draft of the bar written into your task file for you to read and
-          correct, plus the implementation and the suites. Run
-          <code>--compare-criteria</code> on a task where you did write the
-          criteria, to see what a draft would have missed.</td>
-        </tr>
-        <tr>
-          <td>The rules are written, but in a ticket</td>
-          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
-          <td><code>qikly --criteria-from ticket.md
---task-id &lt;MY_TASK&gt;</code></td>
-          <td>Reads <b>#3</b> out of a ticket you saved to a file: a bullet
-          list, an "Acceptance Criteria" heading, or Gherkin scenarios. Only
-          that section is read, so pasting a whole ticket does not turn its
-          description into part of the bar, and prose is never split into rules
-          nobody wrote. <b>You get:</b> acceptance criteria you already had, in
-          the task file, ready to read over before the first run.</td>
-        </tr>
-        <tr>
-          <td>You have written all three</td>
-          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
-          <td><code>qikly --tasks &lt;MY_TASKS&gt;</code></td>
-          <td>Everything you wrote is used, and nothing is drafted on your
-          behalf. <b>You get:</b> an implementation, integration, system and
-          unit suites, a convergence report, and a run summary recording the
-          model and settings that produced them.</td>
-        </tr>
-        <tr>
-          <td>You have all three but doubt they agree</td>
-          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
-          <td><code>qikly --check-criteria
---tasks &lt;MY_TASKS&gt;</code></td>
-          <td>One model call asking whether any implementation could satisfy
-          <b>1</b> and <b>3</b> at once. Advisory, and exits non-zero on a
-          contradiction so a pipeline can gate on it. <b>You get:</b> a list of the requirement and criterion pairs that cannot both hold, before spending a stage budget on them.</td>
-        </tr>
-        <tr>
-          <td>You want a task file checked before it costs anything</td>
-          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
-          <td><code>qikly --validate
---tasks &lt;MY_TASKS&gt;</code></td>
-          <td>Reads the task file and reports what would stop a run: a missing
-          fixture, an interface that names nothing, an empty bar. No API key and
-          no model call, so it costs nothing and takes about a second. It does
-          not check whether your requirements and criteria agree, which is a
-          different question and needs <code>--check-criteria</code> above.
-          <b>You get:</b> the problems a run would have hit, before you pay for
-          the run.</td>
-        </tr>
-        <tr>
-          <td>You would rather run it from your editor than a terminal</td>
-          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
-          <td><code>qikly --install-mcp</code><br><span class="eg">add <code>vscode</code>, <code>claude</code> or <code>all</code></span></td>
-          <td>Registers qikly as an MCP server with the hosts it finds, writing
-          <code>.mcp.json</code> or <code>.vscode/mcp.json</code> in the directory
-          you are standing in. Your editor's agent can then run a task, check a
-          run's status, validate a task file or scaffold one. Add
-          <code>--dry-run</code> to see which file it would write, and whether it
-          would create or update it, before anything is written. The
-          withholding holds here too: the MCP tools never return the acceptance
-          criteria, and a test fails the build if that changes. <b>You get:</b>
-          the same four commands, reachable from whatever you already work in.</td>
-        </tr>
-        <tr>
-          <td>Your coding agent should know when to reach for qikly, and how to
-          split a spec</td>
-          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
-          <td><code>qikly --install-skill</code></td>
-          <td>Copies qikly's agent Skill into <code>.claude/skills/qikly</code>
-          in the directory you are standing in. A Skill is a folder your agent
-          reads rather than a server it calls: it carries the one question that
-          decides where each line of a spec goes, what a stalled repair loop
-          means, and which commands are free. It teaches; it does not enforce,
-          and it says so. The withholding is enforced by the tool either way.
-          <b>You get:</b> an agent that uses qikly properly without being told
-          how each time.</td>
-        </tr>
-        <tr>
-          <td>A previous run stopped before finishing</td>
-          <td class="yes">Y</td><td class="yes">Y</td><td class="yes">Y</td>
-          <td><code>qikly --tasks &lt;MY_TASKS&gt;
---resume</code></td>
-          <td>Generating the tests and the first implementation already cost
-          model calls, and they are still on disk. This keeps them and picks up
-          where it stopped rather than paying twice. It names what it is reusing before it starts, so you can see what you are about to pay for. <b>You get:</b> the same outputs as a full run, without paying for the parts already built.</td>
-        </tr>
-      </tbody>
-    </table>
-    </div>
-    <p class="route-note">
-      <code>&lt;MY_TASKS&gt;</code> is one task_id or several separated by
-      commas. A task_id is a filename under
-      <code>inputs_private/config/tasks/</code> without the <code>.yaml</code>:
-      <code>--tasks CALC_TAX</code>,
-      <code>--tasks ADAS_HEADWAY,MERGE_SALES</code>, or omit it to run every task
-      found. Thirteen ship bundled, including three from driver assistance
-      (<code>ADAS_HEADWAY</code>, <code>ADAS_TTC</code>,
-      <code>ADAS_SPEED_LIMIT</code>) whose criteria turn on the kind of boundary
-      a specification usually leaves vague. <code>&lt;MY_TASK&gt;</code>, singular, takes exactly one.
-    </p>
-
-    <p class="route-note">
-      One thing the three concepts do not say, and it matters:
-      <strong class="says-all">test generation never reads the implementation either.</strong>
-      Integration and system tests are written before any code exists, from the
-      specification alone. The unit stage is the single exception, written last
-      from the code that just cleared the earlier stages, because unit tests
-      have to name real functions.
-    </p>
-
-    <h3 class="spaced">The design write-up, in three parts</h3>
+  <section class="band">
+    <p class="eyebrow">What it has shown</p>
+    <h2>Measured, and where it stops</h2>
     <p>
-      Each stands on its own.
+      Across three sweeps, 967 runs in all, roughly 8 runs in 10 finish with
+      the code passing every integration and system test, and roughly 6 in 10
+      pass the unit stage as well. A run that cannot converge exits non-zero
+      and ships nothing. Whether withholding the criteria makes a suite catch
+      more bugs than one written with the code in view has not yet been
+      measured.
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="limits-performance">The numbers in full</a>.
     </p>
+  </section>
+
+  <section class="band">
+    <p class="eyebrow">Start</p>
+    <h2>Pick the command that fits what you already have</h2>
     <ul class="designs">
-      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md"
-             data-goatcounter-click="design-1">1. The case</a>. Why an agent
-      that writes its own tests is grading its own homework, and one repair
-      followed end to end: what the coding agent was given, the test it failed,
-      the reasoning it produced from that failure alone, and the one-line
-      patch.</li>
-      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md"
-             data-goatcounter-click="design-2">2. How well it works</a>. Three
-      sweeps and 967 runs, the benchmark defect found and corrected between
-      them, the unit-stage gap, what makes a run stall, and the results this
-      project measured and then withdrew.</li>
-      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md"
-             data-goatcounter-click="design-3">3. How it is built</a>. The five
-      agents and what each may read, the FIX and PATCH separation, the
-      thirteen example tasks, and supplying your own code or tests.</li>
+      <li><code>qikly --scaffold your_module.py</code> writes a task file from code
+        you already have, for you to fill in the requirements and criteria.</li>
+      <li><code>qikly --init</code> starts a task from nothing.</li>
+      <li><code>qikly --score-code your_module.py --score-tests tests/</code> checks
+        a suite you already have by planting faults in the code, free and with no
+        model call.</li>
+      <li><code>qikly --install-skill</code> teaches Claude Code, Gemini CLI, Codex
+        or Cursor how to drive qikly.</li>
     </ul>
-
+    <p>
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have" data-goatcounter-click="start-which-command">Every
+      command, by what you already have</a>, and the design write-up:
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">the case</a>,
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">how well it works</a> and
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md" data-goatcounter-click="design-3">how it is built</a>.
+    </p>
   </section>
 
   <p class="origin">The separation this tool enforces is ordinary practice in safety-critical engineering, where verification is required to be independent of implementation as part of a V&amp;V (Verification &amp; Validation) methodology for testing. This library's author worked in that setting on General Motors' autonomous vehicle program before building this toolset.</p>
