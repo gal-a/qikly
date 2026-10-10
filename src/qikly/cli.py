@@ -1052,11 +1052,13 @@ def _parse_args():
              "found. It only prints; nothing is written."
     )
     parser.add_argument(
-        "--install-mcp", nargs="?", const="all", choices=["all", "vscode", "claude"],
+        "--install-mcp", nargs="?", const="all",
+        choices=["all", "vscode", "claude", "cursor"],
         metavar="HOST",
         help="Register the qikly MCP server with the hosts found in this project, "
              "instead of printing a block to paste. It writes project-local files "
-             "only, .mcp.json for Claude Code and .vscode/mcp.json for VS Code, "
+             "only, .mcp.json for Claude Code, .vscode/mcp.json for VS Code and "
+             ".cursor/mcp.json for Cursor, "
              "never your global config, and it merges rather than overwrites: "
              "every other server in the file is kept and the file is backed up "
              "first. It refuses and prints instead when the file holds comments, "

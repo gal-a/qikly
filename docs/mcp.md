@@ -106,11 +106,15 @@ is not trusted on sight, and it should not be: cloning a repository must not
 silently run whatever it ships. `claude mcp list` will show qikly as pending
 until you run `claude` once in that directory and approve it.
 
-Add `--install-mcp claude` or `--install-mcp vscode` to target one host.
+Add `--install-mcp claude`, `--install-mcp vscode` or `--install-mcp cursor`
+to target one host. Without a host it writes all three.
 
-Cursor and Codex CLI are not written yet. Cursor takes the `mcpServers` shape
-below; Codex needs TOML, which the standard library cannot write on any Python
-this supports.
+**Cursor is written but not yet tested in Cursor.** `--install-mcp cursor`
+writes `.cursor/mcp.json` under the `mcpServers` key, the project-local file
+Cursor documents. The suite checks that file is written correctly; nobody has
+yet confirmed Cursor loads it, so treat it as a preview and say so if it
+does not. Codex CLI is not written: it needs TOML, which the standard library
+cannot write on any Python this supports.
 
 ## Two things that will bite you on Windows
 

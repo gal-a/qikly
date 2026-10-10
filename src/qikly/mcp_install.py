@@ -41,15 +41,24 @@ import shutil
 import sys
 import time
 
-CLAUDE, VSCODE = "claude", "vscode"
+CLAUDE, VSCODE, CURSOR = "claude", "vscode", "cursor"
 
 # Host, the file it reads inside a project, and the key servers live under.
-# Only these two: both were read on disk before this was written. Cursor and
-# Codex CLI are a second stage, and Codex needs a TOML writer, which the
-# standard library does not have on any Python this supports.
+#
+# Claude Code and VS Code were both read on disk before they went in, which is
+# the standard this file holds to. **Cursor has not been**, and its entry comes
+# from Cursor's documented project-local config rather than from an observed
+# file: `.cursor/mcp.json`, under the same `mcpServers` key Claude Code uses.
+# The suite proves qikly writes that file correctly. It does not prove Cursor
+# loads it, and those are two different claims, so README still says the server
+# is tested in VS Code and Claude Code only.
+#
+# Codex CLI is still waiting on a TOML writer, which the standard library does
+# not have on any Python this supports.
 HOSTS = {
     CLAUDE: {"path": (".mcp.json",), "key": "mcpServers", "label": "Claude Code"},
     VSCODE: {"path": (".vscode", "mcp.json"), "key": "servers", "label": "VS Code"},
+    CURSOR: {"path": (".cursor", "mcp.json"), "key": "mcpServers", "label": "Cursor"},
 }
 
 

@@ -56,6 +56,10 @@ packaging tools would read as `1.1`.
   To make that possible, a run summary now records which prompts were
   overridden and a digest of each (schema 7), and `QIKLY_PROMPT_OVERRIDES=0`
   makes one process use the shipped prompts while overrides stay on disk.
+- **`--install-mcp cursor`** writes `.cursor/mcp.json`, and a bare
+  `--install-mcp` now writes it alongside the Claude Code and VS Code files.
+  The file is checked; Cursor loading it has not been, which `docs/mcp.md`
+  says.
 - **Skill 0.3.5** mentions `--criteria-from-docs`, and the Skill now also sits
   at `.claude/skills/qikly/SKILL.md`, the path Skill directories crawl.
 

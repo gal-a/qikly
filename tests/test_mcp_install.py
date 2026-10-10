@@ -44,8 +44,14 @@ def test_the_entry_names_this_python_and_this_project(tmp_path):
 
 
 def test_an_absent_file_is_created_with_the_host_s_own_key(tmp_path):
-    for host, key, rel in ((mcp_install.CLAUDE, "mcpServers", ".mcp.json"),
-                           (mcp_install.VSCODE, "servers", os.path.join(".vscode", "mcp.json"))):
+    hosts = ((mcp_install.CLAUDE, "mcpServers", ".mcp.json"),
+             (mcp_install.VSCODE, "servers", os.path.join(".vscode", "mcp.json")),
+             (mcp_install.CURSOR, "mcpServers", os.path.join(".cursor", "mcp.json")))
+    # Listed by hand, so a host added to HOSTS is untested until somebody
+    # edits this tuple. This says so rather than waiting to be noticed.
+    assert {h[0] for h in hosts} == set(mcp_install.HOSTS), (
+        "a host in HOSTS has no creation test")
+    for host, key, rel in hosts:
         item = mcp_install.plan(str(tmp_path), [host])[0]
         assert item["action"] == "create"
         changed, _ = mcp_install.write(item)
@@ -366,6 +372,11 @@ def test_the_cli_exits_non_zero_when_it_refused_everything(tmp_path, monkeypatch
            '{\n // note\n "servers": {}\n}')
     monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
     monkeypatch.delenv("QIKLY_PROJECT_ROOT", raising=False)
+
+    # Every host has to be refused for this to mean what it says. A host
+    # added later and left out here turns this into a different test.
+    _write(os.path.join(str(tmp_path), ".cursor", "mcp.json"),
+           '{"also bad')
 
     assert cli._do_install_mcp("all", dry_run=False, force=False) == 2
     assert "Paste this" in capsys.readouterr().err
