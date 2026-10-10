@@ -75,19 +75,22 @@ not, which nearly happened on 0.4.3. An `__editable__.qikly-*.pth` in
 ## 4. The demo converges
 
 ```bash
-python tools/release_check.py --demo 3
+python tools/release_check.py --demo 5
 ```
 
 It builds the wheel, installs it into a clean environment, and runs
-`qikly --demo` three times, each from a fresh directory that is **not** the
-repository, so a path bug that silently resolves against the source tree has
-nowhere to hide. **Two of the three must converge.** Each run takes about
-thirty seconds and a cent.
+`qikly --demo` five times at once, each from a fresh directory that is **not**
+the repository, so a path bug that silently resolves against the source tree
+has nowhere to hide. **Two of the five must converge.** They run in parallel,
+so the five take about as long as one, a minute or so, and a cent each.
 
-Two of three rather than three, because one run is an artifact and not a
-rate: the demo converges roughly eight times in ten, so demanding all three
-would block about half of good releases on chance. **But read every stalled
-run's blocking test**, which the check prints. A stall is sometimes the
+**Why two of five.** The demo converges about six times in ten, and five runs
+cannot tell sixty percent from fifty; that takes dozens. What five can do is
+catch a release that broke the demo outright. Two of five blocks a healthy
+release about one time in eleven; four of five, which sounds safer, would block
+two good releases in three. So it is a floor, not a measurement. **Read every
+stalled run's blocking test**, which the check prints, whether the gate passed
+or not. A stall is sometimes the
 generated test being wrong rather than the code: on 0.5.9, a rounding test
 expected 0.42 where round-half-up gives 0.41, and no code could pass it. A
 wrong test is a test-generation fault to fix, not bad luck.
@@ -276,11 +279,11 @@ render the new README around the old diagrams, and the CI badge reads
 **Then** run the demo again, from what PyPI actually serves:
 
 ```bash
-python tools/release_check.py --after --demo 3
+python tools/release_check.py --after --demo 5
 ```
 
 It installs the released version from PyPI into a clean environment and needs
-two of three demos to converge, as before tagging. That is the only check that
+two of five demos to converge, as before tagging. That is the only check that
 exercises the actual published artefact rather than a local build of it.
 
 **Glance at the Marketplace box.** Open the release on GitHub and click Edit:

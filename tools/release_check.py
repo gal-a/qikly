@@ -19,8 +19,8 @@ reason nobody remembers is a check somebody eventually deletes.
 
 The demo runs only when asked, with `--demo N`. It needs an API key and spends
 real money, and a script that quietly spends money is worse than one that
-reminds you to. Release day asks for it: `--demo 3` before tagging, and
-`--after --demo 3` once PyPI has the version.
+reminds you to. Release day asks for it: `--demo 5` before tagging, and
+`--after --demo 5` once PyPI has the version.
 """
 import argparse
 import json
@@ -30,6 +30,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -323,53 +324,66 @@ def check_wheel(version, demos=0):
 
 def check_demo(python, runs, source):
     """
-    Run `qikly --demo` `runs` times from `python`, each in a fresh directory
-    outside the repository, and require most of them to converge.
+    Run `qikly --demo` `runs` times from `python`, all at once, each in a fresh
+    directory outside the repository, and require at least two fifths of them
+    to converge.
 
-    Opt-in because it spends money, about a cent a run. Most rather than all,
-    because one run is an artifact and not a rate: the demo converges roughly
-    eight times in ten, so demanding every run would block about half of good
-    releases on chance. Two thirds is the bar, and every run that stalls has
-    its blocking test printed, because a stall is sometimes the generated test
-    being wrong rather than the code. 0.5.9 shipped after one such run, a
-    rounding test that expected 0.42 where round-half-up gives 0.41.
+    Opt-in because it spends money, about a cent a run. In parallel because
+    the runs share nothing: separate processes, separate folders, so five
+    take about as long as one.
+
+    **What the bar is for.** The demo converges about six times in ten, and
+    five runs cannot tell a release at sixty percent from one at fifty; that
+    takes dozens. What five can do cheaply is catch a release that broke the
+    demo outright. Two of five blocks a healthy release about one time in
+    eleven and passes a release converging only one time in five about a
+    quarter of the time; four of five, the bar that sounds safer, would block
+    two good releases in three. So the number is a floor, not a measure, and
+    the blocking test of every stalled run is printed to be read. A stall is
+    sometimes the generated test being wrong rather than the code: on 0.5.9 a
+    rounding test expected 0.42 where round-half-up gives 0.41, and nothing
+    could pass it.
     """
     import math
     import re
+    from concurrent.futures import ThreadPoolExecutor
 
-    needed = int(math.ceil(runs * 2 / 3.0))
-    converged = 0
-    for n in range(runs):
+    needed = max(1, int(math.ceil(runs * 0.4)))
+
+    def one(n):
         where = tempfile.mkdtemp(prefix="qikly-demo-")
         try:
             done = subprocess.run([python, "-m", "qikly", "--demo"], cwd=where,
-                                  capture_output=True, text=True,
-                                  timeout=900)
+                                  capture_output=True, text=True, timeout=900)
             out = done.stdout or ""
             ok = done.returncode == 0 and "Converged" in out
-            converged += ok
             # The per-iteration "FAILED:" lines can arrive on either stream,
             # so both are searched; reading stdout alone reported a stalled
             # run as "an error" with no test named.
             blocked = re.findall(r"FAILED: ([^\n]+)",
                                  out + "\n" + (done.stderr or ""))
-            print("        demo %d of %d from %s: %s%s" % (
-                n + 1, runs, source, "converged" if ok else "did not converge",
-                "" if ok else ", last blocked by " + (blocked[-1] if blocked
-                                                     else "an error, see below")))
-            if not ok and not blocked:
-                print("          " + (done.stderr or out).strip()[-300:])
+            note = ("" if ok else ", last blocked by " + blocked[-1] if blocked
+                    else ", stopped by an error: "
+                    + (done.stderr or out).strip()[-200:])
+            return ok, "converged" if ok else "did not converge" + note
         except subprocess.TimeoutExpired:
-            print("        demo %d of %d from %s: timed out after 15 minutes"
-                  % (n + 1, runs, source))
+            return False, "timed out after 15 minutes"
         finally:
             shutil.rmtree(where, ignore_errors=True)
+
+    started = time.time()
+    with ThreadPoolExecutor(max_workers=runs) as pool:
+        results = list(pool.map(one, range(runs)))
+    for n, (_, line) in enumerate(results):
+        print("        demo %d of %d from %s: %s" % (n + 1, runs, source, line))
+    converged = sum(1 for ok, _ in results if ok)
     check("the demo converges from %s" % source, converged >= needed,
-          "%d of %d runs converged, %d needed" % (converged, runs, needed),
+          "%d of %d runs converged, %d needed, %.0fs in parallel"
+          % (converged, runs, needed, time.time() - started),
           "the demo is the first thing a new user runs, so a release on which "
           "it rarely converges is broken whatever the suite says. Read the "
-          "blocking test of any stalled run before deciding: if the test is "
-          "wrong, that is a test-generation fault to fix, not chance")
+          "blocking test of every stalled run, pass or fail: a wrong test is "
+          "a test-generation fault to fix, not chance")
 
 
 def check_published_demo(version, runs):
@@ -530,11 +544,11 @@ def main():
                         help="skip the build and clean-venv install, which is "
                              "the slow part")
     parser.add_argument("--demo", type=int, default=0, metavar="N",
-                        help="also run `qikly --demo` N times, from the built "
-                             "wheel before tagging or from PyPI with --after, "
-                             "and require two thirds to converge. Spends "
-                             "about a cent a run on your provider key, so it "
-                             "is opt-in; 3 is the release-day number")
+                        help="also run `qikly --demo` N times in parallel, "
+                             "from the built wheel before tagging or from PyPI "
+                             "with --after, and require two fifths to converge. "
+                             "Spends about a cent a run on your provider key, "
+                             "so it is opt-in; 5 is the release-day number")
     args = parser.parse_args()
 
     print("\nqikly release check, %s\n" % ("after release" if args.after else "before tagging"))
@@ -575,9 +589,9 @@ def main():
     if not args.after and not failed:
         if not args.demo:
             print("\nStill yours to do, because it spends money:")
-            print("  python tools/release_check.py --demo 3")
-            print("    runs the demo three times from the built wheel, outside")
-            print("    this repository, and needs two of them to converge.")
+            print("  python tools/release_check.py --demo 5")
+            print("    runs the demo five times at once from the built wheel,")
+            print("    outside this repository, and needs two to converge.")
         # One command per line, and no `&&`: Windows PowerShell 5.1 does
         # not have it, and this list is printed for somebody who is nearly
         # done and reading quickly. `mcp-publisher` is a release binary
