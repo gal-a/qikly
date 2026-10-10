@@ -37,6 +37,15 @@ failure here, and do not "fix" it by changing the test.
 
 ## 3. Build, and install into a clean environment
 
+`tools/release_check.py` does this, and then runs the commands people are
+told to run, from the installed wheel in a folder outside the repository, free
+and with no key: `qikly --explain CALC_TAX`, the landing page's first command;
+`--score-code` twice on a small fixture, which must score the same both times;
+`--install-skill` and `--install-mcp --dry-run`; and the MCP server's opening
+handshake. `--after` runs the same checks against what PyPI serves. The suite
+tests these too, but against the source tree, where a packaging or path bug
+cannot show.
+
 First check no experiment is running. The research scripts write throwaway task
 configs such as `CALC_TAX_EFI.yaml` into `inputs_public/config/tasks/` and
 delete them when the run ends, so a wheel built mid-sweep ships them as though

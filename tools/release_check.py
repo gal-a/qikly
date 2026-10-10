@@ -316,10 +316,112 @@ def check_wheel(version, demos=0):
         check("it is a real install, not editable", not editable, ", ".join(editable),
               "an editable venv imports the source tree and reports the release "
               "version while exercising nothing that ships")
+        check_commands(python, "the built wheel")
         if demos:
             check_demo(python, demos, "the built wheel")
     finally:
         shutil.rmtree(venv, ignore_errors=True)
+
+
+def check_commands(python, source):
+    """
+    The commands the landing page, the README and the Skill directories tell
+    people to run, run from the installed package in a folder that is not
+    this repository. Free: no model call and no key.
+
+    The suite tests these against the source tree, which has every file
+    whether or not the wheel carries it, and resolves paths against the
+    repository. A packaging or path bug shows only here, on the version a
+    user can install.
+    """
+    import json
+    import re
+
+    def run_here(args, cwd, **kw):
+        env = dict(os.environ)
+        env["QIKLY_NO_VERSION_CHECK"] = "1"
+        return subprocess.run(args, cwd=cwd, capture_output=True, text=True,
+                              timeout=kw.pop("timeout", 300), env=env, **kw)
+
+    work = tempfile.mkdtemp(prefix="qikly-commands-")
+    try:
+        # 1. The landing page's first command, for every visitor.
+        done = run_here([python, "-m", "qikly", "--explain", "CALC_TAX"], work)
+        out = done.stdout or ""
+        check("`qikly --explain CALC_TAX` works from %s" % source,
+              done.returncode == 0 and "VERDICT" in out
+              and "acceptance_criteria" in out,
+              (done.stderr or out).strip()[-300:],
+              "it is the first command the landing page gives every visitor")
+
+        # 2. --score-code gives the same score twice, unseeded. Before 0.5.9 a
+        # stale bytecode cache made the same input score 2, 3 or 4 of 8.
+        project = os.path.join(work, "score")
+        os.makedirs(os.path.join(project, "tests"))
+        with open(os.path.join(project, "calc.py"), "w", encoding="utf-8") as fh:
+            fh.write("def f(x):\n    if x == 3:\n        return 1\n    return 2\n\n\n"
+                     "def g(y):\n    if y >= 5:\n        return 7\n    return 0\n")
+        with open(os.path.join(project, "tests", "test_calc.py"), "w",
+                  encoding="utf-8") as fh:
+            fh.write("from calc import f\n\n\ndef test_f():\n"
+                     "    assert f(3) == 1\n    assert f(4) == 2\n")
+        scores = []
+        for _ in range(2):
+            done = run_here([python, "-m", "qikly", "--score-code", "calc.py",
+                             "--score-tests", "tests"], project)
+            m = re.search(r"(\d+) of (\d+) planted faults caught",
+                          (done.stdout or "") + (done.stderr or ""))
+            scores.append(m.group(0) if m and done.returncode == 0 else None)
+        check("`qikly --score-code` scores the same twice from %s" % source,
+              scores[0] is not None and scores[0] == scores[1],
+              " / ".join(str(s) for s in scores),
+              "a score that moves between identical runs is not a score; 0.5.8 "
+              "did exactly that")
+
+        # 3. The two setup commands the Skill directories and the page name.
+        skill = os.path.join(work, "skill")
+        os.makedirs(skill)
+        done = run_here([python, "-m", "qikly", "--install-skill"], skill)
+        installed = os.path.join(skill, ".claude", "skills", "qikly", "SKILL.md")
+        check("`qikly --install-skill` writes the Skill from %s" % source,
+              done.returncode == 0 and os.path.isfile(installed),
+              (done.stderr or done.stdout or "").strip()[-300:])
+        mcp_dir = os.path.join(work, "mcp")
+        os.makedirs(mcp_dir)
+        done = run_here([python, "-m", "qikly", "--install-mcp", "--dry-run"],
+                        mcp_dir)
+        written = [n for n in (".mcp.json", ".vscode", ".cursor")
+                   if os.path.exists(os.path.join(mcp_dir, n))]
+        check("`qikly --install-mcp --dry-run` plans and writes nothing from %s"
+              % source, done.returncode == 0 and not written,
+              ", ".join(written) or (done.stderr or "").strip()[-300:])
+
+        # 4. The MCP server answers its opening handshake. It needs the
+        # optional extra, installed here the way the README tells users to.
+        extra = subprocess.run([python, "-m", "pip", "install", "-q",
+                                "mcp>=2.0,<3"], capture_output=True, text=True)
+        binary = os.path.dirname(python)
+        server = os.path.join(binary, "qikly-mcp" + (".exe" if os.name == "nt" else ""))
+        hello = json.dumps({
+            "jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": {"protocolVersion": "2025-06-18", "capabilities": {},
+                       "clientInfo": {"name": "release-check", "version": "1"}}})
+        answer = ""
+        if extra.returncode == 0 and os.path.isfile(server):
+            try:
+                answer = subprocess.run([server], cwd=work, input=hello + "\n",
+                                        capture_output=True, text=True,
+                                        timeout=60).stdout or ""
+            except subprocess.TimeoutExpired as exc:
+                answer = (exc.stdout or b"").decode("utf-8", "replace") \
+                    if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+        check("the MCP server answers its handshake from %s" % source,
+              '"serverInfo"' in answer,
+              answer.strip()[:200] or (extra.stderr or "no reply").strip()[-200:],
+              "it is a published surface, listed in the MCP Registry, that "
+              "nothing else in this check starts")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def check_demo(python, runs, source):
@@ -399,7 +501,9 @@ def check_published_demo(version, runs):
                               capture_output=True, text=True)
         if check("qikly %s installs from PyPI" % version, done.returncode == 0,
                  (done.stderr or "").strip()[-300:]):
-            check_demo(python, runs, "PyPI")
+            check_commands(python, "PyPI")
+            if runs:
+                check_demo(python, runs, "PyPI")
     finally:
         shutil.rmtree(venv, ignore_errors=True)
 
@@ -561,8 +665,9 @@ def main():
     if args.after:
         check_published(version)
         check_remote_ready(version)
-        if args.demo:
-            check_published_demo(version, args.demo)
+        # Always: the command checks are free, and the demo inside only runs
+        # when --demo asks for it.
+        check_published_demo(version, args.demo)
     else:
         # Cheap and read-only first, expensive last. Every check here ran in
         # this order for 0.5.7: the remote check costs about a second, failed
