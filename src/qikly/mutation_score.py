@@ -617,10 +617,16 @@ def _unreached(workspace, target, env=None):
         never = []
         n = os.path.normcase
         inside = n(os.path.realpath(workspace)) + os.sep
-        outside = [p for p in loaded if not n(p).startswith(inside)]
+        # Indexed by file name once. Rescanning every loaded path for each
+        # scored file took 51 seconds for 500 files against 50,000 modules.
+        outside = {}
+        for p in loaded:
+            if not n(p).startswith(inside):
+                outside.setdefault(n(os.path.basename(p)), []).append(p)
         for path, relative in target.files:
             hit = os.path.exists(os.path.join(workspace, relative) + HIT)
-            if not hit or _shadowed(path, outside):
+            same_name = outside.get(n(os.path.basename(path)), [])
+            if not hit or _shadowed(path, same_name):
                 never.append(relative)
         return never
     finally:
