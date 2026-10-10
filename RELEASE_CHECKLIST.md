@@ -288,3 +288,24 @@ QIKLY_CHECK_LINKS=1 python -m pytest -q tests/test_landing_page_footer.py
 In PowerShell, set `$env:QIKLY_CHECK_LINKS=1` first. If the books address has
 moved, change `BOOKS_URL` in that test and the footer in `docs/index.html`
 together.
+
+## Third-party listings, last
+
+Several sites list qikly, and most were not written by this project. The ones
+that read from GitHub or PyPI catch up on their own; the rest hold a version
+number or a claim that rots unless someone looks. A listing showing an old
+version, or a number the current release no longer produces, is worse than no
+listing. Check these a day after the upload, once their own scans have run:
+
+| Listing | What to check | Updates itself? |
+|---|---|---|
+| [MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=qikly) | the new version is latest, with the matching `qikly[mcp]==` pin | yes, the `mcp-registry` job; checked above |
+| [M8ven MCP Trust Index](https://m8ven.ai/mcp/gal-a/qikly) | the scanned commit is the released one | yes, about once a day |
+| [mcprush](https://mcprush.com/gal-a/qikly-mcp) | the version shown, and the description still matches what ships | not reliably; update it from the publisher account if it lags |
+| [Agensi](https://www.agensi.io/skills/qikly) | the version floor, and any measured figure quoted in its demo | no; edit from the seller dashboard |
+| SkillsMP, skills.sh, agentskill.sh | the Skill version matches `metadata.version` in `SKILL.md` | yes, they read the repository |
+
+**Any measured number a listing quotes has to be reproducible on the version
+just released.** If this release changed a figure, a listing that quotes the
+old one is now making a claim the software does not back, and it is changed
+the same day.
