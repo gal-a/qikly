@@ -180,9 +180,12 @@ def render(facts):
     lines.append("")
 
     if facts["withheld_ok"]:
-        lines.append("  VERDICT: no criterion text reaches the coding agent, so when a "
+        # Not "never the rule it broke": the agent sees the failing test's
+        # source, which often states the rule it checks. What it never sees
+        # is the criteria, and so never the tests it has not failed yet.
+        lines.append("  VERDICT: no criterion text reaches the coding agent. When a "
                      "test fails it")
-        lines.append("  sees the error and never the rule it broke.")
+        lines.append("  sees that test and its error, never the acceptance criteria.")
         if facts.get("restated"):
             lines.append("")
             lines.append("  BUT LOOK AT THIS. That verdict compares text. These lines "
@@ -382,7 +385,8 @@ def render_html(facts):
     code_note = "The same file, without them."
     if facts["withheld_ok"] and count:
         code_note = ('<b class="verdict-inline">No criterion text reaches the coding agent.</b> '
-                     "When a test fails, it sees the error and never the rule it broke.")
+                     "When a test fails, it sees that test and its error, never the "
+                     "acceptance criteria.")
 
     # The coding agent's column leads. This page exists to show what was
     # withheld, and the withheld-from side is the one a reader came to see.
