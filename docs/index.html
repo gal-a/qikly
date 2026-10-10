@@ -651,9 +651,9 @@ footer {
       <img src="images/qikly_hero.png" width="3200" height="1680"
            alt="The coder never sees the answer key. Its tests come from criteria it was never shown, so they can disagree with it. Two code panels kept apart: calc.py written by the coding agent, and test_calc.py written by the test agent, which asserts a tax rate limit the coding agent was never given. The suite passes 9 of 9.">
       <figcaption>One logged run. Only the test agent was told a rate may not
-        exceed 100. The coding agent worked that bound out from a failing test and
-        wrote <code>or rate &gt; 100</code> itself, so the 9 of 9 is code meeting a
-        bar it never read.</figcaption>
+        exceed 100. The coding agent figured that bound out from a failing test and
+        added <code>or rate &gt; 100</code> itself, so the 9 of 9 is code passing an
+        acceptance bar it never saw.</figcaption>
     </figure>
 
     <!-- The first command is free and needs no key: it shows the withholding,
