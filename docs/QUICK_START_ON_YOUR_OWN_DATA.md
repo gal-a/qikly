@@ -56,9 +56,9 @@ dependency chain and pip installs qikly itself last, so there is a window where
 its dependencies are present and qikly is not, which looks exactly like a
 broken install.
 
-Of the five starting points, `--demo` and `--criteria-from-docs` need a
-key. `--version`, `--explain`, `--validate`, `--init`, `--example` and
-`--scaffold` make no model call and cost nothing.
+Only `--demo` needs a key. `--version`, `--explain`, `--validate`,
+`--init`, `--example` and `--scaffold` make no model call and cost
+nothing.
 
 Gemini is the default and its key is `GEMINI_API_KEY`. For OpenAI or
 Anthropic, which need an extra install, see [the provider table in
@@ -150,9 +150,6 @@ second run keeps anything you edited.
 writes `MY_METRICS`, the same form filled in, with a module and real sample data
 behind it. Neither command writes the other's task, so whichever you ran is the
 only task in your project.
-`--criteria-from-docs README.md` writes no task at all: it prints the
-criteria your documentation implies, each with its quote, ready to paste
-into whichever task you are filling in.
 
 > **No module to start from?** You do not need one. `qikly --init` writes a
 > starter task with `requirements` and `acceptance_criteria` and no `seed:`

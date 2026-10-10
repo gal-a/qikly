@@ -831,7 +831,7 @@ def _parse_args():
     )
     parser.add_argument(
         "--init", action="store_true",
-        help="STARTING POINT 1 of 5, for your own code with a blank form. "
+        help="STARTING POINT 1 of 4, for your own code with a blank form. "
              "Create the inputs_private/ layout and a commented starter task in the "
              "current directory, then stop. A fresh install has nowhere to put a task "
              "until this has been run. Never overwrites an existing file. See also "
@@ -841,7 +841,7 @@ def _parse_args():
     )
     parser.add_argument(
         "--example", action="store_true",
-        help="STARTING POINT 2 of 5, and the one to pick first. Copy a finished "
+        help="STARTING POINT 2 of 4, and the one to pick first. Copy a finished "
              "worked example into the project, at the paths its task files name, "
              "creating the inputs_private/ layout first if it is not there yet. "
              "Lays down my_metrics.py, its two task files, and sample data, so "
@@ -914,7 +914,7 @@ def _parse_args():
     )
     parser.add_argument(
         "--scaffold", metavar="FILE", default=None,
-        help="STARTING POINT 3 of 5, for code you already have. Read a Python file "
+        help="STARTING POINT 3 of 4, for code you already have. Read a Python file "
              "and write the task YAML for it: module path, the real "
              "signatures of its public functions, and a guessed entrypoint. Leaves "
              "requirements and acceptance_criteria for you, because criteria derived "
@@ -1118,24 +1118,22 @@ def _parse_args():
     )
     parser.add_argument(
         "--demo", action="store_true",
-        help=f"STARTING POINT 4 of 5, to watch before committing to anything. "
+        help=f"STARTING POINT 4 of 4, to watch before committing to anything. "
              f"Run one task end to end in a throwaway "
              f"{DEMO_DIR}/{DEMO_PREFIX}<timestamp>/ directory and print "
              f"where the code, tests, and full record landed. Defaults to {DEMO_TASK}; combine with "
              f"--tasks to demo a different one. Writes nothing outside that directory, and you "
              f"delete the directory afterwards: do not start your own project inside it."
     )
+    # Hidden from --help and undocumented, on purpose. Graded on five READMEs
+    # on 2026-10-10 it mostly copied example lines rather than stating
+    # behaviour, found about one in ten of the claims a reader would pull
+    # out of prose, and its rejections were wrong more often than right. The
+    # code stays so the work is not lost; it is not offered until it passes
+    # that measurement.
     parser.add_argument(
         "--criteria-from-docs", metavar="DOC", nargs="+", default=None,
-        help="STARTING POINT 5 of 5, for a project whose rules were never "
-             "written down as rules. Read prose documentation and print the "
-             "acceptance criteria it implies, each quoting the sentence it "
-             "came from, plus the sentences that cannot be tested as written "
-             "and why. One model call, which needs a key. The model is shown "
-             "only the files you name, so name documentation rather than "
-             "source: criteria read out of code describe that code. The "
-             "output is valid YAML: paste it into a task file's "
-             "acceptance_criteria."
+        help=argparse.SUPPRESS
     )
     return parser.parse_args()
 
@@ -1277,7 +1275,7 @@ def _do_init(with_example=False):
         print("  never do. Your own code instead:")
         print("    qikly --scaffold path/to/module.py")
         print()
-        # The one page that disambiguates the five starting points was
+        # The one page that disambiguates the four starting points was
         # reachable from neither --help nor from here, which is where somebody
         # who has just run one of them is standing.
         print("  The rest, including which starter is which:")

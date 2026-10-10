@@ -253,7 +253,11 @@ def test_the_table_still_has_a_row_for_every_use_case_we_test():
     joined = " ".join(commands)
     for flag in ("--demo", "--scaffold", "--init", "--generate-criteria",
                  "--check-criteria", "--resume", "--criteria-from"):
-        assert flag in joined, f"{flag} is no longer documented in the table"
+        # Matched as a whole flag. A substring match let --criteria-from-docs
+        # stand in for the ticket row, which had been missing from the
+        # reference all along.
+        assert re.search(re.escape(flag) + r"(?![\w-])", joined), (
+            f"{flag} is no longer documented in the table")
     assert any(c.strip() in ("qikly --tasks <MY_TASKS>", "qikly --tasks &lt;MY_TASKS&gt;")
                for c in commands), "the plain run, the case the tool is built for, is missing"
 

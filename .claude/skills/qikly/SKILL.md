@@ -5,7 +5,7 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.3.5
+  version: 0.3.6
   requires: qikly >= 0.5.4
 ---
 
@@ -59,16 +59,6 @@ things that do work, and let the user choose:
   could fail. The scaffold reads their real signatures; the two halves are the
   part only they can write, and the whole value is in that being a separate act
   from writing the code.
-
-**If they have documentation but no written criteria**, a README or docs
-pages that make claims in sentences, `qikly --criteria-from-docs README.md`
-drafts the criteria from those pages for them to correct. One model call; it
-reads only the files named, and every criterion is printed above the sentence
-it came from. Only that quote is checked against the document: the criterion
-is the model's wording of it, so ask the user to read the two together before
-using any. Never point it at source code: criteria read out of an
-implementation describe that implementation, which is the bar this whole tool
-argues against. Needs qikly 0.5.9 or later.
 
 ## Ask economically, or you will lose them
 
@@ -369,7 +359,6 @@ yet.
 | `qikly --explain X` | free | to show the user exactly what each agent receives, criteria present on one side and absent on the other |
 | `qikly --score-suite --tasks X` | free, and slow | after a run converges, to find what the suite would not have noticed. It plants one fault at a time in the code and reports which ones the tests missed. Free because every fault is an edit to the code's syntax tree and no model is asked anything; slow because each fault means running your whole suite again |
 | `qikly --score-code PATH --score-tests PATH` | free, and slow | **for a suite qikly did not write**, which is what somebody already has before they have anything else. Point it at a module or package and the tests for it, and it reports which planted faults the tests did not notice. No task file, no run, no model call, and the report lands beside their code |
-| `qikly --criteria-from-docs DOC...` | one model call | when the rules exist only as prose in a README or docs pages. Prints draft criteria as YAML, each above the sentence it quotes, plus the sentences too vague to test. A quote not found word for word in one document drops its criterion. Documentation only, never source |
 | `qikly --check-criteria --tasks X` | one model call | when a spec may contradict itself, before spending a run on it |
 | `qikly --propose-fixtures --tasks X` | one model call | when `--validate` says a criterion's values are missing from the data, to get the rows it would take |
 

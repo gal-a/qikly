@@ -251,6 +251,10 @@ SKILL_BODY_HASHES = {
     # mutation-score caution: that count came from a scorer later found to
     # reuse stale bytecode, and has not been re-measured.
     "0.3.5": "c3bab99fcf283fe1efa7ad31d9b49c09eda56d06148dfc77ff942acf4a389786",
+    # 0.3.6 takes --criteria-from-docs back out. Graded on five READMEs it
+    # was not good enough to recommend, and a Skill that offers it would
+    # send agents to it.
+    "0.3.6": "530814d582a806d93cd62beac34817d4e582e7e65a3e8b84c921faac1c31ff0c",
 }
 
 

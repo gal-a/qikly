@@ -6,7 +6,7 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
-> Mutation scores you can trust, criteria drafted from prose, and a way to tell whether editing a prompt helped
+> Mutation scores you can trust, and a way to tell whether editing a prompt helped
 
 ### Fixed
 - **`--score-code` and `--score-suite` could print a wrong score, in either
@@ -37,17 +37,6 @@ packaging tools would read as `1.1`.
   broken tests were counted as faults caught.
 
 ### Added
-- **`--criteria-from-docs DOC...`**, the fifth starting point, for a project
-  whose rules exist only as prose. One model call reads only the documents
-  named and prints the acceptance criteria they imply as YAML to paste into a
-  task file, each above the sentence it came from, plus the sentences too
-  vague to test. A quote must be found as whole sentences of one paragraph,
-  list item, heading or table cell, as a table row exactly as written, or as
-  a whole line of code, or its criterion is dropped, because a model will
-  invent a citation. That catches a fragment lifted from a wrapped line or
-  after a colon, which drops the "never" or the "unless" before it; it cannot
-  catch a whole list item whose lead-in sets the condition. Only the quote is
-  checked: the criterion is the model's wording of it.
 - **`--compare-prompts TASK`** groups a task's run summaries by the prompts
   that produced them and compares the arms, without a model call. `--repeats
   N` runs N more of each arm first, alternating. It refuses to compare arms
@@ -60,8 +49,9 @@ packaging tools would read as `1.1`.
   `--install-mcp` now writes it alongside the Claude Code and VS Code files.
   The file is checked; Cursor loading it has not been, which `docs/mcp.md`
   says.
-- **Skill 0.3.5** mentions `--criteria-from-docs`, and the Skill now also sits
-  at `.claude/skills/qikly/SKILL.md`, the path Skill directories crawl.
+- **Skill 0.3.6.** The Skill now also sits at `.claude/skills/qikly/SKILL.md`,
+  the path Skill directories crawl, and its mutation-score caution no longer
+  quotes a count measured before the bytecode fix.
 
 ## 0.5.8
 
