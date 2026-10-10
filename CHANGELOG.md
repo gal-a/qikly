@@ -4,7 +4,7 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
-## Unreleased
+## 0.5.9
 
 > Mutation scores you can trust, and a way to tell whether editing a prompt helped
 
@@ -52,6 +52,18 @@ packaging tools would read as `1.1`.
 - **Skill 0.3.6.** The Skill now also sits at `.claude/skills/qikly/SKILL.md`,
   the path Skill directories crawl, and its mutation-score caution no longer
   quotes a count measured before the bytecode fix.
+
+### Changed
+- **The landing page says what qikly is for**, functional tests for backend
+  Python, and what it does not test: interfaces, performance, load, security
+  or other non-functional properties. It is about a third of its former
+  length; the command table moved to `TASK_FILE_REFERENCE.md`.
+- **A failing test was described as returning only its error text**, on the
+  landing page and in `docs/FINDINGS.md`. The coding agent also sees the
+  failing test's source, and both now say so.
+- **`docs/FINDINGS.md` is published**, which the README already linked to,
+  with the pricing example re-measured on the fixed scorer: 3 of 8, where it
+  had said 4 of 8.
 
 ## 0.5.8
 
