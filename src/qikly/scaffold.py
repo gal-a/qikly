@@ -200,6 +200,47 @@ def module_path(source_path, task_id):
     return "outputs.agent_src.code.%s.%s" % (task_id, importable(stem))
 
 
+PLACEHOLDER_CRITERIA = '''acceptance_criteria:
+  - "TODO: one checkable statement, with its boundary value, e.g. a humidity of
+    100 is accepted and 101 is rejected"
+'''
+
+
+def with_questions(text, questions, written=None):
+    """
+    `text` with its placeholder criterion replaced by questions to answer, and
+    whether the replacement was made.
+
+    The questions are the ones `--score-code` raised about this file, each a
+    comment above a TODO. Two checks before the result is used, because this
+    writes into the section the whole tool rests on: the file must still parse,
+    and none of the question text may survive the cut the coding agent's prompt
+    is made from. Either failing keeps the plain scaffold.
+    """
+    import yaml
+
+    from qikly import score_questions
+    from qikly.agent_api.agent_interface import without_acceptance_criteria
+
+    questions = [q for q in questions or []
+                 if isinstance(q, dict) and isinstance(q.get("question"), str)]
+    if not questions or text.count(PLACEHOLDER_CRITERIA) != 1:
+        return text, False
+    try:
+        out = text.replace(PLACEHOLDER_CRITERIA,
+                           score_questions.yaml_block(questions, written))
+        criteria = (yaml.safe_load(out) or {}).get("acceptance_criteria")
+        handed_over = without_acceptance_criteria(out)
+        if not isinstance(criteria, list) or len(criteria) != len(questions):
+            return text, False
+        if score_questions.MARK in handed_over or any(
+                q["question"][:40] in handed_over for q in questions):
+            return text, False
+    except Exception:
+        return text, False
+    return out, True
+
+
 def importable(stem):
     """
     A file stem as a name Python can import: `my-calc` becomes `my_calc`.

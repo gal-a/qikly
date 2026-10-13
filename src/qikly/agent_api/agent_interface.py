@@ -107,7 +107,24 @@ def _read_task(task_id):
         suggestion = difflib.get_close_matches(task_id, _available_task_ids(), n=1)
         hint = f" Did you mean {suggestion[0]!r}?" if suggestion else ""
         raise FileNotFoundError(f"task config not found at: {path}.{hint}")
-    return open(path).read()
+    # UTF-8, which is what YAML is and what --scaffold writes. Without an
+    # encoding Windows read the file as cp1252, and one accented letter in a
+    # question --scaffold copied from the code stopped --explain and the run.
+    # A file saved in the old local encoding is still read, as it always was.
+    with open(path, "rb") as handle:
+        raw = handle.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        import locale
+
+        text = raw.decode(locale.getpreferredencoding(False), errors="replace")
+    # Neither agent reads the questions --score-code raised: the test
+    # generator reads this whole file, comments included, and those lines
+    # quote the code it must never see.
+    from qikly.score_questions import drop_question_lines
+
+    return drop_question_lines(text.replace("\r\n", "\n"))
 
 
 def _criteria_span(task_text):
@@ -189,6 +206,11 @@ def without_acceptance_criteria(task_text):
     """
     import yaml
 
+    from qikly.score_questions import drop_question_lines
+
+    # Here as well as in _read_task, so `validate`, which hands this the file
+    # as written, sees exactly what a run hands over.
+    task_text = drop_question_lines(task_text)
     try:
         span = _criteria_span(task_text)
     except yaml.YAMLError as exc:

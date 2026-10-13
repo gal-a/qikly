@@ -358,7 +358,7 @@ yet.
 | `qikly --validate --tasks X` | free | always, before any run. Catches a missing input file, a leftover TODO, a criterion made of adjectives, a requirement restating a criterion, and criteria the data cannot reach |
 | `qikly --explain X` | free | to show the user exactly what each agent receives, criteria present on one side and absent on the other |
 | `qikly --score-suite --tasks X` | free, and slow | after a run converges, to find what the suite would not have noticed. It plants one fault at a time in the code and reports which ones the tests missed. Free because every fault is an edit to the code's syntax tree and no model is asked anything; slow because each fault means running your whole suite again |
-| `qikly --score-code PATH --score-tests PATH` | free, and slow | **for a suite qikly did not write**, which is what somebody already has before they have anything else. Point it at a module or package and the tests for it, and it reports which planted faults the tests did not notice, with a question for the user about each. No task file, no run, no model call. The report and the questions land in `qikly-suite-score/` in the directory they ran it from |
+| `qikly --score-code PATH --score-tests PATH` | free, and slow | **for a suite qikly did not write**, which is what somebody already has before they have anything else. Point it at a module or package and the tests for it, and it reports which planted faults the tests did not notice, with a question for the user about each, which `--scaffold` then writes into the task file. No task file, no run, no model call. The report lands in `qikly-suite-score/` in the directory they ran it from |
 | `qikly --check-criteria --tasks X` | one model call | when a spec may contradict itself, before spending a run on it |
 | `qikly --propose-fixtures --tasks X` | one model call | when `--validate` says a criterion's values are missing from the data, to get the rows it would take |
 
@@ -382,17 +382,19 @@ gone away: a fault that survives may be on a line no test ever executes, which
 is a gap in what the tests reach rather than in what they assert. Say that to
 the user rather than handing them a percentage as a verdict on their suite.
 
-**When `--score-code` reports misses, it also writes a questions file beside
-the report** (qikly 0.5.10 or later): a question for each missed fault, such as
-whether `rate > 100` or `rate >= 100` is what they meant, and what should
-happen at exactly 100. **Those questions are the user's to answer, never
-yours.** Put them to the user in plain words and write down what they say.
-Do not answer them from the code: what the code does now is exactly what is
-in question, and an answer read off it is a criterion that agrees with the
-code by construction. The file ends with an empty Acceptance Criteria section.
-Once it holds the user's answers, one per line, the three commands printed
-with it (`--scaffold`, `--criteria-from FILE --task-id TASK`, `--validate`)
-turn them into a task whose suite can disagree with the code.
+**When `--score-code` reports misses, its report ends with a question about
+each one** (qikly 0.6.0 or later), such as whether `rate > 100` or
+`rate >= 100` is what they meant, and what should happen at exactly 100.
+`qikly --scaffold` on the same module then writes those questions into the
+task file's `acceptance_criteria`, each as a comment above a `TODO`.
+**Those questions are the user's to answer, never yours.** Put them to the
+user in plain words and write down what they say in place of each `TODO`,
+deleting any they skip. Do not answer them from the code: what the code does
+now is exactly what is in question, and an answer read off it is a criterion
+that agrees with the code by construction. `qikly --validate` says how many
+answers are still `TODO`. Leave the `#?` question lines where they are or
+delete them: qikly removes them from what either agent receives, so moving
+them elsewhere in the file exposes nothing.
 
 ## When a run does not converge
 

@@ -919,7 +919,10 @@ def _parse_args():
              "and write the task YAML for it: module path, the real "
              "signatures of its public functions, and a guessed entrypoint. Leaves "
              "requirements and acceptance_criteria for you, because criteria derived "
-             "from an implementation can only describe what it already does."
+             "from an implementation can only describe what it already does. If "
+             "--score-code was run on the same file from this directory, its "
+             "questions are written into acceptance_criteria for you to answer "
+             "(not with --fresh or --from-doc)."
     )
     parser.add_argument(
         "--fresh", action="store_true",
@@ -2080,6 +2083,19 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
     if problem:
         print(problem)
         return 2
+    # The questions a `--score-code` run raised about this file go into the
+    # criteria section, where the answers belong. Not with --fresh, whose job
+    # is a new implementation, and not with --from-doc, whose criteria come
+    # from the document.
+    asked, asked_on = 0, None
+    if not fresh and not doc:
+        from qikly import score_questions
+        from qikly.scaffold import with_questions
+
+        found, asked_on = score_questions.latest_for(
+            source, os.path.join(root, "qikly-suite-score"))
+        text, used = with_questions(text, found, asked_on)
+        asked = len(found) if used else 0
     if doc:
         text, doc_problem = _fill_criteria_from(text, doc, root)
         if doc_problem:
@@ -2118,6 +2134,16 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
         print()
         print("  `qikly --validate` checks what you write there against the")
         print("  criteria and says so if the two say the same thing.")
+    elif asked:
+        print(f"  Its acceptance_criteria hold the {asked} question"
+              f"{'' if asked == 1 else 's'} your --score-code run of {asked_on}")
+        print("  raised, each above a TODO. Replace each TODO with your answer,")
+        print("  and delete any question you skip. Answer from what the code is")
+        print("  meant to do, not from what it does now: that is what is in question.")
+        print()
+        print("  requirements, the decisions in your own words, are yours too.")
+        print(f"  `qikly --validate --tasks {tid}` says how many are still unanswered.")
+        print()
     else:
         print("  It needs two sections from you, and neither can be derived from")
         print("  the code:")

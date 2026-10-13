@@ -4,11 +4,10 @@ Turn the faults a suite missed into questions a person can answer.
 `--score-code` ends with a list of changes your tests did not notice. That is
 useful and it is also where people stopped: the next step, writing a task file
 with acceptance criteria, is a blank page. This module fills the page with the
-questions the score has already raised, one per missed fault, in words rather
-than in AST notation:
+questions the score has already raised, in words rather than in AST notation:
 
-    Your tests pass whether this is `>=` or `>`. What should happen when the
-    value is exactly on the boundary?
+    Your tests pass whether this is `rate > 100` or `rate >= 100`, so nothing
+    checks the boundary itself. What should happen at exactly `100`?
 
 ## Why a question and not a test
 
@@ -16,21 +15,32 @@ A test written from the code can only check what the code already does, which
 is the failure this whole project exists to prevent. The answer has to come
 from a person who knows what the code is for. So nothing here guesses the
 answer, and nothing here calls a model: the question is built from the planted
-change alone, and the reply goes into `acceptance_criteria`, which the coding
-agent never sees.
+change alone.
 
-## The file is also the input to the next command
+## Where the answers go
 
-It ends with an empty `## Acceptance Criteria` section. Answers written there,
-one per line, are read by `qikly --criteria-from FILE --task-id TASK` unchanged:
-the questions above that heading are outside the section and are never taken
-for criteria, and an unanswered `-` line is skipped.
+Into the task file, where acceptance criteria live and where the run reads
+them. `--score-code` saves the questions beside its report, and `--scaffold`
+writes the newest ones about the file it is given into `acceptance_criteria`,
+each as a comment above a `TODO` for the answer, and `--validate` counts the
+`TODO`s left. Every question line starts with `#?` and is dropped from the text
+either agent receives, wherever it is in the file: the criteria cut would
+remove it for the coding agent, but the test generator reads the whole file,
+comments included, and a question quotes the code it must never see.
+
+An earlier version collected the answers in a separate markdown file and
+imported them with `--criteria-from`. That put the bar in two places, and the
+import's Gherkin detection read a code line such as `example: int = 3` as a
+scenario, so the code became a criterion.
 """
 import ast
+import glob
+import json
 import os
 import re
+from datetime import datetime
 
-QUESTIONS_SUFFIX = "_questions.md"
+QUESTIONS_SUFFIX = "_questions.json"
 
 _LINE = re.compile(r",\s*line (\d+)\s*$")
 _SWAP = re.compile(r"^(.+?) became (.+?)$")
@@ -263,113 +273,189 @@ def _scaffoldable(path):
         return True
 
 
-def next_steps(questions, questions_path, invoked_from=None):
+def _same_file(a, b):
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
+# ------------------------------------------------------------ saved form --
+
+def save(questions, path, label, scored=()):
     """
-    (commands, note): what turns the answers into a task, from where they are.
+    Write the questions where `--scaffold` will look for them.
 
-    The commands are exact or absent, never a template to edit, because a
-    template pasted as it stands fails. When they cannot be exact the note
-    says why and what to do instead:
-
-    - questions over several files, since `--scaffold` takes one module and
-      `--criteria-from` fills one task;
-    - a module `--scaffold` refuses, one with no public top-level function,
-      which is any module made only of classes;
-    - a task that already exists from an earlier round, which `--scaffold`
-      will not overwrite.
+    `scored` names every file the score planted faults in, including those
+    with no questions. Without it, a re-score after the tests were improved
+    left nothing behind, and `--scaffold` fell back to the older score's
+    questions, which were no longer true.
     """
-    here = invoked_from or os.getcwd()
+    data = {"label": label,
+            "written": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "scored": sorted({os.path.abspath(f) for f in scored}),
+            "questions": [{k: q.get(k) for k in
+                           ("file", "path", "line", "function", "code", "question")}
+                          for q in questions]}
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(data, handle, indent=1)
+    return path
 
-    def shown(p):
+
+def latest_for(module, directory):
+    """
+    (questions, written) from the newest saved score that asked about `module`,
+    or ([], None).
+
+    Newest by file time, and only the questions about this exact file, so
+    scaffolding one module of a scored package takes that module's questions
+    and leaves the rest. A file that cannot be read is skipped, never fatal:
+    scaffolding has to work whether or not a score was ever taken.
+    """
+    def age(name):
         try:
-            rel = os.path.relpath(p, here)
-        except ValueError:
-            return _pasteable(p)
-        return _pasteable(p if rel.startswith("..") else rel)
+            return os.path.getmtime(name)
+        except OSError:
+            return 0.0
 
-    paths = sorted({q["path"] for q in questions if q.get("path")})
-    answers = shown(questions_path)
-    if len(paths) != 1:
-        return [], (
-            f"These questions are about {len(paths)} files, and a task covers "
-            f"one module. Pick the module your answers are about, run "
-            f"`qikly --scaffold` on it, then `qikly --criteria-from {answers} "
-            f"--task-id` with the task id it prints.")
-    module, task = paths[0], task_for(paths[0])
-    if not _scaffoldable(module):
-        return [], (
-            f"`qikly --scaffold` needs a public top-level function to call, "
-            f"and {os.path.basename(module)} has none, which is usual for a "
-            f"module made of classes. Start a task with `qikly --init` "
-            f"instead and copy your answers under its acceptance_criteria.")
-    existing = os.path.join(here, "inputs_private", "config", "tasks",
-                            f"{task}.yaml")
-    if os.path.isfile(existing):
-        return [f"qikly --criteria-from {answers} --task-id {task}",
-                f"qikly --validate --tasks {task}"], (
-            f"{task} already exists, so there is nothing to scaffold. If it "
-            f"already has acceptance criteria, --criteria-from will not "
-            f"overwrite them: add your answers to them by hand instead.")
-    return [f"qikly --scaffold {shown(module)}",
-            f"qikly --criteria-from {answers} --task-id {task}",
-            f"qikly --validate --tasks {task}"], None
+    found = sorted(glob.glob(os.path.join(directory, "*" + QUESTIONS_SUFFIX)),
+                   key=age, reverse=True)
+    for name in found:
+        try:
+            with open(name, encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        def listed(key):
+            value = data.get(key)
+            return value if isinstance(value, list) else []
 
+        items = [q for q in listed("questions")
+                 if isinstance(q, dict) and isinstance(q.get("question"), str)
+                 and isinstance(q.get("path"), str)]
+        scored = [f for f in listed("scored") if isinstance(f, str)]
+        mine = [q for q in items if _same_file(q["path"], module)]
+        if not mine and not any(_same_file(f, module) for f in scored):
+            continue
+        # The newest score of this file decides, even when it asked nothing:
+        # its tests may since have been improved.
+        return _still_true(mine, module), data.get("written")
+    return [], None
+
+
+def _still_true(questions, module):
+    """
+    The questions whose line still reads as it did when they were asked.
+
+    A question names a line and shows its code. Once the file is edited, the
+    line number can point at something else entirely, and a question about
+    code that is no longer there is worse than none.
+    """
+    try:
+        with open(module, encoding="utf-8-sig", errors="replace") as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return []
+    kept = []
+    for q in questions:
+        line, code = q.get("line"), q.get("code")
+        if not isinstance(line, int) or not code:
+            continue
+        if 0 < line <= len(lines) and lines[line - 1].strip() == code.strip():
+            kept.append(q)
+    return kept
+
+
+# ------------------------------------------------------- in the task file --
+
+_ANSWER = '  - "TODO: your answer to the question above"'
+
+# Every line qikly writes for a question starts with this, so the text either
+# agent receives can drop them wherever a user moves them. Plain comments
+# inside the criteria block are cut with it, but the test generator reads the
+# whole file, comments included, and it must not read the code they quote.
+MARK = "#?"
+_MARKED = re.compile(r"(?m)^[ \t]*#\?.*(?:\r?\n|$)")
+# YAML refuses a control character anywhere in a file, comments included, so
+# one escape code in a string literal would void the whole block.
+_UNPRINTABLE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f\ud800-\udfff\ufffe\uffff]")
+
+
+def drop_question_lines(text):
+    """`text` without any line qikly wrote for a question. Idempotent."""
+    return _MARKED.sub("", text or "")
+
+
+def _printable(text):
+    return _UNPRINTABLE.sub("?", " ".join(str(text).split()))
+
+
+def _comment(text, width=78):
+    """Marked comment lines, wrapped, whatever the code or the question holds."""
+    import textwrap
+
+    return ["  %s " % MARK + part for part in
+            textwrap.wrap(_printable(text), width - 5, break_long_words=False,
+                          break_on_hyphens=False)] or ["  " + MARK]
+
+
+def yaml_block(questions, written=None):
+    """
+    The `acceptance_criteria` block `--scaffold` writes when there are questions.
+
+    Every question and every line of code is a comment, so nothing taken from
+    the code can become a criterion, and each answer slot is a TODO, which
+    `--validate` reports until it is replaced. The block is parsed back before
+    it is used, in `scaffold`, so a question can never leave the file invalid.
+    """
+    when = f" on {written}" if written else ""
+    count = len(questions)
+    lines = ["acceptance_criteria:"]
+    lines += _comment(
+        f"{count} question{'' if count == 1 else 's'} from qikly --score-code"
+        f"{when}, about behaviour your tests do not check. Replace each TODO "
+        f"with your answer, naming a value someone could check, and delete any "
+        f"you skip. Answer from what the code is meant to do, not from what "
+        f"the line shown does now. Lines starting {MARK} are removed from "
+        f"everything either agent receives, wherever they are in this file.")
+    lines.append("")
+    for q in questions:
+        where = q.get("file") or "your code"
+        if q.get("function"):
+            where += f", {q['function']}"
+        if q.get("line"):
+            where += f", line {q['line']}"
+        lines += _comment(where + ":")
+        if q.get("code"):
+            # The code on a line of its own, never wrapped, so it reads as
+            # code. Still a comment: nothing taken from it can be a criterion.
+            lines.append("  %s     " % MARK + _printable(q["code"]))
+        lines += _comment(q["question"])
+        lines.append(_ANSWER)
+        lines.append("")
+    return "\n".join(lines).rstrip("\n") + "\n"
+
+
+# ------------------------------------------------------- in the report ----
 
 def _inline(code):
-    """
-    A line of code as inline code, never as a fenced block.
-
-    The file is read by `--criteria-from`, which looks for Gherkin first and
-    matches `Example:` or `Scenario:` at the start of any line. A dataclass
-    field `example: int = 3` shown in a fenced block became the criterion
-    `int = 3:`, and the user's real answers were dropped. Inside a code span
-    the line starts with a backtick and cannot match.
-    """
+    """A line of code as an inline code span, whatever backticks it holds."""
     fence = "``" if "`" in code else "`"
     pad = " " if code.startswith("`") or code.endswith("`") else ""
     return f"{fence}{pad}{code}{pad}{fence}"
 
 
-def render(label, questions, steps, note=None, misses=None):
-    """The questions file: questions first, then the empty section to answer in."""
+def report_lines(questions, misses, advice_lines):
+    """The questions section of the `--score-code` report, grouped by line."""
     count = len(questions)
-    misses = count if misses is None else misses
-    plural = "" if misses == 1 else "s"
-    lines = [f"# Questions your tests leave open: {label}", "",
-             f"Your tests passed {misses} deliberate change{plural} to your "
-             f"code, which come down to {count} question"
-             f"{'' if count == 1 else 's'} below. Each is a behaviour nothing "
-             f"checks yet, so each is a question only you can answer: qikly "
+    lines = ["## Questions your tests leave open", "",
+             f"The {misses} miss{'' if misses == 1 else 'es'} above come down "
+             f"to {count} question{'' if count == 1 else 's'}. Each is a "
+             f"behaviour nothing checks yet, so each is yours to answer: qikly "
              f"will not guess, because tests written from the code can only "
-             f"agree with it.", "",
-             "Answer from what the code is meant to do, not from what the "
-             "line shown does now: that line is the thing in question. Some "
-             "changes make no difference a test could ever see, so if a "
-             "question has no sensible answer, skip it.", "",
-             "## How to use this file", "",
-             "1. Answer each question as one line under **Acceptance "
-             "Criteria** at the end, naming a value someone could check: \"a "
-             "rate of exactly 100 is rejected\", not \"rates are validated\". "
-             "Write the answer alone, without the question's number."]
-    if steps:
-        lines += ["2. Then run these, in order:", "", "   ```"]
-        lines += [f"   {step}" for step in steps]
-        lines += ["   ```", ""]
-        if note:
-            lines += [note, ""]
-        lines += ["They copy your answers into a task file as its acceptance "
-                  "criteria and check it for free. The check lists what is "
-                  "still yours to fill in before a run: the TODO lines, such "
-                  "as the requirements, and a sample of your input data.", ""]
-    else:
-        lines += [f"2. {note}", ""]
-    lines += ["## Questions", ""]
-    # Grouped by line, because a line such as `if rate < 0 or rate > 100:`
-    # can raise several questions, and repeating the code for each reads as
-    # the tool repeating itself. The numbers are for reading; the answers
-    # below are written without them, because a number copied into an answer
-    # would reach test generation as part of the criterion.
-    number, last = 0, None
+             f"agree with it. Some changes make no difference a test could ever "
+             f"see; skip a question with no sensible answer.", ""]
+    lines += [line for line in advice_lines] + [""]
+    last = None
     for q in questions:
         place = (q["file"], q["line"])
         if place != last:
@@ -382,10 +468,48 @@ def render(label, questions, steps, note=None, misses=None):
             lines += [f"### {where}", ""]
             if q["code"]:
                 lines += [_inline(q["code"]), ""]
-        number += 1
-        lines += [f"**Q{number}.** {q['question']}", ""]
-    lines += ["## Acceptance Criteria", "",
-              "<!-- One answer per line. Lines left as a bare dash are "
-              "skipped. -->", ""]
-    lines += ["- " for _ in questions]
-    return "\n".join(lines) + "\n"
+        lines += [f"- {q['question']}", ""]
+    return lines
+
+
+def advice(questions, invoked_from=None):
+    """
+    What to run next, as lines, exact for where the questions are.
+
+    Commands are given only when they will work as pasted: `--scaffold` takes
+    one module and refuses one with no public function, and will not rewrite a
+    task that already exists.
+    """
+    here = invoked_from or os.getcwd()
+
+    def shown(p):
+        try:
+            rel = os.path.relpath(p, here)
+        except ValueError:
+            return _pasteable(p)
+        return _pasteable(p if rel.startswith("..") else rel)
+
+    paths = sorted({q["path"] for q in questions if q.get("path")})
+    if not paths:
+        return []
+    if len(paths) > 1:
+        return ["They are about %d files. A task covers one module: run "
+                "`qikly --scaffold FILE` on the one you want to specify first, "
+                "and it writes that file's questions into the task for you to "
+                "answer. The files: %s." % (len(paths), ", ".join(shown(p) for p in paths))]
+    module, task = paths[0], task_for(paths[0])
+    if not _scaffoldable(module):
+        return ["`qikly --scaffold` needs a public top-level function to call, "
+                "and %s has none, which is usual for a module made of classes. "
+                "Start a task with `qikly --init` instead and copy these "
+                "questions under its acceptance_criteria as comments starting "
+                "%s, each above your answer." % (os.path.basename(module), MARK)]
+    existing = os.path.join(here, "inputs_private", "config", "tasks", f"{task}.yaml")
+    if os.path.isfile(existing):
+        return ["%s already exists, so `--scaffold` will not rewrite it. Paste "
+                "the questions you want under its acceptance_criteria as "
+                "comments starting %s, each above your answer." % (task, MARK)]
+    return ["Next: `qikly --scaffold %s` writes the task file with these "
+            "questions in its acceptance_criteria, each above a TODO for your "
+            "answer. `qikly --validate --tasks %s` then says how many are "
+            "still unanswered." % (shown(module), task)]

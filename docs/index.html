@@ -666,9 +666,10 @@ footer {
     </p>
 
     <!-- 2026-10-13: the first command is now the one that runs on the
-         reader's own code. It is free and needs no key, and since 0.5.10 it
+         reader's own code. It is free and needs no key, and since 0.6.0 it
          ends with a next step: each fault the tests missed becomes a question,
-         and the answers become the criteria. --explain, which shows the
+         and --scaffold writes the questions into the task file's criteria for
+         the reader to answer. --explain, which shows the
          withholding on a bundled task, is the second line. -->
     <div class="install">
       <span><span class="prompt">$</span> pip install --upgrade qikly</span>
@@ -677,10 +678,11 @@ footer {
     <p class="route-note">That plants faults in a copy of your code, names the
       ones your tests miss, and turns each into a question only you can answer,
       such as whether <code>rate &gt; 100</code> or <code>rate &gt;= 100</code>
-      is what you meant. That much needs no API key and no model call, and
-      nothing of yours is modified. Your answers then become the acceptance
-      criteria a run writes independent tests from, which is the step that
-      needs a key. <code>qikly --explain CALC_TAX</code> shows the split
+      is what you meant. Then <code>qikly --scaffold your_module.py</code>
+      writes those questions into a task file's acceptance criteria for you to
+      answer. Both need no API key and no model call, and nothing of yours is
+      modified. A run writes independent tests from your answers, which is the
+      step that needs a key. <code>qikly --explain CALC_TAX</code> shows the split
       on a bundled task, in about a second. Then <code>qikly --demo</code> runs a task end to end with a
       Gemini, OpenAI or Anthropic key for well under a cent, and
       <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="hero-quick-start">five

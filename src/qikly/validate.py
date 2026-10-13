@@ -189,9 +189,18 @@ def check_task(path):
                                     "requirements", "acceptance_criteria")
                 if task.get(field) is not None and _TODO.search(str(task.get(field)))]
     if leftover:
+        # Counted for the criteria, because --scaffold writes one TODO per
+        # question --score-code raised, and "still has TODO placeholders"
+        # does not tell anyone how many answers are left.
+        open_answers = sum(
+            1 for c in (task.get("acceptance_criteria") or [])
+            if isinstance(c, str) and _TODO.search(c))
+        counted = (f" ({open_answers} of the acceptance criteria still "
+                   f"unanswered)" if open_answers else "")
         warnings.append(
-            f"{name}: still has TODO placeholders in {', '.join(leftover)}. A run "
-            f"sends them to the agents as written, so replace them first")
+            f"{name}: still has TODO placeholders in {', '.join(leftover)}"
+            f"{counted}. A run sends them to the agents as written, so "
+            f"replace them first")
 
     for relative in (task.get("inputs") or []):
         if not _input_exists(relative):

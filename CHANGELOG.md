@@ -7,20 +7,25 @@ packaging tools would read as `1.1`.
 ## Unreleased
 
 ### Added
-- **`--score-code` asks a question about every fault your tests missed.**
-  Beside the report it writes `<name>_questions.md`: a plain question for
-  each miss, naming the file, line and function, and the comparison itself
-  when it is the only one of its kind on the line, such as "your tests pass
-  whether this is `rate > 100` or `rate >= 100`... what should happen at
-  exactly `100`?". Misses that ask the same thing share one question. The
-  file ends with an empty Acceptance Criteria section, and the console prints
-  the commands that turn the answers into a task: `--scaffold`,
-  `--criteria-from FILE --task-id TASK` and `--validate`, quoted for pasting.
-  Where those cannot be exact, for questions over several files, a module
-  made only of classes, or a task that already exists, it says what to do
+- **`--score-code` asks a question about every fault your tests missed, and
+  `--scaffold` puts the questions where the answers belong.** The report ends
+  with a plain question for each miss, naming the file, line and function,
+  and the comparison itself when it is the only one of its kind on the line,
+  such as "your tests pass whether this is `rate > 100` or `rate >= 100`...
+  what should happen at exactly `100`?". Misses that ask the same thing share
+  one question. `qikly --scaffold` on the same module then writes the newest
+  questions about that file into `acceptance_criteria`, each as a comment
+  above a `TODO` for your answer. Question lines start with `#?` and are
+  removed from everything either agent receives, wherever they end up in the
+  file, because they quote the code; the answers are withheld from the coding
+  agent like any criterion. `--validate` says how many answers are still
+  `TODO`. A question whose line has since changed is dropped, and a newer
+  score that asks nothing replaces an older one that did. Where the next command
+  cannot be exact, for questions over several files, a module made only of
+  classes, or a task that already exists, the report says what to do
   instead. Nothing guesses an answer and no model is called; the answers are
-  yours, because tests read off the code can only agree with it. Written only
-  for a suite qikly did not write, and only when something was missed.
+  yours, because tests read off the code can only agree with it. Asked only
+  about a suite qikly did not write, and only when something was missed.
 - **Skill 0.3.7** tells an assistant that those questions are the user's to
   answer, never its own, and how the answers become a task.
 
@@ -31,6 +36,11 @@ packaging tools would read as `1.1`.
   scalar and every later command reported the task file as unparseable. The
   documented sequence, scaffold and then import criteria, failed on every
   scaffolded task. The whole placeholder block is now removed.
+- **A task file with a non-ASCII character could not be read on Windows.**
+  The prompt builder opened it without an encoding, so Windows read it as
+  cp1252, and one accented letter stopped `--explain` and the run while
+  `--validate`, which reads UTF-8, said nothing. Task files are now read as
+  UTF-8, and a file saved in the old local encoding is still read.
 - **`--scaffold` on a file whose name is not a Python name wrote a task no
   test could import.** `my-calc.py` gave `module: "...MY_CALC_VERIFY.my-calc"`.
   The module path now uses an importable name (`my_calc`), and a run copies

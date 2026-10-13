@@ -255,11 +255,11 @@ SKILL_BODY_HASHES = {
     # was not good enough to recommend, and a Skill that offers it would
     # send agents to it.
     "0.3.6": "530814d582a806d93cd62beac34817d4e582e7e65a3e8b84c921faac1c31ff0c",
-    # 0.3.7 adds the questions --score-code writes about the faults a suite
-    # missed, and the rule that they are the user's to answer: an assistant
+    # 0.3.7 adds the questions --score-code asks about the faults a suite
+    # missed, which --scaffold writes into the task file, and the rule that they are the user's to answer: an assistant
     # answering them from the code would be writing criteria off the
     # implementation, which is the failure the Skill opens by warning against.
-    "0.3.7": "249f245f32b49403ede06b7d1fcdbf409209c695ba4d152743ae6ff7d3359d30",
+    "0.3.7": "1d76ae0cc25b85158b9182b7d97fd7bf07d4b5948b44e4088755c3ea700759a3",
 }
 
 

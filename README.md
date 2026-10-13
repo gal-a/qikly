@@ -49,13 +49,21 @@ notice. Then it turns each one into a question only you can answer:
 > Your tests pass whether this is `rate > 100` or `rate >= 100`, so nothing
 > checks the boundary itself. What should happen at exactly `100`?
 
-Write your answers in the file it prints, one line each. The commands it
-prints next are free too: they turn your answers into a task file whose
-acceptance criteria they are, and check it. A run on that task,
-`qikly --tasks NAME_VERIFY`, is the step that needs an API key. qikly writes a
-suite from your answers without reading your code, runs it against a copy of
-your module, and repairs that copy where tests fail. Your own file is never
-edited.
+The answers go where acceptance criteria live, in the task file:
+
+```bash
+qikly --scaffold my_module.py
+```
+
+writes `MY_MODULE_VERIFY.yaml` with those questions in its
+`acceptance_criteria`, each above a `TODO` for your answer, and
+`qikly --validate --tasks MY_MODULE_VERIFY` tells you how many are still
+unanswered. Both are free. The question lines start with `#?`, and qikly
+removes them from everything either agent receives, because they quote your
+code. A run on the task, `qikly --tasks MY_MODULE_VERIFY`, is the
+step that needs an API key: qikly writes a suite from your answers without
+reading your code, runs it against a copy of your module, and repairs that
+copy where tests fail. Your own file is never edited.
 
 ### Other ways in
 
