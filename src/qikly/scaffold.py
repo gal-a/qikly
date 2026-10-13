@@ -197,7 +197,27 @@ def module_path(source_path, task_id):
     than the copy the coding agent patches, so no fix could ever reach a test.
     """
     stem = os.path.splitext(os.path.basename(source_path))[0]
-    return "outputs.agent_src.code.%s.%s" % (task_id, stem)
+    return "outputs.agent_src.code.%s.%s" % (task_id, importable(stem))
+
+
+def importable(stem):
+    """
+    A file stem as a name Python can import: `my-calc` becomes `my_calc`.
+
+    A dash, a space or a leading digit is fine in a filename and not in an
+    import, so `--scaffold my-calc.py` used to write a module path no test
+    could import. A run copies a seeded file in under this same name, so the
+    path and the file agree, and the original file keeps its own name.
+    """
+    import keyword
+    import re
+
+    name = re.sub(r"\W", "_", stem) or "module"
+    if name[0].isdigit():
+        name = "_" + name
+    if keyword.iskeyword(name):
+        name += "_"
+    return name
 
 
 def _source_rel(source_path, project_root):

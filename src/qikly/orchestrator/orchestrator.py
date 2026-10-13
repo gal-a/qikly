@@ -513,6 +513,22 @@ def load_seed_spec(task_id):
         )
     return implementation, tests
 
+def seed_filename(src):
+    """
+    The name a seeded file goes in under, or None to keep its own.
+
+    Only a single file whose stem Python cannot import is renamed, to the name
+    `--scaffold` wrote into interface.module: my-calc.py goes in as my_calc.py.
+    A package keeps its folder name, which is part of its imports.
+    """
+    if not src or not os.path.isfile(src):
+        return None
+    from qikly.scaffold import importable
+
+    stem = os.path.splitext(os.path.basename(src))[0]
+    return None if importable(stem) == stem else importable(stem) + ".py"
+
+
 def install_seed(src, dest_dir, filename=None, keep_directory_name=False):
     """
     Copy a seed file or directory into dest_dir, which the caller has already
@@ -524,7 +540,9 @@ def install_seed(src, dest_dir, filename=None, keep_directory_name=False):
 
     A single file keeps its own basename unless `filename` overrides it --
     the implementation's basename has to match the task's interface.module,
-    so it is never renamed, while a seeded test file is renamed to the
+    so it is renamed only when its own name cannot be imported (my-calc.py
+    goes in as my_calc.py, the name --scaffold wrote), while a seeded test
+    file is renamed to the
     canonical name for its stage.
 
     Returns the list of paths written.
@@ -1311,8 +1329,15 @@ def orchestrate(task_id, seed=None, resume=False):
     # and nothing new becomes importable for them.
     seeded_package = bool(seed_implementation) and os.path.isdir(seed_implementation)
     if seed_implementation and not reusable["implementation"]:
+        # A file whose stem is not a Python name, such as my-calc.py, goes in
+        # under the name `--scaffold` wrote into interface.module, or no test
+        # could import it. The user's own file keeps its name.
+        renamed = seed_filename(seed_implementation)
+        if renamed:
+            print(f"copying {os.path.basename(seed_implementation)} in as "
+                  f"{renamed}, so the tests can import it", flush=True)
         installed = install_seed(seed_implementation, agent_src_dir,
-                                 keep_directory_name=True)
+                                 filename=renamed, keep_directory_name=True)
         log_transaction({
             "action": "seed_installed", "kind": "implementation",
             "source": seed_implementation, "files": installed,

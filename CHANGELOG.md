@@ -31,6 +31,11 @@ packaging tools would read as `1.1`.
   scalar and every later command reported the task file as unparseable. The
   documented sequence, scaffold and then import criteria, failed on every
   scaffolded task. The whole placeholder block is now removed.
+- **`--scaffold` on a file whose name is not a Python name wrote a task no
+  test could import.** `my-calc.py` gave `module: "...MY_CALC_VERIFY.my-calc"`.
+  The module path now uses an importable name (`my_calc`), and a run copies
+  the seeded file in under that name and says so. Your own file keeps its
+  name.
 
 ## 0.5.9
 

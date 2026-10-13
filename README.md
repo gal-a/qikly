@@ -29,10 +29,6 @@ criteria and asked to produce both the implementation and the suite that checks
 it. Everything goes green, and the green means nothing. **qikly takes the answer
 key away from the student: the coding agent never sees the acceptance criteria.**
 
-In one session, a suite an AI wrote from the code scored 8 out of 8 on a
-fault-planting check and still missed four real bugs. A suite qikly wrote from a
-spec which the coding agent never saw found them. That gap is what qikly is for.
-
 ## Start here
 
 ```bash
@@ -78,10 +74,8 @@ what should notice.
 
 It tells you what your tests would notice changing. It cannot tell you whether
 the code was right to begin with, because it works by breaking code that is
-there, so anything the code never did is invisible to it. That is the gap
-above: the suite that scored 8 out of 8 was thorough about the code that was
-there and blind to what the code should have done. No model is called, nothing
-of yours is modified, and no code leaves your machine.
+there, so anything the code never did is invisible to it. No model is called,
+nothing of yours is modified, and no code leaves your machine.
 
 `--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
 delete. It is for watching, not for building in. `--example` and `--scaffold`
