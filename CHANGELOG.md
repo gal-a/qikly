@@ -4,6 +4,34 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## Unreleased
+
+### Added
+- **`--score-code` asks a question about every fault your tests missed.**
+  Beside the report it writes `<name>_questions.md`: a plain question for
+  each miss, naming the file, line and function, and the comparison itself
+  when it is the only one of its kind on the line, such as "your tests pass
+  whether this is `rate > 100` or `rate >= 100`... what should happen at
+  exactly `100`?". Misses that ask the same thing share one question. The
+  file ends with an empty Acceptance Criteria section, and the console prints
+  the commands that turn the answers into a task: `--scaffold`,
+  `--criteria-from FILE --task-id TASK` and `--validate`, quoted for pasting.
+  Where those cannot be exact, for questions over several files, a module
+  made only of classes, or a task that already exists, it says what to do
+  instead. Nothing guesses an answer and no model is called; the answers are
+  yours, because tests read off the code can only agree with it. Written only
+  for a suite qikly did not write, and only when something was missed.
+- **Skill 0.3.7** tells an assistant that those questions are the user's to
+  answer, never its own, and how the answers become a task.
+
+### Fixed
+- **`--criteria-from --task-id` on a freshly scaffolded task wrote invalid
+  YAML.** `--scaffold`'s placeholder criterion wraps onto a second line, and
+  only its first line was removed, so the second was left behind as a stray
+  scalar and every later command reported the task file as unparseable. The
+  documented sequence, scaffold and then import criteria, failed on every
+  scaffolded task. The whole placeholder block is now removed.
+
 ## 0.5.9
 
 > Fix: --score-code results from earlier versions could be wrong; re-measure them

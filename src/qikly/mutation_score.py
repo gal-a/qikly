@@ -790,9 +790,11 @@ def _score_once(target, mutants, seed, code_root):
                 # flattering possible misreading.
                 unscorable += 1
             else:
+                # `path` is kept so a missed fault can be turned into a
+                # question that shows the line it was planted in.
                 (missed if verdict == "pass" else caught).append(
                     {"file": os.path.basename(path), "family": family,
-                     "change": described})
+                     "change": described, "path": path})
             shutil.copy2(path, planted)
 
     if unverified and missed and not caught:
@@ -933,6 +935,10 @@ def render(result, gaps):
         for item in result["missed"]:
             lines.append(f"- `{item['file']}`: {item['change']} ({item['family']})")
         lines.append("")
+        if result.get("questions_file"):
+            lines += [f"Each miss is also a question in "
+                      f"`{result['questions_file']}`. Answer them there and "
+                      f"qikly can write tests that check the answers.", ""]
 
     if result["caught"]:
         lines += ["## What it caught", ""]
@@ -959,7 +965,14 @@ def report_dir(target, invoked_from=None):
     return os.path.join(invoked_from or os.getcwd(), "qikly-suite-score")
 
 
-def write(result, gaps, out_dir=OUT_DIR):
+def write(result, gaps, out_dir=OUT_DIR, invoked_from=None):
+    """
+    The report, and beside it the questions file when there is one to write.
+
+    Questions are written only for a suite qikly did not write. A qikly task
+    already has its criteria, and `--criteria-from` refuses to add more, so a
+    questions file there would end in a command that does nothing.
+    """
     os.makedirs(out_dir, exist_ok=True)
     # A task id is already a safe name; a label taken from a path is not, and
     # "src/pricing.py" in a filename is a directory that does not exist.
@@ -972,6 +985,21 @@ def write(result, gaps, out_dir=OUT_DIR):
     while os.path.exists(path):
         path = f"{base}_{suffix}.md"
         suffix += 1
+    questions = []
+    if result.get("generated") is False and result.get("missed"):
+        from qikly import score_questions
+
+        questions = score_questions.build(result["missed"])
+    if questions:
+        asked = path[:-len(".md")] + score_questions.QUESTIONS_SUFFIX
+        steps, note = score_questions.next_steps(questions, asked, invoked_from)
+        with open(asked, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(score_questions.render(
+                result["task"], questions, steps, note,
+                misses=len(result["missed"])))
+        result.update(questions_file=os.path.basename(asked),
+                      questions_path=asked, questions_count=len(questions),
+                      questions_steps=steps, questions_note=note)
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(render(result, gaps))
     return path
@@ -1047,7 +1075,7 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
         return None
 
     gaps = unreachable_criteria(target.task_id)
-    path = write(result, gaps, report_dir(target, invoked_from))
+    path = write(result, gaps, report_dir(target, invoked_from), invoked_from)
 
     if not result["baseline"]:
         if target.task_id is None:
@@ -1075,5 +1103,18 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
               f"never triggers: a suite cannot catch what no row exercises. "
               f"Run --propose-fixtures --tasks {task_id} first.")
     print(f"[{task_id}] what it missed, one line each: {path}")
+    if result.get("questions_path"):
+        # The step people stopped at was the blank task file. This is the
+        # moment they know what their tests leave open, so the way from here
+        # to a suite is printed in full rather than left to the docs.
+        count = result["questions_count"]
+        print(f"[{task_id}] {count} question{'' if count == 1 else 's'} your "
+              f"tests leave open: {result['questions_path']}")
+        if result["questions_steps"]:
+            print(f"[{task_id}] answer them in that file, then run:")
+            for step in result["questions_steps"]:
+                print(f"    {step}")
+        if result.get("questions_note"):
+            print(f"[{task_id}] {result['questions_note']}")
     _invite_a_report(result)
     return path

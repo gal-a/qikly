@@ -2029,132 +2029,6 @@ def _do_validate(tasks, as_json):
     return 1 if errors else 0
 
 
-def _do_criteria_from(source, task_id):
-    """
-    Lift acceptance criteria out of wherever they were already written.
-
-    The blank `acceptance_criteria:` list is the biggest thing between someone
-    and a first run, and for most teams the list is not actually blank: it is
-    sitting in a ticket, written before any code was cut, because their process
-    asked for it. This reads that ticket.
-
-    Printing is the default and writing needs --task-id, because criteria are
-    the one input the whole tool is judged against. Silently editing them is
-    not a thing this should ever do without being asked by name.
-
-    Only the YAML goes to stdout. Every explanation goes to stderr, so
-
-        qikly --criteria-from ticket.md >> inputs_private/config/tasks/T.yaml
-
-    appends a valid block rather than a block with advice wedged into the
-    middle of it. A command whose output is meant to be pasted has to be
-    pipeable, or the advice is worth less than the friction it adds.
-    """
-    from qikly.criteria_import import parse_file
-
-    root = INVOKED_FROM
-    path = source if os.path.isabs(source) else os.path.join(root, source)
-    if not os.path.isfile(path):
-        print(f"no such file: {path}", file=sys.stderr)
-        return 2
-
-    criteria = parse_file(path)
-    if not criteria:
-        print(f"No acceptance criteria found in {shown(path)}.", file=sys.stderr)
-        print(file=sys.stderr)
-        print("  Looked for a bullet list, an 'Acceptance Criteria' section, and", file=sys.stderr)
-        print("  Gherkin scenarios. Prose is deliberately not split into criteria:", file=sys.stderr)
-        print("  a rule nobody wrote is exactly the invented bar this tool argues", file=sys.stderr)
-        print("  against. Add a list and run this again.", file=sys.stderr)
-        return 2
-
-    print(f"# {len(criteria)} criteria from {shown(path)}")
-    print("acceptance_criteria:")
-    for item in criteria:
-        print(f'  - "{item.replace(chr(92), chr(92) * 2).replace(chr(34), chr(92) + chr(34))}"')
-
-    if not task_id:
-        print(file=sys.stderr)
-        print("  Paste this into your task file, or re-run with --task-id TASK to", file=sys.stderr)
-        print("  have it written in for you.", file=sys.stderr)
-        return 0
-
-    return _append_criteria_to_task(task_id, criteria)
-
-
-def shown(path, root=None):
-    """
-    A path as a reader wants to see it.
-
-    A file outside the project relpaths into a wall of "..", which is worse
-    than the absolute path it came from.
-    """
-    try:
-        rel = os.path.relpath(path, root or INVOKED_FROM)
-    except ValueError:
-        return path          # on another drive, where no relative path exists
-    return path if rel.startswith("..") else rel
-
-
-def _append_criteria_to_task(task_id, criteria):
-    """
-    Write criteria into a task that has none. Shared by both importers, so a
-    ticket read from a file and the same ticket read from Jira cannot end up
-    with two different rules about overwriting.
-    """
-    import yaml
-
-    root = INVOKED_FROM
-    dest = os.path.join(root, "inputs_private", "config", "tasks", f"{task_id}.yaml")
-    if not os.path.isfile(dest):
-        print(file=sys.stderr)
-        print(f"  No such task: {shown(dest)}", file=sys.stderr)
-        print("  Create it with --init or --scaffold first, then run this again.", file=sys.stderr)
-        return 2
-    with open(dest, encoding="utf-8") as handle:
-        text = handle.read()
-    existing = (yaml.safe_load(text) or {}).get("acceptance_criteria") or []
-    # A placeholder qikly wrote itself is not a bar to protect. --scaffold
-    # seeds a TODO line so the shape of the file is obvious, and treating that
-    # as real criteria blocked the natural sequence: scaffold from your code,
-    # then import the criteria from the ticket that described it.
-    placeholder = bool(existing) and all(
-        isinstance(c, str) and c.strip().upper().startswith("TODO") for c in existing)
-    if placeholder:
-        # Drop the placeholder block so the new criteria are the file's only
-        # bar, rather than being appended under a TODO nobody meant to keep.
-        kept, skipping = [], False
-        for line in text.splitlines():
-            if line.startswith("acceptance_criteria:"):
-                skipping = True
-                continue
-            if skipping and (line.startswith("  - ") or not line.strip()):
-                continue
-            skipping = False
-            kept.append(line)
-        text = "\n".join(kept).rstrip("\n") + "\n"
-        with open(dest, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(text)
-
-    if existing and not placeholder:
-        print(file=sys.stderr)
-        print(f"  {task_id} already has acceptance_criteria, so nothing was written.", file=sys.stderr)
-        print("  Merging two bars automatically would be a guess about which rule", file=sys.stderr)
-        print("  wins. Paste what you want from the list above.", file=sys.stderr)
-        return 2
-
-    block = "acceptance_criteria:\n" + "".join(
-        '  - "%s"\n' % item.replace("\\", "\\\\").replace('"', '\\"')
-        for item in criteria)
-    with open(dest, "a", encoding="utf-8", newline="\n") as handle:
-        handle.write(("" if text.endswith("\n") else "\n") + "\n" + block)
-    print(file=sys.stderr)
-    print(f"  Written into {shown(dest)}.", file=sys.stderr)
-    print("  Read them before you run. They are the standard the code is judged", file=sys.stderr)
-    print("  against, and a criterion that came out of a ticket is a draft.", file=sys.stderr)
-    return 0
-
-
 def _fill_criteria_from(text, doc, root):
     """Put a document's acceptance criteria into a freshly scaffolded task."""
     from qikly import from_doc as fd
@@ -2373,7 +2247,11 @@ def _append_criteria_to_task(task_id, criteria):
             if line.startswith("acceptance_criteria:"):
                 skipping = True
                 continue
-            if skipping and (line.startswith("  - ") or not line.strip()):
+            # Every indented line belongs to the block, not only the "  - "
+            # that opens an item: --scaffold's placeholder wraps onto a second
+            # line, and skipping just the first left that continuation behind
+            # as a stray scalar, so the file stopped being valid YAML.
+            if skipping and (not line.strip() or line[:1] in (" ", "\t")):
                 continue
             skipping = False
             kept.append(line)

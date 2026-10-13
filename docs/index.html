@@ -665,15 +665,23 @@ footer {
       passing an acceptance bar it never saw.
     </p>
 
-    <!-- The first command is free and needs no key: it shows the withholding,
-         which is the claim the headline makes. -->
+    <!-- 2026-10-13: the first command is now the one that runs on the
+         reader's own code. It is free and needs no key, and since 0.5.10 it
+         ends with a next step: each fault the tests missed becomes a question,
+         and the answers become the criteria. --explain, which shows the
+         withholding on a bundled task, is the second line. -->
     <div class="install">
       <span><span class="prompt">$</span> pip install --upgrade qikly</span>
-      <span><span class="prompt">$</span> qikly --explain CALC_TAX</span>
+      <span><span class="prompt">$</span> qikly --score-code your_module.py --score-tests tests/</span>
     </div>
-    <p class="route-note">That prints a bundled task twice, once as each agent
-      receives it, and the difference between them. No API key, no model call,
-      about a second. Then <code>qikly --demo</code> runs a task end to end with a
+    <p class="route-note">That plants faults in a copy of your code, names the
+      ones your tests miss, and turns each into a question only you can answer,
+      such as whether <code>rate &gt; 100</code> or <code>rate &gt;= 100</code>
+      is what you meant. That much needs no API key and no model call, and
+      nothing of yours is modified. Your answers then become the acceptance
+      criteria a run writes independent tests from, which is the step that
+      needs a key. <code>qikly --explain CALC_TAX</code> shows the split
+      on a bundled task, in about a second. Then <code>qikly --demo</code> runs a task end to end with a
       Gemini, OpenAI or Anthropic key for well under a cent, and
       <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="hero-quick-start">five
       steps</a> take your own module to a first run.</p>
@@ -858,7 +866,7 @@ footer {
     <ul class="designs">
       <li><code>qikly --score-code your_module.py --score-tests tests/</code> checks
         a suite you already have by planting faults in the code, free and with no
-        model call.</li>
+        model call, and asks you a question about each fault it missed.</li>
       <li><code>qikly --scaffold your_module.py</code> writes a task file from code
         you already have, for you to fill in the requirements and criteria.</li>
       <li><code>qikly --init</code> starts a task from nothing.</li>

@@ -53,8 +53,11 @@ qikly --score-code src/pricing.py --score-tests tests/test_pricing.py
 `--score-tests` is **the suite to run against each planted fault**, a file or a
 directory of them. The report names the faults your tests did not notice.
 
-Neither writes anything: the faults go into a temporary copy, and your files
-are not modified. No task file, no run, no API key, no model call.
+Neither changes your files: the faults go into a temporary copy. What it
+writes is a report in `qikly-suite-score/`, and, when your tests missed
+something, a questions file beside it with one question per miss for you to
+answer. Your answers become acceptance criteria through the three commands the
+file ends with. No task file, no run, no API key, no model call.
 
 ## 5. What is the difference between `--demo` and `--example`?
 

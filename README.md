@@ -47,6 +47,20 @@ probably arrived with.
 qikly --score-code my_module.py --score-tests tests/
 ```
 
+It plants faults in a copy of your code and names the ones your tests did not
+notice. Then it turns each one into a question only you can answer:
+
+> Your tests pass whether this is `rate > 100` or `rate >= 100`, so nothing
+> checks the boundary itself. What should happen at exactly `100`?
+
+Write your answers in the file it prints, one line each. The commands it
+prints next are free too: they turn your answers into a task file whose
+acceptance criteria they are, and check it. A run on that task,
+`qikly --tasks NAME_VERIFY`, is the step that needs an API key. qikly writes a
+suite from your answers without reading your code, runs it against a copy of
+your module, and repairs that copy where tests fail. Your own file is never
+edited.
+
 ### Other ways in
 
 | If you want to | Run | Costs |

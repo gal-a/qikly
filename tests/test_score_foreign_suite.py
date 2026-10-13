@@ -124,8 +124,11 @@ def test_the_report_lands_where_the_user_is_not_in_the_project_root(project):
 
 def test_the_report_names_what_the_suite_missed(project):
     _score(project)
-    text = (list((project / "qikly-suite-score").glob("*.md"))[0]
-            .read_text(encoding="utf-8"))
+    # The questions file sits beside the report from 0.5.10, so "the first
+    # .md" is no longer necessarily the report.
+    reports = [p for p in (project / "qikly-suite-score").glob("*.md")
+               if not p.name.endswith("_questions.md")]
+    text = reports[0].read_text(encoding="utf-8")
     assert "What it missed" in text
     assert "pricing.py" in text
     # The caveat about equivalent mutants is what makes a miss a question
