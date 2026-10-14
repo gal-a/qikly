@@ -282,14 +282,78 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  overflow-x: auto;
-  max-width: 520px;
+  width: fit-content;
+  max-width: 100%;
 }
 
-/* Never wrap a command. Broken across two lines it reads as two
-   commands, and the break lands inside a flag. The overflow above
-   turns that into a scroll on a narrow screen instead. */
+/* Never wrap a command on a screen it fits: broken across two lines it reads
+   as two commands. It fits from about 560px. Below that it wraps, with a
+   hanging indent so the continuation reads as one command, because a scroll
+   bar inside the one command we want copied hid half of it. */
 .install span { white-space: nowrap; }
+@media (max-width: 560px) {
+  .install { font-size: .82rem; }
+  .install span { white-space: normal; padding-left: 1.2em; text-indent: -1.2em; }
+}
+
+/* The three steps under the hero: one command each, with what it costs. */
+.steps {
+  list-style: none;
+  margin: 22px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+.step {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-top: 3px solid var(--accent);
+  border-radius: 10px;
+  padding: 18px 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.step .n {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .8rem;
+  color: var(--accent);
+  letter-spacing: .1em;
+}
+.step b { font-size: 1.08rem; color: var(--ink); }
+.step .cmd {
+  display: block;
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: .8rem;
+  line-height: 1.45;
+  /* Wrap between words only, so a flag such as --score-tests stays whole. */
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+.step .cmd span { white-space: nowrap; }
+.step p { margin: 0; font-size: .92rem; color: var(--ink-soft); flex: 1; }
+.step .cost {
+  align-self: flex-start;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: .72rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.step .cost.free { color: var(--accent); background: var(--accent-soft); }
+.step .cost.key { color: var(--code); background: var(--code-soft); }
+.step:last-child { border-top-color: var(--code); }
+
+.eyebrow.also { margin-top: 34px; }
+.also-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.also-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.also-list code { flex: 0 0 auto; }
+.also-list span { color: var(--ink-soft); font-size: .92rem; }
 
 .install .prompt { color: var(--ink-faint); }
 
@@ -652,46 +716,82 @@ footer {
            alt="The coder never sees the answer key. Its tests come from criteria it was never shown, so they can disagree with it. Two code panels kept apart: calc.py written by the coding agent, and test_calc.py written by the test agent, which asserts a tax rate limit the coding agent was never given. The suite passes 9 of 9.">
     </figure>
     <p class="lede">
-      When one AI writes both the code and its tests, a green suite proves
-      little: the tests were written to pass.
-      <strong>qikly splits the work between two agents. A test agent reads the
-      acceptance criteria and writes the tests. A coding agent writes the code
-      and never sees those criteria, so the tests can disagree with it.</strong>
-    </p>
-    <p class="lede">
-      In the run shown above, only the test agent was told a rate may not
-      exceed 100. The coding agent figured that bound out from a failing test
-      and added <code style="white-space:nowrap">or rate &gt; 100</code> itself, so the 9 of 9 is code
-      passing an acceptance bar it never saw.
+      One AI writing both the code and its tests proves little.
+      <strong>qikly keeps the acceptance criteria from the agent that writes
+      the code, so its tests can disagree with it.</strong>
     </p>
 
-    <!-- 2026-10-13: the first command is now the one that runs on the
-         reader's own code. It is free and needs no key, and since 0.6.0 it
-         ends with a next step: each fault the tests missed becomes a question,
-         and --scaffold writes the questions into the task file's criteria for
-         the reader to answer. --explain, which shows the
-         withholding on a bundled task, is the second line. -->
+    <!-- 2026-10-14: the hero carries one example and one command. The way
+         from that command to a suite is the section below, as three steps,
+         rather than a paragraph of commands under the install line. -->
+    <p class="lede">
+      In the run above, only the test agent was told a rate may not exceed
+      100. The coding agent found that bound from a failing test and added
+      <code style="white-space:nowrap">or rate &gt; 100</code> itself: the 9 of
+      9 is code passing a bar it never saw.
+    </p>
     <div class="install">
       <span><span class="prompt">$</span> pip install --upgrade qikly</span>
       <span><span class="prompt">$</span> qikly --score-code your_module.py --score-tests tests/</span>
     </div>
     <p class="route-note">That plants faults in a copy of your code, names the
-      ones your tests miss, and turns each into a question only you can answer,
-      such as whether <code>rate &gt; 100</code> or <code>rate &gt;= 100</code>
-      is what you meant. Then <code>qikly --scaffold your_module.py</code>
-      writes those questions into a task file's acceptance criteria for you to
-      answer. Both need no API key and no model call, and nothing of yours is
-      modified. A run writes independent tests from your answers, which is the
-      step that needs a key. <code>qikly --explain CALC_TAX</code> shows the split
-      on a bundled task, in about a second. Then <code>qikly --demo</code> runs a task end to end with a
-      Gemini, OpenAI or Anthropic key for well under a cent, and
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="hero-quick-start">five
-      steps</a> take your own module to a first run.</p>
+      ones your tests miss, and asks you a question about each: whether
+      <code style="white-space:nowrap">rate &gt; 100</code> or <code style="white-space:nowrap">rate &gt;= 100</code> is what you
+      meant. Free, no API key. Three steps below take it to a suite, or
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="hero-quick-start">the
+      quick start</a> does it in five.</p>
     <div class="links">
       <a class="btn btn-primary" href="https://github.com/gal-a/qikly" data-goatcounter-click="hero-github">Source on GitHub</a>
       <a class="btn" href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="hero-how-it-works">How it works, with one repair end to end</a>
     </div>
   </header>
+
+  <section class="band">
+    <p class="eyebrow">Start</p>
+    <h2>On your own code, in three steps</h2>
+    <ol class="steps">
+      <li class="step">
+        <span class="n">1</span>
+        <b>Score your tests</b>
+        <code class="cmd"><span>qikly</span> <span>--score-code</span> <span>your_module.py</span> <span>--score-tests</span> <span>tests/</span></code>
+        <p>Names the faults your tests miss, with a question about each.</p>
+        <span class="cost free">free, no key</span>
+      </li>
+      <li class="step">
+        <span class="n">2</span>
+        <b>Answer the questions</b>
+        <code class="cmd"><span>qikly</span> <span>--scaffold</span> <span>your_module.py</span></code>
+        <p>Writes them into the task file's acceptance criteria. You answer
+          each one there.</p>
+        <span class="cost free">free, no key</span>
+      </li>
+      <li class="step">
+        <span class="n">3</span>
+        <b>Run it</b>
+        <code class="cmd"><span>qikly</span> <span>--tasks</span> <span>YOUR_MODULE_VERIFY</span></code>
+        <p>Tests written from your answers, by an agent that never reads your
+          code. Your file is never edited.</p>
+        <span class="cost key">needs an API key</span>
+      </li>
+    </ol>
+
+    <p class="eyebrow also">Or see it first</p>
+    <ul class="also-list">
+      <li><code>qikly --explain CALC_TAX</code><span>what each agent is shown, free, about a second</span></li>
+      <li><code>qikly --demo</code><span>a task end to end, well under a cent with a Gemini, OpenAI or Anthropic key</span></li>
+      <li><code>qikly --init</code><span>a task from nothing</span></li>
+      <li><code>qikly --install-skill</code><span>teaches Claude Code, Gemini CLI, Codex or Cursor to drive qikly</span></li>
+    </ul>
+    <p class="route-note">
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="start-quick-start">Five
+      steps from your module to a first run</a>,
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have" data-goatcounter-click="start-which-command">every
+      command by what you already have</a>, and the design write-up:
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">the case</a>,
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">how well it works, with the measured results</a> and
+      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md" data-goatcounter-click="design-3">how it is built</a>.
+    </p>
+  </section>
 
   <section class="band">
     <p class="eyebrow">What it is for</p>
@@ -860,28 +960,6 @@ footer {
         are withheld, the suites are generated, a test fails, a patch lands, and
         it goes green. 38 seconds on gemini-3.5-flash-lite, not sped up.</figcaption>
     </figure>
-  </section>
-
-  <section class="band">
-    <p class="eyebrow">Start</p>
-    <h2>Pick the command that fits what you already have</h2>
-    <ul class="designs">
-      <li><code>qikly --score-code your_module.py --score-tests tests/</code> checks
-        a suite you already have by planting faults in the code, free and with no
-        model call, and asks you a question about each fault it missed.</li>
-      <li><code>qikly --scaffold your_module.py</code> writes a task file from code
-        you already have, for you to fill in the requirements and criteria.</li>
-      <li><code>qikly --init</code> starts a task from nothing.</li>
-      <li><code>qikly --install-skill</code> teaches Claude Code, Gemini CLI, Codex
-        or Cursor how to drive qikly.</li>
-    </ul>
-    <p>
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have" data-goatcounter-click="start-which-command">Every
-      command, by what you already have</a>, and the design write-up:
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">the case</a>,
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">how well it works, with the measured results</a> and
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md" data-goatcounter-click="design-3">how it is built</a>.
-    </p>
   </section>
 
   <p class="origin">The separation this tool enforces is ordinary practice in safety-critical engineering, where verification is required to be independent of implementation as part of a V&amp;V (Verification &amp; Validation) methodology for testing. This library's author worked in that setting on General Motors' autonomous vehicle program before building this toolset.</p>
