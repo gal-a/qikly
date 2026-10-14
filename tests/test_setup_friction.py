@@ -112,13 +112,19 @@ def test_the_scaffold_template_uses_decisions_and_consequences():
     assert "checkable edge cases" not in scaffold.TASK_TEMPLATE
 
 
-def test_the_landing_page_offers_the_quick_start_beside_the_install_block():
+def test_the_landing_page_offers_the_quick_start_where_people_start():
+    """
+    The quick start is linked from the Start section, the three steps right
+    under the hero. It used to have to sit beside the install block; on
+    2026-10-14 the hero was cut to one command and one line, and the way on
+    from it became that section, so the link lives there now.
+    """
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     with open(os.path.join(root, "docs", "index.html"), encoding="utf-8") as handle:
         page = handle.read()
-    install = page.index('<div class="install">')
-    links = page.index('<div class="links">', install)
-    assert "QUICK_START_ON_YOUR_OWN_DATA.md" in page[install:links]
+    start = page.index('<p class="eyebrow">Start</p>')
+    end = page.index("</section>", start)
+    assert "QUICK_START_ON_YOUR_OWN_DATA.md" in page[start:end]
 
 
 # ---------------------------------------------------------------- over MCP ----
