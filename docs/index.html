@@ -438,6 +438,7 @@ h1 {
 .install .prompt { color: var(--ink-faint); }
 
 .links { display: flex; flex-wrap: wrap; gap: 10px; }
+.links.install-row { align-items: center; gap: 14px; }
 
 .btn {
   font-size: .9rem;
@@ -810,12 +811,13 @@ footer {
         </ol>
       </figcaption>
     </figure>
-    <div class="install">
-      <span><span class="prompt">$</span> pip install qikly</span>
-    </div>
-    <div class="links">
+    <!-- The install line and the source link on one row. The design write-up
+         is linked from Read more in the Start section. -->
+    <div class="links install-row">
+      <div class="install">
+        <span><span class="prompt">$</span> pip install qikly</span>
+      </div>
       <a class="btn btn-primary" href="https://github.com/gal-a/qikly" data-goatcounter-click="hero-github">Source on GitHub</a>
-      <a class="btn" href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="hero-how-it-works">How it works, with one repair end to end</a>
     </div>
   </header>
 
