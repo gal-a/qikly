@@ -6,6 +6,12 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
+### Changed
+- **`--score-code` and `--score-suite` lead with what was missed:** "5 of 12
+  planted faults missed (41%), 7 caught" rather than "7 of 12 caught". The
+  misses are the finding, and a caught count read as a pass mark. Scripts
+  that parsed the old line need the new form.
+
 ### Added
 - **`--score-code` asks a question about every fault your tests missed, and
   `--scaffold` puts the questions where the answers belong.** The report ends
