@@ -234,6 +234,10 @@ h1 {
 /* The header image, above the fold. It is the only thing up here that shows
    the two agents side by side rather than describing them in a sentence. */
 .shot { margin: 26px 0 0; }
+.shot figcaption p { margin: 0 0 6px; }
+.shot figcaption ol { margin: 0; padding-left: 1.3em; }
+.shot figcaption li { margin: 0 0 4px; }
+.shot figcaption b { color: var(--ink); font-weight: 600; }
 .shot figcaption {
   margin-top: 10px;
   font-size: 0.9rem;
@@ -399,18 +403,20 @@ h1 {
 .eg .k { color: var(--code); }
 .eg .q { color: var(--ink-soft); }
 .eg .q b { color: var(--accent); font-weight: 500; }
-.eg .alert { color: var(--alert); font-weight: 600; }
+/* Crimson orange marks what needs attention, at normal weight: bold in
+   this colour was hard on the eyes. */
+.eg .alert { color: var(--alert); font-weight: 400; }
 .eg a.path { color: var(--alert); text-decoration: underline; text-underline-offset: 3px; }
 .eg .ask { margin: 10px 0 0; font-size: .86rem; line-height: 1.5; color: var(--ink-soft); }
 .eg .ask b { color: var(--ink); font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: .92em; }
-.eg .tag { color: var(--alert); font-weight: 700; margin-right: 4px; }
+.eg .tag { color: var(--alert); font-weight: 400; margin-right: 4px; }
 /* Two different edits, so two different looks. The person's own edit in
    step 2 is a struck line and a typed one, labelled "you delete" and "you
    type". qikly's repair in step 3 is a diff, with - and + and no strike. */
 .eg .who {
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: .72rem;
-  color: var(--alert);
+  color: var(--ink-faint);
   font-style: italic;
   white-space: nowrap;
 }
@@ -791,19 +797,22 @@ footer {
       <!-- 2026-10-14: the run the image shows, in small text under it, so the
            hero reads image, command, and nothing in between. The idea itself
            is the section after the hero, The Concept. -->
-      <figcaption>In this run only the test agent was told a rate may not
-        exceed 100. The coding agent found that bound from a failing test and
-        added <code style="white-space:nowrap">or rate &gt; 100</code> itself:
-        the 9 of 9 is code passing a bar it never saw.</figcaption>
+      <figcaption>
+        <p>This was run by two independent AI agents:</p>
+        <ol>
+          <li><b>The Test Agent set the acceptance bar:</b> it was told, from
+            the spec's acceptance criteria, that the rate may not exceed
+            100.</li>
+          <li><b>The Coding Agent found that bound from a failing test:</b> it
+            added <code style="white-space:nowrap">or rate &gt; 100</code>
+            itself, so the 9 of 9 is code passing an acceptance bar it never
+            saw, after applying the fix in a repair loop.</li>
+        </ol>
+      </figcaption>
     </figure>
     <div class="install">
-      <span><span class="prompt">$</span> pip install --upgrade qikly</span>
-      <span><span class="prompt">$</span> qikly --score-code your_module.py --score-tests tests/</span>
+      <span><span class="prompt">$</span> pip install qikly</span>
     </div>
-    <p class="route-note">That plants faults in a copy of your code, names the
-      ones your tests miss, and asks you a question about each: whether
-      <code style="white-space:nowrap">rate &gt; 100</code> or <code style="white-space:nowrap">rate &gt;= 100</code> is what you
-      meant. Free, no API key.</p>
     <div class="links">
       <a class="btn btn-primary" href="https://github.com/gal-a/qikly" data-goatcounter-click="hero-github">Source on GitHub</a>
       <a class="btn" href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="hero-how-it-works">How it works, with one repair end to end</a>
@@ -832,8 +841,7 @@ footer {
         </div>
         <figure class="eg">
           <figcaption>Four passing tests, scored</figcaption>
-<pre><span class="dim">[pricing.py]</span> <span class="alert">5 of 12 planted faults missed (41%)</span>, 7 caught.
-<span class="dim">[pricing.py]</span> <a class="path" href="https://github.com/gal-a/qikly/blob/main/docs/FAQ.md#4-what-is-the-difference-between---score-code-and---score-tests" data-goatcounter-click="eg-what-it-missed">what it missed, one line each</a>
+<pre><span class="dim">[pricing.py]</span> <a class="alert path" href="https://github.com/gal-a/qikly/blob/main/docs/FAQ.md#4-what-is-the-difference-between---score-code-and---score-tests" data-goatcounter-click="eg-what-it-missed">5 of 12 planted faults missed</a><span class="alert"> (41%)</span>, 7 caught.
 <span class="dim">[pricing.py]</span> <span class="alert">4 questions your tests leave open</span>
 </pre>
           <p class="ask"><span class="tag">Question 1</span> Your tests pass
@@ -929,8 +937,8 @@ footer {
       </div>
     </div>
     <p class="route-note">It fits most naturally where verification already
-      has to be independent of the people who build the thing: automotive,
-      medical devices, fintech and defence.</p>
+      has to be independent of the people who build the thing: Automotive,
+      Medical Devices, Fintech and Defence.</p>
   </section>
 
   <section class="band">
