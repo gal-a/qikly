@@ -319,7 +319,7 @@ def test_an_unconfirmed_run_is_flagged_above_the_score():
               "total": 1, "generated": False, "unreached": [],
               "unverified": True}
     text = mutation_score.render(result, [])
-    assert text.index("Could not confirm") < text.index("planted faults caught")
+    assert text.index("Could not confirm") < text.index("planted faults missed")
 
 
 def test_a_stray_init_in_a_flat_project_still_scores(tmp_path):

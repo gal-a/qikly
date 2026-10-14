@@ -369,7 +369,7 @@ def check_commands(python, source):
         for _ in range(2):
             done = run_here([python, "-m", "qikly", "--score-code", "calc.py",
                              "--score-tests", "tests"], project)
-            m = re.search(r"(\d+) of (\d+) planted faults caught",
+            m = re.search(r"(\d+) of (\d+) planted faults missed[^,]*, (\d+) caught",
                           (done.stdout or "") + (done.stderr or ""))
             scores.append(m.group(0) if m and done.returncode == 0 else None)
         check("`qikly --score-code` scores the same twice from %s" % source,

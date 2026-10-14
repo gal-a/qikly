@@ -850,6 +850,20 @@ def unreachable_criteria(task_id):
         return None
 
 
+def headline(caught, total):
+    """
+    The score in one line, misses first: "3 of 12 planted faults missed (25%),
+    9 caught".
+
+    Misses first because they are the finding. "9 of 12 caught" reads as a
+    pass mark, and the three it did not catch are the lines worth reading.
+    One function, so the report and the console cannot say it differently.
+    """
+    missed = total - caught
+    return (f"{missed} of {total} planted faults missed "
+            f"({missed * 100 // total}%), {caught} caught")
+
+
 def render(result, gaps):
     """The report, with what the number does not mean stated above it."""
     task = result["task"]
@@ -883,8 +897,7 @@ def render(result, gaps):
     total = result["total"]
     caught = len(result["caught"])
     if total:
-        lines += [f"**{caught} of {total} planted faults caught "
-                  f"({caught * 100 // total}%).**", ""]
+        lines += [f"**{headline(caught, total)}.**", ""]
         # The sentence that stops the number being read as a grade. A suite
         # scored 8 of 8 here while a suite written from the specification found
         # four real bugs in the same file: mutation scoring asks whether your
@@ -1097,8 +1110,8 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
         return path
 
     total, caught = result["total"], len(result["caught"])
-    percent = f"{caught * 100 // total}%" if total else "no faults planted"
-    print(f"[{task_id}] {caught} of {total} planted faults caught ({percent}).")
+    print(f"[{task_id}] {headline(caught, total)}." if total
+          else f"[{task_id}] no faults planted.")
     if gaps is None:
         print(f"[{task_id}] reachability could not be checked, so part of that "
               f"number may belong to your data rather than to your suite.")

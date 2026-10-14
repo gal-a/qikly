@@ -41,6 +41,7 @@
   --accent: #0e6a70;
   --accent-soft: #d9ebea;
   --warn: #b45309;
+  --alert: #c2410c;
   --warn-bg: #fdf0d5;
   /* The coding agent. Its own colour, because --warn was doing two jobs: a
      caveat box and "the side the criteria are kept from". They are now
@@ -61,6 +62,7 @@
     --accent: #57b8bd;
     --accent-soft: #112f2e;
     --warn: #d9a743;
+    --alert: #ff6a3d;
     --warn-bg: #2f2411;
     --code: #a855f7;
     --code-soft: #1e1729;
@@ -77,6 +79,7 @@
   --accent: #57b8bd;
   --accent-soft: #112f2e;
   --warn: #d9a743;
+  --alert: #ff6a3d;
   --warn-bg: #2f2411;
   --code: #a855f7;
   --code-soft: #1e1729;
@@ -396,8 +399,28 @@ h1 {
 .eg .k { color: var(--code); }
 .eg .q { color: var(--ink-soft); }
 .eg .q b { color: var(--accent); font-weight: 500; }
-.eg .del { color: var(--ink-faint); text-decoration: line-through; }
-.eg .ins { color: var(--accent); }
+.eg .alert { color: var(--alert); font-weight: 600; }
+.eg a.path { color: var(--alert); text-decoration: underline; text-underline-offset: 3px; }
+.eg .ask { margin: 10px 0 0; font-size: .86rem; line-height: 1.5; color: var(--ink-soft); }
+.eg .ask b { color: var(--ink); font-family: "IBM Plex Mono", monospace; font-weight: 500; font-size: .92em; }
+.eg .tag { color: var(--alert); font-weight: 700; margin-right: 4px; }
+/* Two different edits, so two different looks. The person's own edit in
+   step 2 is a struck line and a typed one, labelled "you delete" and "you
+   type". qikly's repair in step 3 is a diff, with - and + and no strike. */
+.eg .who {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: .72rem;
+  color: var(--alert);
+  font-style: italic;
+  white-space: nowrap;
+}
+.eg .legend { margin: 10px 0 0; font-size: .78rem; color: var(--ink-faint); }
+.eg .legend .you-del, .eg .legend .you-ins, .eg .legend .d-del, .eg .legend .d-ins {
+  font-family: "IBM Plex Mono", monospace; }
+.eg .you-del { color: var(--ink-faint); text-decoration: line-through; }
+.eg .you-ins { color: var(--accent); }
+.eg .d-del { color: var(--alert); }
+.eg .d-ins { color: var(--accent); }
 
 .eyebrow.also { margin-top: 34px; }
 .also-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
@@ -791,10 +814,12 @@ footer {
     <p class="eyebrow">Start</p>
     <h2>Create a test suite for your own code in 3 steps</h2>
     <!-- 2026-10-14: each step beside a real excerpt from one run of the same
-         module, pricing.py with a two-test suite: the score and a question it
-         asked, the answer written into the task file, and the test written
-         from that answer catching the code and the one-line repair. 5 model
-         calls, about $0.002, on gemini-3.5-flash-lite. -->
+         module, pricing.py with a four-test suite: the score and a question
+         it asked, the answer written in place of its TODO, and the test
+         written from that answer catching the code, with qikly's one-line
+         repair of a copy. 5 model calls, about $0.002, gemini-3.5-flash-lite.
+         The only additions are the Question 1 label and the price, rate note,
+         set in the page's own type rather than as output. -->
     <ol class="steps">
       <li class="row">
         <div class="step">
@@ -806,12 +831,14 @@ footer {
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
-          <figcaption>Two passing tests, scored</figcaption>
-<pre><span class="dim">[pricing.py]</span> 3 of 12 planted faults caught (25%).
-<span class="dim">[pricing.py]</span> 8 questions your tests leave open
-
-<span class="q">Your tests pass whether this is <b>rate &gt; 100</b>
-or <b>rate &gt;= 100</b>. What should happen at exactly 100?</span></pre>
+          <figcaption>Four passing tests, scored</figcaption>
+<pre><span class="dim">[pricing.py]</span> <span class="alert">5 of 12 planted faults missed (41%)</span>, 7 caught.
+<span class="dim">[pricing.py]</span> <a class="path" href="https://github.com/gal-a/qikly/blob/main/docs/FAQ.md#4-what-is-the-difference-between---score-code-and---score-tests" data-goatcounter-click="eg-what-it-missed">what it missed, one line each</a>
+<span class="dim">[pricing.py]</span> <span class="alert">4 questions your tests leave open</span>
+</pre>
+          <p class="ask"><span class="tag">Question 1</span> Your tests pass
+            whether this is <b>rate &gt; 100</b> or <b>rate &gt;= 100</b>.
+            What should happen at exactly 100?</p>
         </figure>
       </li>
       <li class="row">
@@ -819,18 +846,20 @@ or <b>rate &gt;= 100</b>. What should happen at exactly 100?</span></pre>
           <span class="n">Step 2</span>
           <b>Answer the questions</b>
           <code class="cmd"><span>qikly</span> <span>--scaffold</span> <span>your_module.py</span></code>
-          <p>Writes the questions into a task file. Replace each
-            <code>TODO</code> under a question with your answer in plain words,
-            and delete the ones you skip.</p>
+          <p>Writes the questions into a task file. Under each one, replace the
+            <code>TODO</code> line with your answer in plain words, and delete
+            the questions you skip.</p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
-          <figcaption>PRICING_VERIFY.yaml, one question</figcaption>
+          <figcaption>PRICING_VERIFY.yaml, Question 1, as you edit it</figcaption>
 <pre><span class="k">acceptance_criteria:</span>
   <span class="dim">#?     if rate &lt; 0 or rate &gt; 100:
   #? ... What should happen at exactly `100`?</span>
-  <span class="del">- "TODO: your answer to the question above"</span>
-  <span class="ins">- "a rate of exactly 100 is rejected with ValueError"</span></pre>
+  <span class="you-del">- "TODO: your answer to the question above"</span>
+  <span class="you-ins">- "a rate of exactly 100 is rejected with ValueError"</span></pre>
+          <p class="legend"><span class="you-del">struck</span> the line you delete,
+            <span class="you-ins">teal</span> the answer you type: your edit</p>
         </figure>
       </li>
       <li class="row">
@@ -838,21 +867,23 @@ or <b>rate &gt;= 100</b>. What should happen at exactly 100?</span></pre>
           <span class="n">Step 3</span>
           <b>Build the test suite</b>
           <code class="cmd"><span>qikly</span> <span>--tasks</span> <span>YOUR_MODULE_VERIFY</span></code>
-          <p>Tests written from your answers, by an agent that never reads your
-            code. Where one fails, a copy of the code is repaired. Your file is
-            never edited.</p>
+          <p>Tests are written from your answers by an agent that never reads
+            your code. Where one fails, qikly repairs a copy of the code. Your
+            file is never edited.</p>
           <span class="cost key">needs an API key</span>
         </div>
         <figure class="eg">
-          <figcaption>The test from that answer, and the repair</figcaption>
+          <figcaption>Your answer as a test, then qikly's repair</figcaption>
 <pre><span class="k">def</span> test_apply_discount_to_label_rate_100_rejection():
     <span class="k">with</span> pytest.raises(ValueError):
-        apply_discount(100.0, 100.0)
+        apply_discount(100.0, 100.0)  <span class="who">price, rate</span>
 
-<span class="dim">[stage 1/3]</span> 2/3 passed | FAILED: ..._rate_100_rejection
-<span class="del">-    if rate &lt; 0 or rate &gt; 100:</span>
-<span class="ins">+    if rate &lt; 0 or rate &gt;= 100:</span>
+<span class="dim">[stage 1/3]</span> 2/3 passed | <span class="alert">FAILED</span>: ..._rate_100_rejection
+<span class="d-del">-    if rate &lt; 0 or rate &gt; 100:</span>
+<span class="d-ins">+    if rate &lt; 0 or rate &gt;= 100:</span>
 <span class="dim">[stage 1/3]</span> 3/3 passed</pre>
+          <p class="legend"><span class="d-del">-</span> and <span class="d-ins">+</span>
+            qikly's repair, made in a copy of your code: not your edit</p>
         </figure>
       </li>
     </ol>
@@ -868,6 +899,7 @@ or <b>rate &gt;= 100</b>. What should happen at exactly 100?</span></pre>
     <ul class="also-list">
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="start-quick-start">Quick start</a><span>from your own module to a first run</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have" data-goatcounter-click="start-which-command">Which command to use</a><span>depending on what you already have</span></li>
+      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-provider-keys">API key setup</a><span>for step 3: Gemini, OpenAI or Anthropic, and what a wrong key looks like</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">Design 1: the case</a><span>why an agent that writes its own tests grades its own homework</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">Design 2: how well it works</a><span>the measured results</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md" data-goatcounter-click="design-3">Design 3: how it is built</a><span>the agents and what each may read</span></li>

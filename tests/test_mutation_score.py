@@ -112,7 +112,7 @@ def test_a_suite_that_notices_everything_scores_full(monkeypatch, tmp_path):
     assert result["missed"] == []
     assert len(result["caught"]) == result["total"] >= 1
     total = result["total"]
-    assert f"{total} of {total} planted faults caught (100%)" in ms.render(result, [])
+    assert f"0 of {total} planted faults missed (0%), {total} caught" in ms.render(result, [])
 
 
 def test_a_miss_is_named_in_the_report():
@@ -122,7 +122,7 @@ def test_a_miss_is_named_in_the_report():
               "missed": [{"file": "impl.py", "family": "validation",
                           "change": "guard disabled"}]}
     text = ms.render(result, [])
-    assert "1 of 2 planted faults caught (50%)" in text
+    assert "1 of 2 planted faults missed (50%), 1 caught" in text
     assert "guard disabled" in text
     assert "cannot be caught by any test" in text, "the equivalent-mutant caveat"
 

@@ -22,6 +22,7 @@ is not hypothetical: the first run of this feature wrote its report into this
 repository's own `outputs/`.
 """
 import io
+import re
 import os
 import subprocess
 import sys
@@ -83,7 +84,7 @@ def _score(project, extra=()):
 
 def test_it_scores_a_project_qikly_has_never_seen(project):
     done = _score(project)
-    assert "planted faults caught" in done.stdout, done.stdout + done.stderr
+    assert "planted faults missed" in done.stdout, done.stdout + done.stderr
 
 
 def test_a_weak_suite_scores_badly_which_is_the_entire_point(project):
@@ -93,8 +94,8 @@ def test_a_weak_suite_scores_badly_which_is_the_entire_point(project):
     other people's suites.
     """
     done = _score(project)
-    line = [l for l in done.stdout.splitlines() if "planted faults caught" in l][0]
-    caught = int(line.split("]")[1].strip().split(" ")[0])
+    line = [l for l in done.stdout.splitlines() if "planted faults missed" in l][0]
+    caught = int(re.search(r"(\d+) caught", line).group(1))
     assert caught <= 3, "a suite with no boundary tests scored well: %s" % line
 
 
@@ -146,7 +147,7 @@ def test_a_directory_of_code_works_as_well_as_one_file(tmp_path):
 
     done = _run(["--score-code", "src/billing", "--score-tests", "tests",
                  "--score-mutants", "4", "--score-seed", "1"], str(tmp_path))
-    assert "planted faults caught" in done.stdout or "not scored" in done.stdout.lower(), (
+    assert "planted faults missed" in done.stdout or "not scored" in done.stdout.lower(), (
         done.stdout + done.stderr)
 
 
@@ -302,7 +303,7 @@ def test_a_byte_order_mark_does_not_stop_it(tmp_path):
                 str(tmp_path))
     output = done.stdout + done.stderr
     assert "U+FEFF" not in output, output[-400:]
-    assert "planted faults caught" in output, output[-400:]
+    assert "planted faults missed" in output, output[-400:]
 
 def test_two_mutations_that_read_the_same_are_told_apart_by_line():
     """
