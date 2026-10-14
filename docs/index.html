@@ -353,6 +353,7 @@ h1 {
 .also-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .also-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
 .also-list code { flex: 0 0 auto; }
+.also-list a { flex: 0 0 auto; font-weight: 600; }
 .also-list span { color: var(--ink-soft); font-size: .92rem; }
 
 .install .prompt { color: var(--ink-faint); }
@@ -737,9 +738,9 @@ footer {
     <p class="route-note">That plants faults in a copy of your code, names the
       ones your tests miss, and asks you a question about each: whether
       <code style="white-space:nowrap">rate &gt; 100</code> or <code style="white-space:nowrap">rate &gt;= 100</code> is what you
-      meant. Free, no API key. Three steps below take it to a suite, or
+      meant. Free, no API key. The steps below take it to a suite, or see
       <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="hero-quick-start">the
-      quick start</a> does it in five.</p>
+      quick start page</a>.</p>
     <div class="links">
       <a class="btn btn-primary" href="https://github.com/gal-a/qikly" data-goatcounter-click="hero-github">Source on GitHub</a>
       <a class="btn" href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="hero-how-it-works">How it works, with one repair end to end</a>
@@ -782,15 +783,14 @@ footer {
       <li><code>qikly --init</code><span>a task from nothing</span></li>
       <li><code>qikly --install-skill</code><span>teaches Claude Code, Gemini CLI, Codex or Cursor to drive qikly</span></li>
     </ul>
-    <p class="route-note">
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="start-quick-start">Five
-      steps from your module to a first run</a>,
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have" data-goatcounter-click="start-which-command">every
-      command by what you already have</a>, and the design write-up:
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">the case</a>,
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">how well it works, with the measured results</a> and
-      <a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md" data-goatcounter-click="design-3">how it is built</a>.
-    </p>
+    <p class="eyebrow also">Read more</p>
+    <ul class="also-list">
+      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="start-quick-start">Quick start</a><span>from your own module to a first run</span></li>
+      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have" data-goatcounter-click="start-which-command">Which command to use</a><span>depending on what you already have</span></li>
+      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">Design 1: the case</a><span>why an agent that writes its own tests grades its own homework</span></li>
+      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">Design 2: how well it works</a><span>the measured results</span></li>
+      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md" data-goatcounter-click="design-3">Design 3: how it is built</a><span>the agents and what each may read</span></li>
+    </ul>
   </section>
 
   <section class="band">
