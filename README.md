@@ -29,6 +29,17 @@ criteria and asked to produce both the implementation and the suite that checks
 it. Everything goes green, and the green means nothing. **qikly takes the answer
 key away from the student: the coding agent never sees the acceptance criteria.**
 
+<!-- 2026-10-14: grouped into parts with this map, same sections and
+     wording; every heading kept, so every existing link still lands. -->
+| | |
+|---|---|
+| **Get started** | [Start here](#start-here) · [What it is for](#what-it-is-for) · [From your coding agent](#use-it-from-your-coding-agent) |
+| **How it works** | [The idea](#the-idea) · [What makes this different](#what-makes-this-different) |
+| **Running it** | [Four ways to use it](#how-to-use-the-tools-in-this-project) · [Free commands](#the-free-commands-in-detail) · [The demo](#what---demo-looks-like) · [Your own data](#your-own-data-in-full) · [Test data](#two-kinds-of-test-data-from-two-different-sources) · [Running](#running) · [When a run stalls](#when-a-run-does-not-converge) · [Output](#output) · [Two free checks](#two-free-checks-on-what-your-tests-are-not-measuring) |
+| **Set up** | [Configuration](#configuration-and-llm-provider) · [Use it in CI](#use-it-in-ci) · [Version check](#version-check) |
+| **Reference** | [Features](#features) · [Where it fits today](#where-it-fits-today) · [What it has caught](#examples-of-what-qikly-has-actually-caught) · [Further reading](#further-reading) |
+| **Community** | [The badge](#using-qikly-show-it) · [Contributing a task](#contributing-a-task) · [Where this came from](#where-this-came-from) · [Privacy](#privacy) · [License](#license) |
+
 ## Start here
 
 ```bash
@@ -38,6 +49,8 @@ pip install --upgrade qikly
 **Start on your own code, not on ours.** This needs no API key, no task file,
 no specification and no decision from you, and it answers the question you
 probably arrived with.
+
+**1. Score your tests.** Free, no key.
 
 ```bash
 qikly --score-code my_module.py --score-tests tests/
@@ -49,21 +62,28 @@ notice. Then it turns each one into a question only you can answer:
 > Your tests pass whether this is `rate > 100` or `rate >= 100`, so nothing
 > checks the boundary itself. What should happen at exactly `100`?
 
-The answers go where acceptance criteria live, in the task file:
+**2. Answer the questions.** Free, no key. The answers go where acceptance
+criteria live, in the task file:
 
 ```bash
 qikly --scaffold my_module.py
 ```
 
-writes `MY_MODULE_VERIFY.yaml` with those questions in its
+That writes `MY_MODULE_VERIFY.yaml` with those questions in its
 `acceptance_criteria`, each above a `TODO` for your answer, and
 `qikly --validate --tasks MY_MODULE_VERIFY` tells you how many are still
-unanswered. Both are free. The question lines start with `#?`, and qikly
-removes them from everything either agent receives, because they quote your
-code. A run on the task, `qikly --tasks MY_MODULE_VERIFY`, is the
-step that needs an API key: qikly writes a suite from your answers without
-reading your code, runs it against a copy of your module, and repairs that
-copy where tests fail. Your own file is never edited.
+unanswered. The question lines start with `#?`, and qikly removes them from
+everything either agent receives, because they quote your code.
+
+**3. Run it.** Needs an API key.
+
+```bash
+qikly --tasks MY_MODULE_VERIFY
+```
+
+qikly writes a suite from your answers without reading your code, runs it
+against a copy of your module, and repairs that copy where tests fail. Your
+own file is never edited.
 
 ### Other ways in
 
@@ -74,31 +94,28 @@ copy where tests fail. Your own file is never edited.
 | **See the split for yourself**, on a bundled task | `qikly --explain CALC_TAX` | nothing, no API key |
 | **Watch a real run** end to end | `qikly --demo` | needs a key, about half a minute and well under a cent |
 
-**`--score-code` is the one to try in a meeting.** Point it at a module or a
-package, with the tests you already have. It plants one fault at a time in a
-copy of your code, runs those tests against each one, and names the faults
-nothing noticed. Both flags are needed: one says what to break, the other says
-what should notice.
+### Good to know
 
-It tells you what your tests would notice changing. It cannot tell you whether
-the code was right to begin with, because it works by breaking code that is
-there, so anything the code never did is invisible to it. No model is called,
-nothing of yours is modified, and no code leaves your machine.
-
-`--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
-delete. It is for watching, not for building in. `--example` and `--scaffold`
-create a real project in the directory you are standing in, and those are the
-two to build from.
-
-`--upgrade` rather than a bare install, because the Skill ships inside the
-package: `pip install qikly` on a machine that already has an older one
-prints "Requirement already satisfied", changes nothing, and
-`--install-skill` then writes that older Skill.
-
-Then [five steps from your module to a first run](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md).
-
-[test.qikly.com](https://test.qikly.com) is the two minute version of this page, and
-the one to send to somebody else.
+- **`--score-code` is the one to try in a meeting.** Point it at a module or a
+  package, with the tests you already have. It plants one fault at a time in a
+  copy of your code, runs those tests against each one, and names the faults
+  nothing noticed. Both flags are needed: one says what to break, the other says
+  what should notice.
+- It tells you what your tests would notice changing. It cannot tell you whether
+  the code was right to begin with, because it works by breaking code that is
+  there, so anything the code never did is invisible to it. No model is called,
+  nothing of yours is modified, and no code leaves your machine.
+- `--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
+  delete. It is for watching, not for building in. `--example` and `--scaffold`
+  create a real project in the directory you are standing in, and those are the
+  two to build from.
+- `--upgrade` rather than a bare install, because the Skill ships inside the
+  package: `pip install qikly` on a machine that already has an older one
+  prints "Requirement already satisfied", changes nothing, and
+  `--install-skill` then writes that older Skill.
+- Then [five steps from your module to a first run](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md).
+- [test.qikly.com](https://test.qikly.com) is the two minute version of this page, and
+  the one to send to somebody else.
 
 > **New: an agent Skill.** `qikly --install-skill` teaches Claude Code, Gemini
 > CLI, Codex, Cursor or GitHub Copilot how to drive qikly.
@@ -113,6 +130,70 @@ the files that failure names are loaded, so runs stay small and quick. It fits
 most naturally where verification already has to be independent, such as
 automotive, medical devices, fintech and defence: `ADAS_HEADWAY`, a bundled
 example, checks following distance from forward-radar samples. See [What it is for](#what-it-is-for).
+
+## What it is for
+
+Built for **self-contained Python modules that transform data, not for a large
+existing repository**: ETL, merges, calculations, validation. That is the layer where a wrong answer looks like a
+right answer, and where a test written from the rule is the only thing that
+catches it.
+
+**Where it does not fit today:** an existing large repository. PATCH prompts
+load only the files a FIX names, and while a large file is now excerpted rather
+than loaded whole, there is no cross-file index. See
+[Where it fits today](#where-it-fits-today).
+
+## Use it from your coding agent
+
+qikly runs as an [MCP](https://modelcontextprotocol.io) server, so an agent in
+any MCP host can start a run and read the result without you leaving the
+conversation. It is tested in VS Code and Claude Code so far. With [uv](https://docs.astral.sh/uv/)
+installed there is nothing else to install. In Claude Code:
+
+```bash
+claude mcp add qikly -- uvx --from "qikly[mcp]" qikly-mcp
+```
+
+In VS Code, the **Install qikly MCP** badge at the top of this page writes the
+same command for you.
+
+**No qikly tool returns your acceptance criteria**, on success or on failure.
+Your agent sees which tests failed and the pytest output, never the rule it
+broke.
+
+[`docs/mcp.md`](https://github.com/gal-a/qikly/blob/main/docs/mcp.md) has the four tools, other hosts,
+installing with pip instead, what to do when the server does not start, and
+how to keep the generated tests out of your agent's reach.
+
+### Or as a Skill, which teaches rather than calls
+
+```bash
+qikly --install-skill
+```
+
+That copies a Skill into `.claude/skills/qikly` in the directory you are
+standing in. A Skill is a folder your agent reads: it tells the agent when
+qikly is the right move, which line of a spec is a decision the coder needs and
+which is a consequence to withhold, what a stalled repair loop means, and which
+commands cost nothing. No server, no configuration.
+
+It loads, and is then used correctly, in **Claude Code, Gemini CLI, Codex and
+Cursor**: first time in each, in a project with a rival testing skill installed
+beside it and a request that never mentioned qikly. The agent had a competing
+option and no hint, which is what makes that worth reporting.
+`--install-skill agents`,
+`cursor` or `gemini` write where those tools document their own folders, and
+`copilot` writes the instruction file GitHub Copilot reads instead, which is
+the one path here nobody has watched load yet.
+
+**The two are not alternatives.** The MCP server is code, so it can enforce:
+no tool returns your criteria, and a test fails the build if that ever changes.
+A Skill is instructions, so it can only inform, and it says so itself. The
+withholding is enforced by the tool whether or not the Skill is installed.
+[`docs/skill.md`](https://github.com/gal-a/qikly/blob/main/docs/skill.md) has
+what is in it, how to check it loads, and the difference stated in full.
+
+---
 
 ## The idea
 
@@ -320,17 +401,7 @@ Design rationale, and the harder problem of where `acceptance_criteria` comes
 from in the first place: **[docs/design_1_case_study.md](https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md)**,
 the first of three parts.
 
-## What it is for
-
-Built for **self-contained Python modules that transform data, not for a large
-existing repository**: ETL, merges, calculations, validation. That is the layer where a wrong answer looks like a
-right answer, and where a test written from the rule is the only thing that
-catches it.
-
-**Where it does not fit today:** an existing large repository. PATCH prompts
-load only the files a FIX names, and while a large file is now excerpted rather
-than loaded whole, there is no cross-file index. See
-[Where it fits today](#where-it-fits-today).
+---
 
 ## How to use the tools in this project
 
@@ -361,8 +432,8 @@ says which command each one needs:
 ## The free commands, in detail
 
 Three commands that make no model call, need no API key, and cost
-nothing. `--explain` is the first row of [Start here](#start-here); this
-is what it and its two neighbours actually do.
+nothing. `--explain` is in [Other ways in](#other-ways-in); this is what
+it and its two neighbours actually do.
 
 ```bash
 qikly --explain MERGE_SALES   # what each side is shown, and the difference
@@ -391,8 +462,8 @@ rather than the paid one.
 
 ## What `--demo` looks like
 
-The second row of [Start here](#start-here), in full. It needs a provider
-key:
+The last row of [Other ways in](#other-ways-in), in full. It needs a
+provider key:
 
 ```bash
 export GEMINI_API_KEY=...     # PowerShell: $env:GEMINI_API_KEY = "..."
@@ -411,6 +482,72 @@ That is a real run on `gemini-3.5-flash-lite`, 38 seconds, not sped up.
 
 **Tried it?** [Tell us what happened](https://github.com/gal-a/qikly/discussions/6), whether it worked, stalled
 or never got past install.
+
+## Your own data, in full
+
+Starting from nothing rather than from code you have: make the two
+directories, drop your fixture data in, write the task file, run it. Nothing
+is written into the package and nothing is written into your source tree. The
+walkthrough with the task file explained field by field is in
+[docs/QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md).
+
+```bash
+qikly --init                    # creates inputs_private/ and a starter task
+qikly --tasks MY_TASK
+```
+
+Want to watch it work before writing anything? `qikly --example` adds a
+worked example that runs as it stands: a module, the two task files a
+scaffold of it produces, sample data, and the `requirements` and
+`acceptance_criteria` already written, each at the path a real task uses.
+It is the one command here that puts a file in your project root,
+`my_metrics.py`, and you can delete the lot when you are done. Which
+starter is which, `--init` against `--example`, is set out in the quick
+start below.
+
+**[docs/QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md)** has the
+rest: the task file field by field, getting the split between `requirements`
+and `acceptance_criteria` right (decisions in one, their consequences in the other, and the gap between them is the whole mechanism),
+lifting criteria out of a ticket you already wrote, seeding your own
+implementation or test suites, where each file is read from, and proposing the
+fixture rows a criterion needs before any test can reach it.
+
+## Two kinds of test data, from two different sources
+
+Worth knowing before you prepare your fixture data, because it decides what
+your data has to contain:
+
+| | Where the rows come from | Which stages use them |
+|---|---|---|
+| **Invented** | The test-writing agent makes them up from your `acceptance_criteria`, and writes them straight into the Python | unit, integration |
+| **Yours** | Your fixture data (e.g. the CSV files named in the task's `inputs:` list) | system |
+
+The test-writing agent never sees your fixture data. It is handed the task file
+and, for unit tests, the code, and nothing else, so when it writes
+
+```python
+invalid_prices = ['0', '0.00', '-5.00', 'abc', '']
+```
+
+those five values came from reading a criterion, not from a row in your files.
+
+**Your data still decides what gets proven.** The system stage is the only one
+that runs the real pipeline over the real files. So a criterion no row reaches
+is checked in miniature by an invented row, and never checked on the path your
+code will actually take. The run goes green and one rule was never exercised
+end to end. That is why the bundled sample data carries awkward rows on purpose,
+and why there is a command for finding the gap:
+
+```bash
+qikly --propose-fixtures --tasks MY_TASK
+```
+
+It reports which criteria nothing in your data reaches and proposes a row for
+each, next to the criterion it was proposed for. It writes a file for you to
+read and copy from, and never edits your fixtures: a row is only right or wrong
+relative to the criterion it was proposed for, and fixtures that grow in
+whatever direction a model finds interesting stop resembling the data you
+actually process.
 
 ## Running
 
@@ -498,71 +635,24 @@ Everything is namespaced by `task_id` so concurrent runs never collide:
 | `outputs/reports/run_summary/<task_id>_<run_timestamp>.json` | The same numbers as the metrics report, as JSON instead of HTML, so runs can be compared across time by a script. Written automatically at the end of every `run.py` invocation. Stays on your disk. The only network calls this project makes are to your configured LLM provider and, unless disabled, a check for a newer release at startup (see [Version check](#version-check)). |
 | `outputs/reports/aggregate/aggregate_<timestamp>.{html,json}` | Many runs at once, rather than one: see [Running everything at once](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md#measuring-rather-than-producing) for what it reports and why. Written by `--repeat`, or on demand: `python -m qikly.orchestrator.reports.aggregate_report [--task ID] [--last N]`. Reads the `run_summary/` JSONs only, so no LLM calls and free to re-run. |
 
-## Two kinds of test data, from two different sources
+## Two free checks on what your tests are not measuring
 
-Worth knowing before you prepare your fixture data, because it decides what
-your data has to contain:
+**Which criteria your data cannot reach.** `qikly --validate` now says when a
+criterion names a value no input row holds, because that criterion produces a
+test which passes whatever the code does:
 
-| | Where the rows come from | Which stages use them |
-|---|---|---|
-| **Invented** | The test-writing agent makes them up from your `acceptance_criteria`, and writes them straight into the Python | unit, integration |
-| **Yours** | Your fixture data (e.g. the CSV files named in the task's `inputs:` list) | system |
-
-The test-writing agent never sees your fixture data. It is handed the task file
-and, for unit tests, the code, and nothing else, so when it writes
-
-```python
-invalid_prices = ['0', '0.00', '-5.00', 'abc', '']
+```
+MY_TASK.yaml: criterion 2 names 0 for gap_m, and no row holds it.
+`qikly --propose-fixtures --tasks MY_TASK` drafts the rows it would take.
 ```
 
-those five values came from reading a criterion, not from a row in your files.
+**What your suite would not have noticed.** `qikly --score-suite --tasks X`
+breaks your converged code one place at a time, re-runs the suite against each
+break, and lists what went unnoticed. Nothing of yours is modified. Read the
+score beside the reachability warning printed above it: a suite cannot catch a
+fault in behaviour no row exercises.
 
-**Your data still decides what gets proven.** The system stage is the only one
-that runs the real pipeline over the real files. So a criterion no row reaches
-is checked in miniature by an invented row, and never checked on the path your
-code will actually take. The run goes green and one rule was never exercised
-end to end. That is why the bundled sample data carries awkward rows on purpose,
-and why there is a command for finding the gap:
-
-```bash
-qikly --propose-fixtures --tasks MY_TASK
-```
-
-It reports which criteria nothing in your data reaches and proposes a row for
-each, next to the criterion it was proposed for. It writes a file for you to
-read and copy from, and never edits your fixtures: a row is only right or wrong
-relative to the criterion it was proposed for, and fixtures that grow in
-whatever direction a model finds interesting stop resembling the data you
-actually process.
-
-## Your own data, in full
-
-The fourth row of [Start here](#start-here), in full: make the two
-directories, drop your fixture data in, write the task file, run it. Nothing
-is written into the package and nothing is written into your source tree. The
-walkthrough with the task file explained field by field is in
-[docs/QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md).
-
-```bash
-qikly --init                    # creates inputs_private/ and a starter task
-qikly --tasks MY_TASK
-```
-
-Want to watch it work before writing anything? `qikly --example` adds a
-worked example that runs as it stands: a module, the two task files a
-scaffold of it produces, sample data, and the `requirements` and
-`acceptance_criteria` already written, each at the path a real task uses.
-It is the one command here that puts a file in your project root,
-`my_metrics.py`, and you can delete the lot when you are done. Which
-starter is which, `--init` against `--example`, is set out in the quick
-start below.
-
-**[docs/QUICK_START_ON_YOUR_OWN_DATA.md](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md)** has the
-rest: the task file field by field, getting the split between `requirements`
-and `acceptance_criteria` right (decisions in one, their consequences in the other, and the gap between them is the whole mechanism),
-lifting criteria out of a ticket you already wrote, seeding your own
-implementation or test suites, where each file is read from, and proposing the
-fixture rows a criterion needs before any test can reach it.
+---
 
 ## Configuration and LLM provider
 
@@ -579,6 +669,52 @@ each provider actually gives you, and how to notice an SDK changing under you.
 Keys, PowerShell, CI and what a wrong key looks like:
 **[docs/PROVIDER_KEY_SETUP.md](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md)**.
 
+## Use it in CI
+
+Listed on the GitHub Marketplace as
+**[Qikly Test Generation](https://github.com/marketplace/actions/qikly-test-generation)**.
+
+The Action runs one task and keeps what came out: the generated pytest suite,
+the code that satisfies it, and a JUnit XML file that CI dashboards and
+test-management tools already read.
+
+```yaml
+- uses: actions/checkout@v5
+
+- id: qikly
+  uses: gal-a/qikly@v0
+  with:
+    task: CALC_TAX
+  env:
+    GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+```
+
+Two working templates are in this repository, meant to be copied out rather
+than run here:
+[`qikly-example.yml`](https://github.com/gal-a/qikly/blob/main/.github/workflows/qikly-example.yml)
+runs on demand, and
+[`qikly-pr-example.yml`](https://github.com/gal-a/qikly/blob/main/.github/workflows/qikly-pr-example.yml)
+comments the result on a pull request.
+
+Three things worth knowing before you wire it up.
+
+**It does not fail your build by default.** A run that does not converge is a
+normal outcome, not a broken pipeline, and a tool whose first impression is a
+red X on someone's main branch does not get a second look. Set
+`fail-on-stall: true` when you want it enforcing rather than reporting.
+
+**Every trigger spends money.** Both templates are `workflow_dispatch` on
+purpose. Move to `on: pull_request` once you know what a run costs you, and
+scope it by `paths:` to the task files so an unrelated commit does not pay for
+a run.
+
+**Two ways to pin, and the choice is yours.** `@v0` is a moving alias that
+this project repoints at every release, so you receive fixes without receiving
+a breaking change. `@v0.5.9` is an exact pin that never moves, so nothing
+changes under you and nothing reaches you either. The templates use `@v0`
+because most people want the fixes; use the exact form if your policy requires
+it.
+
 ## Version check
 
 On startup the CLI makes one request to `pypi.org` and prints a single line if
@@ -588,6 +724,59 @@ It never changes a run: every failure path is silent, the timeout is 1.5
 seconds, it happens once per invocation rather than once per task, and it reads
 only the public PyPI and GitHub release indexes you already rely on to install
 software.
+
+---
+
+## Features
+
+Split three ways, because a single list mixed things that are not alike:
+what the loop guarantees whatever you type, what you type, and what you are
+left holding afterwards.
+
+### What the loop does on its own
+
+| | What it does |
+|---|---|
+| **Withheld acceptance criteria** | The coding agent never receives them. Enforced by `tests/test_withholding.py`, not by an instruction |
+| **Staged test generation** | Integration, then system, then unit. Integration and system are written before any implementation exists, so they cannot be shaped to it |
+| **Regression re-checks** | Every stage that has already passed is re-run after each later fix, so a repair cannot quietly break an earlier stage |
+| **Retrieval within a file** | A module over ~16k characters contributes the definitions the failure names, in full, plus a one-line signature for everything else. Deterministic, AST-based, no index and no extra model call |
+| **Seeded inputs** | Supply your own implementation or any test stage instead of generating it |
+| **Independence evidence** | For code you supply, git is asked whether the criteria were settled before the implementation's first commit, and the answer is printed with the bounds of what it shows, because a run cannot enforce a separation it did not perform |
+| **Any provider** | Gemini, OpenAI or Anthropic, selectable per agent role |
+| **Concurrent tasks** | Each task in its own process, output prefixed `[task_id]` |
+| **Run provenance** | Every summary records the model, provider, date and generation settings, because a convergence rate belongs to a configuration as much as to a tool |
+| **Approval gate** | `--review-patches` prints each diff and waits for y/N; `--dry-run` generates every patch and applies none |
+
+### Commands
+
+| | What it does |
+|---|---|
+| **Show the withholding** | `--explain TASK` prints what each side is given and the difference. No model call, no API key |
+| **Offline validation** | `--validate` checks task files for free: valid YAML, criteria as a list, fixture paths that resolve, criteria naming values not adjectives |
+| **Scaffold from code** | `--scaffold FILE` reads an existing module and writes a task that tests that code, or with `--fresh` one that writes a fresh implementation of the same interface |
+| **Draft criteria** | `--generate-criteria` writes a first bar from requirements alone, for a task that has none |
+| **Score a drafted bar against yours** | `--compare-criteria TASK` drafts criteria from your requirements alone, then reports what a generated bar would have missed, treating yours as ground truth |
+| **Contradiction check** | `--check-criteria` asks whether any implementation could satisfy the description, the requirements and the criteria at once, and whether the criteria agree with each other, before a stage budget is spent |
+| **Import criteria from a ticket** | `--criteria-from FILE` reads bullet lists, an "Acceptance Criteria" section, or Gherkin scenarios out of a ticket you paste into a file |
+| **Jira import** | `--criteria-from-jira PROJ-412` reads criteria from a named field or the issue description, through the same parser the file importer uses |
+| **Document plus code, in one command** | `--scaffold module.py --from-doc feature.md` writes the task file with the criteria taken from the document and the interface read from the module. `requirements` is left for you on purpose: the coding agent reads it, and a feature page usually restates its own criteria in the prose above them. |
+| **Fixture proposals** | A separate agent names the criteria no input row can trigger and proposes the smallest row that would. It never edits your data |
+| **Convergence trends** | `--trends` shows each task's rate over time from summaries already on disk, marking any period where the model or settings changed |
+| **Did editing a prompt help?** | `--compare-prompts TASK` groups that task's runs by the prompts that produced them and prints both arms. Free, and reads what is already on disk. `--repeats N` runs N more of each arm first, alternating. Counts and ranges only, and it declines to compare arms too small to mean anything |
+| **Machine-readable output** | `--json` on `--explain` and `--validate` |
+
+### What you keep
+
+| | What it does |
+|---|---|
+| **Executable output** | Plain pytest files you keep, read, and put in CI long after the run |
+| **JUnit XML** | `outputs/reports/junit/<task>_<timestamp>.xml`, the format Xray, qTest, TestRail, Jenkins, GitLab and GitHub Actions all ingest |
+| **Full audit trail** | Every test run, FIX, PATCH and apply outcome in an append-only log, plus HTML timeline and metrics reports |
+| **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
+| **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
+| **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
+| **GitHub Action** | `gal-a/qikly@v0.5.9`, uploading the suite, the code and the JUnit XML |
 
 ## Where it fits today
 
@@ -652,170 +841,6 @@ requirements never asked for. How much it sharpens a bar is
 **One provider per run**, and no cross-run trend reporting yet: the metrics
 report covers a single run.
 
-## Features
-
-Split three ways, because a single list mixed things that are not alike:
-what the loop guarantees whatever you type, what you type, and what you are
-left holding afterwards.
-
-### What the loop does on its own
-
-| | What it does |
-|---|---|
-| **Withheld acceptance criteria** | The coding agent never receives them. Enforced by `tests/test_withholding.py`, not by an instruction |
-| **Staged test generation** | Integration, then system, then unit. Integration and system are written before any implementation exists, so they cannot be shaped to it |
-| **Regression re-checks** | Every stage that has already passed is re-run after each later fix, so a repair cannot quietly break an earlier stage |
-| **Retrieval within a file** | A module over ~16k characters contributes the definitions the failure names, in full, plus a one-line signature for everything else. Deterministic, AST-based, no index and no extra model call |
-| **Seeded inputs** | Supply your own implementation or any test stage instead of generating it |
-| **Independence evidence** | For code you supply, git is asked whether the criteria were settled before the implementation's first commit, and the answer is printed with the bounds of what it shows, because a run cannot enforce a separation it did not perform |
-| **Any provider** | Gemini, OpenAI or Anthropic, selectable per agent role |
-| **Concurrent tasks** | Each task in its own process, output prefixed `[task_id]` |
-| **Run provenance** | Every summary records the model, provider, date and generation settings, because a convergence rate belongs to a configuration as much as to a tool |
-| **Approval gate** | `--review-patches` prints each diff and waits for y/N; `--dry-run` generates every patch and applies none |
-
-### Commands
-
-| | What it does |
-|---|---|
-| **Show the withholding** | `--explain TASK` prints what each side is given and the difference. No model call, no API key |
-| **Offline validation** | `--validate` checks task files for free: valid YAML, criteria as a list, fixture paths that resolve, criteria naming values not adjectives |
-| **Scaffold from code** | `--scaffold FILE` reads an existing module and writes a task that tests that code, or with `--fresh` one that writes a fresh implementation of the same interface |
-| **Draft criteria** | `--generate-criteria` writes a first bar from requirements alone, for a task that has none |
-| **Score a drafted bar against yours** | `--compare-criteria TASK` drafts criteria from your requirements alone, then reports what a generated bar would have missed, treating yours as ground truth |
-| **Contradiction check** | `--check-criteria` asks whether any implementation could satisfy the description, the requirements and the criteria at once, and whether the criteria agree with each other, before a stage budget is spent |
-| **Import criteria from a ticket** | `--criteria-from FILE` reads bullet lists, an "Acceptance Criteria" section, or Gherkin scenarios out of a ticket you paste into a file |
-| **Jira import** | `--criteria-from-jira PROJ-412` reads criteria from a named field or the issue description, through the same parser the file importer uses |
-| **Document plus code, in one command** | `--scaffold module.py --from-doc feature.md` writes the task file with the criteria taken from the document and the interface read from the module. `requirements` is left for you on purpose: the coding agent reads it, and a feature page usually restates its own criteria in the prose above them. |
-| **Fixture proposals** | A separate agent names the criteria no input row can trigger and proposes the smallest row that would. It never edits your data |
-| **Convergence trends** | `--trends` shows each task's rate over time from summaries already on disk, marking any period where the model or settings changed |
-| **Did editing a prompt help?** | `--compare-prompts TASK` groups that task's runs by the prompts that produced them and prints both arms. Free, and reads what is already on disk. `--repeats N` runs N more of each arm first, alternating. Counts and ranges only, and it declines to compare arms too small to mean anything |
-| **Machine-readable output** | `--json` on `--explain` and `--validate` |
-
-### What you keep
-
-| | What it does |
-|---|---|
-| **Executable output** | Plain pytest files you keep, read, and put in CI long after the run |
-| **JUnit XML** | `outputs/reports/junit/<task>_<timestamp>.xml`, the format Xray, qTest, TestRail, Jenkins, GitLab and GitHub Actions all ingest |
-| **Full audit trail** | Every test run, FIX, PATCH and apply outcome in an append-only log, plus HTML timeline and metrics reports |
-| **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
-| **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
-| **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.5.9`, uploading the suite, the code and the JUnit XML |
-
-## Use it in CI
-
-Listed on the GitHub Marketplace as
-**[Qikly Test Generation](https://github.com/marketplace/actions/qikly-test-generation)**.
-
-The Action runs one task and keeps what came out: the generated pytest suite,
-the code that satisfies it, and a JUnit XML file that CI dashboards and
-test-management tools already read.
-
-```yaml
-- uses: actions/checkout@v5
-
-- id: qikly
-  uses: gal-a/qikly@v0
-  with:
-    task: CALC_TAX
-  env:
-    GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-```
-
-Two working templates are in this repository, meant to be copied out rather
-than run here:
-[`qikly-example.yml`](https://github.com/gal-a/qikly/blob/main/.github/workflows/qikly-example.yml)
-runs on demand, and
-[`qikly-pr-example.yml`](https://github.com/gal-a/qikly/blob/main/.github/workflows/qikly-pr-example.yml)
-comments the result on a pull request.
-
-Three things worth knowing before you wire it up.
-
-**It does not fail your build by default.** A run that does not converge is a
-normal outcome, not a broken pipeline, and a tool whose first impression is a
-red X on someone's main branch does not get a second look. Set
-`fail-on-stall: true` when you want it enforcing rather than reporting.
-
-**Every trigger spends money.** Both templates are `workflow_dispatch` on
-purpose. Move to `on: pull_request` once you know what a run costs you, and
-scope it by `paths:` to the task files so an unrelated commit does not pay for
-a run.
-
-**Two ways to pin, and the choice is yours.** `@v0` is a moving alias that
-this project repoints at every release, so you receive fixes without receiving
-a breaking change. `@v0.5.9` is an exact pin that never moves, so nothing
-changes under you and nothing reaches you either. The templates use `@v0`
-because most people want the fixes; use the exact form if your policy requires
-it.
-
-## Use it from your coding agent
-
-qikly runs as an [MCP](https://modelcontextprotocol.io) server, so an agent in
-any MCP host can start a run and read the result without you leaving the
-conversation. It is tested in VS Code and Claude Code so far. With [uv](https://docs.astral.sh/uv/)
-installed there is nothing else to install. In Claude Code:
-
-```bash
-claude mcp add qikly -- uvx --from "qikly[mcp]" qikly-mcp
-```
-
-In VS Code, the **Install qikly MCP** badge at the top of this page writes the
-same command for you.
-
-**No qikly tool returns your acceptance criteria**, on success or on failure.
-Your agent sees which tests failed and the pytest output, never the rule it
-broke.
-
-[`docs/mcp.md`](https://github.com/gal-a/qikly/blob/main/docs/mcp.md) has the four tools, other hosts,
-installing with pip instead, what to do when the server does not start, and
-how to keep the generated tests out of your agent's reach.
-
-### Or as a Skill, which teaches rather than calls
-
-```bash
-qikly --install-skill
-```
-
-That copies a Skill into `.claude/skills/qikly` in the directory you are
-standing in. A Skill is a folder your agent reads: it tells the agent when
-qikly is the right move, which line of a spec is a decision the coder needs and
-which is a consequence to withhold, what a stalled repair loop means, and which
-commands cost nothing. No server, no configuration.
-
-It loads, and is then used correctly, in **Claude Code, Gemini CLI, Codex and
-Cursor**: first time in each, in a project with a rival testing skill installed
-beside it and a request that never mentioned qikly. The agent had a competing
-option and no hint, which is what makes that worth reporting.
-`--install-skill agents`,
-`cursor` or `gemini` write where those tools document their own folders, and
-`copilot` writes the instruction file GitHub Copilot reads instead, which is
-the one path here nobody has watched load yet.
-
-**The two are not alternatives.** The MCP server is code, so it can enforce:
-no tool returns your criteria, and a test fails the build if that ever changes.
-A Skill is instructions, so it can only inform, and it says so itself. The
-withholding is enforced by the tool whether or not the Skill is installed.
-[`docs/skill.md`](https://github.com/gal-a/qikly/blob/main/docs/skill.md) has
-what is in it, how to check it loads, and the difference stated in full.
-
-## Two free checks on what your tests are not measuring
-
-**Which criteria your data cannot reach.** `qikly --validate` now says when a
-criterion names a value no input row holds, because that criterion produces a
-test which passes whatever the code does:
-
-```
-MY_TASK.yaml: criterion 2 names 0 for gap_m, and no row holds it.
-`qikly --propose-fixtures --tasks MY_TASK` drafts the rows it would take.
-```
-
-**What your suite would not have noticed.** `qikly --score-suite --tasks X`
-breaks your converged code one place at a time, re-runs the suite against each
-break, and lists what went unnoticed. Nothing of yours is modified. Read the
-score beside the reachability warning printed above it: a suite cannot catch a
-fault in behaviour no row exercises.
-
 ## Examples of what qikly has actually caught
 
 Specific findings, each with what was run, what it found, and what the result
@@ -825,6 +850,22 @@ missed half the planted faults, and the two thirds of planted faults that no
 suite could have caught because the data never reached them.
 
 [docs/FINDINGS.md](https://github.com/gal-a/qikly/blob/main/docs/FINDINGS.md)
+
+## Further reading
+
+Two reference pages, for looking things up rather than reading through:
+**[quick start on your own data](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md)** and
+**[configuration and provider](https://github.com/gal-a/qikly/blob/main/docs/CONFIGURATION.md)**.
+
+The design write-up is in three parts, and each stands on its own.
+
+| | What is in it |
+|---|---|
+| **[1. The case](https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md)** | Why an agent that writes its own tests is grading its own homework, and one `CALC_TAX` repair followed end to end: what the coding agent was given, the test it failed, the reasoning it produced from the failure alone, and the one-line patch. Start here. |
+| **[2. How well it works](https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md)** | Three sweeps and 967 runs, the benchmark defect found and corrected between them, the unit-stage gap, what makes a run stall, and the results this project measured and then withdrew. |
+| **[3. How it is built](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md)** | What separates this from the alternatives, the five agents and what each may read, the FIX and PATCH separation, the thirteen example tasks, watching a run live, supplying your own code or tests, and the tools for generating and evaluating acceptance criteria. |
+
+---
 
 ## Using qikly? Show it
 
@@ -848,20 +889,6 @@ task is credited in the changelog, and its author gets a contributor badge.
 Start with a
 [task proposal](https://github.com/gal-a/qikly/issues/new?template=task_proposal.yml),
 so two people do not write the same one.
-
-## Further reading
-
-Two reference pages, for looking things up rather than reading through:
-**[quick start on your own data](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md)** and
-**[configuration and provider](https://github.com/gal-a/qikly/blob/main/docs/CONFIGURATION.md)**.
-
-The design write-up is in three parts, and each stands on its own.
-
-| | What is in it |
-|---|---|
-| **[1. The case](https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md)** | Why an agent that writes its own tests is grading its own homework, and one `CALC_TAX` repair followed end to end: what the coding agent was given, the test it failed, the reasoning it produced from the failure alone, and the one-line patch. Start here. |
-| **[2. How well it works](https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md)** | Three sweeps and 967 runs, the benchmark defect found and corrected between them, the unit-stage gap, what makes a run stall, and the results this project measured and then withdrew. |
-| **[3. How it is built](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md)** | What separates this from the alternatives, the five agents and what each may read, the FIX and PATCH separation, the thirteen example tasks, watching a run live, supplying your own code or tests, and the tools for generating and evaluating acceptance criteria. |
 
 ## Where this came from
 
