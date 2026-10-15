@@ -145,7 +145,7 @@ implementation of the same interface.
   package: `pip install qikly` on a machine that already has an older one
   prints "Requirement already satisfied", changes nothing, and
   `--install-skill` then writes that older Skill.
-- Then [five steps from your module to a first run](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md).
+- The [quick start](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md) walks the same steps, then each command on its own.
 - [test.qikly.com](https://test.qikly.com) is the two minute version of this page, and
   the one to send to somebody else.
 

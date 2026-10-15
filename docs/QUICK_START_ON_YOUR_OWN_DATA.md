@@ -1,7 +1,7 @@
 # Quick start on your own data
 
 From nothing to a first run on your own module. Try the bundled demo, follow
-the five steps, then read the one question that decides where each line of your
+the three steps, then read the one question that decides where each line of your
 specification goes. That is the whole path, and it is the whole of this page.
 
 Everything else lives in [the task file reference](https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md): which command fits what
@@ -56,9 +56,10 @@ dependency chain and pip installs qikly itself last, so there is a window where
 its dependencies are present and qikly is not, which looks exactly like a
 broken install.
 
-Only `--demo` needs a key. `--version`, `--explain`, `--validate`,
-`--init`, `--example` and `--scaffold` make no model call and cost
-nothing.
+Only `--demo` and the run at the end of `--start` need a key. `--version`,
+`--score-code`, `--start` until its run, `--take-tests`, `--explain`,
+`--validate`, `--init`, `--example` and `--scaffold` make no model call and
+cost nothing.
 
 Gemini is the default and its key is `GEMINI_API_KEY`. For OpenAI or
 Anthropic, which need an extra install, see [the provider table in
@@ -110,6 +111,48 @@ installed `qikly` command calls, so a clone and an install run identical
 code.
 
 ## Your own module, start to first run
+
+The same three steps as [the home page](https://test.qikly.com/?ref=quick-start):
+
+1. **If you have a test suite, score it.** Optional, free, no key:
+
+   ```bash
+   qikly --score-code my_metrics.py --score-tests tests/
+   qikly --score-code my_project --score-tests tests/     # or a whole folder
+   ```
+
+   It plants faults in a copy of your code, one at a time, and names the ones
+   your tests did not notice.
+
+2. **Answer what your tests never check.** Free until its last step:
+
+   ```bash
+   qikly --start my_metrics.py        # or: qikly --start my_project
+   ```
+
+   It scores your tests first, so you can start here directly, then asks you
+   a numbered-menu question about each thing they never check, what the
+   module does in a sentence, and a few rows of example inputs, which it
+   builds from your answers and your tests for you to confirm. It says where
+   it writes before it starts, saves as you go, and Ctrl+C is safe: the same
+   command continues where you stopped. Not in a terminal, as in CI or under
+   a coding agent, it writes the questions to a file instead, and
+   `--answers <that file>` reads them back.
+
+3. **Get a fresh test suite written from your answers.** `--start` offers
+   the run at the end, which needs a key. A test agent writes tests from your
+   answers before any code is shown to it, and a separate coding agent, which
+   never sees them, repairs a copy of your code until they pass. Your files
+   are never edited. It tells you first where your code and your answers
+   disagree, then offers to copy the new tests into
+   `tests/qikly_generated/`, importing your own module (`qikly --take-tests
+   <TASK>` does the same later), and ends with a full audit of every file it
+   read, saved and wrote.
+
+## Command by command
+
+The separate commands `--start` runs, for scripts and CI, or when you would
+rather write the task file yourself.
 
 Rather see it work before you point it at your own code?
 
@@ -184,9 +227,12 @@ only task in your project.
 2. **Put your input data where the task says.** Its `inputs:` list names the
    files a run reads, here `inputs_private/data/MY_METRICS/input_01.csv`. Both
    task files point at that one folder, named for the module rather than the
-   task, so scaffolding both ways does not split your data in two. Scaffold
-   does not create them, so copy a real sample of your data there. Until you
-   do, `qikly --validate` reports `input file not found`. What a good sample
+   task, so scaffolding both ways does not split your data in two. For code
+   called with values, scaffold starts that file with one column per
+   argument and no rows: add a few rows of real example values. For code that
+   reads a file, copy a real sample there. Until it exists, `qikly --validate`
+   reports `input file not found`, and while it holds only its header line,
+   it warns. What a good sample
    looks like: [`input_01.csv`](https://github.com/gal-a/qikly/blob/main/src/qikly/inputs_public/examples/data/MY_METRICS/input_01.csv) and
    [`input_02.csv`](https://github.com/gal-a/qikly/blob/main/src/qikly/inputs_public/examples/data/MY_METRICS/input_02.csv).
 
