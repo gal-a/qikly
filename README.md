@@ -111,6 +111,10 @@ they catch.
   the code was right to begin with, because it works by breaking code that is
   there, so anything the code never did is invisible to it. No model is called,
   nothing of yours is modified, and no code leaves your machine.
+- The 12 faults are a random sample, shared across every file when you point
+  it at a folder. `--score-mutants 48` plants more, and `--score-seed 1`
+  plants the same sample again, so a score can be compared with the one you
+  took before changing your tests.
 - `--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
   delete. It is for watching, not for building in. `--example` and `--scaffold`
   create a real project in the directory you are standing in, and those are the

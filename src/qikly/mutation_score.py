@@ -1175,7 +1175,8 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
         # file had been given the same scrutiny as a single module.
         print(f"[{task_id}] those {total} were spread at random over "
               f"{len(target.files)} files, so a larger folder gets fewer per "
-              f"file. Score one module for a closer look.")
+              f"file. Plant more with --score-mutants, such as "
+              f"--score-mutants {total * 4}, or score one module.")
     if gaps is None:
         print(f"[{task_id}] reachability could not be checked, so part of that "
               f"number may belong to your data rather than to your suite.")

@@ -63,6 +63,7 @@ def test_a_folder_score_says_the_faults_were_shared(tmp_path, monkeypatch, capsy
     ms.run(target, invoked_from=str(tmp_path))
     out = capsys.readouterr().out
     assert "spread at random over 2 files" in out
+    assert "--score-mutants 48" in out
 
 
 def test_a_single_file_score_says_nothing_about_sharing(tmp_path, monkeypatch, capsys):
