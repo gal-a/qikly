@@ -1100,13 +1100,17 @@ def _invite_a_report(result):
     if result.get("generated") is not False:
         return None
     _ALREADY_ASKED = True
+    # Labelled as separate from the result, in plain words. The first wording
+    # ("the generated suites are measured against what real suites miss") was
+    # read by a first-time user as part of their score, and not understood.
     message = chr(10).join([
         "",
-        "The faults your tests did not notice are the most useful thing this",
-        "project can be sent. The generated suites are measured against what",
-        "real suites miss, and there is no other source for that. The shape of",
-        "one is enough and none of your code has to leave your machine:",
+        "Optional, and separate from your result: would you share what your",
+        "tests missed? Just the kind of gap, for example \"nothing checked the",
+        "rate limit at exactly 100\". No code needed. It helps measure how well",
+        "qikly's own generated tests do against real ones:",
         "  https://github.com/gal-a/qikly/discussions",
+        "(Set QIKLY_NO_INVITE=1 to hide this.)",
     ])
     print(message)
     return message
