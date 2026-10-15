@@ -363,3 +363,48 @@ def test_a_src_layout_package_can_be_probed(tmp_path):
                                     "    return clamp(p, 0, 100)\n")
     assert start_probe.run_calls(str(pkg / "scoring.py"), str(tmp_path),
                                  [("grade", [150], {})]) == [{"returns": "100"}]
+
+
+def test_a_module_in_a_package_seeds_the_whole_package(tmp_path):
+    """A one-file seed lost `from .util import clamp`, so no test ran on the code."""
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='acme'\n")
+    pkg = tmp_path / "src" / "acme"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("")
+    (pkg / "util.py").write_text("def clamp(v, lo, hi):\n    return max(lo, min(hi, v))\n")
+    (pkg / "scoring.py").write_text("from .util import clamp\n\ndef grade(p):\n"
+                                    "    return clamp(p, 0, 100)\n")
+    paths = start.Paths(str(tmp_path), str(pkg / "scoring.py"))
+    state = {"requirements": "grades", "extra": [], "answers": {"a": {
+        "status": "answered", "criterion": "grade(150) returns 100", "question": "q",
+        "where": "w"}}}
+    task = yaml.safe_load(start.task_text(paths, state))
+    assert task["interface"]["module"] == "acme.scoring"
+    assert task["seed"]["implementation"] == "src/acme"
+
+
+def test_a_first_iteration_that_ran_nothing_is_not_agreement(tmp_path):
+    _project(tmp_path)
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
+    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] no test ran: the module "
+             f"could not be imported",
+             f"[{paths.task_id}] [stage 1/3] [iteration 2] 1/1 passed"]
+    assert start.disagreements(paths, state, lines)[0] == "unknown"
+    s = Script([])
+    start.report_result(s.console, paths, state, lines, True)
+    assert "cannot say where your code and your answers disagree" in s.text
+    assert "agrees" not in s.text
+
+
+def test_a_boundary_between_two_categories_offers_both(tmp_path):
+    source = 'def grade(p):\n    if p >= 90:\n        return "A"\n    return "B"\n'
+    (tmp_path / "g.py").write_text(source)
+    q = {"file": "g.py", "path": str(tmp_path / "g.py"), "line": 2, "function": "grade",
+         "question": "q?", "edge": "90", "kind": ">= became >"}
+    prompt, options = so.menu(q, source, ["grade(95)\n"], str(tmp_path))
+    labels = [o["label"] for o in options]
+    assert "return 'B', as p 89 does now" in labels
+    assert "return 'A', as p 91 does now" in labels
+    chosen = next(o for o in options if o["label"].startswith("return 'A'"))
+    assert so.criterion(chosen) == "grade(90) returns 'A'"

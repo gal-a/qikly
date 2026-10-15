@@ -270,10 +270,23 @@ def boundary_options(question, source, test_sources, root):
                            "kwargs": built[0][1], "function": function})
     prompt = (f"Your tests never try {variable} at exactly {shown_edge}. "
               f"What should {call} do?")
+    if all("raises" not in o for o in outcomes) and not all(
+            _is_number(o["returns"]) for o in outcomes):
+        # A category on each side, such as 'B' at 89 and 'A' at 91: which one
+        # the edge belongs to is the whole decision, so both are offered as
+        # they are, the current neighbour's value labelled.
+        behaviours = [
+            {"kind": BEHAVIOUR, "call": call, "args": built[0][0],
+             "kwargs": built[0][1], "function": function,
+             "pins": {"returns": o["returns"]},
+             "label": f"return {o['returns']}, as {variable} {v!r} does now"}
+            for v, o in ((below, outcomes[0]), (above, outcomes[1]))]
+        return prompt, _shuffled(behaviours, question["question"])
     if all("raises" not in o for o in outcomes):
-        # Both sides return a value, so "return a value, as 9 does" and
+        # Both sides return a number, so "return a value, as 9 does" and
         # "return a value, as 11 does" were two options that both led to the
-        # same question. One option, with both neighbours shown, is clearer.
+        # same question, and the right number may be neither. One option,
+        # with both neighbours shown, is clearer.
         context = (f"{variable} {below!r} returns {outcomes[0]['returns']} now, "
                    f"and {variable} {above!r} returns {outcomes[1]['returns']}")
         return prompt, [{"kind": BEHAVIOUR, "call": call, "args": built[0][0],
@@ -281,6 +294,14 @@ def boundary_options(question, source, test_sources, root):
                          "pins": {"returns": None, "like": outcomes[0]["returns"]},
                          "label": f"type the value it should return ({context})"}]
     return prompt, _shuffled(behaviours, question["question"])
+
+
+def _is_number(text):
+    try:
+        value = ast.literal_eval(text)
+    except (ValueError, SyntaxError, TypeError):
+        return False
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _variants(value):

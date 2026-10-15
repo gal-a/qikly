@@ -64,6 +64,13 @@ packaging tools would read as `1.1`.
     tried in a separate process in an empty folder, never in your project.
   - Two modules with the same file name get two tasks, and an answers file
     names its module, so its answers never land on another one.
+  - A module inside a package is seeded as its whole top-level package and
+    named by its dotted path (`acme.scoring`), so a relative import such as
+    `from .util import clamp` works in qikly's copy and the first tests run
+    on your code as it is. Test calls are found through import aliases, and
+    `src/` layouts are tried correctly.
+  - If nothing ran on your code as it is, the result says it cannot tell
+    where your code and your answers disagree, rather than that they agree.
 - **The Skill offers `--start` first**, and says to relay its questions to the
   user word for word when it runs without a terminal.
 - **`--score-code` asks a question about every fault your tests missed, and
