@@ -826,22 +826,39 @@ footer {
 
   <section class="band">
     <p class="eyebrow">Start</p>
-    <h2>Create a test suite for your own code with one command</h2>
+    <h2>Create a test suite for your own code</h2>
     <!-- 2026-10-15: real excerpts from one qikly --start session on
          pricing.py with a two-test suite, branch build of 0.6.0,
          gemini-3.5-flash-lite: question 3 of 8 as it was asked, and the
          finding the run ended with, with the diff it made to its copy. The
          run took 5 model calls, about $0.002. Lines are trimmed, not
-         reworded. -->
+         reworded. Step 1's excerpt is qikly --score-code on the same module
+         and suite with --score-seed 1, the same day. -->
     <ol class="steps">
       <li class="row">
         <div class="step">
-          <span class="n">Step 1</span>
+          <span class="n">Step 1 (optional)</span>
+          <b>If you have a test suite, score it</b>
+          <code class="cmd"><span>qikly</span> <span>--score-code</span> <span>your_module.py</span> <span>--score-tests</span> <span>test_folder/</span><span class="or">or</span><span>qikly</span> <span>--score-code</span> <span>your_project_folder</span> <span>--score-tests</span> <span>test_folder/</span></code>
+          <p>Plants faults in a copy of your code, one at a time, and names the
+            ones your tests did not notice. Nothing of yours is changed, and no
+            model is called.</p>
+          <span class="cost free">free, no key</span>
+        </div>
+        <figure class="eg">
+          <figcaption>Two passing tests, scored</figcaption>
+<pre><span class="dim">[pricing.py]</span> <span class="alert">9 of 12 planted faults missed</span><span class="alert"> (75%)</span>, 3 caught.
+<span class="dim">[pricing.py]</span> 8 questions your tests leave open, in the same report.</pre>
+        </figure>
+      </li>
+      <li class="row">
+        <div class="step">
+          <span class="n">Step 2</span>
           <b>Answer what your tests never check</b>
           <code class="cmd"><span>qikly</span> <span>--start</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--start</span> <span>your_project_folder</span></code>
-          <p>Scores the tests you already have by planting faults in a copy of
-            your code, then asks you about each thing they never check. Every
-            question is a numbered menu, and your answers are saved as you go.</p>
+          <p>Scores your tests the same way, then asks you about each thing
+            they never check. Every question is a numbered menu, and your
+            answers are saved as you go.</p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
@@ -861,15 +878,15 @@ Type a number from 1 to 5, then press Enter: <span class="you-ins">2</span></pre
       </li>
       <li class="row">
         <div class="step">
-          <span class="n">Step 2</span>
-          <b>Get a suite written from your answers</b>
+          <span class="n">Step 3</span>
+          <b>Get a fresh test suite written from your answers</b>
           <p>At the end, <code>--start</code> offers the run. A test agent
             writes tests from your answers before any code is shown to it, and
             a separate coding agent, which never sees your answers, repairs a
             copy of your code until they pass. Your files are never edited.
             The first thing it tells you is where your code and your answers
             disagree.</p>
-          <span class="cost key">needs an <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-step2-key">API key</a></span>
+          <span class="cost key">needs an <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-step3-key">API key</a></span>
         </div>
         <figure class="eg">
           <figcaption>How the run ended, and the fix it made in its copy</figcaption>
@@ -888,7 +905,6 @@ qikly fixed this in a copy, not in your file pricing.py.
 
     <p class="eyebrow also">Other ways in</p>
     <ul class="also-list">
-      <li><code>qikly --score-code your_module.py --score-tests tests/</code><span>only score the tests you already have, and stop there: free, no key</span></li>
       <li><code>qikly --demo</code><span>a bundled task end to end, well under a cent with a Gemini, OpenAI or Anthropic key</span></li>
       <li><code>qikly --install-skill</code><span>teaches Claude Code, Gemini CLI, Codex or Cursor to drive qikly</span></li>
     </ul>
