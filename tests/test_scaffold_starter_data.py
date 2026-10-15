@@ -58,4 +58,40 @@ def test_starter_columns_skips_self_and_repeats():
               "def b(y, z=1, *rest, k=2, **more):\n    pass\n\n"
               "def _hidden(secret):\n    pass\n")
     assert scaffold.starter_columns(source) == ["x", "y", "z", "k"]
-    assert scaffold.starter_columns("def f():\n    pass\n") is None
+    assert scaffold.starter_columns("def f():\n    pass\n") == []
+
+
+# ------------------------------------------- found by the audit, 2026-10-15 --
+
+def test_names_that_merely_contain_a_file_word_are_values():
+    source = ("def heading(direction, fps, offpeak_rate, profile_id):\n"
+              "    pass\n\n"
+              "def save(result, output_path):\n    pass\n")
+    assert scaffold.starter_columns(source) == [
+        "direction", "fps", "offpeak_rate", "profile_id", "result"]
+    assert scaffold.starter_columns("def load(input_path):\n    pass\n") is None
+
+
+def test_a_header_only_data_file_draws_a_validate_warning(
+        tmp_path, monkeypatch, capsys):
+    from qikly import validate
+    _scaffold(tmp_path, monkeypatch)
+    task = tmp_path / "inputs_private" / "config" / "tasks" / "PRICING_VERIFY.yaml"
+    monkeypatch.chdir(tmp_path)
+    errors, warnings = validate.check_task(str(task))
+    assert any("only its header line" in w for w in warnings), warnings
+    _data(tmp_path).write_text("price,rate,code\n80,25,vip\n", encoding="utf-8")
+    errors, warnings = validate.check_task(str(task))
+    assert not any("only its header line" in w for w in warnings), warnings
+
+
+def test_a_bundled_example_s_data_folder_is_never_written(
+        tmp_path, monkeypatch, capsys):
+    """calc_tax.py names CALC_TAX, whose fixture ships with qikly."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "calc_tax.py").write_text(
+        "def tax(subtotal, region):\n    return subtotal\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    assert cli._do_scaffold("calc_tax.py", None) == 0
+    assert not (tmp_path / "inputs_private" / "data" / "CALC_TAX").exists()
+    assert "--task-id" in capsys.readouterr().out

@@ -752,7 +752,10 @@ def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
     return result
 
 
-_GENERATED_IMPORT = re.compile(r"\boutputs\.agent_src\.code\.(\w+)\.")
+# An import statement, not the string anywhere: a comment naming the path in
+# someone's own suite was enough to send them to a task they never ran.
+_GENERATED_IMPORT = re.compile(
+    r"^[ \t]*(?:from|import)[ \t]+outputs\.agent_src\.code\.(\w+)\.", re.M)
 
 
 def _generated_suite_task(target):
@@ -793,6 +796,10 @@ def _score_once(target, mutants, seed, code_root):
     if not candidates:
         return None
 
+    # Kept for the console note on a folder: how many files had anything to
+    # plant, and whether the sample left any sites out.
+    site_files = len(set(c[0] for c in candidates))
+    site_count = len(candidates)
     random.Random(seed).shuffle(candidates)
     candidates = candidates[:mutants]
 
@@ -886,7 +893,8 @@ def _score_once(target, mutants, seed, code_root):
             "total": len(caught) + len(missed),
             "generated": target.task_id is not None,
             "unreached": never_ran,
-            "unverified": unverified}
+            "unverified": unverified,
+            "site_files": site_files, "sites": site_count}
 
 
 def unreachable_criteria(task_id):
@@ -920,6 +928,14 @@ def unreachable_criteria(task_id):
         return None
 
 
+def percent(part, total):
+    """
+    A share as a whole percent, rounded half up. Floored, "2 of 3 caught"
+    read 66%, and the report's caught and missed lines summed to 99.
+    """
+    return (part * 200 + total) // (2 * total)
+
+
 def headline(caught, total):
     """
     The score in one line, misses first: "3 of 12 planted faults missed (25%),
@@ -931,7 +947,7 @@ def headline(caught, total):
     """
     missed = total - caught
     return (f"{missed} of {total} planted faults missed "
-            f"({missed * 100 // total}%), {caught} caught")
+            f"({percent(missed, total)}%), {caught} caught")
 
 
 def render(result, gaps):
@@ -971,9 +987,9 @@ def render(result, gaps):
         # from the other. The console keeps the one-line headline().
         missed = total - caught
         lines += [f"**{caught} of {total} planted faults caught "
-                  f"({caught * 100 // total}%).**", "",
+                  f"({100 - percent(missed, total)}%).**", "",
                   f"**{missed} of {total} planted faults missed "
-                  f"({missed * 100 // total}%).**", ""]
+                  f"({percent(missed, total)}%).**", ""]
 
     if gaps is None:
         lines += ["Reachability could not be checked for this task, so read "
@@ -1170,13 +1186,18 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
     total, caught = result["total"], len(result["caught"])
     print(f"[{task_id}] {headline(caught, total)}." if total
           else f"[{task_id}] no faults planted.")
-    if total and len(target.files) > 1:
+    site_files = result.get("site_files") or 0
+    if total and site_files > 1:
         # The cap is per run, not per file, and a folder looked as if each
-        # file had been given the same scrutiny as a single module.
+        # file had been given the same scrutiny as a single module. Counted
+        # over files that had something to plant, and "plant more" only when
+        # the sample left sites out.
+        more = (f" Plant more with --score-mutants, such as --score-mutants "
+                f"{min(result['sites'], total * 4)}."
+                if result.get("sites", 0) > total else "")
         print(f"[{task_id}] those {total} were spread at random over "
-              f"{len(target.files)} files, so a larger folder gets fewer per "
-              f"file. Plant more with --score-mutants, such as "
-              f"--score-mutants {total * 4}, or score one module.")
+              f"{site_files} files, so a larger folder gets fewer per "
+              f"file.{more}")
     if gaps is None:
         print(f"[{task_id}] reachability could not be checked, so part of that "
               f"number may belong to your data rather than to your suite.")

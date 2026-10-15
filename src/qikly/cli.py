@@ -361,16 +361,35 @@ def _run_task_process(task_id, seed, generate_criteria, resume=False):
         sys.exit(1)
 
     print("All tests passed.")
-    # A new user's first question after a green run was where the suite is,
-    # and the run never said. Then what it is worth, which one free command
-    # answers. It adds to their own tests: it covers what the criteria name.
+    _say_where_the_new_tests_are(task_id)
+
+
+def _say_where_the_new_tests_are(task_id):
+    """
+    After a green run on the user's own code: where the suite is, and the
+    free command that says what it is worth.
+
+    A new user's first question after a green run was where the suite was,
+    and the run never said. Only for a task that tests code the user already
+    has (`seed.implementation`): for a bundled or `--fresh` task there is no
+    "your code", and in a demo the command would be typed from a directory
+    that holds no run.
+    """
+    try:
+        from qikly.orchestrator.orchestrator import load_seed_spec
+        implementation, _ = load_seed_spec(task_id)
+    except Exception:
+        return
+    if not implementation or inside_a_demo(os.getcwd()):
+        return
     from qikly.mutation_score import TEST_ROOT
     print(f"Your new tests: {os.path.abspath(os.path.join(TEST_ROOT, task_id))}")
-    print("  They add to any tests you already have, covering what your "
-          "acceptance criteria name, and import qikly's copy of your code "
-          "under outputs/agent_src/.")
-    print(f"  See how many planted faults they catch, free:  "
-          f"qikly --score-suite --tasks {task_id}")
+    print("  They add to any tests you already have. The integration and "
+          "system tests cover what your acceptance criteria name, the unit "
+          "tests are written from the code, and all of them import qikly's "
+          "copy of your code under outputs/agent_src/.")
+    print(f"  See how many planted faults the integration and system tests "
+          f"catch, free:  qikly --score-suite --tasks {task_id}")
 
 
 def _demo_root(where=None):
@@ -2082,14 +2101,31 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
     if os.path.isdir(source):
         # `--score-code` takes a folder, so `--scaffold` on the same folder is
         # the natural next command, and "no such file" read like a typo.
-        files = sorted(f for f in os.listdir(source)
-                       if f.endswith(".py") and f != "__init__.py")
+        # Modules only, subfolders included: tests, conftest and setup files
+        # are not code anyone specifies, and conftest.py sorted first as the
+        # suggested example.
+        skip_dirs = {"tests", "test", "venv", ".venv", "outputs",
+                     "inputs_private", "node_modules", "__pycache__"}
+        files = []
+        for folder, dirs, names in os.walk(source):
+            dirs[:] = sorted(d for d in dirs
+                             if d not in skip_dirs and not d.startswith("."))
+            for f in sorted(names):
+                if (f.endswith(".py") and f not in ("__init__.py",
+                        "conftest.py", "setup.py") and not f.startswith("test_")
+                        and not f.endswith("_test.py")):
+                    files.append(shown(os.path.join(folder, f)))
         print(f"{shown(source)} is a folder. A task covers one module, so "
               f"--scaffold takes one file at a time.")
         if files:
+            first = files[0]
+            if " " in first:
+                first = f'"{first}"'
             print("Run it on the one you want to specify first, for example:")
-            print(f"    qikly --scaffold {os.path.join(shown(source), files[0])}")
-            print("The files: " + ", ".join(files))
+            print(f"    qikly --scaffold {first}")
+            shown_files = files[:10]
+            print("The files: " + ", ".join(shown_files)
+                  + (f", and {len(files) - 10} more" if len(files) > 10 else ""))
         return 2
     if not os.path.isfile(source):
         print(f"no such file: {source}")
@@ -2194,10 +2230,24 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
 
     with open(source, "r", encoding="utf-8-sig", errors="replace") as handle:
         columns = starter_columns(handle.read())
+    from qikly.validate import _input_exists
+
+    # Named only when there are questions to answer; "your answers" meant
+    # nothing after a plain scaffold or one filled from a document.
+    values = ("the values your answers name" if asked
+              else "any values your acceptance criteria name")
     steps = []
     for p in missing:
         data = os.path.abspath(os.path.join(root, p))
-        if columns and p.lower().endswith(".csv"):
+        if _input_exists(p):
+            # Not in this project, but a bundled example's data has the same
+            # name. A file written here would replace that fixture for the
+            # bundled task too, so nothing is written.
+            steps.append(
+                f"{p} is also a bundled example's data, so give this task"
+                + nl_indent + "its own name: move the task file aside and run"
+                + nl_indent + f"qikly --scaffold {shown(source)} --task-id MY_NAME")
+        elif columns and p.lower().endswith(".csv"):
             # The header only. The rows have to be real values the code is
             # called with, so they are never made up here.
             os.makedirs(os.path.dirname(data), exist_ok=True)
@@ -2205,14 +2255,18 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
                 handle.write(",".join(columns) + "\n")
             steps.append(
                 "add a few example rows to the data file. Its first line"
-                + nl_indent + "already names the columns, one per argument, so add rows"
-                + nl_indent + "of values below it, separated by commas, including the"
-                + nl_indent + "values your answers name:"
+                + nl_indent + "already names the columns, one per named argument, so add"
+                + nl_indent + "rows of values below it, separated by commas, including"
+                + nl_indent + values + ":"
                 + nl_indent + data)
-        else:
+        elif columns is None:
             steps.append(
                 "copy in a small real file of the kind your code reads, exactly"
                 + nl_indent + "as it arrives, header line included if it has one:"
+                + nl_indent + data)
+        else:
+            steps.append(
+                "add a small real sample of the data your code works on:"
                 + nl_indent + data)
     steps.append("replace the TODO lines in the task file:" + nl_indent
                  + os.path.abspath(dest))

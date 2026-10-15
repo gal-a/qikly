@@ -123,6 +123,18 @@ def _readable_input(relative):
     return None
 
 
+def _header_only(path):
+    """Whether a CSV or TSV holds a header line and no rows."""
+    if not path or not path.lower().endswith((".csv", ".tsv")):
+        return False
+    try:
+        with open(path, encoding="utf-8-sig", errors="replace") as handle:
+            lines = [line for line in handle if line.strip()]
+    except OSError:
+        return False
+    return len(lines) == 1
+
+
 def check_task(path):
     """
     Returns (errors, warnings) for one task file. Errors mean a run cannot
@@ -205,6 +217,15 @@ def check_task(path):
     for relative in (task.get("inputs") or []):
         if not _input_exists(relative):
             errors.append(f"{name}: input file not found: {relative}")
+        elif _header_only(_readable_input(relative)):
+            # `--scaffold` writes the header for code called with values and
+            # leaves the rows to you. Without this, skipping that step passed
+            # with no warning at all, and the reachability check is silent on
+            # a file with no rows, so nothing else would have said so either.
+            warnings.append(
+                f"{name}: {relative} has only its header line. Add a few rows "
+                f"of example values below it, including the values your "
+                f"acceptance criteria name")
 
     # The suffix says "test the code I already have" and the seed block is
     # what makes that true. Without it the run writes a fresh implementation

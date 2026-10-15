@@ -72,9 +72,10 @@ qikly --scaffold my_module.py
 
 That writes `MY_MODULE_VERIFY.yaml`, one module at a time, with those
 questions in its `acceptance_criteria`, each above a `TODO` for your answer.
-Fill in the file's other `TODO` lines too, and add a few rows of example
-values to the data file it started for you, whose first line already names
-the columns. `qikly --validate --tasks MY_MODULE_VERIFY` lists anything still
+Fill in the file's other `TODO` lines too, and add a small real sample of
+your data. For code called with values, `--scaffold` starts that file for
+you with the column names in its first line, and you add rows of example
+values. `qikly --validate --tasks MY_MODULE_VERIFY` lists anything still
 missing. The question lines start with `#?`, and qikly removes them from
 everything either agent receives, because they quote your code.
 
@@ -89,7 +90,7 @@ sees any code, runs them against a copy of your module, and repairs that copy
 where tests fail. Your own file is never edited. The new tests land in
 `outputs/tests/MY_MODULE_VERIFY/` and add to the ones you have, and
 `qikly --score-suite --tasks MY_MODULE_VERIFY` shows how many planted faults
-they catch.
+the integration and system tests catch.
 
 ### Other ways in
 
@@ -111,10 +112,10 @@ they catch.
   the code was right to begin with, because it works by breaking code that is
   there, so anything the code never did is invisible to it. No model is called,
   nothing of yours is modified, and no code leaves your machine.
-- The 12 faults are a random sample, shared across every file when you point
-  it at a folder. `--score-mutants 48` plants more, and `--score-seed 1`
-  plants the same sample again, so a score can be compared with the one you
-  took before changing your tests.
+- The 12 faults are a random sample, drawn afresh on every run and shared
+  across every file when you point it at a folder. `--score-mutants 48`
+  plants more. To compare a score before and after changing your tests, pass
+  the same seed both times, such as `--score-seed 1`.
 - `--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
   delete. It is for watching, not for building in. `--example` and `--scaffold`
   create a real project in the directory you are standing in, and those are the

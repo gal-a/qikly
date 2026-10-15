@@ -8,7 +8,7 @@ packaging tools would read as `1.1`.
 
 ### Changed
 - **`--score-code` and `--score-suite` lead with what was missed:** "5 of 12
-  planted faults missed (41%), 7 caught" rather than "7 of 12 caught". The
+  planted faults missed (42%), 7 caught" rather than "7 of 12 caught". The
   misses are the finding, and a caught count read as a pass mark. Scripts
   that parsed the old line need the new form.
 - **The saved report gives both counts on their own lines**, caught then
@@ -52,6 +52,11 @@ packaging tools would read as `1.1`.
   answer, never its own, and how the answers become a task.
 
 ### Fixed
+- **Score percentages round instead of rounding down**, so "2 of 3 caught"
+  reads 67% rather than 66%, and the report's caught and missed lines sum to
+  100.
+- **`--validate` warns about a data file with only its header line**, the
+  state `--scaffold` leaves it in; skipping the rows used to pass silently.
 - **Scoring qikly's generated suite against your own file now says what
   happened.** Those tests import qikly's copy of the code, so the file is
   never run, and the message blamed an installed package. It now names

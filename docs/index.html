@@ -830,7 +830,8 @@ footer {
          written from that answer catching the code, with qikly's one-line
          repair of a copy. 5 model calls, about $0.002, gemini-3.5-flash-lite.
          The only additions are the Question 1 label and the price, rate note,
-         set in the page's own type rather than as output. -->
+         set in the page's own type rather than as output. The 41% the run
+         printed reads 42% from 0.6.0, which rounds rather than floors. -->
     <ol class="steps">
       <li class="row">
         <div class="step">
@@ -844,7 +845,7 @@ footer {
         </div>
         <figure class="eg">
           <figcaption>Four passing tests, scored</figcaption>
-<pre><span class="dim">[pricing.py]</span> <a class="alert path" href="https://github.com/gal-a/qikly/blob/main/docs/FAQ.md#4-what-is-the-difference-between---score-code-and---score-tests" data-goatcounter-click="eg-what-it-missed">5 of 12 planted faults missed</a><span class="alert"> (41%)</span>, 7 caught.
+<pre><span class="dim">[pricing.py]</span> <a class="alert path" href="https://github.com/gal-a/qikly/blob/main/docs/FAQ.md#4-what-is-the-difference-between---score-code-and---score-tests" data-goatcounter-click="eg-what-it-missed">5 of 12 planted faults missed</a><span class="alert"> (42%)</span>, 7 caught.
 <span class="dim">[pricing.py]</span> <span class="alert">4 questions your tests leave open</span>
 </pre>
           <p class="ask"><span class="tag">Question 1</span> Your tests pass
@@ -860,8 +861,9 @@ footer {
           <p>Writes the questions into a task file, one module at a time.
             Under each one, replace the <code>TODO</code> line with your answer
             in plain words, and delete the questions you skip. Then fill in the
-            file's other <code>TODO</code> lines and add a few rows of example
-            values to the data file it started for you.
+            file's other <code>TODO</code> lines and add a small real sample
+            of your data: for code called with values, rows under the column
+            names it wrote for you.
             <code>qikly --validate --tasks YOUR_MODULE_VERIFY</code> lists
             anything still missing.</p>
           <span class="cost free">free, no key</span>
@@ -887,7 +889,8 @@ footer {
             copy of the code: your file is never edited. The new tests land in
             <code>outputs/tests/</code> and add to your own, and
             <code>qikly --score-suite --tasks YOUR_MODULE_VERIFY</code> shows
-            how many planted faults they catch.</p>
+            how many planted faults the integration and system tests
+            catch.</p>
           <span class="cost key">needs an API key</span>
         </div>
         <figure class="eg">
