@@ -58,7 +58,6 @@ def test_label():
 def _run(arguments, cwd):
     environment = dict(os.environ)
     environment["PYTHONPATH"] = SRC
-    environment["QIKLY_NO_INVITE"] = "1"
     for name in ("GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY",
                  "ANTHROPIC_API_KEY"):
         environment.pop(name, None)

@@ -36,10 +36,10 @@ packaging tools would read as `1.1`.
   answer, never its own, and how the answers become a task.
 
 ### Fixed
-- **The request to share what your tests missed is labelled and in plain
-  words.** It printed straight after the report path, in project jargon, and
-  read as part of the result. It now starts "Optional, and separate from your
-  result", gives an example of what to share, and says how to hide it.
+- **`--score-code` no longer prints a request for feedback.** It came straight
+  after the result, in project jargon, and read as part of it. The request is
+  now a short, optional last section of the report, below the misses it asks
+  about, and `QIKLY_NO_INVITE` is no longer needed.
 - **A `--score-tests` path that does not exist now says where the tests are.**
   With `test_pricing.py` beside `pricing.py` and `--score-tests tests/` typed
   as the docs show, the message was only `no suite at ...\tests`. It now names

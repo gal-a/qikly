@@ -997,6 +997,7 @@ def render(result, gaps):
         for item in result["caught"]:
             lines.append(f"- `{item['file']}`: {item['change']} ({item['family']})")
         lines.append("")
+    lines += _invite_lines(result)
     return "\n".join(lines) + "\n"
 
 
@@ -1059,61 +1060,34 @@ def write(result, gaps, out_dir=OUT_DIR, invoked_from=None):
     return path
 
 
-# Once per invocation, not once per task. `--score-suite` loops over every
-# task it was given, and version_check.py settles the rule for unprompted
-# messages in this codebase: a sweep of ten tasks says a thing once.
-_ALREADY_ASKED = False
-
-
-def _invite_a_report(result):
+def _invite_lines(result):
     """
-    Ask at the one moment the user has just learned something they did not
-    know, and only then.
+    A short request at the end of the report, made only when the user has
+    just learned something they did not know.
 
     The Skill is built to make qikly invisible: it installs into an agent
-    somebody already uses, so adopting it is not adopting a tool. Good for
-    adoption, bad for hearing anything back, because a user whose agent
-    quietly scored their suite has no reason to think about this project at
-    all. Until now the only place that asked for anything was the Copilot
-    install, which is the moment a user knows least.
+    somebody already uses, so a user whose agent quietly scored their suite
+    has no reason to think about this project at all. A fault their own tests
+    did not notice is the exception, and the most useful thing anyone outside
+    this project can send: the generated suites are measured against what
+    real suites miss, and there is no other source for that.
 
-    A fault their own tests did not notice is the exception. It is a surprise,
-    it is about their code rather than about qikly, and it is the most useful
-    thing anyone outside this project can send it: the generated suites are
-    measured against what real suites miss, and there is no other source for
-    that.
-
-    Silent when nothing was missed, because an invitation after good news is
-    an advertisement. `QIKLY_NO_INVITE=1` turns it off.
+    In the report, not the terminal. Printed after the next-step advice, it
+    competed with it, and a first-time user read it, in two wordings, as part
+    of their result. In the report it sits right below the misses it asks
+    about. Silent when nothing was missed, because a request after good news
+    is an advertisement. Silent for a suite qikly wrote, because there the
+    misses are qikly's own, not evidence of what real suites miss (found by
+    audit before 0.5.7).
     """
-    global _ALREADY_ASKED
-    if os.environ.get("QIKLY_NO_INVITE") or _ALREADY_ASKED:
-        return None
     result = result or {}
-    if not result.get("missed"):
-        return None
-    # Only for a suite qikly did not write. `--score-suite --tasks X` scores
-    # the suite qikly generated, and there the message is simply false: the
-    # thing that missed the faults is the generated suite, so asking the user
-    # to send them as evidence of what real suites miss asks for the wrong
-    # thing. Found by audit before 0.5.7.
-    if result.get("generated") is not False:
-        return None
-    _ALREADY_ASKED = True
-    # Labelled as separate from the result, in plain words. The first wording
-    # ("the generated suites are measured against what real suites miss") was
-    # read by a first-time user as part of their score, and not understood.
-    message = chr(10).join([
-        "",
-        "Optional, and separate from your result: would you share what your",
-        "tests missed? Just the kind of gap, for example \"nothing checked the",
-        "rate limit at exactly 100\". No code needed. It helps measure how well",
-        "qikly's own generated tests do against real ones:",
-        "  https://github.com/gal-a/qikly/discussions",
-        "(Set QIKLY_NO_INVITE=1 to hide this.)",
-    ])
-    print(message)
-    return message
+    if not result.get("missed") or result.get("generated") is not False:
+        return []
+    return ["## Optional: tell me what this found", "",
+            "If a miss above surprised you, a one-line note about it at "
+            "https://github.com/gal-a/qikly/discussions helps me make "
+            "qikly's own tests better, for example \"nothing checked "
+            "rate = 100\". Please don't post your code.", ""]
 
 
 def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
@@ -1170,5 +1144,4 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
               f"tests leave open, in the same report.")
         for line in result["questions_advice"]:
             print(f"[{task_id}] {line}")
-    _invite_a_report(result)
     return path

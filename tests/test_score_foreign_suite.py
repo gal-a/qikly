@@ -344,64 +344,63 @@ def test_two_mutations_that_read_the_same_are_told_apart_by_line():
 # Added after an audit found three defects in a function that had no test:
 # it fired for qikly's own generated suites, where its wording is false; it
 # printed once per task rather than once per invocation; and one of its two
-# call sites could never fire.
+# call sites could never fire. Since moved from the terminal to the report,
+# where it no longer competes with the next-step advice.
+
+_MISS = {"file": "pricing.py", "change": "> became >=, line 3",
+         "family": "arithmetic"}
 
 
-@pytest.fixture(autouse=True)
-def _forget_that_we_asked(monkeypatch):
-    """Each test starts as a fresh invocation would."""
-    monkeypatch.setattr(ms, "_ALREADY_ASKED", False)
-    monkeypatch.delenv("QIKLY_NO_INVITE", raising=False)
+def _scored(**changes):
+    result = {"task": "pricing.py", "baseline": True, "caught": [],
+              "missed": [_MISS], "unscorable": 0, "total": 1,
+              "generated": False}
+    result.update(changes)
+    return result
 
 
-def test_it_asks_when_a_suite_of_theirs_missed_something():
-    assert ms._invite_a_report({"missed": ["a"], "generated": False})
+def test_the_report_asks_when_a_suite_of_theirs_missed_something():
+    text = ms.render(_scored(), [])
+    assert "## Optional: tell me what this found" in text
+    assert "https://github.com/gal-a/qikly/discussions" in text
+    # Last, so it never sits between the result and what to do about it.
+    assert text.rstrip().endswith("Please don't post your code.")
 
 
 def test_it_says_nothing_when_the_suite_caught_everything():
-    """An invitation printed after good news is an advertisement."""
-    assert ms._invite_a_report({"missed": [], "generated": False}) is None
+    """A request printed after good news is an advertisement."""
+    text = ms.render(_scored(missed=[], caught=[_MISS]), [])
+    assert "Optional: tell me" not in text
 
 
 def test_it_says_nothing_about_a_suite_qikly_wrote_itself():
     """
-    `--score-suite --tasks X` scores the generated suite. There the message
+    `--score-suite --tasks X` scores the generated suite. There the request
     is not merely unnecessary, it is false: it offers the misses as evidence
     of what *real* suites miss, and the suite that missed them is qikly's.
     """
-    assert ms._invite_a_report({"missed": ["a"], "generated": True}) is None
-
-
-def test_it_asks_once_per_invocation_and_not_once_per_task():
-    """
-    `--score-suite` loops over every task it was given. The rule for
-    unprompted output in this codebase is set by the version check: a sweep
-    of ten tasks says a thing once.
-    """
-    result = {"missed": ["a"], "generated": False}
-    assert ms._invite_a_report(result)
-    assert ms._invite_a_report(result) is None
-    assert ms._invite_a_report(result) is None
-
-
-def test_the_opt_out_wins():
-    import os
-    os.environ["QIKLY_NO_INVITE"] = "1"
-    try:
-        assert ms._invite_a_report({"missed": ["a"], "generated": False}) is None
-    finally:
-        del os.environ["QIKLY_NO_INVITE"]
+    assert ms._invite_lines(_scored(generated=True)) == []
 
 
 def test_it_survives_a_result_that_is_missing_its_keys():
-    """It runs at the end of a scoring run; it must never be what fails one."""
+    """It runs inside the report; it must never be what fails one."""
     for result in (None, {}, {"missed": None}, {"missed": ["a"]}):
-        assert ms._invite_a_report(result) is None
+        assert ms._invite_lines(result) == []
 
 
-def test_the_ask_is_ascii_because_it_prints_to_a_windows_console():
-    message = ms._invite_a_report({"missed": ["a"], "generated": False})
-    assert message.isascii(), [c for c in message if not c.isascii()]
+def test_the_terminal_carries_no_request(tmp_path, monkeypatch, capsys):
+    """
+    Printed after the next-step advice, a first-time user read the request,
+    in two wordings, as part of their result.
+    """
+    (tmp_path / "pricing.py").write_text("def f():\n    return 1\n")
+    target = ms.from_paths(str(tmp_path / "pricing.py"), str(tmp_path))
+    monkeypatch.setattr(ms, "score", lambda *a, **k: _scored())
+    monkeypatch.setattr(ms, "unreachable_criteria", lambda task_id: [])
+    path = ms.run(target, invoked_from=str(tmp_path))
+    printed = capsys.readouterr().out
+    assert "discussions" not in printed and "Optional" not in printed, printed
+    assert "Optional: tell me" in io.open(path, encoding="utf-8").read()
 
 def test_the_project_root_line_is_not_shown_where_it_would_be_false(monkeypatch):
     """
