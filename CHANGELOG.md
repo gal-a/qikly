@@ -7,6 +7,9 @@ packaging tools would read as `1.1`.
 ## Unreleased
 
 ### Changed
+- **`--start` no longer starts a background run.** It was an old alias of
+  `--run TASK`, and is now the guided first run above. A task id passed to it
+  is told to use `qikly --run TASK`.
 - **`--score-code` and `--score-suite` lead with what was missed:** "5 of 12
   planted faults missed (42%), 7 caught" rather than "7 of 12 caught". The
   misses are the finding, and a caught count read as a pass mark. Scripts
@@ -29,6 +32,33 @@ packaging tools would read as `1.1`.
   spread at random over every file, so a larger folder gets fewer per file.
 
 ### Added
+- **`qikly --start my_module.py`: the whole path in one guided command.** It
+  scores the tests you already have, asks you about each thing they never
+  check, saves your answers as acceptance criteria, builds a few rows of
+  example inputs from your answers and tests, checks the task, and offers the
+  run. It takes one module or a whole folder (one task per module), or asks
+  when no path is given.
+  - Every prompt is a numbered menu whose last option is free text, says on
+    its last line what to type, and answers wrong input with a reason and
+    the same prompt. Nothing is chosen by default.
+  - Where it can, the options are concrete behaviours, such as "raise
+    ValueError, as rate 101 does now". A boundary is only ever run on either
+    side of the value in question, never at it; other changes show an input
+    where the code and the changed code differ, with the current result
+    labelled. The order of the two is shuffled per question. Where the input
+    cannot be known, the only options are to skip or type your own answer.
+  - "Either is fine" and "not mine to decide" are options; open questions go
+    to `inputs_private/questions/<NAME>_open_questions.txt`, to send to
+    whoever owns the spec.
+  - It says where it writes before it starts, after each save and at the end,
+    and the run's first line is where your code and your answers disagree.
+  - Answers are saved as you go, so stopping is safe and the same command
+    continues. Without a terminal it never waits: it writes the questions to
+    that file and exits 3, and `--answers <file>` reads them back.
+  - The landing page's three steps are now this one command, and the README
+    lists the separate commands behind it for scripts and CI.
+- **The Skill offers `--start` first**, and says to relay its questions to the
+  user word for word when it runs without a terminal.
 - **`--score-code` asks a question about every fault your tests missed, and
   `--scaffold` puts the questions where the answers belong.** The report ends
   with a plain question for each miss, naming the file, line and function,

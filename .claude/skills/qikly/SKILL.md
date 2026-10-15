@@ -47,8 +47,22 @@ describe what it already does: they pass by construction, they encode every
 choice the code happened to make as though it were intended, and they cannot
 disagree with a bug because the bug is what they were written from.
 
-So do not open by writing tests. Say that in one sentence, then offer the two
+So do not open by writing tests. Say that in one sentence, then offer the
 things that do work, and let the user choose:
+
+- **`qikly --start my_module.py`** (qikly 0.6.0 or later) is the whole path in
+  one command, and the best first offer when a suite already exists. It scores
+  their tests, asks them a numbered-menu question about each thing the tests
+  never check, saves the answers as acceptance criteria and offers the run.
+  **Suggest they run it in their own terminal**: the answers have to be
+  theirs, and there it asks them directly. If you run it, it has no terminal
+  to ask in, so it writes the questions, with their options, to
+  `inputs_private/questions/<NAME>_open_questions.txt` and exits with code 3.
+  Then put each question and its options to the user **word for word**, write
+  what they choose or say after its `Q` number, never an answer of your own or
+  one read off the code, and run `qikly --start my_module.py --answers <that
+  file>`. It also needs a `requirements:` line, a sentence from them on what
+  the module does.
 
 - **`qikly --score-code my_module.py --score-tests their_tests.py`** if any
   suite already exists. Free, no model call, nothing of theirs modified, and it

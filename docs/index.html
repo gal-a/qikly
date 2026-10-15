@@ -823,104 +823,77 @@ footer {
 
   <section class="band">
     <p class="eyebrow">Start</p>
-    <h2>Create a test suite for your own code in 3 steps</h2>
-    <!-- 2026-10-14: each step beside a real excerpt from one run of the same
-         module, pricing.py with a four-test suite: the score and a question
-         it asked, the answer written in place of its TODO, and the test
-         written from that answer catching the code, with qikly's one-line
-         repair of a copy. 5 model calls, about $0.002, gemini-3.5-flash-lite.
-         The only additions are the Question 1 label and the price, rate note,
-         set in the page's own type rather than as output. The 41% the run
-         printed reads 42% from 0.6.0, which rounds rather than floors. -->
+    <h2>Create a test suite for your own code with one command</h2>
+    <!-- 2026-10-15: real excerpts from one qikly --start session on
+         pricing.py with a two-test suite, branch build of 0.6.0,
+         gemini-3.5-flash-lite: question 3 of 8 as it was asked, and the
+         finding the run ended with, with the diff it made to its copy. The
+         run took 5 model calls, about $0.002. Lines are trimmed, not
+         reworded. -->
     <ol class="steps">
       <li class="row">
         <div class="step">
           <span class="n">Step 1</span>
-          <b>Score your tests</b>
-          <code class="cmd"><span>qikly</span> <span>--score-code</span> <span>your_module.py</span> <span>--score-tests</span> <span>tests/</span></code>
-          <p>Plants faults in a copy of your code, names the ones your tests
-            miss, and asks you a question about each. Give it one module or a
-            whole folder.</p>
+          <b>Answer what your tests never check</b>
+          <code class="cmd"><span>qikly</span> <span>--start</span> <span>your_module.py</span></code>
+          <p>Scores the tests you already have by planting faults in a copy of
+            your code, then asks you about each thing they never check. Every
+            question is a numbered menu, and your answers are saved as you go.
+            Point it at one module or a whole folder.</p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
-          <figcaption>Four passing tests, scored</figcaption>
-<pre><span class="dim">[pricing.py]</span> <a class="alert path" href="https://github.com/gal-a/qikly/blob/main/docs/FAQ.md#4-what-is-the-difference-between---score-code-and---score-tests" data-goatcounter-click="eg-what-it-missed">5 of 12 planted faults missed</a><span class="alert"> (42%)</span>, 7 caught.
-<span class="dim">[pricing.py]</span> <span class="alert">4 questions your tests leave open</span>
-</pre>
-          <p class="ask"><span class="tag">Question 1</span> Your tests pass
-            whether this is <b>rate &gt; 100</b> or <b>rate &gt;= 100</b>.
-            What should happen at exactly 100?</p>
+          <figcaption>Question 3 of 8, as it is asked</figcaption>
+<pre><span class="dim">  &gt;    3     if rate &lt; 0 or rate &gt; 100:</span>
+Your tests never try rate at exactly 100.
+What should apply_discount(100, 100) do?
+  1. return a value, as rate 99 does now
+  2. raise ValueError, as rate 101 does now
+  3. either is fine, I do not mind
+  4. not mine to decide: save it to ask someone
+  5. type my own answer
+Type a number from 1 to 5, then press Enter: <span class="you-ins">2</span></pre>
+          <p class="legend">qikly runs your code beside the value in question,
+            never at it: <span class="you-ins">the answer</span> is yours</p>
         </figure>
       </li>
       <li class="row">
         <div class="step">
           <span class="n">Step 2</span>
-          <b>Answer the questions</b>
-          <code class="cmd"><span>qikly</span> <span>--scaffold</span> <span>your_module.py</span></code>
-          <p>Writes the questions into a task file, one module at a time.
-            Under each one, replace the <code>TODO</code> line with your answer
-            in plain words, and delete the questions you skip. Then fill in the
-            file's other <code>TODO</code> lines and add a small real sample
-            of your data: for code called with values, rows under the column
-            names it wrote for you.
-            <code>qikly --validate --tasks YOUR_MODULE_VERIFY</code> lists
-            anything still missing.</p>
-          <span class="cost free">free, no key</span>
+          <b>Get a suite written from your answers</b>
+          <p>At the end, <code>--start</code> offers the run. A test agent
+            writes tests from your answers before any code is shown to it, and
+            a separate coding agent, which never sees your answers, repairs a
+            copy of your code until they pass. Your files are never edited.
+            The first thing it tells you is where your code and your answers
+            disagree.</p>
+          <span class="cost key">needs an <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-step2-key">API key</a></span>
         </div>
         <figure class="eg">
-          <figcaption>PRICING_VERIFY.yaml, Question 1, as you edit it</figcaption>
-<pre><span class="k">acceptance_criteria:</span>
-  <span class="dim">#?     if rate &lt; 0 or rate &gt; 100:
-  #? ... What should happen at exactly `100`?</span>
-  <span class="you-del">- "TODO: your answer to the question above"</span>
-  <span class="you-ins">- "a rate of exactly 100 is rejected with ValueError"</span></pre>
-          <p class="legend"><span class="you-del">struck</span> the line you delete,
-            <span class="you-ins">teal</span> the answer you type: your edit</p>
-        </figure>
-      </li>
-      <li class="row">
-        <div class="step">
-          <span class="n">Step 3</span>
-          <b>Build the test suite</b>
-          <code class="cmd"><span>qikly</span> <span>--tasks</span> <span>YOUR_MODULE_VERIFY</span></code>
-          <p>The integration and system tests are written from your answers
-            before the agent sees any code. Where one fails, qikly repairs a
-            copy of the code: your file is never edited. The new tests land in
-            <code>outputs/tests/</code> and add to your own, and
-            <code>qikly --score-suite --tasks YOUR_MODULE_VERIFY</code> shows
-            how many planted faults the integration and system tests
-            catch.</p>
-          <span class="cost key">needs an API key</span>
-        </div>
-        <figure class="eg">
-          <figcaption>Your answer as a test, then qikly's repair</figcaption>
-<pre><span class="k">def</span> test_apply_discount_to_label_rate_100_rejection():
-    <span class="k">with</span> pytest.raises(ValueError):
-        apply_discount(100.0, 100.0)  <span class="who">price, rate</span>
+          <figcaption>How the run ended, and the fix it made in its copy</figcaption>
+<pre>Your code disagrees with 1 of your 6 answers:
+  - <span class="alert">apply_discount(100, 100) raises ValueError</span>
+qikly fixed this in a copy, not in your file pricing.py.
 
-<span class="dim">[stage 1/3]</span> 2/3 passed | <span class="alert">FAILED</span>: ..._rate_100_rejection
 <span class="d-del">-    if rate &lt; 0 or rate &gt; 100:</span>
-<span class="d-ins">+    if rate &lt; 0 or rate &gt;= 100:</span>
-<span class="dim">[stage 1/3]</span> 3/3 passed</pre>
+<span class="d-ins">+    if rate &lt; 0 or rate &gt;= 100:</span></pre>
           <p class="legend"><span class="d-del">-</span> and <span class="d-ins">+</span>
             qikly's repair, made in a copy of your code: not your edit</p>
         </figure>
       </li>
     </ol>
+    <p>It ends by listing every file it read, saved and wrote, and where.</p>
 
-    <p class="eyebrow also">Or see it first</p>
+    <p class="eyebrow also">Or watch it first</p>
     <ul class="also-list">
-      <li><code>qikly --explain CALC_TAX</code><span>what each agent is shown, free, about a second</span></li>
-      <li><code>qikly --demo</code><span>a task end to end, well under a cent with a Gemini, OpenAI or Anthropic key</span></li>
-      <li><code>qikly --init</code><span>a task from nothing</span></li>
+      <li><code>qikly --demo</code><span>a bundled task end to end, well under a cent with a Gemini, OpenAI or Anthropic key</span></li>
       <li><code>qikly --install-skill</code><span>teaches Claude Code, Gemini CLI, Codex or Cursor to drive qikly</span></li>
     </ul>
     <p class="eyebrow also">Read more</p>
     <ul class="also-list">
-      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="start-quick-start">Quick start</a><span>from your own module to a first run</span></li>
-      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/TASK_FILE_REFERENCE.md#which-command-depends-on-which-parts-you-already-have" data-goatcounter-click="start-which-command">Which command to use</a><span>depending on what you already have</span></li>
-      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-provider-keys">API key setup</a><span>for step 3: Gemini, OpenAI or Anthropic, and what a wrong key looks like</span></li>
+      <li><a href="https://github.com/gal-a/qikly#start-here" data-goatcounter-click="start-readme">Every other way in</a><span>the separate commands behind --start, for scripts and CI</span></li>
+      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-provider-keys">API key setup</a><span>for the run: Gemini, OpenAI or Anthropic, and what a wrong key looks like</span></li>
+      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="start-quick-start">Quick start</a><span>the same path, command by command</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">Design 1: the case</a><span>why an agent that writes its own tests grades its own homework</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">Design 2: how well it works</a><span>the measured results</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md" data-goatcounter-click="design-3">Design 3: how it is built</a><span>the agents and what each may read</span></li>

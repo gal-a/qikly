@@ -44,66 +44,75 @@ key away from the student: the coding agent never sees the acceptance criteria.*
 
 ```bash
 pip install --upgrade qikly
+qikly --start my_module.py
 ```
 
-**Start on your own code, not on ours.** This needs no API key, no task file,
-no specification and no decision from you, and it answers the question you
-probably arrived with.
+**Start on your own code, not on ours.** `--start` needs no task file, no
+specification and, until its last step, no API key. Point it at one module or
+a whole folder, or leave the path out to be asked. It:
 
-**1. Score your tests.** Free, no key.
+1. **Scores the tests you already have**, by planting faults in a copy of your
+   code one at a time and seeing which ones your tests do not notice. Free, and
+   no model is called.
+2. **Asks you about each thing they never check**, as a numbered menu. Where
+   it can, the options are concrete, worked out by running your code beside
+   the value in question, never at it:
 
-```bash
-qikly --score-code my_module.py --score-tests tests/
-```
+   ```
+   Your tests never try rate at exactly 100.
+   What should apply_discount(100, 100) do?
+     1. return a value, as rate 99 does now
+     2. raise ValueError, as rate 101 does now
+     3. either is fine, I do not mind
+     4. not mine to decide: save it to ask someone
+     5. type my own answer
+   Type a number from 1 to 5, then press Enter:
+   ```
 
-It plants faults in a copy of your code and names the ones your tests did not
-notice. Give it one module or a whole folder. Then it turns each one into a
-question only you can answer:
+   It also asks what the module does, in a sentence, and builds a few rows of
+   example inputs from your answers and your tests for you to confirm.
+3. **Saves your answers as acceptance criteria**, checks them, and offers the
+   run, which needs an API key. A test agent writes tests from your answers
+   before any code is shown to it; a separate coding agent, which never sees
+   your answers, repairs a copy of your code until they pass. It tells you
+   first where your code and your answers disagree.
 
-> Your tests pass whether this is `rate > 100` or `rate >= 100`, so nothing
-> checks the boundary itself. What should happen at exactly `100`?
+It says where it writes before it starts and lists every file at the end.
+Your own files are never edited. Answers are saved as you go, so Ctrl+C is
+safe, and running the same command again continues where you stopped. Not in
+a terminal, as in CI or under a coding agent, it never waits: it writes the
+questions to a file and exits with code 3, and `qikly --start my_module.py
+--answers <that file>` reads them back.
 
-**2. Answer the questions.** Free, no key. The answers go where acceptance
-criteria live, in the task file:
+### The same path, command by command
 
-```bash
-qikly --scaffold my_module.py
-```
+`--start` runs these, and they remain for scripts and CI:
 
-That writes `MY_MODULE_VERIFY.yaml`, one module at a time, with those
-questions in its `acceptance_criteria`, each above a `TODO` for your answer.
-Fill in the file's other `TODO` lines too, and add a small real sample of
-your data. For code called with values, `--scaffold` starts that file for
-you with the column names in its first line, and you add rows of example
-values. `qikly --validate --tasks MY_MODULE_VERIFY` lists anything still
-missing. The question lines start with `#?`, and qikly removes them from
-everything either agent receives, because they quote your code.
+| Step | Command | Costs |
+|---|---|---|
+| Score your tests, and turn each miss into a question | `qikly --score-code my_module.py --score-tests tests/` | free, no key |
+| Write the task file with those questions in it, to answer by hand | `qikly --scaffold my_module.py` | free, no key |
+| Check the task file | `qikly --validate --tasks MY_MODULE_VERIFY` | free, no key |
+| Run it | `qikly --tasks MY_MODULE_VERIFY` | needs an API key |
+| See how many planted faults the new integration and system tests catch | `qikly --score-suite --tasks MY_MODULE_VERIFY` | free, no key |
 
-**3. Run it.** Needs an API key.
-
-```bash
-qikly --tasks MY_MODULE_VERIFY
-```
-
-qikly writes the integration and system tests from your answers before it
-sees any code, runs them against a copy of your module, and repairs that copy
-where tests fail. Your own file is never edited. The new tests land in
-`outputs/tests/MY_MODULE_VERIFY/` and add to the ones you have, and
-`qikly --score-suite --tasks MY_MODULE_VERIFY` shows how many planted faults
-the integration and system tests catch.
+A task id is the module's name in capitals plus `_VERIFY`, which marks a task
+that tests code you already have. `qikly --scaffold my_module.py --fresh`
+writes `MY_MODULE.yaml` instead, a task in which qikly writes a new
+implementation of the same interface.
 
 ### Other ways in
 
 | If you want to | Run | Costs |
 |---|---|---|
-| **Point it at your own module** and write tests from a spec | `qikly --scaffold my_module.py` | nothing to set it up |
+| **Watch a real run** end to end, on a bundled task | `qikly --demo` | needs a key, about half a minute and well under a cent |
 | **Start from a finished example** in a project of your own | `qikly --example` | nothing to set it up |
 | **See the split for yourself**, on a bundled task | `qikly --explain CALC_TAX` | nothing, no API key |
-| **Watch a real run** end to end | `qikly --demo` | needs a key, about half a minute and well under a cent |
+| **Write a task from nothing** | `qikly --init` | nothing to set it up |
 
 ### Good to know
 
-- **`--score-code` is the one to try in a meeting.** Point it at a module or a
+- **`--score-code` on its own is the one to try in a meeting.** Point it at a module or a
   package, with the tests you already have. It plants one fault at a time in a
   copy of your code, runs those tests against each one, and names the faults
   nothing noticed. Both flags are needed: one says what to break, the other says
