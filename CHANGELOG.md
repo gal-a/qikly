@@ -69,6 +69,10 @@ packaging tools would read as `1.1`.
     `from .util import clamp` works in qikly's copy and the first tests run
     on your code as it is. Test calls are found through import aliases, and
     `src/` layouts are tried correctly.
+  - `--start my_module.py --score-tests tests/` names the tests instead of
+    being asked. Code with no tests yet works too: "I have no tests for it
+    yet" scores it against a placeholder that only imports it, kept under
+    `qikly-suite-score/`, so every planted fault becomes a question.
   - If nothing ran on your code as it is, the result says it cannot tell
     where your code and your answers disagree, rather than that they agree.
   - Each answer is listed only against the tests that make the call it

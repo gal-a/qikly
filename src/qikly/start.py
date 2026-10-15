@@ -467,20 +467,63 @@ def pick_tests(console, code, cwd):
         options.append(f"{shown(d, cwd) or '.'}{os.sep}  every test file in it, "
                        f"{_count_tests(inside)} tests")
         targets.append(d)
+    # No tests at all is a normal place to start, not a dead end: every
+    # planted fault then goes unnoticed, so the questions cover the module.
+    options.append("I have no tests for it yet")
     options.append("type a path to a test file or folder")
     what = (os.path.basename(code) if os.path.isfile(code)
             else shown(code, cwd) + os.sep)
     lead = [f"Which tests should {what} be scored against?"]
     if not targets:
-        # One option is no choice: say what was searched and ask for the path.
-        console.say(lead[0])
-        console.say(f"No test files (test_*.py or *_test.py) were found under "
+        lead.append(f"No test files (test_*.py or *_test.py) were found under "
                     f"{root}.")
-        return _typed_path(console, cwd, "a test file or folder")
     picked = choose(console, options, lead=lead)
     if picked <= len(targets):
         return targets[picked - 1]
+    if picked == len(targets) + 1:
+        return no_tests_suite(console, code, cwd)
     return _typed_path(console, cwd, "a test file or folder")
+
+
+NO_TESTS = os.path.join("qikly-suite-score", "no_tests")
+
+
+def no_tests_suite(console, code, cwd):
+    """
+    A placeholder suite for code that has no tests yet: one test that imports
+    each module and checks nothing. Every planted fault then goes unnoticed,
+    which is the truth, and the questions cover the whole module. Written
+    under qikly-suite-score, never among the user's own tests.
+    """
+    from qikly import start_probe
+
+    root = project_root(code, cwd)
+    modules = [code] if os.path.isfile(code) else modules_in(code)
+    folder = os.path.join(cwd, NO_TESTS)
+    os.makedirs(folder, exist_ok=True)
+    lines = ['"""Written by qikly --start: imports the code and checks nothing,',
+             'because it has no tests yet. Not a test of yours."""',
+             "import importlib", "import os", "import sys", ""]
+    # Relative to this file, not absolute: scoring runs the suite in a copy of
+    # the project, and an absolute path imported the untouched original, so
+    # no planted fault was ever run.
+    bases = sorted(set(start_probe.import_base(m, root) for m in modules))
+    lines += [f"sys.path.insert(0, os.path.normpath(os.path.join("
+              f"os.path.dirname(os.path.abspath(__file__)), "
+              f"{os.path.relpath(b, folder)!r})))" for b in bases]
+    lines += ["", "", "def test_it_imports():"]
+    lines += [f"    importlib.import_module({start_probe.dotted_name(m, root)!r})"
+              for m in modules]
+    path = os.path.join(folder, "test_imports_only.py")
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write("\n".join(lines) + "\n")
+    console.say(f"  scoring against a placeholder that only imports the code: "
+                f"{shown(path, cwd)}")
+    return path
+
+
+def is_placeholder(tests, cwd):
+    return os.path.abspath(tests).startswith(os.path.abspath(os.path.join(cwd, NO_TESTS)))
 
 
 # -------------------------------------------------------------- the state --
@@ -1517,9 +1560,10 @@ def inputs_outputs(console, cwd, code, tests, report, results, ran):
 def announce(console, cwd, code):
     what = os.path.basename(code) if os.path.isfile(code) else shown(code, cwd) + os.sep
     console.say("")
-    console.say(f"This scores the tests you already have, asks you a few questions "
-                f"about what {what} should do, and saves your answers. Nothing "
-                f"of yours is changed: your code and your tests are only read.")
+    console.say(f"This scores the tests you already have, if any, asks you a few "
+                f"questions about what {what} should do, and saves your answers. "
+                f"Nothing of yours is changed: your code and your tests are only "
+                f"read.")
     console.say("")
     console.say(f"It writes into {cwd}:")
     console.say("  qikly-suite-score" + os.sep + "     the score report")
@@ -1762,10 +1806,10 @@ def _user_env(var):
         return None
 
 
-def main(arg, cwd, console=None, answers=None):
+def main(arg, cwd, console=None, answers=None, tests=None):
     console = console or Console()
     try:
-        return _main(arg, cwd, console, answers)
+        return _main(arg, cwd, console, answers, tests)
     except (Stop, KeyboardInterrupt):
         console.say("")
         console.say("Stopped. Every answer you gave is saved, in the task file "
@@ -1851,9 +1895,9 @@ def _test_sources(tests):
     return [_read(p) for p in ([tests] if os.path.isfile(tests) else _test_files(tests))]
 
 
-def _main(arg, cwd, console, answers):
+def _main(arg, cwd, console, answers, given_tests=None):
     if not console.interactive and not answers:
-        return _non_interactive(arg, cwd, console)
+        return _non_interactive(arg, cwd, console, given_tests)
     if answers:
         code = os.path.abspath(os.path.join(cwd, arg or "."))
         if not os.path.exists(code):
@@ -1874,7 +1918,14 @@ def _main(arg, cwd, console, answers):
         code = pick_code(console, arg, cwd)
         announce(console, cwd, code)
         session = load_session(cwd, code)
-        tests = _choose_tests(console, code, cwd, session)
+        if given_tests:
+            # --score-tests on the command line: used as given, nothing asked.
+            tests = os.path.abspath(os.path.join(cwd, given_tests))
+            if not os.path.exists(tests):
+                console.say(f"There is no test file or folder at {tests}.")
+                return 2
+        else:
+            tests = _choose_tests(console, code, cwd, session)
     result, report = _scored(console, code, tests, cwd, session)
     if result is None:
         return 2
@@ -1985,7 +2036,8 @@ def _main(arg, cwd, console, answers):
             home = [t for t in ready if t not in not_green]
             if home:
                 offer_take_home(console, cwd, home,
-                                tests if os.path.isdir(tests) else os.path.dirname(tests))
+                                os.path.join(cwd, "tests") if is_placeholder(tests, cwd)
+                                else tests if os.path.isdir(tests) else os.path.dirname(tests))
     elif ready:
         console.say(f"To run it, which needs an API key:  qikly --tasks {' '.join(ready)}")
     inputs_outputs(console, cwd, code, tests, report, results, ran)
@@ -2038,7 +2090,7 @@ def _complete(paths):
 
 # --------------------------------------------------- without a terminal ----
 
-def _non_interactive(arg, cwd, console):
+def _non_interactive(arg, cwd, console, given_tests=None):
     """No prompts: score, print the questions, write them where --answers reads."""
     if not arg:
         console.say("qikly --start needs a module or folder when it is not run "
@@ -2051,12 +2103,13 @@ def _non_interactive(arg, cwd, console):
     root = project_root(code, cwd)
     session = load_session(cwd, code)
     saved = session.get("tests")
-    tests = (os.path.abspath(os.path.join(cwd, saved))
+    tests = (os.path.abspath(os.path.join(cwd, given_tests)) if given_tests
+             else os.path.abspath(os.path.join(cwd, saved))
              if saved and os.path.exists(os.path.join(cwd, saved))
              else auto_tests(code, cwd))
-    if not tests:
-        console.say("No test files that import it were found. Score it with  "
-                    "qikly --score-code <code> --score-tests <tests>")
+    if not tests or not os.path.exists(tests):
+        console.say("No test files that import it were found. Name them with  "
+                    "qikly --start <code> --score-tests <tests>")
         return 2
     result, report = _scored(console, code, tests, cwd, session)
     if result is None:

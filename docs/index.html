@@ -847,7 +847,7 @@ footer {
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
-          <figcaption>Two passing tests, scored</figcaption>
+          <figcaption>What it printed for pricing.py, whose two tests both pass</figcaption>
 <pre><span class="dim">[pricing.py]</span> <span class="alert">9 of 12 planted faults missed</span><span class="alert"> (75%)</span>, 3 caught.
 <span class="dim">[pricing.py]</span> 8 questions your tests leave open, in the same report.</pre>
         </figure>
@@ -857,9 +857,11 @@ footer {
           <span class="n">Step 2</span>
           <b>Answer what your tests never check</b>
           <code class="cmd"><span>qikly</span> <span>--start</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--start</span> <span>your_project_folder</span></code>
-          <p>Scores your tests first, as in step 1, so you can start here
-            directly. Then asks you about each thing they never check. Every
-            question is a numbered menu, and your answers are saved as you go.</p>
+          <p>If you have tests, it scores them first, as in step 1, so you can
+            start here directly: it finds them, or add
+            <code>--score-tests test_folder/</code>. No tests yet? It asks about
+            the whole module instead. Every question is a numbered menu, and your
+            answers are saved as you go.</p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
@@ -881,7 +883,9 @@ Type a number from 1 to 5, then press Enter: <span class="you-ins">2</span></pre
         <div class="step">
           <span class="n">Step 3</span>
           <b>Get a fresh test suite written from your answers</b>
-          <p>At the end, <code>--start</code> offers the run. A test agent
+          <p>Once you have answered the questions, <code>--start</code> offers
+            the full run, which needs an API key (Google Gemini, Anthropic or
+            OpenAI). A test agent
             writes tests from your answers before any code is shown to it, and
             a separate coding agent, which never sees your answers, repairs a
             copy of your code until they pass. Your files are never edited.

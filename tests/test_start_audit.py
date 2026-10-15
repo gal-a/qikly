@@ -460,3 +460,25 @@ def test_a_failure_with_no_tag_is_still_reported(tmp_path):
     s = Script([])
     start.report_result(s.console, paths, state, lines, True)
     assert "test_odd" in s.text and "agrees" not in s.text
+
+
+def test_start_takes_its_tests_from_score_tests(monkeypatch, tmp_path):
+    seen = {}
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    monkeypatch.setattr(start, "main",
+                        lambda path, cwd, answers=None, tests=None: seen.update(tests=tests) or 0)
+    monkeypatch.setattr(sys, "argv", ["qikly", "--start", "pricing.py",
+                                      "--score-tests", "tests/"])
+    assert cli.main() == 0 and seen["tests"] == "tests/"
+
+
+def test_code_with_no_tests_gets_questions_about_every_fault(tmp_path, monkeypatch):
+    (tmp_path / "pricing.py").write_text(PRICING)
+    monkeypatch.chdir(tmp_path)
+    s = Script([])
+    suite = start.no_tests_suite(s.console, str(tmp_path / "pricing.py"), str(tmp_path))
+    assert start.is_placeholder(suite, str(tmp_path))
+    assert "qikly-suite-score" in suite and not (tmp_path / "tests").exists()
+    result, _ = start.score(s.console, str(tmp_path / "pricing.py"), suite,
+                            str(tmp_path), False)
+    assert result and result["total"] and not result["caught"]

@@ -58,7 +58,9 @@ a whole folder, or leave the path out to be asked. It:
 
 1. **Scores the tests you already have**, by planting faults in a copy of your
    code one at a time and seeing which ones your tests do not notice. Free, and
-   no model is called.
+   no model is called. It finds your tests, or name them with
+   `--score-tests tests/`. No tests yet? Choose "I have no tests for it yet"
+   and it asks about the whole module instead.
 2. **Asks you about each thing they never check**, as a numbered menu. Where
    it can, the options are concrete, worked out by running your code beside
    the value in question, never at it:

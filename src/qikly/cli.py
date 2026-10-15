@@ -2104,7 +2104,7 @@ def _fill_criteria_from(text, doc, root):
     return fd.merge(text, criteria)
 
 
-def _do_start(path, answers=None):
+def _do_start(path, answers=None, tests=None):
     """`qikly --start [PATH]`: see start.py."""
     import re
 
@@ -2123,7 +2123,7 @@ def _do_start(path, answers=None):
         print(f"There is no answers file at {answers}.")
         return 2
     from qikly import start
-    return start.main(path or None, INVOKED_FROM, answers=answers)
+    return start.main(path or None, INVOKED_FROM, answers=answers, tests=tests)
 
 
 def _do_scaffold(source, task_id, doc=None, fresh=False):
@@ -2531,15 +2531,15 @@ def main():
             ("--from-doc", args.from_doc is not None),
             ("--scaffold", bool(args.scaffold)),
             ("--score-code", bool(args.score_code)),
-            ("--score-tests", bool(args.score_tests)),
             ("--score-suite", bool(args.score_suite)),
         ) if given]
         if ignored:
-            print(f"--start takes a path and, optionally, --answers; it would "
+            print(f"--start takes a path and, optionally, --score-tests and "
+                  f"--answers; it would "
                   f"ignore {', '.join(ignored)}. Run it without "
                   f"{'that' if len(ignored) == 1 else 'those'}.", file=sys.stderr)
             return 2
-        return _do_start(args.start, args.answers)
+        return _do_start(args.start, args.answers, args.score_tests)
 
     # These run before anything else and exit: they exist to make a project
     # runnable, so they must work when nothing is configured yet and must not
