@@ -38,7 +38,7 @@ packaging tools would read as `1.1`.
 ### Fixed
 - **A `--score-tests` path that does not exist now says where the tests are.**
   With `test_pricing.py` beside `pricing.py` and `--score-tests tests/` typed
-  as the docs show, the message was only `no suite at ...	ests`. It now names
+  as the docs show, the message was only `no suite at ...\tests`. It now names
   the test files it finds beside the code and the flag that would work, for
   example `try --score-tests test_pricing.py`.
 - **`--criteria-from --task-id` on a freshly scaffolded task wrote invalid
