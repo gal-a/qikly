@@ -926,7 +926,8 @@ def _parse_args():
         "--score-tests", metavar="PATH", default=None,
         help="The suite to run against those planted faults: a test file or a "
              "directory of them, absolute or relative the same way. Goes with "
-             "--score-code, and neither works alone."
+             "--score-code, and neither works alone. With --start, it names "
+             "the tests to score instead of being asked."
     )
     parser.add_argument(
         "--score-mutants", type=int, default=None,
@@ -2517,6 +2518,10 @@ def main():
             pass
 
     if args.take_tests:
+        if args.start is not None:
+            print("--take-tests and --start are separate steps: run one, then the "
+                  "other.", file=sys.stderr)
+            return 2
         from qikly import take_tests
         return take_tests.main(args.take_tests, INVOKED_FROM)
 
@@ -2532,6 +2537,8 @@ def main():
             ("--scaffold", bool(args.scaffold)),
             ("--score-code", bool(args.score_code)),
             ("--score-suite", bool(args.score_suite)),
+            ("--score-mutants", args.score_mutants is not None),
+            ("--score-seed", args.score_seed is not None),
         ) if given]
         if ignored:
             print(f"--start takes a path and, optionally, --score-tests and "

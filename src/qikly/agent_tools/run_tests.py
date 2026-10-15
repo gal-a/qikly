@@ -42,7 +42,9 @@ def _parse_test_results(combined_output):
     # outputs/tests/<task_id>/integration/test_integration.py::test_extract_reads_all_rows PASSED [ 33%]
     results = []
     for match in re.finditer(
-        r"^(\S+::\S+)\s+(PASSED|FAILED|ERROR|SKIPPED)\b",
+        # A parametrize id may hold spaces, `test_x[a b]`; matching \S+ there
+        # dropped the test, and a failing stage was printed with no names.
+        r"^(\S+::[^\s\[]+(?:\[[^\]\n]*\])?)\s+(PASSED|FAILED|ERROR|SKIPPED)\b",
         combined_output,
         re.MULTILINE
     ):

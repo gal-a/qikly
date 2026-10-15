@@ -83,10 +83,12 @@ a whole folder, or leave the path out to be asked. It:
    before any code is shown to it; a separate coding agent, which never sees
    your answers, repairs a copy of your code until they pass. It tells you
    first where your code and your answers disagree.
-4. **Offers to copy the new tests into your own tests folder**, as
-   `tests/qikly_generated/`, rewritten to import your module rather than
-   qikly's copy of it, and runs them on your code. Any that fail there mark
-   where your code and your answers disagree.
+4. **After a green run, offers to copy the new tests into your own tests
+   folder**, under `qikly_generated/` beside the tests it scored, rewritten to
+   import your module rather than qikly's copy of it, and runs them on your
+   code. It names which failures are disagreements between your code and
+   your answers, and which only call a helper qikly's copy has or could not
+   import your module. `qikly --take-tests <TASK>` does the same later.
 
 It says where it writes before it starts, and ends with a full audit: every
 file it read, saved and wrote, and where.

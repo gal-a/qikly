@@ -78,12 +78,16 @@ packaging tools would read as `1.1`.
   - Each answer is listed only against the tests that make the call it
     names; where none does, the test writer's own tags are shown, marked.
 - **`qikly --take-tests <TASK>`: tests you can take home.** The tests a run
-  wrote import qikly's copy of your code; this copies them into
-  `tests/qikly_generated/`, rewritten to import your own module, and runs them
-  on your code. Those that fail there are where your code and your answers
-  disagree, and those that call a helper only qikly's copy has are named
-  apart. A file it did not write is never overwritten. `--start` offers it
-  after a green run.
+  wrote import qikly's copy of your code; this copies each stage's files into
+  `qikly_generated/<task>/<stage>/` beside your tests, keeping their names,
+  rewrites every import of qikly's copy to yours, writes a `conftest.py` that
+  makes your code importable from wherever it lives, and runs them on your
+  code. Failures are classified from pytest's own XML: disagreements with
+  your answers, calls to a helper only qikly's copy has, copies that could not
+  import your module, and files that could not be collected. A file it did
+  not write is never overwritten, a rerun removes its own stale copies, the
+  folder is remembered, and `outputs/conftest.py` keeps a plain `pytest` from
+  running qikly's own copies as well. `--start` offers it after a green run.
 - **The Skill offers `--start` first**, and says to relay its questions to the
   user word for word when it runs without a terminal.
 - **`--score-code` asks a question about every fault your tests missed, and

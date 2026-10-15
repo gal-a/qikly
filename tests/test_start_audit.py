@@ -482,3 +482,97 @@ def test_code_with_no_tests_gets_questions_about_every_fault(tmp_path, monkeypat
     result, _ = start.score(s.console, str(tmp_path / "pricing.py"), suite,
                             str(tmp_path), False)
     assert result and result["total"] and not result["caught"]
+
+
+# ---------------------------------------------- second audit, 2026-10-15 --
+
+def _tagged_project(tmp_path, body):
+    _project(tmp_path)
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    folder = tmp_path / "outputs" / "tests" / paths.task_id / "integration"
+    folder.mkdir(parents=True)
+    (folder / "test_integration.py").write_text(body)
+    return paths
+
+
+def test_a_failure_tagged_beyond_the_answers_is_still_reported(tmp_path):
+    paths = _tagged_project(tmp_path, 'def test_x():\n    """# Criteria: 3"""\n')
+    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
+    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_x"]
+    _, _, _, untagged = start.disagreements(paths, state, lines)
+    assert untagged == ["test_x"]
+
+
+def test_a_failing_stage_without_names_is_never_agreement(tmp_path):
+    paths = _tagged_project(tmp_path, 'def test_x():\n    pass\n')
+    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
+    for tail in ("1/2 passed | FAILED: ", "0 passed, 1 failed"):
+        lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] {tail}"]
+        s = Script([])
+        start.report_result(s.console, paths, state, lines, True)
+        assert "agrees" not in s.text and "did not name" in s.text, tail
+
+
+def test_a_tag_above_the_next_test_belongs_to_that_test(tmp_path):
+    body = ('def test_a():\n    assert True\n\n# Criteria: 1\ndef test_b():\n'
+            '    """b"""\n    assert True\n')
+    paths = _tagged_project(tmp_path, body)
+    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
+    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 1/2 passed | FAILED: test_a"]
+    disagreed, _, _, untagged = start.disagreements(paths, state, lines)
+    assert disagreed == [] and untagged == ["test_a"]
+
+
+def test_same_named_methods_in_two_classes_stay_apart(tmp_path):
+    body = ('class TestHigh:\n    def test_edge(self):\n        """# Criteria: 1"""\n\n'
+            'class TestLow:\n    def test_edge(self):\n        """# Criteria: 2"""\n')
+    paths = _tagged_project(tmp_path, body)
+    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "high"},
+                                      "b": {"status": "answered", "criterion": "low"}}}
+    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 1/2 passed | FAILED: TestHigh::test_edge"]
+    assert start.disagreements(paths, state, lines)[0] == ["high"]
+
+
+def test_a_package_named_like_the_standard_library_stays_a_file_seed(tmp_path):
+    pkg = tmp_path / "code"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    (pkg / "pricing.py").write_text(PRICING)
+    paths = start.Paths(str(tmp_path), str(pkg / "pricing.py"))
+    state = {"requirements": "r", "extra": [], "answers": {"a": {
+        "status": "answered", "criterion": "apply_discount(1, 2) returns 0.98",
+        "question": "q", "where": "w"}}}
+    task = yaml.safe_load(start.task_text(paths, state))
+    assert task["seed"]["implementation"].endswith("pricing.py")
+
+
+def test_the_placeholder_leaves_out_main_and_unimportable_modules(tmp_path):
+    pkg = tmp_path / "app"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("")
+    (pkg / "__main__.py").write_text("import sys\nsys.exit(2)\n")
+    (pkg / "broken.py").write_text("import nonexistent_module_xyz\n")
+    (pkg / "rules.py").write_text("def f(x):\n    return x\n")
+    s = Script([])
+    path = start.no_tests_suite(s.console, str(pkg), str(tmp_path))
+    text = open(path).read()
+    assert "app.rules" in text and "__main__" not in text and "broken" not in text
+    assert "left out" in s.text
+
+
+def test_decimal_neighbours_are_typed_not_pinned(tmp_path, monkeypatch):
+    source = ("from decimal import Decimal\n\ndef fee(amount):\n"
+              "    if amount >= 100:\n        return Decimal('9.9')\n"
+              "    return Decimal('0')\n")
+    (tmp_path / "f.py").write_text(source)
+    q = {"file": "f.py", "path": str(tmp_path / "f.py"), "line": 4, "function": "fee",
+         "question": "q?", "edge": "100", "kind": ">= became >"}
+    _, options = so.menu(q, source, ["fee(50)\n"], str(tmp_path))
+    behaviours = [o for o in options if o["kind"] == so.BEHAVIOUR]
+    assert len(behaviours) == 1 and behaviours[0]["pins"]["returns"] is None
+
+
+def test_take_tests_and_start_together_are_refused(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["qikly", "--start", "p.py", "--take-tests", "X"])
+    assert cli.main() == 2
+    assert "separate steps" in capsys.readouterr().err

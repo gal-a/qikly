@@ -56,10 +56,10 @@ dependency chain and pip installs qikly itself last, so there is a window where
 its dependencies are present and qikly is not, which looks exactly like a
 broken install.
 
-Only `--demo` and the run at the end of `--start` need a key. `--version`,
-`--score-code`, `--start` until its run, `--take-tests`, `--explain`,
-`--validate`, `--init`, `--example` and `--scaffold` make no model call and
-cost nothing.
+A key is needed only for a run: `--demo`, the run at the end of `--start`,
+and `--tasks`, `--run` and `--repeat`. `--version`, `--score-code`, `--start`
+until its run, `--take-tests`, `--explain`, `--validate`, `--init`,
+`--example` and `--scaffold` make no model call and cost nothing.
 
 Gemini is the default and its key is `GEMINI_API_KEY`. For OpenAI or
 Anthropic, which need an extra install, see [the provider table in
@@ -144,10 +144,10 @@ The same three steps as [the home page](https://test.qikly.com/?ref=quick-start)
    answers before any code is shown to it, and a separate coding agent, which
    never sees them, repairs a copy of your code until they pass. Your files
    are never edited. It tells you first where your code and your answers
-   disagree, then offers to copy the new tests into
-   `tests/qikly_generated/`, importing your own module (`qikly --take-tests
-   <TASK>` does the same later), and ends with a full audit of every file it
-   read, saved and wrote.
+   disagree. After a green run it offers to copy the new tests into
+   `qikly_generated/` beside the tests it scored, importing your own module
+   (`qikly --take-tests <TASK>` does the same later), and it ends with a full
+   audit of every file it read, saved and wrote.
 
 ## Command by command
 

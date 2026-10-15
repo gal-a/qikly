@@ -493,11 +493,15 @@ def advice(questions, invoked_from=None):
     paths = sorted({q["path"] for q in questions if q.get("path")})
     if not paths:
         return []
+    # `--start` first, because it is step 2 on the home page and asks these
+    # one at a time; `--scaffold` stays as the way to answer them by hand.
     if len(paths) > 1:
-        return ["They are about %d files. A task covers one module: run "
-                "`qikly --scaffold FILE` on the one you want to specify first, "
-                "and it writes that file's questions into the task for you to "
-                "answer. The files: %s." % (len(paths), ", ".join(shown(p) for p in paths))]
+        folder = os.path.commonpath([os.path.dirname(p) for p in paths])
+        return ["Next: `qikly --start %s` asks these one at a time, one task "
+                "per module, and saves your answers. They are about %d files: "
+                "%s. By hand instead: `qikly --scaffold FILE` writes one file's "
+                "questions into a task file." % (
+                    shown(folder), len(paths), ", ".join(shown(p) for p in paths))]
     module, task = paths[0], task_for(paths[0])
     if not _scaffoldable(module):
         return ["`qikly --scaffold` needs a public top-level function to call, "
@@ -507,10 +511,10 @@ def advice(questions, invoked_from=None):
                 "%s, each above your answer." % (os.path.basename(module), MARK)]
     existing = os.path.join(here, "inputs_private", "config", "tasks", f"{task}.yaml")
     if os.path.isfile(existing):
-        return ["%s already exists, so `--scaffold` will not rewrite it. Paste "
-                "the questions you want under its acceptance_criteria as "
-                "comments starting %s, each above your answer." % (task, MARK)]
-    return ["Next: `qikly --scaffold %s` writes the task file with these "
-            "questions in its acceptance_criteria, each above a TODO for your "
-            "answer. `qikly --validate --tasks %s` then says how many are "
-            "still unanswered." % (shown(module), task)]
+        return ["Next: `qikly --start %s` asks these one at a time and saves "
+                "your answers. %s already exists, so `--scaffold` would not "
+                "rewrite it." % (shown(module), task)]
+    return ["Next: `qikly --start %s` asks these one at a time and saves your "
+            "answers. By hand instead: `qikly --scaffold %s` writes them into "
+            "the task file, each above a TODO, and `qikly --validate --tasks %s` "
+            "says how many are still unanswered." % (shown(module), shown(module), task)]

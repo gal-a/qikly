@@ -32,6 +32,18 @@ from qikly import start_probe
 BEHAVIOUR, EITHER, ASK, SKIP, OWN = "behaviour", "either", "ask", "skip", "own"
 
 
+def path_module(path, root):
+    """
+    A module named by its path from the project root, `lib.a.util`, whether
+    or not its folders are packages. For matching imports only: two `util`
+    modules in folders without `__init__.py` both had the dotted name `util`,
+    and one's test calls were offered for the other.
+    """
+    import os
+    rel = os.path.relpath(os.path.splitext(os.path.abspath(path))[0], os.path.abspath(root))
+    return rel.replace(os.sep, ".").replace("/", ".")
+
+
 def _names_for(tree, function, module):
     """
     The names a test file calls `function` by. `from lib.a.util import scale
@@ -239,7 +251,7 @@ def boundary_options(question, source, test_sources, root):
     if variable not in positional and variable not in keyword_only:
         return None
     bases = _usable_calls(test_sources, function, positional, keyword_only,
-                          start_probe.dotted_name(question["path"], root))
+                          path_module(question["path"], root))
     if not bases:
         return None
     at, below, above = near
@@ -270,8 +282,8 @@ def boundary_options(question, source, test_sources, root):
                            "kwargs": built[0][1], "function": function})
     prompt = (f"Your tests never try {variable} at exactly {shown_edge}. "
               f"What should {call} do?")
-    if all("raises" not in o for o in outcomes) and not all(
-            _is_number(o["returns"]) for o in outcomes):
+    if all("raises" not in o for o in outcomes) and all(
+            _is_category(o["returns"]) for o in outcomes):
         # A category on each side, such as 'B' at 89 and 'A' at 91: which one
         # the edge belongs to is the whole decision, so both are offered as
         # they are, the current neighbour's value labelled.
@@ -294,6 +306,20 @@ def boundary_options(question, source, test_sources, root):
                          "pins": {"returns": None, "like": outcomes[0]["returns"]},
                          "label": f"type the value it should return ({context})"}]
     return prompt, _shuffled(behaviours, question["question"])
+
+
+def _is_category(text):
+    """
+    A value that names a category, a string, True, False or None, so pinning
+    the neighbour's is a real choice. Anything else, numbers and also values
+    whose repr is not a literal such as Decimal('9.9'), goes to "type the
+    value": pinning a neighbour's Decimal saved the wrong amount as an answer.
+    """
+    try:
+        value = ast.literal_eval(text)
+    except (ValueError, SyntaxError, TypeError):
+        return False
+    return isinstance(value, (str, bool)) or value is None
 
 
 def _is_number(text):
@@ -344,7 +370,7 @@ def difference_options(question, source, test_sources, root, mutant):
         return None
     positional, keyword_only = found
     bases = _usable_calls(test_sources, function, positional, keyword_only,
-                          start_probe.dotted_name(question["path"], root))
+                          path_module(question["path"], root))
     if not bases:
         return None
     candidates = []

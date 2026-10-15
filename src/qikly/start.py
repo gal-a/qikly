@@ -499,6 +499,19 @@ def no_tests_suite(console, code, cwd):
 
     root = project_root(code, cwd)
     modules = [code] if os.path.isfile(code) else modules_in(code)
+    # `__main__.py` runs a program when imported, and one that exits failed
+    # the whole placeholder; a module that will not import at all is named
+    # and left out, rather than making every other module unscoreable.
+    kept = []
+    for m in modules:
+        if os.path.basename(m) == "__main__.py":
+            continue
+        if start_probe.run_calls(m, root, []) is None:
+            console.say(f"  left out, because it does not import on its own: "
+                        f"{shown(m, cwd)}")
+            continue
+        kept.append(m)
+    modules = kept or modules[:1]
     folder = os.path.join(cwd, NO_TESTS)
     os.makedirs(folder, exist_ok=True)
     lines = ['"""Written by qikly --start: imports the code and checks nothing,',
@@ -511,9 +524,9 @@ def no_tests_suite(console, code, cwd):
     lines += [f"sys.path.insert(0, os.path.normpath(os.path.join("
               f"os.path.dirname(os.path.abspath(__file__)), "
               f"{os.path.relpath(b, folder)!r})))" for b in bases]
-    lines += ["", "", "def test_it_imports():"]
-    lines += [f"    importlib.import_module({start_probe.dotted_name(m, root)!r})"
-              for m in modules]
+    for index, m in enumerate(modules, 1):
+        lines += ["", "", f"def test_{index}_imports():",
+                  f"    importlib.import_module({start_probe.dotted_name(m, root)!r})"]
     path = os.path.join(folder, "test_imports_only.py")
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(lines) + "\n")
@@ -996,8 +1009,9 @@ def ask_data(console, paths, state, source, test_sources):
     # the first-time user asked both, and whether to write True or true.
     lead = [f"{os.path.basename(paths.module)}'s functions take "
             f"{', '.join(columns)}. The run tries the code on a few example "
-            f"inputs, one row each, with a value for every one of those, "
-            f"written as Python would write it (True, not true)."]
+            f"inputs, one row each, with a value for every one of those: "
+            f"numbers as numbers, True or False as Python writes them, and text "
+            f"without quotes."]
     if built:
         lead.append("Built from your answers and your tests:")
         lead += ["    " + ", ".join(r) for r in built]
@@ -1089,6 +1103,11 @@ def _as_package_seed(text, paths):
     root = project_root(paths.module, paths.cwd)
     dotted = start_probe.dotted_name(paths.module, root)
     if "." not in dotted:
+        return text
+    # A package named like a standard-library module, `code` or `json`, is
+    # refused by the run as a seed, but only after the paid test generation;
+    # such a module stays a single-file seed, as it was before.
+    if dotted.split(".")[0] in getattr(sys, "stdlib_module_names", ()):
         return text
     top = os.path.join(start_probe.import_base(paths.module, root), dotted.split(".")[0])
     seed = shown(top, paths.cwd).replace(os.sep, "/")
@@ -1254,13 +1273,21 @@ def _failed_tasks(lines, task_ids, converged):
     return set(task_ids)
 
 
-_STAGE = re.compile(r"^\[(\w+)\].*\[stage ([12])/\d\] \[iteration 1\] (\d+)/(\d+) passed"
-                    r"(?: \| FAILED: (.+))?$")
+_STAGE = re.compile(r"^\[(\w+)\].*\[stage ([12])/\d\] \[iteration 1\] (.*)$")
+_COUNTS = re.compile(r"^(\d+)/(\d+) passed(?: \| FAILED: ?(.*))?$")
+
+
+# A failure the run's line did not name: never dropped, never "agreement".
+UNNAMED = "a failing test the run did not name"
 
 
 def _bare(name):
-    """`test_x` from `test_x[100]` or `TestLabel::test_x`, as pytest names them."""
-    return name.strip().split("::")[-1].split("[")[0]
+    """
+    A test as the run names it, without its parametrize id: `test_x` from
+    `test_x[100]`, `TestLow::test_edge` kept whole, so same-named methods in
+    two classes stay apart.
+    """
+    return name.strip().split("[")[0]
 
 
 def _batched():
@@ -1293,9 +1320,20 @@ def disagreements(paths, state, lines):
         found = _STAGE.match(line)
         if not found or found.group(1) != paths.task_id:
             continue
-        names = [_bare(n) for n in (found.group(5) or "").split(",") if n.strip()]
+        counts = _COUNTS.match(found.group(3).strip())
+        if counts:
+            names = [_bare(n) for n in (counts.group(3) or "").split(",") if n.strip()]
+            failing = int(counts.group(1)) < int(counts.group(2))
+        else:
+            # A line in another shape, such as "0 passed, 1 failed", still
+            # says whether anything failed; unparsed, it read as clean.
+            names = []
+            failing = not re.search(r"\b0 failed\b|^\d+ passed$", found.group(3)) \
+                and bool(re.search(r"fail|error", found.group(3), re.I))
+        if failing and not names:
+            names = [UNNAMED]
         if found.group(2) == "1":
-            stage_one_clean = not names
+            stage_one_clean = not failing
             failed.update(names)
         elif stage_one_clean:
             failed.update(names)
@@ -1326,6 +1364,9 @@ def disagreements(paths, state, lines):
     # answers it does not check: a free-shipping answer was listed against
     # two express-delivery tests. Where an answer names a call, only tests
     # that make that call are kept; if none does, the tags stand, marked.
+    # Only tags that point at an answer count: "Criteria: 3" with two answers
+    # tags nothing, and counting it hid that test's failure from both lists.
+    tests_for = {n: names for n, names in tests_for.items() if 0 < n <= len(criteria)}
     tagged = {n: list(names) for n, names in tests_for.items()}
     unconfirmed = set()
     module_source = _read(paths.module)
@@ -1355,25 +1396,38 @@ _CRITERIA_TAG = re.compile(r"(?:#\s*)?Criteria:\s*([\d,\s]+)")
 
 
 def _test_text(source, name):
-    """A test's lines, from its def to the next def, comments included."""
+    """
+    A test's own lines: from its first decorator to its last statement, plus
+    comment lines indented inside it that follow. Not the comment above the
+    next test, which belongs to that test: sliced by "to the next def", a tag
+    written above a test was read as the one before it.
+    """
     lines = source.splitlines()
-    start = next((i for i, l in enumerate(lines)
-                  if re.match(r"\s*(?:async\s+)?def %s\(" % re.escape(name), l)), None)
-    if start is None:
-        return ""
-    end = next((i for i in range(start + 1, len(lines))
-                if re.match(r"\s*(?:async\s+)?def |\s*class |@", lines[i])), len(lines))
-    return "\n".join(lines[start:end])
+    for qualified, node in _test_nodes(source):
+        if qualified != name:
+            continue
+        start = min([node.lineno] + [d.lineno for d in node.decorator_list]) - 1
+        end = node.end_lineno
+        indent = len(lines[node.lineno - 1]) - len(lines[node.lineno - 1].lstrip())
+        while end < len(lines):
+            line = lines[end]
+            stripped = line.strip()
+            if stripped.startswith("#") and len(line) - len(line.lstrip()) > indent:
+                end += 1
+            elif not stripped and end + 1 < len(lines) and \
+                    lines[end + 1].strip().startswith("#") and \
+                    len(lines[end + 1]) - len(lines[end + 1].lstrip()) > indent:
+                end += 1
+            else:
+                break
+        return "\n".join(lines[start:end])
+    return ""
 
 
 def _test_body(source, name):
     import ast
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return ""
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+    for qualified, node in _test_nodes(source):
+        if qualified == name:
             return ast.get_source_segment(source, node) or ""
     return ""
 
@@ -1422,6 +1476,26 @@ def _makes_call(body, call, source=None):
     return False
 
 
+def _test_nodes(source):
+    """(qualified name, node) for each test, `Class::name` inside a class."""
+    import ast
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    out = []
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and \
+                node.name.startswith("test_"):
+            out.append((node.name, node))
+        elif isinstance(node, ast.ClassDef):
+            for item in node.body:
+                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and \
+                        item.name.startswith("test_"):
+                    out.append((f"{node.name}::{item.name}", item))
+    return out
+
+
 def _test_docstrings(source):
     """
     (test name, docstring) for each test function, read with ast. A pattern
@@ -1429,14 +1503,7 @@ def _test_docstrings(source):
     generator often writes them, and reported a real disagreement as none.
     """
     import ast
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return []
-    return [(node.name, ast.get_docstring(node) or "")
-            for node in ast.walk(tree)
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name.startswith("test_")]
+    return [(name, ast.get_docstring(node) or "") for name, node in _test_nodes(source)]
 
 
 def _newest(folder, prefix=""):
@@ -1517,11 +1584,15 @@ def report_result(console, paths, state, lines, converged):
 
 # --------------------------------------------------------------- the block --
 
-def inputs_outputs(console, cwd, code, tests, report, results, ran):
+def inputs_outputs(console, cwd, code, tests, report, results, ran, copied=()):
     console.say("")
     console.say("  INPUTS (read, not changed)")
     console.say(f"    Your code      {shown(code, cwd)}")
-    console.say(f"    Your tests     {shown(tests, cwd)}")
+    if is_placeholder(tests, cwd):
+        console.say("    Your tests     none yet, so qikly scored a placeholder of its "
+                    f"own: {shown(tests, cwd)}")
+    else:
+        console.say(f"    Your tests     {shown(tests, cwd)}")
     console.say("  SAVED BY THIS COMMAND")
     if report:
         console.say(f"    Score report   {shown(report, cwd)}")
@@ -1560,8 +1631,21 @@ def inputs_outputs(console, cwd, code, tests, report, results, ran):
         if os.path.isdir(os.path.join(cwd, "outputs", "reports")):
             console.say(f"    Other reports  {shown(os.path.join(cwd, 'outputs', 'reports'), cwd)}{os.sep}   "
                         f"metrics, JUnit XML, run summaries")
+        conftest = os.path.join(cwd, "outputs", "conftest.py")
+        if os.path.exists(conftest):
+            console.say(f"    pytest guard   {shown(conftest, cwd)}   keeps a plain pytest "
+                        f"out of outputs{os.sep}")
         ids = ",".join(p.task_id for p, _, _ in results)
         console.say(f"    Their score    free:  qikly --score-suite --tasks {ids}")
+    if copied:
+        console.say("  COPIED INTO YOUR TESTS")
+        for path in copied:
+            if os.path.basename(path).startswith("test_"):
+                console.say(f"    {shown(path, cwd)}")
+        others = sum(1 for p in copied if not os.path.basename(p).startswith("test_"))
+        if others:
+            console.say(f"    and {others} supporting files beside them (conftest.py, "
+                        f"__init__.py)")
     console.say("")
     console.say(f"  Everything above is under {cwd}.")
 
@@ -1830,11 +1914,15 @@ def main(arg, cwd, console=None, answers=None, tests=None):
         return _main(arg, cwd, console, answers, tests)
     except (Stop, KeyboardInterrupt):
         console.say("")
-        console.say("Stopped. Every answer you gave is saved, in the task file "
-                    "under " + os.path.join("inputs_private", "config", "tasks")
-                    + " and the progress file under "
-                    + os.path.join("inputs_private", "questions")
-                    + ". Run the same command again to continue where you stopped.")
+        if os.path.isdir(os.path.join(cwd, "inputs_private", "questions")):
+            console.say("Stopped. Every answer you gave is saved, in the task file "
+                        "under " + os.path.join("inputs_private", "config", "tasks")
+                        + " and the progress file under "
+                        + os.path.join("inputs_private", "questions")
+                        + ". Run the same command again to continue where you stopped.")
+        else:
+            console.say("Stopped before any answer was given, so nothing is saved "
+                        "yet. Run the same command again to start.")
         return STOPPED
 
 
@@ -2059,6 +2147,15 @@ def _main(arg, cwd, console, answers, given_tests=None):
                         f"test may check less than you meant; none stops the run:")
             for w in warnings:
                 console.say(f"  - {w}")
+            if any("restates a criterion" in w for w in warnings):
+                # The check compares words, so a purpose sentence about the
+                # same topic as a longer answer can trip it. Said plainly, so
+                # a first-time user can judge it rather than fear it.
+                console.say("  That check compares words, so a sentence about the "
+                            "same topic can trip it. It matters only if your "
+                            "description of the module says what an answer says, "
+                            "such as a boundary value; if it does, rerun and reword "
+                            "the description.")
             if console.interactive and not answers:
                 picked = choose(console, [
                     "continue anyway",
@@ -2078,7 +2175,7 @@ def _main(arg, cwd, console, answers, given_tests=None):
         else:
             console.say(f"Checked {paths.task_id}: ready to run.")
         ready.append(paths.task_id)
-    ran, failed = False, False
+    ran, failed, copied = False, False, []
     if ready and console.interactive and not answers:
         module_arg = score_questions_pasteable(code, cwd)
         if offer_run(console, cwd, ready, module_arg):
@@ -2091,12 +2188,20 @@ def _main(arg, cwd, console, answers, given_tests=None):
                                   paths.task_id not in not_green)
             home = [t for t in ready if t not in not_green]
             if home:
-                offer_take_home(console, cwd, home,
-                                os.path.join(cwd, "tests") if is_placeholder(tests, cwd)
-                                else tests if os.path.isdir(tests) else os.path.dirname(tests))
+                try:
+                    copied = offer_take_home(
+                        console, cwd, home,
+                        os.path.join(cwd, "tests") if is_placeholder(tests, cwd)
+                        else tests if os.path.isdir(tests) else os.path.dirname(tests))
+                except Stop:
+                    # The run has finished; stopping here only skips the copy,
+                    # and the audit below still says what was written.
+                    console.say("")
+                    console.say(f"Not copied. The run itself has finished. Later:  "
+                                f"qikly --take-tests {','.join(home)}")
     elif ready:
         console.say(f"To run it, which needs an API key:  qikly --tasks {','.join(ready)}")
-    inputs_outputs(console, cwd, code, tests, report, results, ran)
+    inputs_outputs(console, cwd, code, tests, report, results, ran, copied)
     if failed:
         return 1
     return 2 if refused and not ready else 0
@@ -2111,23 +2216,26 @@ def offer_take_home(console, cwd, task_ids, test_dir):
     picked = choose(console, [
         f"copy the new tests into {shown(target, cwd)}{os.sep}, importing your "
         f"own code, and run them on it",
-        f"not now (later:  qikly --take-tests {task_ids[0]})",
+        f"not now (later:  qikly --take-tests {','.join(task_ids)})",
         "type a different tests folder to copy them into",
     ], lead=["The new tests import qikly's copy of your code. Copied into your "
              "own tests, they import your module instead."])
     if picked == 2:
-        return
+        return []
     if picked == 3:
         raw = free_text(console, "Type the folder to copy them into",
                         "tests" + os.sep + "generated")
         test_dir = os.path.abspath(os.path.join(cwd, raw.strip('"')))
         os.makedirs(test_dir, exist_ok=True)
+    copied = []
     for task_id in task_ids:
         written, result = take_tests.take(cwd, task_id, test_dir, say=console.say)
         if written:
             take_tests.report(console.say, cwd, written, result, task_id)
+            copied += written
         else:
             console.say(f"Nothing copied for {task_id}: {result}.")
+    return copied
 
 
 def _cannot_task(paths):
@@ -2163,7 +2271,10 @@ def _non_interactive(arg, cwd, console, given_tests=None):
              else os.path.abspath(os.path.join(cwd, saved))
              if saved and os.path.exists(os.path.join(cwd, saved))
              else auto_tests(code, cwd))
-    if not tests or not os.path.exists(tests):
+    if given_tests and not os.path.exists(tests):
+        console.say(f"There is no test file or folder at {tests}.")
+        return 2
+    if not tests:
         console.say("No test files that import it were found. Name them with  "
                     "qikly --start <code> --score-tests <tests>")
         return 2
