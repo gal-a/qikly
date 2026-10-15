@@ -838,7 +838,8 @@ footer {
           <b>Score your tests</b>
           <code class="cmd"><span>qikly</span> <span>--score-code</span> <span>your_module.py</span> <span>--score-tests</span> <span>tests/</span></code>
           <p>Plants faults in a copy of your code, names the ones your tests
-            miss, and asks you a question about each.</p>
+            miss, and asks you a question about each. Give it one module or a
+            whole folder.</p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
@@ -856,9 +857,13 @@ footer {
           <span class="n">Step 2</span>
           <b>Answer the questions</b>
           <code class="cmd"><span>qikly</span> <span>--scaffold</span> <span>your_module.py</span></code>
-          <p>Writes the questions into a task file. Under each one, replace the
-            <code>TODO</code> line with your answer in plain words, and delete
-            the questions you skip.</p>
+          <p>Writes the questions into a task file, one module at a time.
+            Under each one, replace the <code>TODO</code> line with your answer
+            in plain words, and delete the questions you skip. Then fill in the
+            file's other <code>TODO</code> lines and add a few rows of example
+            values to the data file it started for you.
+            <code>qikly --validate --tasks YOUR_MODULE_VERIFY</code> lists
+            anything still missing.</p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
@@ -877,9 +882,12 @@ footer {
           <span class="n">Step 3</span>
           <b>Build the test suite</b>
           <code class="cmd"><span>qikly</span> <span>--tasks</span> <span>YOUR_MODULE_VERIFY</span></code>
-          <p>Tests are written from your answers by an agent that never reads
-            your code. Where one fails, qikly repairs a copy of the code. Your
-            file is never edited.</p>
+          <p>The integration and system tests are written from your answers
+            before the agent sees any code. Where one fails, qikly repairs a
+            copy of the code: your file is never edited. The new tests land in
+            <code>outputs/tests/</code> and add to your own, and
+            <code>qikly --score-suite --tasks YOUR_MODULE_VERIFY</code> shows
+            how many planted faults they catch.</p>
           <span class="cost key">needs an API key</span>
         </div>
         <figure class="eg">

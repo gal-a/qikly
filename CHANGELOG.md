@@ -22,6 +22,11 @@ packaging tools would read as `1.1`.
   It writes the column names, one per argument (`price,rate,code`), and no
   rows, which have to be real. For code that is given a file, it says to copy
   in a real one, header line included.
+- **A run that passes says where the new tests are**, that they add to the
+  ones you have, and that `qikly --score-suite --tasks <TASK>` shows how many
+  planted faults they catch.
+- **`--score-code` on a folder says its faults were shared**: the 12 are
+  spread at random over every file, so a larger folder gets fewer per file.
 
 ### Added
 - **`--score-code` asks a question about every fault your tests missed, and

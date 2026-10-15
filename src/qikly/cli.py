@@ -361,6 +361,16 @@ def _run_task_process(task_id, seed, generate_criteria, resume=False):
         sys.exit(1)
 
     print("All tests passed.")
+    # A new user's first question after a green run was where the suite is,
+    # and the run never said. Then what it is worth, which one free command
+    # answers. It adds to their own tests: it covers what the criteria name.
+    from qikly.mutation_score import TEST_ROOT
+    print(f"Your new tests: {os.path.abspath(os.path.join(TEST_ROOT, task_id))}")
+    print("  They add to any tests you already have, covering what your "
+          "acceptance criteria name, and import qikly's copy of your code "
+          "under outputs/agent_src/.")
+    print(f"  See how many planted faults they catch, free:  "
+          f"qikly --score-suite --tasks {task_id}")
 
 
 def _demo_root(where=None):
@@ -2068,6 +2078,18 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
 
     root = INVOKED_FROM
     source = source if os.path.isabs(source) else os.path.join(root, source)
+    if os.path.isdir(source):
+        # `--score-code` takes a folder, so `--scaffold` on the same folder is
+        # the natural next command, and "no such file" read like a typo.
+        files = sorted(f for f in os.listdir(source)
+                       if f.endswith(".py") and f != "__init__.py")
+        print(f"{shown(source)} is a folder. A task covers one module, so "
+              f"--scaffold takes one file at a time.")
+        if files:
+            print("Run it on the one you want to specify first, for example:")
+            print(f"    qikly --scaffold {os.path.join(shown(source), files[0])}")
+            print("The files: " + ", ".join(files))
+        return 2
     if not os.path.isfile(source):
         print(f"no such file: {source}")
         return 2

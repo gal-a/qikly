@@ -752,6 +752,27 @@ def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
     return result
 
 
+_GENERATED_IMPORT = re.compile(r"\boutputs\.agent_src\.code\.(\w+)\.")
+
+
+def _generated_suite_task(target):
+    """The task whose generated suite this is, or None for anyone else's."""
+    for suite in target.suites:
+        path = os.path.join(target.root, suite)
+        names = ([path] if os.path.isfile(path) else
+                 [os.path.join(d, f) for d, _, fs in os.walk(path)
+                  for f in fs if f.endswith(".py")])
+        for name in names:
+            try:
+                with open(name, encoding="utf-8", errors="replace") as handle:
+                    found = _GENERATED_IMPORT.search(handle.read())
+            except OSError:
+                continue
+            if found:
+                return found.group(1)
+    return None
+
+
 def _score_once(target, mutants, seed, code_root):
     files = target.files
     if not target:
@@ -796,6 +817,18 @@ def _score_once(target, mutants, seed, code_root):
         unverified = unreached is None
         unreached = unreached or []
         if unreached and len(unreached) == len(files):
+            generated = _generated_suite_task(target)
+            if generated:
+                # The obvious move after a run: score the new suite against
+                # your own file. It imports qikly's copy instead, so the
+                # general explanation below, an installed package, was wrong
+                # for exactly the case a new user hits first.
+                raise NeverRan(
+                    "these tests are the suite qikly generated for %s, and "
+                    "they import qikly's copy of your code under "
+                    "outputs/agent_src/, not your file. Score them where "
+                    "they run:\n  qikly --score-suite --tasks %s"
+                    % (generated, generated))
             raise NeverRan(
                 "the suite never ran the code being scored.\n"
                 "  planting faults in: %s\n"
@@ -1137,6 +1170,12 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
     total, caught = result["total"], len(result["caught"])
     print(f"[{task_id}] {headline(caught, total)}." if total
           else f"[{task_id}] no faults planted.")
+    if total and len(target.files) > 1:
+        # The cap is per run, not per file, and a folder looked as if each
+        # file had been given the same scrutiny as a single module.
+        print(f"[{task_id}] those {total} were spread at random over "
+              f"{len(target.files)} files, so a larger folder gets fewer per "
+              f"file. Score one module for a closer look.")
     if gaps is None:
         print(f"[{task_id}] reachability could not be checked, so part of that "
               f"number may belong to your data rather than to your suite.")

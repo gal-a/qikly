@@ -280,7 +280,8 @@ stalled loop later.
 
 ```bash
 qikly --scaffold my_metrics.py          # reads real signatures, writes a task file
-# put a real sample of the data where the task's `inputs:` says
+# add example rows to the data file it started: the first line
+#   already names the columns; for code given a file, copy a real one in
 # fill in `requirements` and `acceptance_criteria`, using the question above
 qikly --validate --tasks MY_METRICS_VERIFY    # free, no model call
 qikly --tasks MY_METRICS_VERIFY               # the paid one

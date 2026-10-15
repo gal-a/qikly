@@ -57,7 +57,8 @@ qikly --score-code my_module.py --score-tests tests/
 ```
 
 It plants faults in a copy of your code and names the ones your tests did not
-notice. Then it turns each one into a question only you can answer:
+notice. Give it one module or a whole folder. Then it turns each one into a
+question only you can answer:
 
 > Your tests pass whether this is `rate > 100` or `rate >= 100`, so nothing
 > checks the boundary itself. What should happen at exactly `100`?
@@ -69,10 +70,12 @@ criteria live, in the task file:
 qikly --scaffold my_module.py
 ```
 
-That writes `MY_MODULE_VERIFY.yaml` with those questions in its
-`acceptance_criteria`, each above a `TODO` for your answer, and
-`qikly --validate --tasks MY_MODULE_VERIFY` tells you how many are still
-unanswered. The question lines start with `#?`, and qikly removes them from
+That writes `MY_MODULE_VERIFY.yaml`, one module at a time, with those
+questions in its `acceptance_criteria`, each above a `TODO` for your answer.
+Fill in the file's other `TODO` lines too, and add a few rows of example
+values to the data file it started for you, whose first line already names
+the columns. `qikly --validate --tasks MY_MODULE_VERIFY` lists anything still
+missing. The question lines start with `#?`, and qikly removes them from
 everything either agent receives, because they quote your code.
 
 **3. Run it.** Needs an API key.
@@ -81,9 +84,12 @@ everything either agent receives, because they quote your code.
 qikly --tasks MY_MODULE_VERIFY
 ```
 
-qikly writes a suite from your answers without reading your code, runs it
-against a copy of your module, and repairs that copy where tests fail. Your
-own file is never edited.
+qikly writes the integration and system tests from your answers before it
+sees any code, runs them against a copy of your module, and repairs that copy
+where tests fail. Your own file is never edited. The new tests land in
+`outputs/tests/MY_MODULE_VERIFY/` and add to the ones you have, and
+`qikly --score-suite --tasks MY_MODULE_VERIFY` shows how many planted faults
+they catch.
 
 ### Other ways in
 
