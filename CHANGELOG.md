@@ -52,6 +52,12 @@ packaging tools would read as `1.1`.
   answer, never its own, and how the answers become a task.
 
 ### Fixed
+- **Scoring qikly's generated suite against your own file now says what
+  happened.** Those tests import qikly's copy of the code, so the file is
+  never run, and the message blamed an installed package. It now names
+  `qikly --score-suite --tasks <TASK>`.
+- **`--scaffold` on a folder says it takes one file** and lists the files,
+  instead of "no such file".
 - **`--score-code` no longer prints a request for feedback.** It came straight
   after the result, in project jargon, and read as part of it. The request is
   now a short, optional last section of the report, below the misses it asks
