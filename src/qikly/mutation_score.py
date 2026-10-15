@@ -143,6 +143,42 @@ def from_task(task_id, code_root=CODE_ROOT):
                   task_id=task_id)
 
 
+def _nearby_suite(code, tests):
+    """
+    A hint naming test files that do exist, for a `--score-tests` path that
+    does not.
+
+    The usual cause is a `test_*.py` sitting beside the module rather than in
+    the `tests/` folder the command names. A bare "no suite at ...\\tests" sent
+    a first-time user looking for something that was there all along.
+    """
+    import glob
+
+    here = os.path.dirname(code) if os.path.isfile(code) else code
+    seen, found = set(), []
+    for folder in (here, os.path.dirname(tests)):
+        for pattern in ("test_*.py", "*_test.py"):
+            for match in sorted(glob.glob(os.path.join(folder, pattern))):
+                if match not in seen:
+                    seen.add(match)
+                    found.append(match)
+    if not found:
+        return (". Point --score-tests at a test file or a folder of them, "
+                "for example --score-tests tests/ or --score-tests test_my_module.py")
+    names = ", ".join(os.path.basename(f) for f in found[:3])
+    # Relative to where the command was typed, which is the folder the given
+    # --score-tests path sits in: this process has moved to a project root by
+    # now, so the working directory says nothing about where the user is.
+    pick = found[0]
+    try:
+        rel = os.path.relpath(found[0], os.path.dirname(tests))
+        pick = found[0] if rel.startswith("..") else rel
+    except ValueError:
+        pass
+    return (f". Found {names} next to it: try --score-tests "
+            f"{pick if ' ' not in pick else repr(pick)}")
+
+
 def from_paths(code, tests):
     """
     An implementation and a suite that already exist, anywhere.
@@ -156,7 +192,8 @@ def from_paths(code, tests):
     code, tests = os.path.abspath(code), os.path.abspath(tests)
     for path, what in ((code, "implementation"), (tests, "suite")):
         if not os.path.exists(path):
-            raise ValueError(f"no {what} at {path}")
+            raise ValueError(f"no {what} at {path}" + (
+                _nearby_suite(code, tests) if what == "suite" else ""))
 
     try:
         root = os.path.commonpath(
