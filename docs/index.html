@@ -356,6 +356,8 @@ h1 {
 /* The line of the user's own code a question is about, in the accent teal. */
 .eg pre .code-line { color: var(--accent); }
 .audit-note { margin: 28px 0 32px; }
+.audit-note + .audit-note { margin-top: -16px; }
+.step .small-link { display: block; margin-top: 6px; font-size: .8rem; }
 .step p { margin: 0; font-size: .92rem; color: var(--ink-soft); flex: 1; }
 .step .cost {
   align-self: flex-start;
@@ -843,12 +845,8 @@ footer {
           <b>If you have a test suite, score it</b>
           <code class="cmd"><span>qikly</span> <span>--score-code</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--score-code</span> <span>your_project_folder</span></code>
           <p>Plants faults in a copy of your code, one at a time, and names the
-            ones your tests did not notice. Nothing of yours is changed, and no
-            model is called.</p>
-          <p>Your tests can be anywhere in your project, such as a
-            <code>tests/</code> folder or beside your code, in files named
-            <code>test_*.py</code> that import your module. qikly finds them;
-            to name them instead, add <code>--score-tests test_folder/</code>.</p>
+            ones your tests did not notice. Nothing of yours is changed.
+            <a class="small-link" href="#your-tests">Where your tests can be</a></p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
@@ -862,10 +860,10 @@ footer {
           <span class="n">Step 2</span>
           <b>Answer what your tests never check</b>
           <code class="cmd"><span>qikly</span> <span>--start</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--start</span> <span>your_project_folder</span></code>
-          <p>If you have tests, it scores them first, as in step 1, so you can
-            start here directly. No tests yet? It asks about the whole module
-            instead. Every question is a numbered menu, and your answers are
-            saved as you go.</p>
+          <p>Scores your tests first, so you can start here. No tests yet? It
+            asks about the whole module. Every question is a numbered menu, and
+            your answers are saved as you go.
+            <a class="small-link" href="#your-tests">Where your tests can be</a></p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
@@ -911,9 +909,13 @@ qikly fixed this in a copy, not in your file pricing.py.
         </figure>
       </li>
     </ol>
-    <p class="audit-note">Step 2 finds your tests the same way as step 1. It
-      ends by providing a full audit, listing every file it read, saved and
-      wrote, and where.</p>
+    <p class="audit-note" id="your-tests"><b>Where your tests can be.</b>
+      Anywhere in your project, such as a <code>tests/</code> folder or beside
+      your code, in files named <code>test_*.py</code> that import your module.
+      Steps 1 and 2 find them; to name them instead, add
+      <code>--score-tests test_folder/</code>.</p>
+    <p class="audit-note">It ends by providing a full audit, listing every file
+      it read, saved and wrote, and where.</p>
 
     <p class="eyebrow also">Other ways in</p>
     <ul class="also-list">
@@ -1089,7 +1091,7 @@ qikly fixed this in a copy, not in your file pricing.py.
   </section>
 
   <section class="band">
-    <p class="eyebrow">See it run</p>
+    <p class="eyebrow">See it run end-to-end on a bundled task</p>
     <h2>One command, about thirty seconds, nothing written outside its folder</h2>
     <figure class="demo">
       <img src="images/qikly_demo.gif" width="811" height="820" loading="lazy"
