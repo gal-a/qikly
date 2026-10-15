@@ -1134,6 +1134,13 @@ def _parse_args():
              "Nothing of yours is changed."
     )
     parser.add_argument(
+        "--take-tests", metavar="TASK", default=None,
+        help="Copy the tests a run wrote for TASK into tests/qikly_generated/, "
+             "rewritten to import your own module rather than qikly's copy of "
+             "it, and run them on your code. A test that fails there is a "
+             "place your code disagrees with your answers. Free."
+    )
+    parser.add_argument(
         "--answers", metavar="FILE", default=None,
         help="With --start, answer its questions from a file instead of "
              "prompting: the open-questions file --start writes when it is not "
@@ -2508,6 +2515,10 @@ def main():
             atexit.register(repeat_notice)
         except Exception:
             pass
+
+    if args.take_tests:
+        from qikly import take_tests
+        return take_tests.main(args.take_tests, INVOKED_FROM)
 
     if args.start is not None:
         # --start returns before the misattached-flag guard below, so it does

@@ -1258,18 +1258,95 @@ def disagreements(paths, state, lines):
         # Each batch numbers its criteria from 1, so a test's "Criteria: 2"
         # cannot be traced to one answer. Say nothing rather than misattribute.
         return None, {}, criteria
+    bodies = {}
     for stage in ("integration", "system"):
         folder = os.path.join(paths.tests, stage)
         for name in (sorted(os.listdir(folder)) if os.path.isdir(folder) else []):
             if not name.endswith(".py"):
                 continue
-            for test, doc in _test_docstrings(_read(os.path.join(folder, name))):
+            source = _read(os.path.join(folder, name))
+            for test, doc in _test_docstrings(source):
+                bodies[test] = _test_body(source, test)
                 numbers = re.search(r"#\s*Criteria:\s*([\d,\s]+)", doc)
                 for n in re.findall(r"\d+", numbers.group(1) if numbers else ""):
                     tests_for.setdefault(int(n), []).append(test)
+    # The tags are the test writer's own, and it sometimes tags a test with
+    # answers it does not check: a free-shipping answer was listed against
+    # two express-delivery tests. Where an answer names a call, only tests
+    # that make that call are kept; if none does, the tags stand, marked.
+    unconfirmed = set()
+    module_source = _read(paths.module)
+    for n, names in tests_for.items():
+        if not 0 < n <= len(criteria):
+            continue
+        call = _call_in(criteria[n - 1])
+        if not call:
+            continue
+        kept = [t for t in names if _makes_call(bodies.get(t, ""), call, module_source)]
+        if kept:
+            tests_for[n] = kept
+        else:
+            unconfirmed.add(n)
     disagreed = [criteria[n - 1] for n, names in sorted(tests_for.items())
                  if 0 < n <= len(criteria) and set(names) & failed]
+    tests_for = {n: (names, n in unconfirmed) for n, names in tests_for.items()}
     return disagreed, tests_for, criteria
+
+
+def _test_body(source, name):
+    import ast
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return ""
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+            return ast.get_source_segment(source, node) or ""
+    return ""
+
+
+def _makes_call(body, call, source=None):
+    """
+    Whether a test body makes exactly the call the answer names: the same
+    values, and the same keyword arguments. Finding the values anywhere was
+    not enough: `shipping_cost(50.0, 2, express=True)` holds both values of
+    the free-shipping answer and tests something else. With the module's
+    `source`, calls are compared by meaning, so `express=False` passed
+    explicitly matches leaving it at its default.
+    """
+    import ast
+    function, args, kwargs = call
+    found_sig = so.signature(source, function) if source else None
+    defaults = so.literal_defaults(source, function) if source else {}
+
+    def meaning(a, k):
+        if not found_sig:
+            return list(a), dict(k)
+        named = dict(zip(found_sig[0], a))
+        named.update(k)
+        return {n: v for n, v in named.items()
+                if not (n in defaults and defaults[n] == v)}
+
+    wanted = meaning(args, kwargs)
+    try:
+        tree = ast.parse(body)
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = (node.func.id if isinstance(node.func, ast.Name)
+                else node.func.attr if isinstance(node.func, ast.Attribute) else None)
+        if name != function:
+            continue
+        try:
+            found_args = [ast.literal_eval(a) for a in node.args]
+            found_kwargs = {k.arg: ast.literal_eval(k.value) for k in node.keywords}
+        except (ValueError, SyntaxError, TypeError):
+            continue
+        if meaning(found_args, found_kwargs) == wanted:
+            return True
+    return False
 
 
 def _test_docstrings(source):
@@ -1341,10 +1418,12 @@ def report_result(console, paths, state, lines, converged):
                     + "The new tests now pin that behaviour, so a later change "
                       "that breaks one of them will fail.")
     if tests_for:
-        console.say("Each answer and the test written from it:")
-        for n, names in sorted(tests_for.items()):
+        console.say("Each answer and the tests written from it:")
+        for n, (names, unconfirmed) in sorted(tests_for.items()):
             if 0 < n <= len(criteria):
-                console.say(f"  {criteria[n - 1]}  ->  {', '.join(names)}")
+                console.say(f"  {criteria[n - 1]}  ->  {', '.join(names)}"
+                            + ("  (tagged by the test writer; none makes this "
+                               "exact call)" if unconfirmed else ""))
 
 
 # --------------------------------------------------------------- the block --
@@ -1868,12 +1947,44 @@ def _main(arg, cwd, console, answers):
                 if paths.task_id in ready:
                     report_result(console, paths, state, lines,
                                   paths.task_id not in not_green)
+            home = [t for t in ready if t not in not_green]
+            if home:
+                offer_take_home(console, cwd, home,
+                                tests if os.path.isdir(tests) else os.path.dirname(tests))
     elif ready:
         console.say(f"To run it, which needs an API key:  qikly --tasks {' '.join(ready)}")
     inputs_outputs(console, cwd, code, tests, report, results, ran)
     if failed:
         return 1
     return 2 if refused and not ready else 0
+
+
+def offer_take_home(console, cwd, task_ids, test_dir):
+    """After a green run: copy the new tests into the user's own tests."""
+    from qikly import take_tests
+
+    target = os.path.join(test_dir, take_tests.FOLDER)
+    console.say("")
+    picked = choose(console, [
+        f"copy the new tests into {shown(target, cwd)}{os.sep}, importing your "
+        f"own code, and run them on it",
+        f"not now (later:  qikly --take-tests {task_ids[0]})",
+        "type a different tests folder to copy them into",
+    ], lead=["The new tests import qikly's copy of your code. Copied into your "
+             "own tests, they import your module instead."])
+    if picked == 2:
+        return
+    if picked == 3:
+        raw = free_text(console, "Type the folder to copy them into",
+                        "tests" + os.sep + "generated")
+        test_dir = os.path.abspath(os.path.join(cwd, raw.strip('"')))
+        os.makedirs(test_dir, exist_ok=True)
+    for task_id in task_ids:
+        written, result = take_tests.take(cwd, task_id, test_dir, say=console.say)
+        if written:
+            take_tests.report(console.say, cwd, written, result, task_id)
+        else:
+            console.say(f"Nothing copied for {task_id}: {result}.")
 
 
 def _cannot_task(paths):

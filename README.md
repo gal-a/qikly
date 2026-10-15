@@ -44,10 +44,15 @@ key away from the student: the coding agent never sees the acceptance criteria.*
 
 ```bash
 pip install --upgrade qikly
-qikly --start my_module.py
+qikly --score-code my_module.py --score-tests tests/   # optional: score the suite you have
+qikly --start my_module.py                              # or a folder: qikly --start my_project
 ```
 
-**Start on your own code, not on ours.** `--start` needs no task file, no
+**Have a test suite? Score it first.** `--score-code` plants faults in a copy
+of your code, one at a time, and names the ones your tests did not notice.
+Free, no key, nothing of yours changed. It takes a module or a whole folder.
+
+**Then, or instead, start on your own code, not on ours.** `--start` needs no task file, no
 specification and, until its last step, no API key. Point it at one module or
 a whole folder, or leave the path out to be asked. It:
 
@@ -76,8 +81,13 @@ a whole folder, or leave the path out to be asked. It:
    before any code is shown to it; a separate coding agent, which never sees
    your answers, repairs a copy of your code until they pass. It tells you
    first where your code and your answers disagree.
+4. **Offers to copy the new tests into your own tests folder**, as
+   `tests/qikly_generated/`, rewritten to import your module rather than
+   qikly's copy of it, and runs them on your code. Any that fail there mark
+   where your code and your answers disagree.
 
-It says where it writes before it starts and lists every file at the end.
+It says where it writes before it starts, and ends with a full audit: every
+file it read, saved and wrote, and where.
 Your own files are never edited. Answers are saved as you go, so Ctrl+C is
 safe, and running the same command again continues where you stopped. Not in
 a terminal, as in CI or under a coding agent, it never waits: it writes the
@@ -96,6 +106,7 @@ does not recognise as a terminal, set `QIKLY_INTERACTIVE=1` first to be asked.
 | Check the task file | `qikly --validate --tasks MY_MODULE_VERIFY` | free, no key |
 | Run it | `qikly --tasks MY_MODULE_VERIFY` | needs an API key |
 | See how many planted faults the new integration and system tests catch | `qikly --score-suite --tasks MY_MODULE_VERIFY` | free, no key |
+| Copy the new tests into your own tests, importing your module | `qikly --take-tests MY_MODULE_VERIFY` | free, no key |
 
 A task id is the module's name in capitals plus `_VERIFY`, which marks a task
 that tests code you already have. `qikly --scaffold my_module.py --fresh`

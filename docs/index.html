@@ -355,6 +355,7 @@ h1 {
 .step .cmd .or { display: block; color: var(--ink-soft); font-family: inherit; margin: 2px 0; }
 /* The line of the user's own code a question is about, in the accent teal. */
 .eg pre .code-line { color: var(--accent); }
+.audit-note { margin: 28px 0 32px; }
 .step p { margin: 0; font-size: .92rem; color: var(--ink-soft); flex: 1; }
 .step .cost {
   align-self: flex-start;
@@ -856,9 +857,9 @@ footer {
           <span class="n">Step 2</span>
           <b>Answer what your tests never check</b>
           <code class="cmd"><span>qikly</span> <span>--start</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--start</span> <span>your_project_folder</span></code>
-          <p>Scores your tests the same way, then asks you about each thing
-            they never check. Every question is a numbered menu, and your
-            answers are saved as you go.</p>
+          <p>Scores your tests first, as in step 1, so you can start here
+            directly. Then asks you about each thing they never check. Every
+            question is a numbered menu, and your answers are saved as you go.</p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
@@ -885,7 +886,8 @@ Type a number from 1 to 5, then press Enter: <span class="you-ins">2</span></pre
             a separate coding agent, which never sees your answers, repairs a
             copy of your code until they pass. Your files are never edited.
             The first thing it tells you is where your code and your answers
-            disagree.</p>
+            disagree, and then it offers to copy the new tests into your own
+            tests folder, importing your code.</p>
           <span class="cost key">needs an <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-step3-key">API key</a></span>
         </div>
         <figure class="eg">
@@ -901,7 +903,8 @@ qikly fixed this in a copy, not in your file pricing.py.
         </figure>
       </li>
     </ol>
-    <p>It ends by listing every file it read, saved and wrote, and where.</p>
+    <p class="audit-note">It ends by providing a full audit, listing every
+      file it read, saved and wrote, and where.</p>
 
     <p class="eyebrow also">Other ways in</p>
     <ul class="also-list">

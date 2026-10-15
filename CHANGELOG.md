@@ -71,6 +71,15 @@ packaging tools would read as `1.1`.
     `src/` layouts are tried correctly.
   - If nothing ran on your code as it is, the result says it cannot tell
     where your code and your answers disagree, rather than that they agree.
+  - Each answer is listed only against the tests that make the call it
+    names; where none does, the test writer's own tags are shown, marked.
+- **`qikly --take-tests <TASK>`: tests you can take home.** The tests a run
+  wrote import qikly's copy of your code; this copies them into
+  `tests/qikly_generated/`, rewritten to import your own module, and runs them
+  on your code. Those that fail there are where your code and your answers
+  disagree, and those that call a helper only qikly's copy has are named
+  apart. A file it did not write is never overwritten. `--start` offers it
+  after a green run.
 - **The Skill offers `--start` first**, and says to relay its questions to the
   user word for word when it runs without a terminal.
 - **`--score-code` asks a question about every fault your tests missed, and

@@ -63,6 +63,9 @@ things that do work, and let the user choose:
   one read off the code, and run `qikly --start my_module.py --answers <that
   file>`. It also needs a `requirements:` line, a sentence from them on what
   the module does.
+  After a green run, `qikly --take-tests <TASK>` copies the new tests into
+  `tests/qikly_generated/`, importing the user's own module, and runs them
+  on it: any that fail there are where the code and the answers disagree.
 
 - **`qikly --score-code my_module.py --score-tests their_tests.py`** if any
   suite already exists. Free, no model call, nothing of theirs modified, and it

@@ -416,3 +416,18 @@ def test_only_the_tasks_the_run_names_are_reported_as_failed():
         {"COUPONS_VERIFY"}
     assert start._failed_tasks(["boom"], ["A", "B"], False) == {"A", "B"}
     assert start._failed_tasks(lines, ["A"], True) == set()
+
+
+def test_an_answer_is_listed_only_against_tests_that_make_its_call():
+    """A free-shipping answer was listed against two express-delivery tests."""
+    express = "def t():\n    cost = shipping_cost(50.0, 2, express=True)\n    assert cost\n"
+    exact = "def t():\n    assert shipping_cost(50.0, 2) == 0.0\n"
+    call = ("shipping_cost", [50.0, 2], {})
+    assert not start._makes_call(express, call)
+    assert start._makes_call(exact, call)
+
+
+def test_a_default_passed_explicitly_is_the_same_call():
+    source = "def shipping_cost(order_total, weight_kg, express=False):\n    return 0.0\n"
+    body = "def t():\n    assert shipping_cost(50.0, weight_kg=2, express=False) == 0.0\n"
+    assert start._makes_call(body, ("shipping_cost", [50.0, 2], {}), source)
