@@ -82,7 +82,8 @@ Your own files are never edited. Answers are saved as you go, so Ctrl+C is
 safe, and running the same command again continues where you stopped. Not in
 a terminal, as in CI or under a coding agent, it never waits: it writes the
 questions to a file and exits with code 3, and `qikly --start my_module.py
---answers <that file>` reads them back.
+--answers <that file>` reads them back. In Git Bash, whose window Python
+does not recognise as a terminal, set `QIKLY_INTERACTIVE=1` first to be asked.
 
 ### The same path, command by command
 

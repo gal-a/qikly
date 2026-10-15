@@ -62,6 +62,11 @@ def is_terminal():
     NUL` would then wait on a prompt nobody can see. There the console API
     is asked instead.
     """
+    # Forced on for a terminal Python cannot recognise, such as Git Bash's
+    # window, where input() still works: answers typed there are read as
+    # typed. Never forced off silently; an empty value means "not set".
+    if os.environ.get("QIKLY_INTERACTIVE", "").strip() == "1":
+        return True
     try:
         if not sys.stdin or not sys.stdin.isatty():
             return False
@@ -1473,9 +1478,9 @@ def _non_interactive(arg, cwd, console):
     console.say("Answer them there, then run the --answers command at the top of "
                 "each file.")
     console.say("If you are at a keyboard and still see this, your terminal is "
-                "not one Python can prompt in, which is how Git Bash's window "
-                "behaves: run the same command in PowerShell or cmd, or as  "
-                "winpty qikly --start ...  in Git Bash.")
+                "not one Python recognises, which is how Git Bash's window "
+                "behaves. Run the same command in PowerShell or cmd, or set "
+                "QIKLY_INTERACTIVE=1 first:  QIKLY_INTERACTIVE=1 qikly --start ...")
     return NEEDS_ANSWERS
 
 

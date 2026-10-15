@@ -361,3 +361,12 @@ def test_answers_without_start_is_refused(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["qikly", "--answers", "x.txt"])
     assert cli.main() == 2
     assert "--answers goes with --start" in capsys.readouterr().err
+
+
+def test_qikly_interactive_forces_prompts_for_a_terminal_python_cannot_see(monkeypatch):
+    """Git Bash's window is not a console to Python, but input() works there."""
+    monkeypatch.setenv("QIKLY_INTERACTIVE", "1")
+    assert start.is_terminal() is True
+    monkeypatch.setenv("QIKLY_INTERACTIVE", "")
+    monkeypatch.setattr(sys, "stdin", None)
+    assert start.is_terminal() is False
