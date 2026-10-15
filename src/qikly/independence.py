@@ -236,24 +236,25 @@ def check(criteria_file, implementation):
 
     if _git(["--version"], os.getcwd()) is None:
         return _blank(criteria_file, implementation, UNAVAILABLE,
-                      "git could not be run, so the order of the two cannot be "
-                      "evidenced either way")
+                      "git could not be run, so qikly cannot show whether the "
+                      "acceptance criteria were written before the code")
 
     criteria_root = _repo_root(criteria_file)
     implementation_root = _repo_root(implementation)
     if criteria_root is None or implementation_root is None:
         missing = criteria_file if criteria_root is None else implementation
         return _blank(criteria_file, implementation, NO_HISTORY,
-                      "%s is not inside a git repository, so the order of the two "
-                      "cannot be evidenced either way" % missing)
+                      "%s is not inside a git repository, so qikly cannot show "
+                      "whether the acceptance criteria were written before the "
+                      "code" % missing)
 
     criteria = _commit_times(criteria_file, criteria_root, oldest=False)
     code = _commit_times(implementation, implementation_root, oldest=True)
     if criteria is None or code is None:
         missing = criteria_file if criteria is None else implementation
         return _blank(criteria_file, implementation, NO_HISTORY,
-                      "git tracks no commit touching %s, so the order of the two "
-                      "cannot be evidenced either way" % missing)
+                      "git has no commit of %s, so qikly cannot show whether the "
+                      "acceptance criteria were written before the code" % missing)
 
     first = criteria["unix"] < code["unix"]
     same_author = bool(criteria["author"]) and criteria["author"] == code["author"]

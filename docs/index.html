@@ -352,6 +352,9 @@ h1 {
   overflow-wrap: normal;
 }
 .step .cmd span { white-space: nowrap; }
+.step .cmd .or { display: block; color: var(--ink-soft); font-family: inherit; margin: 2px 0; }
+/* The line of the user's own code a question is about, in the accent teal. */
+.eg pre .code-line { color: var(--accent); }
 .step p { margin: 0; font-size: .92rem; color: var(--ink-soft); flex: 1; }
 .step .cost {
   align-self: flex-start;
@@ -835,22 +838,21 @@ footer {
         <div class="step">
           <span class="n">Step 1</span>
           <b>Answer what your tests never check</b>
-          <code class="cmd"><span>qikly</span> <span>--start</span> <span>your_module.py</span></code>
+          <code class="cmd"><span>qikly</span> <span>--start</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--start</span> <span>your_project_folder</span></code>
           <p>Scores the tests you already have by planting faults in a copy of
             your code, then asks you about each thing they never check. Every
-            question is a numbered menu, and your answers are saved as you go.
-            Point it at one module or a whole folder.</p>
+            question is a numbered menu, and your answers are saved as you go.</p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
           <figcaption>Question 3 of 8, as it is asked</figcaption>
-<pre><span class="dim">  &gt;    3     if rate &lt; 0 or rate &gt; 100:</span>
+<pre><span class="code-line">  &gt;    3     if rate &lt; 0 or rate &gt; 100:</span>
 Your tests never try rate at exactly 100.
 What should apply_discount(100, 100) do?
   1. return a value, as rate 99 does now
   2. raise ValueError, as rate 101 does now
   3. either is fine, I do not mind
-  4. not mine to decide: save it to ask someone
+  4. save it (no decision now, maybe later)
   5. type my own answer
 Type a number from 1 to 5, then press Enter: <span class="you-ins">2</span></pre>
           <p class="legend">qikly runs your code beside the value in question,
@@ -884,8 +886,9 @@ qikly fixed this in a copy, not in your file pricing.py.
     </ol>
     <p>It ends by listing every file it read, saved and wrote, and where.</p>
 
-    <p class="eyebrow also">Or watch it first</p>
+    <p class="eyebrow also">Other ways in</p>
     <ul class="also-list">
+      <li><code>qikly --score-code your_module.py --score-tests tests/</code><span>only score the tests you already have, and stop there: free, no key</span></li>
       <li><code>qikly --demo</code><span>a bundled task end to end, well under a cent with a Gemini, OpenAI or Anthropic key</span></li>
       <li><code>qikly --install-skill</code><span>teaches Claude Code, Gemini CLI, Codex or Cursor to drive qikly</span></li>
     </ul>

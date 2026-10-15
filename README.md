@@ -64,7 +64,7 @@ a whole folder, or leave the path out to be asked. It:
      1. return a value, as rate 99 does now
      2. raise ValueError, as rate 101 does now
      3. either is fine, I do not mind
-     4. not mine to decide: save it to ask someone
+     4. save it (no decision now, maybe later)
      5. type my own answer
    Type a number from 1 to 5, then press Enter:
    ```

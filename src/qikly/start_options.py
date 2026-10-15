@@ -389,7 +389,7 @@ def menu(question, source, test_sources, root, mutant=None):
     prompt, behaviours = built
     return prompt, behaviours + [
         {"kind": EITHER, "label": "either is fine, I do not mind"},
-        {"kind": ASK, "label": "not mine to decide: save it to ask someone"},
+        {"kind": ASK, "label": "save it (no decision now, maybe later)"},
         {"kind": OWN, "label": "type my own answer"},
     ]
 

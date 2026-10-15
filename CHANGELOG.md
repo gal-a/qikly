@@ -47,7 +47,7 @@ packaging tools would read as `1.1`.
     where the code and the changed code differ, with the current result
     labelled. The order of the two is shuffled per question. Where the input
     cannot be known, the only options are to skip or type your own answer.
-  - "Either is fine" and "not mine to decide" are options; open questions go
+  - "Either is fine" and "save it for later" are options; open questions go
     to `inputs_private/questions/<NAME>_open_questions.txt`, to send to
     whoever owns the spec.
   - It says where it writes before it starts, after each save and at the end,
@@ -89,6 +89,12 @@ packaging tools would read as `1.1`.
   answer, never its own, and how the answers become a task.
 
 ### Fixed
+- **A run's log reads plainly.** Lines no longer carry the task id twice
+  (`[TASK] [TASK] ...`), and three research-flavoured lines say what they mean:
+  a seeded run "uses your own implementation ... so its results are not
+  comparable with runs where qikly writes them", the git check says it
+  "cannot show whether the acceptance criteria were written before the
+  code", and the seed line says what the seed is for.
 - **`--validate` no longer warns that a criterion written as a call restates
   the interface.** A signature qikly wrote, such as
   `delivery_days(country_code, express=False)`, shares every word with a

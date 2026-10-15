@@ -801,7 +801,7 @@ def summary(console, paths, state, questions_by_key, example="f(1) returns 2"):
             elif rec["status"] == so.EITHER:
                 console.say(f"    answer {n}: either is fine ({rec['where']})")
             elif rec["status"] == so.ASK:
-                console.say(f"    answer {n}: to ask someone ({rec['where']})")
+                console.say(f"    answer {n}: saved for later ({rec['where']})")
             else:
                 console.say(f"    answer {n}: skipped for now ({rec['where']})")
         for extra in state.get("extra", []):

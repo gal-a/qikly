@@ -1247,9 +1247,9 @@ def orchestrate(task_id, seed=None, resume=False):
     if seed_implementation or seed_tests:
         seeded = (["implementation"] if seed_implementation else []) + sorted(seed_tests)
         print(
-            f"[{task_id}] NOTE: seeded run -- supplying {', '.join(seeded)} from the "
-            f"task's `seed:` block instead of generating them. Seeded runs measure a "
-            f"different thing from unseeded ones, so don't pool them in one rate."
+            f"[{task_id}] NOTE: this run uses your own {' and '.join(seeded)}, from "
+            f"the task's `seed:` block, instead of writing them, so its results "
+            f"are not comparable with runs where qikly writes them."
         )
         # A supplied implementation is the one case where withholding cannot be
         # enforced, only evidenced: this process did not write that code and

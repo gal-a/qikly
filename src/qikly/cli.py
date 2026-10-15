@@ -255,7 +255,13 @@ def _run_task_process(task_id, seed, generate_criteria, resume=False):
     import builtins
     real_print = builtins.print
     prefix = f"[{task_id}]"
-    builtins.print = lambda *args, **kwargs: real_print(prefix, *args, **kwargs)
+    # Lines the orchestrator already starts with the task id are left alone:
+    # prefixing them again printed "[TASK] [TASK] ...".
+    def prefixed(*args, **kwargs):
+        if args and isinstance(args[0], str) and args[0].startswith(prefix):
+            return real_print(*args, **kwargs)
+        return real_print(prefix, *args, **kwargs)
+    builtins.print = prefixed
 
     heartbeat = _heartbeat(task_id)
 
@@ -2747,7 +2753,8 @@ def main():
     print("Project root:", PROJECT_ROOT)
     print(f"Running {len(task_ids)} task(s), one process each: {', '.join(task_ids)}")
     if seed is not None:
-        print(f"Running with seed={seed} (best-effort determinism)")
+        print(f"Model seed {seed}, so a rerun repeats this one as closely as the "
+              f"provider allows.")
 
     processes = [
         multiprocessing.Process(
