@@ -2113,7 +2113,9 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
         handle.write(text)
 
     print(f"Read {shown(source)} and wrote a task that {headline}:")
-    print(f"    {shown(dest)}")
+    # In full: it is the file every step below sends you to, and a relative
+    # path is only right while you stay in this directory.
+    print(f"    {os.path.abspath(dest)}")
     print()
     if fresh:
         print("  To test the code you already have instead, run it again without --fresh.")
@@ -2161,11 +2163,17 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
     # names an input file but never creates one. Say what is missing, and put
     # the free check before the paid run.
     inputs = (yaml.safe_load(text) or {}).get("inputs") or []
+    nl_indent = "\n       "
     missing = [p for p in inputs if not os.path.isfile(os.path.join(root, p))]
-    steps = [f"add a real sample of your input data at {p}" for p in missing]
+    # Each step names its file in full, because each sends you to a different
+    # one and "the TODO lines" did not say where they were.
+    steps = ["add a small real sample of the data your code is given:" + nl_indent
+             + os.path.abspath(os.path.join(root, p)) for p in missing]
+    steps.append("replace the TODO lines in the task file:" + nl_indent
+                 + os.path.abspath(dest))
     # Scoped to this task: unscoped, --validate also checks every bundled
     # example, and the one line about this task gets lost among them.
-    steps.append(f"replace the TODO lines, then check it for free:  qikly --validate --tasks {tid}")
+    steps.append(f"check it, free and with no model calls:  qikly --validate --tasks {tid}")
     steps.append(f"run it:  qikly --tasks {tid}")
     print()
     print("  Next:")

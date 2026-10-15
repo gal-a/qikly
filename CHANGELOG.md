@@ -15,6 +15,9 @@ packaging tools would read as `1.1`.
   missed, and numbers the misses, the questions and the catches. The note
   that a score is a floor rather than a verdict moved to the end, after the
   lists it qualifies.
+- **`--scaffold`'s next steps name each file in full**: the task file it wrote,
+  the sample data to add and where the TODO lines are. Checking the task is
+  now a step of its own.
 
 ### Added
 - **`--score-code` asks a question about every fault your tests missed, and

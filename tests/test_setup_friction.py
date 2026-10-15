@@ -74,7 +74,7 @@ def test_the_input_step_is_skipped_when_the_data_is_already_there(
     data.mkdir(parents=True)
     (data / "input_01.csv").write_text("a,b\n1,2\n", encoding="utf-8")
     cli._do_scaffold("billing.py", None)
-    assert "add a real sample of your input data" not in capsys.readouterr().out
+    assert "sample of the data your code is given" not in capsys.readouterr().out
 
 
 # --------------------------------------------------------- --validate TODO ----
