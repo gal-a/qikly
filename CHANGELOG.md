@@ -18,6 +18,10 @@ packaging tools would read as `1.1`.
 - **`--scaffold`'s next steps name each file in full**: the task file it wrote,
   the sample data to add and where the TODO lines are. Checking the task is
   now a step of its own.
+- **`--scaffold` starts the data file for code that is called with values.**
+  It writes the column names, one per argument (`price,rate,code`), and no
+  rows, which have to be real. For code that is given a file, it says to copy
+  in a real one, header line included.
 
 ### Added
 - **`--score-code` asks a question about every fault your tests missed, and

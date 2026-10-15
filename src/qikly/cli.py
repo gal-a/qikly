@@ -2167,8 +2167,29 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
     missing = [p for p in inputs if not os.path.isfile(os.path.join(root, p))]
     # Each step names its file in full, because each sends you to a different
     # one and "the TODO lines" did not say where they were.
-    steps = ["add a small real sample of the data your code is given:" + nl_indent
-             + os.path.abspath(os.path.join(root, p)) for p in missing]
+    from qikly.scaffold import starter_columns
+
+    with open(source, "r", encoding="utf-8-sig", errors="replace") as handle:
+        columns = starter_columns(handle.read())
+    steps = []
+    for p in missing:
+        data = os.path.abspath(os.path.join(root, p))
+        if columns and p.lower().endswith(".csv"):
+            # The header only. The rows have to be real values the code is
+            # called with, so they are never made up here.
+            os.makedirs(os.path.dirname(data), exist_ok=True)
+            with open(data, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(",".join(columns) + "\n")
+            steps.append(
+                "add a few example rows to the data file, under the column"
+                + nl_indent + "names already in its first line: one row per call, values"
+                + nl_indent + "separated by commas, such as the values your answers name:"
+                + nl_indent + data)
+        else:
+            steps.append(
+                "copy in a small real file of the kind your code reads, exactly"
+                + nl_indent + "as it arrives, header line included if it has one:"
+                + nl_indent + data)
     steps.append("replace the TODO lines in the task file:" + nl_indent
                  + os.path.abspath(dest))
     # Scoped to this task: unscoped, --validate also checks every bundled

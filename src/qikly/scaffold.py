@@ -261,6 +261,39 @@ def importable(stem):
     return name
 
 
+# An argument with one of these in its name is given a file, not a value, so
+# its data is that file's own content and a column header would be a guess.
+_FILE_LIKE = ("path", "file", "dir", "folder", "csv", "json", "fname",
+              "stream", "url", "fp")
+
+
+def starter_columns(source):
+    """
+    The column names for a starter data file, or None when there is no
+    honest way to name them.
+
+    The step people got stuck on after `--scaffold` was the data file: what
+    goes in it, with a header or without. For code called with values, the
+    answer is one column per argument, named as the argument, which is also
+    the name the reachability check looks for when an answer says `rate =
+    100`. So the header is written for you, and only the rows, which have to
+    be real, are left. Code that is given a file gets None: its data is a copy
+    of such a file, and a header made up from argument names would be wrong.
+    """
+    names = []
+    for fn in read_functions(source):
+        a = fn.args
+        for arg in a.posonlyargs + a.args + a.kwonlyargs:
+            name = arg.arg
+            if name in ("self", "cls"):
+                continue
+            if any(part in name.lower() for part in _FILE_LIKE):
+                return None
+            if name not in names:
+                names.append(name)
+    return names or None
+
+
 def _source_rel(source_path, project_root):
     """The seed path as a task records it: relative when it can be, else absolute."""
     rel = _relative_to(source_path, project_root)
