@@ -57,6 +57,13 @@ packaging tools would read as `1.1`.
     that file and exits 3, and `--answers <file>` reads them back.
   - The landing page's three steps are now this one command, and the README
     lists the separate commands behind it for scripts and CI.
+  - A rerun reuses the tests you chose and, when neither the code nor the
+    tests changed, the score. Deleting your answers asks to confirm.
+  - Boundaries on a named constant (`FREE_SHIPPING_THRESHOLD`) and calls that
+    leave an argument at its default get concrete options too; your code is
+    tried in a separate process in an empty folder, never in your project.
+  - Two modules with the same file name get two tasks, and an answers file
+    names its module, so its answers never land on another one.
 - **The Skill offers `--start` first**, and says to relay its questions to the
   user word for word when it runs without a terminal.
 - **`--score-code` asks a question about every fault your tests missed, and
@@ -82,6 +89,11 @@ packaging tools would read as `1.1`.
   answer, never its own, and how the answers become a task.
 
 ### Fixed
+- **`--validate` no longer warns that a criterion written as a call restates
+  the interface.** A signature qikly wrote, such as
+  `delivery_days(country_code, express=False)`, shares every word with a
+  criterion like `delivery_days('DE') returns 10`, and the warning told a
+  first-time user they had handed over the answers.
 - **Score percentages round instead of rounding down**, so "2 of 3 caught"
   reads 67% rather than 66%, and the report's caught and missed lines sum to
   100.

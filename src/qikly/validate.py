@@ -303,6 +303,14 @@ def _restated_outside_requirements(raw, task, threshold=0.6):
 
     requirement_text = {str(r).strip() for r in (task.get("requirements") or [])}
     handed_over = without_acceptance_criteria(raw)
+    # The interface's own signatures are facts about the code, written by
+    # --scaffold. A criterion phrased as a call, as `qikly --start` writes
+    # them ("delivery_days('DE') returns 10"), shares every word of one, and
+    # the warning then told a first-time user they had leaked the answers.
+    interface = task.get("interface") or {}
+    declared = list(interface.get("integration_functions") or []) + \
+        [interface.get("system_entrypoint") or ""]
+    signatures = {str(s).split("#")[0].strip() for s in declared if s}
 
     lines = []
     for line in handed_over.splitlines():
@@ -311,6 +319,10 @@ def _restated_outside_requirements(raw, task, threshold=0.6):
             stripped = stripped.lstrip("#").strip()
         elif stripped.startswith("- "):
             stripped = stripped[2:].strip().strip('"')
+        elif stripped.startswith("system_entrypoint:"):
+            stripped = stripped[len("system_entrypoint:"):].strip().strip('"')
+        if stripped.split("#")[0].strip().strip('"') in signatures:
+            continue
         # Short lines carry no signal, and a line that IS a requirement is the
         # other check's business: reporting it twice trains people to skim both.
         if len(stripped) < 30 or stripped in requirement_text:

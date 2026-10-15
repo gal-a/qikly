@@ -1077,7 +1077,7 @@ def report_dir(target, invoked_from=None):
     return os.path.join(invoked_from or os.getcwd(), "qikly-suite-score")
 
 
-def write(result, gaps, out_dir=OUT_DIR, invoked_from=None):
+def write(result, gaps, out_dir=OUT_DIR, invoked_from=None, advice=None):
     """
     The report, with the questions in it, and beside it the same questions
     saved for `--scaffold` to put into a task file.
@@ -1112,8 +1112,10 @@ def write(result, gaps, out_dir=OUT_DIR, invoked_from=None):
         score_questions.save(questions, asked, result["task"], scored)
         if questions:
             result.update(questions=questions, questions_path=asked,
-                          questions_advice=score_questions.advice(
-                              questions, invoked_from))
+                          # `qikly --start` passes its own: the report must
+                          # not send its user off to --scaffold mid-flow.
+                          questions_advice=advice if advice is not None
+                          else score_questions.advice(questions, invoked_from))
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(render(result, gaps))
     return path

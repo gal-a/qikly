@@ -228,9 +228,8 @@ def test_open_questions_keep_their_own_numbers(tmp_path):
     start.write_open_questions(paths, state)
     assert "Q5: " in (tmp_path / "inputs_private" / "questions" /
                       "PRICING_open_questions.txt").read_text(encoding="utf-8")
-    found, _, _ = start.parse_answers(paths.open.replace("open_questions", "x")
-                                      if False else paths.open)
-    assert found == {}
+    found, _, _, module, ids = start.parse_answers(paths.open)
+    assert found == {} and module == "pricing.py"
 
 
 def test_rows_are_built_from_typed_answers_and_test_calls():
@@ -249,7 +248,7 @@ def test_answers_file_parsing():
         handle.write("# a comment\nrequirements: applies a discount\n\nQ1: 2\n"
                      "Q2:\nQ3: apply_discount(1, 2) returns 0.98\nrow: 80, 25, vip\n")
     try:
-        found, requirements, rows = start.parse_answers(handle.name)
+        found, requirements, rows, _, _ = start.parse_answers(handle.name)
     finally:
         os.remove(handle.name)
     assert found == {1: "2", 3: "apply_discount(1, 2) returns 0.98"}
@@ -295,10 +294,10 @@ def test_the_guided_flow_on_a_module_without_a_model(tmp_path, monkeypatch):
     # add one rule at the summary.
     original_summary = start.summary
 
-    def summary(console, paths, state, by_key):
+    def summary(console, paths, state, by_key, example=None):
         if not state.get("extra"):
             state["extra"] = ["apply_discount(100, 0) returns 100.0"]
-        return original_summary(console, paths, state, by_key)
+        return original_summary(console, paths, state, by_key, example)
 
     monkeypatch.setattr(start, "summary", summary)
     code = start.main("pricing.py", str(tmp_path), console=s.console)

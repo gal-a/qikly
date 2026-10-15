@@ -23,6 +23,7 @@ Every option set ends with free text, the user's rule for every menu.
 import ast
 import hashlib
 import random
+import re
 
 from qikly import start_probe
 
@@ -64,16 +65,27 @@ def literal_calls(test_sources, function):
     return found
 
 
-def parameters(source, function):
-    """The positional parameter names of a top-level function, or None."""
+def signature(source, function):
+    """
+    (positional names, keyword-only names) of a top-level function, or None.
+    Test calls often leave out an argument that has a default, or pass one by
+    keyword, so both kinds are needed to rebuild a call.
+    """
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return None
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function:
-            return [a.arg for a in node.args.posonlyargs + node.args.args]
+            a = node.args
+            return [x.arg for x in a.posonlyargs + a.args], [x.arg for x in a.kwonlyargs]
     return None
+
+
+def parameters(source, function):
+    """The positional parameter names of a top-level function, or None."""
+    found = signature(source, function)
+    return found[0] if found else None
 
 
 def call_text(function, args, kwargs=None):
@@ -104,15 +116,81 @@ def _boundary_variable(source, line, edge):
     return None
 
 
-def _neighbours(edge):
+def constant_value(source, name):
+    """A module-level `NAME = <number>`, so `FREE_SHIPPING_THRESHOLD` has a value."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return None
+    found = None
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets = [node.target]
+        else:
+            continue
+        for target in targets:
+            if isinstance(target, ast.Name) and target.id == name:
+                try:
+                    found = ast.literal_eval(node.value)
+                except (ValueError, SyntaxError, TypeError):
+                    found = None
+    return found
+
+
+def _neighbours(edge, source=None):
     try:
         value = ast.literal_eval(edge)
     except (ValueError, SyntaxError):
-        return None
+        value = (constant_value(source, edge)
+                 if source and edge.isidentifier() else None)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
     step = 1 if isinstance(value, int) else 0.01
-    return value, value - step, value + step
+    return value, round(value - step, 10), round(value + step, 10)
+
+
+def _with(base, positional, keyword_only, name, value):
+    """A test call's (args, kwargs) with one argument set, wherever it goes."""
+    args, kwargs = list(base[0]), dict(base[1])
+    if name in kwargs or name in keyword_only:
+        kwargs[name] = value
+    elif name in positional and positional.index(name) < len(args):
+        args[positional.index(name)] = value
+    elif name in positional:
+        kwargs[name] = value
+    else:
+        return None
+    return args, kwargs
+
+
+def literal_defaults(source, function):
+    """{name: default} for the arguments of a function whose default is a literal."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return {}
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function:
+            a = node.args
+            named = a.posonlyargs + a.args
+            pairs = list(zip(named[len(named) - len(a.defaults):], a.defaults))
+            pairs += [(x, d) for x, d in zip(a.kwonlyargs, a.kw_defaults) if d is not None]
+            out = {}
+            for arg, default in pairs:
+                try:
+                    out[arg.arg] = ast.literal_eval(default)
+                except (ValueError, SyntaxError, TypeError):
+                    pass
+            return out
+    return {}
+
+
+def _usable_calls(test_sources, function, positional, keyword_only):
+    known = set(positional) | set(keyword_only)
+    return [(a, k) for a, k in literal_calls(test_sources, function)
+            if len(a) <= len(positional) and set(k) <= known]
 
 
 def boundary_options(question, source, test_sources, root):
@@ -124,28 +202,28 @@ def boundary_options(question, source, test_sources, root):
     if not (function and edge and source):
         return None
     variable = _boundary_variable(source, question.get("line"), edge)
-    params = parameters(source, function)
-    near = _neighbours(edge)
-    if not (variable and params and near and variable in params):
+    found = signature(source, function)
+    near = _neighbours(edge, source)
+    if not (variable and found and near):
         return None
-    position = params.index(variable)
-    base = next((a for a, k in literal_calls(test_sources, function)
-                 if not k and len(a) == len(params)), None)
-    if base is None:
+    positional, keyword_only = found
+    if variable not in positional and variable not in keyword_only:
+        return None
+    bases = _usable_calls(test_sources, function, positional, keyword_only)
+    if not bases:
         return None
     at, below, above = near
-
-    def with_value(value):
-        args = list(base)
-        args[position] = value
-        return args
-
+    built = [_with(bases[0], positional, keyword_only, variable, v)
+             for v in (at, below, above)]
+    if None in built:
+        return None
     outcomes = start_probe.run_calls(question["path"], root,
-                                     [(function, with_value(below), {}),
-                                      (function, with_value(above), {})])
+                                     [(function, built[1][0], built[1][1]),
+                                      (function, built[2][0], built[2][1])])
     if not outcomes or outcomes[0] == outcomes[1]:
         return None
-    call = call_text(function, with_value(at))
+    call = call_text(function, built[0][0], built[0][1])
+    shown_edge = edge if edge == repr(at) else f"{edge} ({at!r})"
     behaviours = []
     for value, outcome in ((below, outcomes[0]), (above, outcomes[1])):
         if "raises" in outcome:
@@ -158,9 +236,9 @@ def boundary_options(question, source, test_sources, root):
                      f"value")
             pins = {"returns": None, "like": outcome["returns"]}
         behaviours.append({"kind": BEHAVIOUR, "label": label, "call": call,
-                           "pins": pins, "args": with_value(at),
-                           "function": function})
-    prompt = (f"Your tests never try {variable} at exactly {edge}. "
+                           "pins": pins, "args": built[0][0],
+                           "kwargs": built[0][1], "function": function})
+    prompt = (f"Your tests never try {variable} at exactly {shown_edge}. "
               f"What should {call} do?")
     return prompt, _shuffled(behaviours, question["question"])
 
@@ -200,40 +278,94 @@ def difference_options(question, source, test_sources, root, mutant):
     function = question.get("function")
     if not (function and source and mutant):
         return None
-    params = parameters(source, function)
-    bases = [a for a, k in literal_calls(test_sources, function)
-             if not k and params and len(a) == len(params)]
+    found = signature(source, function)
+    if not found:
+        return None
+    positional, keyword_only = found
+    bases = _usable_calls(test_sources, function, positional, keyword_only)
     if not bases:
         return None
     candidates = []
     for base in bases[:3]:
-        candidates.append(list(base))
-        for i, value in enumerate(base):
-            for variant in _variants(value):
-                args = list(base)
-                args[i] = variant
-                if args not in candidates:
-                    candidates.append(args)
-    candidates = candidates[:40]
-    calls = [(function, args, {}) for args in candidates]
-    now = start_probe.run_calls(question["path"], root, calls)
-    changed = start_probe.run_calls(question["path"], root, calls, mutant=mutant)
-    if not now or not changed:
+        first = (list(base[0]), dict(base[1]))
+        if first not in candidates:
+            candidates.append(first)
+        names = positional[:len(base[0])] + list(base[1])
+        # And the arguments the call left at their default: a branch behind
+        # `express=False` is only reached by trying `express=True`.
+        defaults = literal_defaults(source, function)
+        names += [n for n in defaults if n not in names]
+        for name in names:
+            if name in base[1]:
+                current = base[1][name]
+            elif name in positional and positional.index(name) < len(base[0]):
+                current = base[0][positional.index(name)]
+            else:
+                current = defaults[name]
+            for variant in _variants(current):
+                changed = _with(base, positional, keyword_only, name, variant)
+                if changed and changed not in candidates:
+                    candidates.append(changed)
+        # Then a changed default with each other single change, for a branch
+        # that needs both, such as express=True with a foreign country.
+        for name in [n for n in defaults if n not in base[1]]:
+            for variant in _variants(defaults[name]):
+                flipped = _with(base, positional, keyword_only, name, variant)
+                if not flipped:
+                    continue
+                for other in names:
+                    if other == name or other in defaults and other not in base[1]:
+                        continue
+                    if other in base[1]:
+                        value = base[1][other]
+                    else:
+                        value = base[0][positional.index(other)]
+                    for v in _variants(value):
+                        both = _with(flipped, positional, keyword_only, other, v)
+                        if both and both not in candidates:
+                            candidates.append(both)
+    candidates = candidates[:60]
+    calls = [(function, a, k) for a, k in candidates]
+    result = start_probe.run_calls(question["path"], root, calls, mutant=mutant)
+    if not result:
         return None
-    for args, a, b in zip(candidates, now, changed):
+    now, changed_outcomes = result
+    for (args, kwargs), a, b in zip(candidates, now, changed_outcomes):
         if a != b:
-            call = call_text(function, args)
+            call = call_text(function, args, kwargs)
             behaviours = [
-                {"kind": BEHAVIOUR, "call": call, "args": args,
+                {"kind": BEHAVIOUR, "call": call, "args": args, "kwargs": kwargs,
                  "function": function, "pins": a,
                  "label": f"{_verb(a)}, as your code does now"},
-                {"kind": BEHAVIOUR, "call": call, "args": args,
+                {"kind": BEHAVIOUR, "call": call, "args": args, "kwargs": kwargs,
                  "function": function, "pins": b,
                  "label": _verb(b)},
             ]
             prompt = f"What should {call} do?"
             return prompt, _shuffled(behaviours, question["question"])
     return None
+
+
+_COMPARISON = re.compile(r"^(<=|<|>=|>|==|!=|is not|is|not in|in) became ")
+
+
+def _on_a_comparison(question, source):
+    """
+    Whether a planted change sits in a comparison whose edge was not
+    recorded: a chained `0 <= rate <= 100`, the same operator twice on one
+    line, or a constant nudged inside a comparison. A search for the input
+    where the two versions differ would then find the edge itself, and
+    offering "what your code does now" there reads the answer off the code.
+    """
+    kind = question.get("kind") or ""
+    if _COMPARISON.match(kind):
+        return True
+    if kind.startswith("int ") and source and question.get("line"):
+        lines = source.splitlines()
+        line = question["line"]
+        text = lines[line - 1] if 0 < line <= len(lines) else ""
+        return bool(re.search(r"[<>]=?|==|!=", text))
+    return False
 
 
 def menu(question, source, test_sources, root, mutant=None):
@@ -245,7 +377,9 @@ def menu(question, source, test_sources, root, mutant=None):
     kind = question.get("kind") or ""
     if question.get("edge"):
         built = boundary_options(question, source, test_sources, root)
-    elif kind not in ("guard disabled", "raise swallowed"):
+    elif kind in ("guard disabled", "raise swallowed") or _on_a_comparison(question, source):
+        built = None
+    else:
         built = difference_options(question, source, test_sources, root, mutant)
     if built is None:
         return None, [

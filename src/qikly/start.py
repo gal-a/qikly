@@ -92,6 +92,8 @@ class Console(object):
         self._ask, self._say = ask, say
         self.interactive = (is_terminal() if interactive is None
                             else interactive)
+        if ask is input and self.interactive:
+            _utf8_stdin()
 
     def say(self, text=""):
         self._say(text)
@@ -103,9 +105,41 @@ class Console(object):
             raise Stop()
         if raw is None:
             raise Stop()
-        # A pasted line can carry a trailing carriage return or control
-        # characters; neither is ever meant.
-        return "".join(c for c in raw if c == "\t" or c >= " ").strip()
+        # A pasted line can carry a carriage return, a control character or a
+        # line separator; none is ever meant, and several make the task file
+        # invalid YAML or change on reading it back.
+        return _UNSAFE.sub("", raw.replace("\t", " ")).strip()
+
+
+# C0 controls, DEL, C1 controls (NEL included), the Unicode line and paragraph
+# separators, lone surrogates and the two non-characters YAML refuses.
+_UNSAFE = re.compile("[\x00-\x1f\x7f-\x9f  \ud800-\udfff￾￿]")
+
+
+def _utf8_stdin():
+    """
+    Read piped answers as UTF-8. With QIKLY_INTERACTIVE=1 in Git Bash, stdin
+    is a pipe in the locale's code page, and "café" was saved as mojibake. A
+    real console is left alone: Python reads it as Unicode already.
+    """
+    try:
+        if not _is_console():
+            sys.stdin.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError, OSError):
+        pass
+
+
+def _is_console():
+    if os.name != "nt":
+        return sys.stdin.isatty()
+    try:
+        import ctypes
+        import msvcrt
+        mode = ctypes.c_uint()
+        return bool(ctypes.windll.kernel32.GetConsoleMode(
+            msvcrt.get_osfhandle(sys.stdin.fileno()), ctypes.byref(mode)))
+    except Exception:
+        return False
 
 
 # ----------------------------------------------------------------- prompts --
@@ -146,15 +180,20 @@ def choose(console, options, lead=None):
                         f"type a number from 1 to {count}.")
 
 
-def free_text(console, what, example=None):
-    """A line of text, never empty. `what` says what kind of text is wanted."""
+def free_text(console, what, example=None, value=False):
+    """
+    A line of text, never empty. `what` says what kind of text is wanted.
+    `value` marks a prompt whose answer may well be a bare number, such as
+    "what should it return", where checking for a mistyped menu choice would
+    only get in the way.
+    """
     prompt = what + (f", such as {example}" if example else "") + \
         ". Then press Enter:"
     while True:
         raw = console.ask(prompt)
         if raw.lower() in _QUIT:
             raise Stop()
-        if raw and raw.rstrip(".)").isdigit() and len(raw) <= 3:
+        if not value and raw and raw.rstrip(".)").isdigit() and len(raw) <= 3:
             # A bare small number where words were asked for is almost always
             # a menu choice typed one prompt too late.
             console.say(f"You typed only \"{raw}\", which looks like a menu "
@@ -190,6 +229,14 @@ def own_answer(console, example):
     """
     text = free_text(console, "Type your answer in plain words, naming a value",
                      f'"{example}"')
+    # A criterion of one word is never a rule, and a bare "1" kept as one
+    # made the run refuse the task: it appears elsewhere in the file, so it
+    # cannot be withheld.
+    while len(text.split()) < 3:
+        console.say("A criterion needs a few words: the input, and what should "
+                    "happen to it.")
+        text = free_text(console, "Type your answer in plain words, naming a value",
+                         f'"{example}"')
     while not _names_a_value(text):
         picked = choose(console, [
             "add a value to it",
@@ -207,14 +254,16 @@ def own_answer(console, example):
     return text
 
 
-def ask_rows(console, columns):
+def ask_rows(console, columns, example=None):
     """Rows typed as comma-separated values, one per line, until an empty line."""
     rows = []
     console.say(f"Type one row at a time, as values for {', '.join(columns)} "
                 f"separated by commas.")
+    shown_example = ", ".join(example) if example else \
+        ", ".join(f"<{c}>" for c in columns)
     while True:
-        prompt = ("Type a row, such as " + ", ".join("..." for _ in columns)
-                  + ", then press Enter" + ("; an empty line when you are done:"
+        prompt = ("Type a row, such as  " + shown_example
+                  + "  then press Enter" + ("; an empty line when you are done:"
                                             if rows else ":"))
         raw = console.ask(prompt)
         if raw.lower() in _QUIT:
@@ -439,13 +488,21 @@ def pick_tests(console, code, cwd):
 class Paths(object):
     """Every file this writes, named once, so the messages and the files agree."""
 
-    def __init__(self, cwd, module):
+    def __init__(self, cwd, module, base=None):
         from qikly import score_questions
+        from qikly.scaffold import VERIFY_SUFFIX
         self.cwd = cwd
         self.module = module
-        self.task_id = score_questions.task_for(module)
+        if base is None:
+            base = score_questions.task_for(module)[:-len(VERIFY_SUFFIX)]
+        self.name(base)
+
+    def name(self, base):
+        """Every path follows the task's name, so a rename moves them all."""
         from qikly.scaffold import VERIFY_SUFFIX
-        self.base = self.task_id[:-len(VERIFY_SUFFIX)]
+        cwd = self.cwd
+        self.base = base
+        self.task_id = base + VERIFY_SUFFIX
         self.task = os.path.join(cwd, "inputs_private", "config", "tasks",
                                  self.task_id + ".yaml")
         self.data = os.path.join(cwd, "inputs_private", "data", self.base,
@@ -457,6 +514,64 @@ class Paths(object):
 
     def rel(self, path):
         return shown(path, self.cwd)
+
+
+def task_bases(modules, code):
+    """
+    A task name for each module. Two modules called util.py in different
+    subfolders both became UTIL_VERIFY and overwrote each other's answers, so
+    a name that repeats is built from the module's path inside the folder.
+    """
+    from qikly import score_questions
+    from qikly.scaffold import VERIFY_SUFFIX
+
+    plain = {m: score_questions.task_for(m)[:-len(VERIFY_SUFFIX)] for m in modules}
+    counts = {}
+    for b in plain.values():
+        counts[b] = counts.get(b, 0) + 1
+    out = {}
+    folder = code if os.path.isdir(code) else os.path.dirname(code)
+    for m, b in plain.items():
+        if counts[b] > 1:
+            rel = os.path.splitext(os.path.relpath(m, folder))[0]
+            b = re.sub(r"[^A-Za-z0-9]+", "_", rel).strip("_").upper() or b
+        out[m] = b
+    return out
+
+
+def _session_path(cwd, code):
+    rel = shown(code, cwd)
+    name = re.sub(r"[^A-Za-z0-9]+", "_", rel).strip("_") or "code"
+    return os.path.join(cwd, "inputs_private", "questions", f"{name}_session.json")
+
+
+def load_session(cwd, code):
+    """What the last --start on this code chose and found, or {}."""
+    try:
+        with open(_session_path(cwd, code), encoding="utf-8") as handle:
+            found = json.load(handle)
+        return found if isinstance(found, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_session(cwd, code, session):
+    path = _session_path(cwd, code)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".tmp", "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(session, handle, indent=1)
+    os.replace(path + ".tmp", path)
+
+
+def fingerprint(code, tests):
+    """A hash of every code and test file, so an unchanged pair is not re-scored."""
+    files = ([code] if os.path.isfile(code) else modules_in(code))
+    files += ([tests] if os.path.isfile(tests) else _test_files(tests))
+    digest = hashlib.sha256()
+    for path in sorted(set(files)):
+        digest.update(path.encode("utf-8"))
+        digest.update(_read(path).encode("utf-8", "replace"))
+    return digest.hexdigest()[:16]
 
 
 def _key(question):
@@ -514,17 +629,27 @@ def score(console, code, tests, cwd, many):
     if result is None:
         console.say("Nothing to score: no tests were found at that path.")
         return None, None
+    again = score_questions_pasteable(code, cwd)
     path = ms.write(result, ms.unreachable_criteria(None),
-                    ms.report_dir(target, cwd), cwd)
+                    ms.report_dir(target, cwd), cwd,
+                    advice=[f"Next: `qikly --start {again}` asks these one at "
+                            f"a time and saves your answers."])
     if not result["baseline"]:
-        console.say("Your tests do not pass on your untouched code, so a planted "
-                    "fault would prove nothing. What pytest said:")
+        console.say(f"Your tests do not pass on your untouched code, so a planted "
+                    f"fault would prove nothing (report: {shown(path, cwd)}). "
+                    f"What pytest said:")
         for line in _pytest_tail(tests, cwd):
             console.say("    " + line)
         console.say("The usual cause is an import: run qikly from the folder "
                     "your tests import from, or set PYTHONPATH to it.")
         return None, None
     return result, path
+
+
+def score_questions_pasteable(path, cwd=None):
+    """A path to print in a command: relative, forward slashes, quoted if spaced."""
+    from qikly import score_questions
+    return score_questions._pasteable(shown(path, cwd or os.getcwd()))
 
 
 def _pytest_tail(tests, cwd, lines=12):
@@ -613,12 +738,23 @@ def ask_requirements(console, paths, source, state):
             "\"applies a percentage discount to a price\"")
 
 
+def where(q):
+    """
+    "apply_discount, line 3", or "shipping.py, top level, line 6" for a line
+    outside any function, which used to read "None, line 6".
+    """
+    if q.get("function"):
+        return f"{q['function']}, line {q.get('line')}"
+    name = os.path.basename(q.get("path") or q.get("file") or "the module")
+    return f"{name}, top level, line {q.get('line')}"
+
+
 def ask_question(console, number, total, q, source, test_sources, root,
                  same_line=False):
     """One question. Returns the record saved for it."""
-    where = f"{q.get('function') or q.get('file')}, line {q.get('line')}"
+    where_ = where(q)
     console.say("")
-    console.say(f"Question {number} of {total}: {where}"
+    console.say(f"Question {number} of {total}: {where_}"
                 + ("  (another question about the same line)" if same_line else ""))
     for line in _context(source, q.get("line")):
         console.say(line)
@@ -632,22 +768,24 @@ def ask_question(console, number, total, q, source, test_sources, root,
         console.say(q["question"])
     lead = [prompt] if prompt else []
     picked = options[choose(console, [o["label"] for o in options], lead=lead) - 1]
-    record = {"question": q["question"], "where": where, "status": picked["kind"]}
+    record = {"question": q["question"], "where": where_, "status": picked["kind"],
+              "key": _key(q)}
     if picked["kind"] == so.BEHAVIOUR:
         value = None
         if picked["pins"].get("returns", "") is None:
             value = free_text(console, f"Type what {picked['call']} should "
                                        f"return, as Python would show it",
-                              picked["pins"].get("like"))
+                              picked["pins"].get("like"), value=True)
         record.update(status="answered", criterion=so.criterion(picked, value),
-                      function=picked["function"], args=picked["args"])
+                      function=picked["function"], args=picked["args"],
+                      kwargs=picked.get("kwargs") or {})
     elif picked["kind"] == so.OWN:
         record.update(status="answered",
                       criterion=own_answer(console, _example(q, test_sources)))
     return record
 
 
-def summary(console, paths, state, questions_by_key):
+def summary(console, paths, state, questions_by_key, example="f(1) returns 2"):
     """The answers, with a chance to change one or add another rule."""
     while True:
         console.say("")
@@ -691,8 +829,9 @@ def summary(console, paths, state, questions_by_key):
             else:
                 yield key
         else:
-            state.setdefault("extra", []).append(
-                own_answer(console, "label('VIP') returns 'gold'"))
+            # The example comes from this module's own calls: a fixed one
+            # named a function the user's module does not have.
+            state.setdefault("extra", []).append(own_answer(console, example))
             yield None
 
 
@@ -718,9 +857,16 @@ def _call_in(text):
         node = ast.parse(found.group(1), mode="eval").body
         if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
             return None
-        return node.func.id, [ast.literal_eval(a) for a in node.args]
+        return (node.func.id, [ast.literal_eval(a) for a in node.args],
+                {k.arg: ast.literal_eval(k.value) for k in node.keywords if k.arg})
     except (SyntaxError, ValueError, TypeError):
         return None
+
+
+def _is_default(source, function, name, value):
+    """Whether `value` is only the signature's default, so a real call wins."""
+    defaults = so.literal_defaults(source, function)
+    return name in defaults and defaults[name] == value
 
 
 def build_rows(state, columns, source, test_sources):
@@ -728,28 +874,38 @@ def build_rows(state, columns, source, test_sources):
     from qikly.scaffold import read_functions
 
     rows, typical = [], {}
-    import ast
     functions = {f.name: [a.arg for a in f.args.posonlyargs + f.args.args]
                  for f in read_functions(source)}
+
+    def values_of(function, args, kwargs):
+        values = dict(zip(functions[function], args))
+        values.update(kwargs or {})
+        return values
+
     for rec in state["answers"].values():
         if rec.get("function") in functions and rec.get("args") is not None:
-            rows.append(dict(zip(functions[rec["function"]], rec["args"])))
+            rows.append(values_of(rec["function"], rec["args"], rec.get("kwargs")))
         elif rec.get("criterion"):
             call = _call_in(rec["criterion"])
             if call and call[0] in functions:
-                rows.append(dict(zip(functions[call[0]], call[1])))
+                rows.append(values_of(*call))
     for extra in state.get("extra", []):
         call = _call_in(extra)
         if call and call[0] in functions:
-            rows.append(dict(zip(functions[call[0]], call[1])))
+            rows.append(values_of(*call))
     for name, params in functions.items():
+        # A column no call fills, such as express=False left at its default,
+        # takes the default rather than dropping the whole row.
+        for k, v in so.literal_defaults(source, name).items():
+            typical.setdefault(k, v)
         for args, kwargs in so.literal_calls(test_sources, name):
             if len(args) <= len(params):
                 values = dict(zip(params, args))
                 values.update(kwargs)
                 rows.append(values)
                 for k, v in values.items():
-                    typical.setdefault(k, v)
+                    typical[k] = typical.get(k) if k in typical and not \
+                        _is_default(source, name, k, typical.get(k)) else v
     out = []
     for values in rows:
         row = []
@@ -768,7 +924,16 @@ def ask_data(console, paths, state, source, test_sources):
     from qikly.scaffold import starter_columns
 
     columns = starter_columns(source)
-    if not columns:
+    if columns == []:
+        # Functions that take no arguments need no example inputs; a run
+        # still needs a data file to exist, so a one-row placeholder is
+        # written and said to be one.
+        console.say("")
+        console.say(f"{os.path.basename(paths.module)}'s functions take no "
+                    f"arguments, so no example inputs are needed.")
+        state["rows"], state["columns"], state["rows_typed"] = [["none"]], ["input"], False
+        return
+    if columns is None:
         console.say("")
         console.say(f"{os.path.basename(paths.module)} works on files rather "
                     f"than values, so the example data is a real file of that "
@@ -784,8 +949,12 @@ def ask_data(console, paths, state, source, test_sources):
             console.say(f"There is no file at {sample}. Please type the path again.")
     built = build_rows(state, columns, source, test_sources)
     console.say("")
-    lead = [f"{os.path.basename(paths.module)} takes {', '.join(columns)}. The "
-            f"run needs a few example inputs."]
+    # Why a value-taking module needs a data file at all, and what a row is:
+    # the first-time user asked both, and whether to write True or true.
+    lead = [f"{os.path.basename(paths.module)}'s functions take "
+            f"{', '.join(columns)}. The run tries the code on a few example "
+            f"inputs, one row each, with a value for every one of those, "
+            f"written as Python would write it (True, not true)."]
     if built:
         lead.append("Built from your answers and your tests:")
         lead += ["    " + ", ".join(r) for r in built]
@@ -798,7 +967,8 @@ def ask_data(console, paths, state, source, test_sources):
     else:
         for line in lead:
             console.say(line)
-    state["rows"], state["columns"] = ask_rows(console, columns), columns
+    state["rows"], state["columns"] = ask_rows(
+        console, columns, built[0] if built else None), columns
     state["rows_typed"] = True
 
 
@@ -812,15 +982,23 @@ def task_text(paths, state):
     """The task file, from scaffold's own template with every TODO filled."""
     from qikly.scaffold import build_task, PLACEHOLDER_CRITERIA
 
-    text, problem = build_task(paths.module, paths.cwd, seed="existing")
+    # The task's own name, so a renamed task's id, data path and module path
+    # all follow it; without it a rename wrote a file that failed --validate.
+    text, problem = build_task(paths.module, paths.cwd, task_id=paths.base,
+                               seed="existing")
     if problem:
         raise ValueError(problem)
     name = os.path.basename(paths.module)
-    text = re.sub(r'^task_name: ".*"$', f"task_name: {_q(paths.task_id + ': ' + name)}",
-                  text, count=1, flags=re.M)
-    text = re.sub(r'^description: ".*"$',
-                  f"description: {_q('Tests for the existing ' + name + ', written from its owner' + chr(39) + 's answers by qikly --start.')}",
-                  text, count=1, flags=re.M)
+    # Every replacement goes through a function: as a replacement string, a
+    # backslash in the user's text was read as an escape, which halved it and
+    # broke the YAML for a docstring as ordinary as "C:\data\prices".
+    task_name = f"task_name: {_q(paths.task_id + ': ' + name)}"
+    text = re.sub(r'^task_name: ".*"$', lambda m: task_name, text, count=1,
+                  flags=re.M)
+    description = ("description: " + _q("Tests for the existing " + name +
+                   ", written from its owner's answers by qikly --start."))
+    text = re.sub(r'^description: ".*"$', lambda m: description, text, count=1,
+                  flags=re.M)
     text = re.sub(r"  # TODO: what it does, e\.g\. reads one CSV and returns its rows",
                   "", text)
     text = text.replace("  # guessed, check this", "")
@@ -831,8 +1009,8 @@ def task_text(paths, state):
                         "again to change them.")
     text = text.replace("# TODO. The decisions:", "# The decisions:")
     text = text.replace("# TODO. The consequences:", "# The consequences:")
-    text = re.sub(r'requirements:\n  - "TODO:.*?"\n',
-                  "requirements:\n  - " + _q(state.get("requirements") or "") + "\n",
+    requirements = "requirements:\n  - " + _q(state.get("requirements") or "") + "\n"
+    text = re.sub(r'requirements:\n  - "TODO:.*?"\n', lambda m: requirements,
                   text, count=1, flags=re.S)
     if state.get("sample"):
         ext = os.path.splitext(state["sample"])[1] or ".csv"
@@ -853,9 +1031,11 @@ def task_text(paths, state):
 
 def write_files(console, paths, state, quiet=False):
     """Write the task file, the data file and the open questions."""
+    # Built before the file is opened, so a failure cannot leave it empty.
+    text = task_text(paths, state)
     os.makedirs(os.path.dirname(paths.task), exist_ok=True)
     with open(paths.task, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(task_text(paths, state))
+        handle.write(text)
     data = paths.data
     if state.get("sample"):
         ext = os.path.splitext(state["sample"])[1] or ".csv"
@@ -884,13 +1064,17 @@ def write_open_questions(paths, state):
     lines = [f"# Questions about {name} that are still open.",
              "# Write an answer after each Q number, in plain words naming a",
              "# value, then give the file back with",
-             f"#   qikly --start {shown(paths.module, paths.cwd)} --answers "
-             f"{shown(paths.open, paths.cwd)}",
+             f"#   qikly --start {score_questions_pasteable(paths.module, paths.cwd)} "
+             f"--answers {score_questions_pasteable(paths.open, paths.cwd)}",
+             "",
+             f"module: {shown(paths.module, paths.cwd)}",
              ""]
-    # Each keeps its question's own number, which is what --answers reads:
-    # renumbered 1, 2, 3, an answer would land on the wrong question.
+    # Each keeps its question's own number and its id, which is what
+    # --answers matches on, so an answer lands on its own question even if a
+    # later score asks them in a different order.
     for n, rec in enumerate(open_recs, 1):
         lines += [f"# {rec['where']}: {rec['question']}",
+                  f"# id {rec.get('key', '')}",
                   f"Q{rec.get('number', n)}: ", ""]
     with open(paths.open, "w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(lines))
@@ -902,6 +1086,10 @@ def write_open_questions(paths, state):
 def _child_env(cwd):
     env = dict(os.environ)
     env["QIKLY_PROJECT_ROOT"] = cwd
+    # Unbuffered, so the run's own header lines print before its stages
+    # rather than after them, which is how the first-time user read them.
+    env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
     return env
 
 
@@ -910,12 +1098,20 @@ def validate(console, paths):
     done = subprocess.run([sys.executable, "-m", "qikly", "--validate",
                            "--tasks", paths.task_id], cwd=paths.cwd,
                           env=_child_env(paths.cwd), capture_output=True,
-                          text=True, timeout=300)
+                          text=True, timeout=300, encoding="utf-8",
+                          errors="replace")
     errors, warnings = [], []
     for line in (done.stdout or "").splitlines():
         found = re.match(r"^\s+(warn|ERROR|error)\s+(.*)$", line)
         if found:
             (warnings if found.group(1) == "warn" else errors).append(found.group(2))
+    if done.returncode != 0 and not errors:
+        # A crash prints no ERROR line, and reading only those reported a
+        # task the run would refuse as ready.
+        tail = [l for l in ((done.stderr or "") + (done.stdout or "")).splitlines()
+                if l.strip()][-3:]
+        errors.append("qikly --validate stopped with an error: "
+                      + (" ".join(tail) or f"exit code {done.returncode}"))
     return errors, warnings
 
 
@@ -968,7 +1164,21 @@ def run(console, cwd, task_ids):
     return process.returncode == 0, lines
 
 
-_FAILED = re.compile(r"^\[(\w+)\].*\[stage ([12])/\d\] \[iteration 1\] .*FAILED: (.+)$")
+_STAGE = re.compile(r"^\[(\w+)\].*\[stage ([12])/\d\] \[iteration 1\] (\d+)/(\d+) passed"
+                    r"(?: \| FAILED: (.+))?$")
+
+
+def _bare(name):
+    """`test_x` from `test_x[100]` or `TestLabel::test_x`, as pytest names them."""
+    return name.strip().split("::")[-1].split("[")[0]
+
+
+def _batched():
+    try:
+        from qikly.orchestrator.orchestrator import criteria_per_batch
+        return criteria_per_batch() > 0
+    except Exception:
+        return False
 
 
 def disagreements(paths, state, lines):
@@ -976,15 +1186,29 @@ def disagreements(paths, state, lines):
     The answers whose tests failed against the user's code on first contact:
     each is a place the code and the person disagree. Read from the run's own
     lines and the `# Criteria: N` the test generator writes in each test.
+
+    Only failures on the user's untouched code count. Stage 1's first
+    iteration always runs on it; stage 2's does only if stage 1 needed no
+    fix, because otherwise the code it ran was already qikly's patched copy.
     """
-    failed = set()
+    failed, stage_one_clean = set(), None
     for line in lines:
-        found = _FAILED.match(line)
-        if found and found.group(1) == paths.task_id:
-            failed.update(n.strip() for n in found.group(3).split(","))
+        found = _STAGE.match(line)
+        if not found or found.group(1) != paths.task_id:
+            continue
+        names = [_bare(n) for n in (found.group(5) or "").split(",") if n.strip()]
+        if found.group(2) == "1":
+            stage_one_clean = not names
+            failed.update(names)
+        elif stage_one_clean:
+            failed.update(names)
     criteria = [r["criterion"] for r in state["answers"].values()
                 if r["status"] == "answered"] + state.get("extra", [])
     tests_for = {}
+    if _batched():
+        # Each batch numbers its criteria from 1, so a test's "Criteria: 2"
+        # cannot be traced to one answer. Say nothing rather than misattribute.
+        return None, {}, criteria
     for stage in ("integration", "system"):
         folder = os.path.join(paths.tests, stage)
         for name in (sorted(os.listdir(folder)) if os.path.isdir(folder) else []):
@@ -1036,9 +1260,15 @@ def report_result(console, paths, state, lines, converged):
                     f"disagreement qikly could not fix in its copy, or an "
                     f"answer that contradicts another. The step-by-step report "
                     f"says which.")
+    elif disagreed is None:
+        console.say(f"The run for {name} finished green. Criteria were sent to "
+                    f"the test writer in batches (criteria_per_batch in your "
+                    f"settings), so which answer each failure came from cannot "
+                    f"be told apart; the step-by-step report shows the failures.")
     elif disagreed:
-        console.say(f"Your code disagrees with {len(disagreed)} of your "
-                    f"{len(criteria)} answers:")
+        console.say("Your code disagrees with your only answer:" if len(criteria) == 1
+                    else f"Your code disagrees with {len(disagreed)} of your "
+                         f"{len(criteria)} answers:")
         for c in disagreed:
             console.say(f"  - {c}")
         patches = _newest(os.path.join(paths.cwd, "outputs", "logs", "patches",
@@ -1050,9 +1280,10 @@ def report_result(console, paths, state, lines, converged):
         if patches:
             console.say(f"  The fix: {paths.rel(patches)}")
     else:
-        console.say(f"Your code agrees with all {len(criteria)} of your answers. "
-                    f"The new tests now pin that behaviour, so a later change "
-                    f"that breaks one of them will fail.")
+        console.say(("Your code agrees with your answer. " if len(criteria) == 1 else
+                     f"Your code agrees with all {len(criteria)} of your answers. ")
+                    + "The new tests now pin that behaviour, so a later change "
+                      "that breaks one of them will fail.")
     if tests_for:
         console.say("Each answer and the test written from it:")
         for n, names in sorted(tests_for.items()):
@@ -1071,10 +1302,15 @@ def inputs_outputs(console, cwd, code, tests, report, results, ran):
     if report:
         console.say(f"    Score report   {shown(report, cwd)}")
     for paths, state, data in results:
+        # Criteria, counted as the task file holds them: answers plus the
+        # rules added at the summary, which the old count left out.
         answered = sum(1 for r in state["answers"].values() if r["status"] == "answered")
+        answered += len(state.get("extra", []))
         open_n = sum(1 for r in state["answers"].values() if r["status"] in (so.ASK, so.SKIP))
-        console.say(f"    Your answers   {paths.rel(paths.task)}   {answered} answered"
-                    + (f", {open_n} open" if open_n else ""))
+        console.say(f"    Your answers   {paths.rel(paths.task)}   {answered} "
+                    f"criteri{'on' if answered == 1 else 'a'}"
+                    + (f", {open_n} open question{'' if open_n == 1 else 's'}"
+                       if open_n else ""))
         if os.path.exists(paths.open):
             console.say(f"    Open questions {paths.rel(paths.open)}")
         if data and os.path.exists(data):
@@ -1087,10 +1323,19 @@ def inputs_outputs(console, cwd, code, tests, report, results, ran):
         for paths, state, data in results:
             if os.path.isdir(paths.tests):
                 console.say(f"    New tests      {paths.rel(paths.tests)}{os.sep}")
+            copy = os.path.join(cwd, "outputs", "agent_src", "code", paths.task_id)
+            if os.path.isdir(copy):
+                console.say(f"    qikly's copy   {shown(copy, cwd)}{os.sep}   "
+                            f"your code, as qikly ran and fixed it")
             iterations = _newest(os.path.join(cwd, "outputs", "reports", "iterations"),
                                  paths.task_id + "_")
             if iterations:
                 console.say(f"    What happened  {shown(iterations, cwd)}")
+        if os.path.isdir(os.path.join(cwd, "outputs", "logs")):
+            console.say(f"    Logs, patches  {shown(os.path.join(cwd, 'outputs', 'logs'), cwd)}{os.sep}")
+        if os.path.isdir(os.path.join(cwd, "outputs", "reports")):
+            console.say(f"    Other reports  {shown(os.path.join(cwd, 'outputs', 'reports'), cwd)}{os.sep}   "
+                        f"metrics, JUnit XML, run summaries")
         ids = " ".join(p.task_id for p, _, _ in results)
         console.say(f"    Their score    free:  qikly --score-suite --tasks {ids}")
     console.say("")
@@ -1116,6 +1361,22 @@ def announce(console, cwd, code):
     console.say("")
 
 
+def start_probe_timeout():
+    from qikly import start_probe
+    return start_probe.TIMEOUT
+
+
+def _rule_example(questions, test_sources):
+    """An example rule built from this module's own functions and test calls."""
+    for q in questions:
+        if q.get("function"):
+            calls = so.literal_calls(test_sources, q["function"])
+            if calls:
+                return so.call_text(q["function"], *calls[0]) + " returns ..."
+            return f"{q['function']}(...) returns ..."
+    return "a call to one of your functions, and what it should return"
+
+
 def module_flow(console, paths, questions, test_sources, root, answers_file=None):
     """Questions, summary and data for one module. Returns its state."""
     source = _read(paths.module)
@@ -1128,31 +1389,54 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
     # the tests changed, and an answer to a question nobody asked is noise.
     state["answers"] = {k: v for k, v in state["answers"].items() if k in by_key}
     pending = [k for k in keys if k not in state["answers"]]
-    if state["answers"] and console.interactive:
-        done = len(state["answers"])
-        if not pending and _complete(paths):
-            picked = choose(console, [
-                "go straight to the check and the run",
-                "review my answers first",
-                "start the answers again",
-                "type the number of one question to answer again",
-            ], lead=[f"You have answered every question about "
-                     f"{os.path.basename(paths.module)} already."])
-            if picked == 1:
-                return state, write_files(console, paths, state)
-            picked = {2: 1, 3: 2, 4: 3}[picked]
+    if (state["answers"] or state.get("requirements")) and console.interactive:
+        # Shown on every return, so it is never a surprise. Deleting answers
+        # sits behind its own confirmation: a first-time user piping answers
+        # a few at a time typed the next question's "2" here, which wiped
+        # every answer, and the rest then landed one question off.
+        done = len(state["answers"]) + (1 if state.get("requirements") else 0)
+        complete = not pending and _complete(paths)
+        handled = len(state["answers"])
+        answered = sum(1 for r in state["answers"].values() if r.get("status") == "answered")
+        lead = [f"Saved for {os.path.basename(paths.module)}: "
+                + ("what it does, and " if state.get("requirements") else "")
+                + f"{handled} of {len(keys)} questions ({answered} answered, "
+                  f"{handled - answered} skipped, left open or either-is-fine)"
+                + ("." if not pending else
+                   f". {len(pending)} still to go.")]
+        if complete:
+            options = ["go straight to the check and the run"]
+        elif pending:
+            options = [f"continue with question {keys.index(pending[0]) + 1}"]
         else:
-            picked = choose(console, [
-                f"continue where I stopped ({done} answered, {len(pending)} to go)",
-                "start the answers again",
-                "type the number of one question to answer again",
-            ], lead=[f"You have answered some questions about "
-                     f"{os.path.basename(paths.module)} before."])
+            # Every question answered, but stopped before the rows were saved.
+            options = ["continue to the summary and the example inputs"]
+        options += ["review my answers first",
+                    "delete my answers and start again (asks to confirm)",
+                    "type the number of one question to answer again"]
+        picked = choose(console, options, lead=lead)
+        if picked == 1 and complete:
+            return state, write_files(console, paths, state)
         if picked == 2:
-            state["answers"], state["extra"] = {}, []
-            state.pop("requirements", None)
-            pending = list(keys)
+            pending = []
         elif picked == 3:
+            sure = choose(console, [
+                f"no, keep my {done} answers",
+                f"yes, delete all {done} answers and start again",
+                "type the number of one question to answer again instead",
+            ], lead=[f"Delete all {done} saved answers about "
+                     f"{os.path.basename(paths.module)}? This cannot be undone."])
+            if sure == 2:
+                state["answers"], state["extra"] = {}, []
+                state.pop("requirements", None)
+                pending = list(keys)
+                save_state(paths, state)
+                console.say("  deleted. Starting again.")
+            elif sure == 3:
+                which = _number(console, len(keys), "the question")
+                state["answers"].pop(keys[which - 1], None)
+                pending = [k for k in keys if k not in state["answers"]]
+        elif picked == 4:
             which = _number(console, len(keys), "the question")
             state["answers"].pop(keys[which - 1], None)
             pending = [k for k in keys if k not in state["answers"]]
@@ -1164,6 +1448,15 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
         console.say(f"  saved to {paths.rel(paths.task)}")
 
     total = len(keys)
+    if pending:
+        # Said once, because building the options runs the user's code and a
+        # slow function otherwise looked like a hang.
+        console.say("")
+        console.say("For each question, qikly tries your functions on a few "
+                    "nearby inputs, in a separate process and an empty folder, "
+                    "to offer concrete answers. Nothing of yours is changed. If "
+                    f"a function takes longer than {start_probe_timeout()} "
+                    "seconds, that question offers only skip or your own answer.")
     for key in pending:
         number = keys.index(key) + 1
         previous = by_key[keys[number - 2]] if number > 1 else None
@@ -1181,7 +1474,8 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
     # Keep the answers in the order the questions are asked.
     state["answers"] = {k: state["answers"][k] for k in keys if k in state["answers"]}
 
-    for changed in summary(console, paths, state, by_key):
+    for changed in summary(console, paths, state, by_key,
+                           _rule_example(questions, test_sources)):
         if changed is not None:
             n = keys.index(changed) + 1
             state["answers"][changed] = ask_question(console, n, total, by_key[changed],
@@ -1198,10 +1492,17 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
     return state, data
 
 
-def _existing_task(console, paths):
+def _existing_task(console, paths, can_ask=True):
     """A task file this command did not write is never overwritten unasked."""
     if not os.path.exists(paths.task) or os.path.exists(paths.state):
         return True
+    if not can_ask:
+        # Without a terminal, or reading answers from a file, there is nobody
+        # to ask; a menu here hung on an open pipe.
+        console.say(f"{paths.rel(paths.task)} already exists, and qikly --start "
+                    f"did not write it, so it is left alone. Move it aside, or "
+                    f"run qikly --start in a terminal to choose another name.")
+        return False
     picked = choose(console, [
         f"move it aside to {os.path.basename(paths.task)}.bak and start fresh",
         "leave it alone and stop here",
@@ -1214,17 +1515,14 @@ def _existing_task(console, paths):
         return True
     if picked == 2:
         return False
-    name = free_text(console, "Type a task name in capitals and underscores",
-                     "PRICING_V2")
+    from qikly.scaffold import VERIFY_SUFFIX
+    name = free_text(console, "Type a name for the new task, in letters, digits "
+                     "and underscores", "PRICING_V2")
     name = re.sub(r"[^A-Za-z0-9_]", "_", name).upper().strip("_") or "MY_TASK"
-    paths.task_id = name
-    paths.base = name
-    paths.task = os.path.join(paths.cwd, "inputs_private", "config", "tasks",
-                              name + ".yaml")
-    paths.data = os.path.join(paths.cwd, "inputs_private", "data", name, "input_01.csv")
-    paths.state = os.path.join(os.path.dirname(paths.state), name + "_start.json")
-    paths.open = os.path.join(os.path.dirname(paths.open), name + "_open_questions.txt")
-    paths.tests = os.path.join(paths.cwd, "outputs", "tests", name)
+    if name.endswith(VERIFY_SUFFIX):
+        name = name[:-len(VERIFY_SUFFIX)] or "MY_TASK"
+    paths.name(name)
+    console.say(f"  the new task is {paths.task_id}, in {paths.rel(paths.task)}")
     return _existing_task(console, paths)
 
 
@@ -1300,11 +1598,87 @@ def main(arg, cwd, console=None, answers=None):
         return _main(arg, cwd, console, answers)
     except (Stop, KeyboardInterrupt):
         console.say("")
-        console.say("Stopped. Your answers so far are saved under "
+        console.say("Stopped. Every answer you gave is saved, in the task file "
+                    "under " + os.path.join("inputs_private", "config", "tasks")
+                    + " and the progress file under "
                     + os.path.join("inputs_private", "questions")
-                    + ", and running the same command again continues where "
-                      "you stopped.")
+                    + ". Run the same command again to continue where you stopped.")
         return STOPPED
+
+
+def _choose_tests(console, code, cwd, session):
+    """
+    The tests, asked once. The choice is saved, so a rerun says which it is
+    using rather than asking again, and offers a different path in one step.
+    """
+    previous = session.get("tests")
+    if previous:
+        path = os.path.join(cwd, previous)
+        if os.path.exists(path):
+            picked = choose(console, [
+                f"the same tests as last time: {previous}",
+                "type a path to different tests",
+            ], lead=[f"Which tests should "
+                     f"{os.path.basename(code) if os.path.isfile(code) else shown(code, cwd) + os.sep} "
+                     f"be scored against?"])
+            if picked == 1:
+                return os.path.abspath(path)
+            return _typed_path(console, cwd, "a test file or folder")
+    return pick_tests(console, code, cwd)
+
+
+def _scored(console, code, tests, cwd, session, quiet=False):
+    """
+    (result, report), from the saved score when neither the code nor the tests
+    changed since it was taken. Re-scoring each run took twenty seconds a time
+    and left a report behind on every one; the first-time user had eighteen.
+    """
+    stamp = fingerprint(code, tests)
+    saved = session.get("score")
+    if (saved and saved.get("fingerprint") == stamp
+            and session.get("tests") == shown(tests, cwd)
+            and os.path.exists(os.path.join(cwd, saved.get("report", "")))):
+        if not quiet:
+            console.say("Your code and tests have not changed since the last "
+                        "score, so it is reused.")
+        return saved["result"], os.path.join(cwd, saved["report"])
+    result, report = score(console, code, tests, cwd, os.path.isdir(code))
+    if result is None:
+        return None, report
+    keep = {"total": result["total"], "caught": result["caught"],
+            "missed": result["missed"], "questions": result.get("questions") or []}
+    session.update(tests=shown(tests, cwd),
+                   score={"fingerprint": stamp, "report": shown(report, cwd),
+                          "result": keep})
+    save_session(cwd, code, session)
+    return keep, report
+
+
+def _say_score(console, result, report, cwd, questions):
+    total, caught = result["total"], len(result["caught"])
+    console.say("")
+    console.say(f"  {caught} of {total} planted faults caught by your tests")
+    console.say(f"  {total - caught} of {total} missed, which come down to "
+                f"{len(questions)} question{'' if len(questions) == 1 else 's'}")
+    console.say(f"  The full report: {shown(report, cwd)}")
+
+
+def _modules(questions, code, cwd, session):
+    """Questions by module, each module with its task name, in a stable order."""
+    by_module = {}
+    for q in questions:
+        by_module.setdefault(q["path"], []).append(q)
+    names = task_bases(sorted(by_module), code)
+    renamed = session.get("names") or {}
+    for module in by_module:
+        rel = shown(module, cwd)
+        if rel in renamed:
+            names[module] = renamed[rel]
+    return [(m, by_module[m], names[m]) for m in sorted(by_module)]
+
+
+def _test_sources(tests):
+    return [_read(p) for p in ([tests] if os.path.isfile(tests) else _test_files(tests))]
 
 
 def _main(arg, cwd, console, answers):
@@ -1312,62 +1686,78 @@ def _main(arg, cwd, console, answers):
         return _non_interactive(arg, cwd, console)
     if answers:
         code = os.path.abspath(os.path.join(cwd, arg or "."))
-        tests = auto_tests(code, cwd)
+        if not os.path.exists(code):
+            console.say(f"There is no file or folder at {code}.")
+            return 2
+        session = load_session(cwd, code)
+        saved = session.get("tests")
+        # The tests the questions were asked against, not a fresh guess: a
+        # different suite asks different questions, and answers matched by
+        # number then landed on the wrong one.
+        tests = (os.path.abspath(os.path.join(cwd, saved))
+                 if saved and os.path.exists(os.path.join(cwd, saved))
+                 else auto_tests(code, cwd))
         if not tests:
             console.say("No test files that import it were found.")
             return 2
     else:
         code = pick_code(console, arg, cwd)
         announce(console, cwd, code)
-        tests = pick_tests(console, code, cwd)
-    many = os.path.isdir(code)
-    result, report = score(console, code, tests, cwd, many)
+        session = load_session(cwd, code)
+        tests = _choose_tests(console, code, cwd, session)
+    result, report = _scored(console, code, tests, cwd, session)
     if result is None:
         return 2
     questions = enrich(list(result.get("questions") or []), result["missed"])
-    total, caught = result["total"], len(result["caught"])
-    console.say("")
-    console.say(f"  {caught} of {total} planted faults caught by your tests")
-    console.say(f"  {total - caught} of {total} missed, which come down to "
-                f"{len(questions)} question{'' if len(questions) == 1 else 's'}")
-    console.say(f"  The full report: {shown(report, cwd)}")
+    _say_score(console, result, report, cwd, questions)
     if not questions:
         console.say("Your tests caught every fault qikly planted, so there is "
                     "nothing to ask. That says your tests notice changes to the "
                     "code that exists; it cannot say whether a rule is missing.")
         return 0
-    by_module = {}
-    for q in questions:
-        by_module.setdefault(q["path"], []).append(q)
-    test_paths = ([tests] if os.path.isfile(tests)
-                  else _test_files(tests))
-    test_sources = [_read(p) for p in test_paths]
+    test_sources = _test_sources(tests)
     root = project_root(code, cwd)
-    results = []
-    modules = sorted(by_module)
-    for index, module in enumerate(modules, 1):
-        paths = Paths(cwd, module)
+    results, blocked = [], False
+    modules = _modules(questions, code, cwd, session)
+    file_module = parse_answers(answers)[3] if answers else None
+    for index, (module, qs, base) in enumerate(modules, 1):
+        paths = Paths(cwd, module, base)
+        if answers and file_module and file_module != shown(module, cwd):
+            # One module's answers never land on another module's questions.
+            continue
+        problem = _cannot_task(paths)
+        if problem:
+            console.say(f"{shown(module, cwd)} is skipped: {problem}")
+            continue
         if len(modules) > 1:
             console.say("")
             console.say(f"Module {index} of {len(modules)}: {shown(module, cwd)}, "
-                        f"{len(by_module[module])} question"
-                        f"{'' if len(by_module[module]) == 1 else 's'}")
-        if not _existing_task(console, paths):
+                        f"{len(qs)} question{'' if len(qs) == 1 else 's'}, task "
+                        f"{paths.task_id}")
+        if not _existing_task(console, paths, can_ask=not answers):
+            blocked = True
             continue
+        if paths.base != base:
+            session.setdefault("names", {})[shown(module, cwd)] = paths.base
+            save_session(cwd, code, session)
         if answers:
-            state, data = _from_answers(console, paths, by_module[module],
-                                        test_sources, root, answers)
+            state, data = _from_answers(console, paths, qs, test_sources, root,
+                                        answers)
         else:
-            state, data = module_flow(console, paths, by_module[module],
-                                      test_sources, root)
+            state, data = module_flow(console, paths, qs, test_sources, root)
         results.append((paths, state, data))
+    if answers and file_module and not results:
+        console.say(f"{shown(answers, cwd)} is about {file_module}, which this "
+                    f"score has no questions for.")
+        return 2
     if not results:
-        return 0
-    ready = []
+        return 2 if blocked else 0
+    ready, refused = [], False
     for paths, state, data in results:
         errors, warnings = validate(console, paths)
         console.say("")
         if errors:
+            refused = True
             console.say(f"{paths.task_id} cannot run yet:")
             for e in errors:
                 console.say(f"  - {e}")
@@ -1376,20 +1766,23 @@ def _main(arg, cwd, console, answers):
             continue
         if warnings:
             console.say(f"Checked {paths.task_id}, with {len(warnings)} warning"
-                        f"{'' if len(warnings) == 1 else 's'}:")
+                        f"{'' if len(warnings) == 1 else 's'}. Each is a reason a "
+                        f"test may check less than you meant; none stops the run:")
             for w in warnings:
                 console.say(f"  - {w}")
             if console.interactive and not answers:
                 picked = choose(console, [
                     "continue anyway",
                     "stop here, to fix it in the files named above",
-                    "type an extra row of example values to add",
+                    "type an extra row of example values to add, then continue",
                 ])
                 if picked == 2:
                     continue
                 if picked == 3 and state.get("columns"):
                     state["rows"] = (state.get("rows") or []) + ask_rows(
-                        console, state["columns"])
+                        console, state["columns"],
+                        state["rows"][0] if state.get("rows") else None)
+                    state["rows_typed"] = True
                     save_state(paths, state)
                     write_files(console, paths, state)
                     console.say(f"  saved to {paths.rel(data)}")
@@ -1398,9 +1791,7 @@ def _main(arg, cwd, console, answers):
         ready.append(paths.task_id)
     ran, failed = False, False
     if ready and console.interactive and not answers:
-        module_arg = shown(code, cwd)
-        if " " in module_arg:
-            module_arg = f'"{module_arg}"'
+        module_arg = score_questions_pasteable(code, cwd)
         if offer_run(console, cwd, ready, module_arg):
             converged, lines = run(console, cwd, ready)
             ran, failed = True, not converged
@@ -1410,7 +1801,17 @@ def _main(arg, cwd, console, answers):
     elif ready:
         console.say(f"To run it, which needs an API key:  qikly --tasks {' '.join(ready)}")
     inputs_outputs(console, cwd, code, tests, report, results, ran)
-    return 1 if failed else 0
+    if failed:
+        return 1
+    return 2 if refused and not ready else 0
+
+
+def _cannot_task(paths):
+    """Why no task can be written for this module, before anything is asked."""
+    from qikly.scaffold import build_task
+    _, problem = build_task(paths.module, paths.cwd, task_id=paths.base,
+                            seed="existing")
+    return problem
 
 
 def _complete(paths):
@@ -1432,51 +1833,67 @@ def _non_interactive(arg, cwd, console):
         console.say(f"There is no file or folder at {code}.")
         return 2
     root = project_root(code, cwd)
-    tests = auto_tests(code, cwd)
+    session = load_session(cwd, code)
+    saved = session.get("tests")
+    tests = (os.path.abspath(os.path.join(cwd, saved))
+             if saved and os.path.exists(os.path.join(cwd, saved))
+             else auto_tests(code, cwd))
     if not tests:
         console.say("No test files that import it were found. Score it with  "
                     "qikly --score-code <code> --score-tests <tests>")
         return 2
-    found = [tests] if os.path.isfile(tests) else _test_files(tests)
-    result, report = score(console, code, tests, cwd, os.path.isdir(code))
+    result, report = _scored(console, code, tests, cwd, session)
     if result is None:
         return 2
     questions = enrich(list(result.get("questions") or []), result["missed"])
-    test_sources = [_read(p) for p in found]
+    _say_score(console, result, report, cwd, questions)
+    if not questions:
+        console.say("Your tests caught every fault qikly planted, so there is "
+                    "nothing to ask.")
+        return 0
+    test_sources = _test_sources(tests)
     written = []
-    by_module = {}
-    for q in questions:
-        by_module.setdefault(q["path"], []).append(q)
-    for module, qs in sorted(by_module.items()):
-        paths = Paths(cwd, module)
+    for module, qs, base in _modules(questions, code, cwd, session):
+        paths = Paths(cwd, module, base)
+        state = load_state(paths) or {"answers": {}}
+        answers_cmd = (f"qikly --start {score_questions_pasteable(code, cwd)} "
+                       f"--answers {score_questions_pasteable(paths.open, cwd)}")
         lines = [f"# Questions about {os.path.basename(module)} from qikly --start.",
                  "# This was not run in a terminal, so nothing was asked. Give",
                  "# each question an answer after its Q number: an option",
                  "# number from its list, or skip, either or ask, or your own",
-                 "# words naming a value. Then run",
-                 f"#   qikly --start {arg} --answers {shown(paths.open, cwd)}",
-                 "", "requirements: ", ""]
+                 "# words naming a value. For an option that asks for a value,",
+                 "# write the number, a colon and the value, such as  1: 0.0",
+                 "# Then run",
+                 f"#   {answers_cmd}",
+                 "",
+                 f"module: {shown(module, cwd)}",
+                 "",
+                 "# What the module should do, in a sentence: the coding agent",
+                 "# is told this, so describe its purpose, not its boundary values.",
+                 "requirements: " + (state.get("requirements") or ""),
+                 ""]
+        source = _read(module)
         for n, q in enumerate(qs, 1):
-            prompt, options = so.menu(q, _read(module), test_sources, root,
-                                      q.get("mutant"))
-            lines.append(f"# {q.get('function')}, line {q.get('line')}: {q['question']}")
+            prompt, options = so.menu(q, source, test_sources, root, q.get("mutant"))
+            lines.append(f"# {where(q)}: {q['question']}")
             if prompt:
                 lines.append(f"# {prompt}")
             for i, o in enumerate(options, 1):
                 lines.append(f"#   {i}. {o['label']}")
-            lines += [f"Q{n}: ", ""]
+            lines += [f"# id {_key(q)}", f"Q{n}: ", ""]
         os.makedirs(os.path.dirname(paths.open), exist_ok=True)
         with open(paths.open, "w", encoding="utf-8", newline="\n") as handle:
             handle.write("\n".join(lines))
-        written.append(paths.open)
+        written.append((paths.open, answers_cmd))
+        console.say("")
         console.say("\n".join(lines))
     console.say("")
     console.say("Not run in a terminal, so nothing was asked. The questions are "
                 "saved to:")
-    for w in written:
-        console.say(f"  {shown(w, cwd)}")
-    console.say("Answer them there, then run the --answers command at the top of "
-                "each file.")
+    for path, command in written:
+        console.say(f"  {shown(path, cwd)}")
+        console.say(f"    answer them there, then run:  {command}")
     console.say("If you are at a keyboard and still see this, your terminal is "
                 "not one Python recognises, which is how Git Bash's window "
                 "behaves. Run the same command in PowerShell or cmd, or set "
@@ -1485,27 +1902,44 @@ def _non_interactive(arg, cwd, console):
 
 
 def parse_answers(path):
-    """`Q3: text` lines and one `requirements: text` line, from a file."""
-    found, requirements, rows = {}, None, []
+    """
+    (answers by number, requirements, rows, module, ids by number) from a
+    file: `Q3: text` lines, each optionally after a `# id <key>` line,
+    `requirements: text`, `row: a, b, c` and `module: path`.
+    """
+    found, requirements, rows, module, ids = {}, None, [], None, {}
+    pending_id = None
     for line in _read(path).splitlines():
+        marker = re.match(r"^\s*#\s*id\s+([0-9a-f]{6,})\s*$", line)
+        if marker:
+            pending_id = marker.group(1)
+            continue
         if line.lstrip().startswith("#"):
             continue
         q = re.match(r"^\s*Q(\d+)\s*:\s*(.*)$", line)
-        if q and q.group(2).strip():
-            found[int(q.group(1))] = q.group(2).strip()
+        if q:
+            if pending_id:
+                ids[int(q.group(1))] = pending_id
+            pending_id = None
+            if q.group(2).strip():
+                found[int(q.group(1))] = _UNSAFE.sub("", q.group(2)).strip()
+            continue
         r = re.match(r"^\s*requirements\s*:\s*(.*)$", line, re.I)
         if r and r.group(1).strip():
-            requirements = r.group(1).strip()
+            requirements = _UNSAFE.sub("", r.group(1)).strip()
+        m = re.match(r"^\s*module\s*:\s*(.*)$", line, re.I)
+        if m and m.group(1).strip():
+            module = m.group(1).strip()
         row = re.match(r"^\s*row\s*:\s*(.*)$", line, re.I)
         if row and row.group(1).strip():
             rows.append(next(csv.reader([row.group(1)], skipinitialspace=True)))
-    return found, requirements, rows
+    return found, requirements, rows, module, ids
 
 
 def _from_answers(console, paths, questions, test_sources, root, answers_path):
     from qikly.scaffold import starter_columns
 
-    given, requirements, rows = parse_answers(answers_path)
+    given, requirements, rows, _, ids = parse_answers(answers_path)
     source = _read(paths.module)
     state = load_state(paths) or {"answers": {}, "extra": []}
     state.setdefault("extra", [])
@@ -1515,11 +1949,14 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
         console.say(f"{shown(answers_path, paths.cwd)} has no requirements: line, "
                     f"so the coding agent would not be told what the module "
                     f"does. Add one, such as  requirements: applies a discount.")
+    # Matched by the question's id where the file carries one, so a file
+    # answered against an earlier score cannot put an answer on another
+    # question; by number only for a file without ids.
+    by_id = {ids[n]: text for n, text in given.items() if n in ids}
     for n, q in enumerate(questions, 1):
-        text = given.get(n)
         key = _key(q)
-        where = f"{q.get('function') or q.get('file')}, line {q.get('line')}"
-        rec = {"question": q["question"], "where": where, "number": n}
+        text = by_id.get(key) if ids else given.get(n)
+        rec = {"question": q["question"], "where": where(q), "number": n, "key": key}
         if not text:
             if key in state["answers"]:
                 state["answers"][key]["number"] = n
@@ -1527,39 +1964,57 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
             rec["status"] = so.SKIP
         elif text.lower() in ("skip", "either", "ask"):
             rec["status"] = {"skip": so.SKIP, "either": so.EITHER, "ask": so.ASK}[text.lower()]
-        elif text.rstrip(".)").isdigit():
+        elif re.match(r"^\d+\s*[.):]?\s*(?::\s*(.+))?$", text) and \
+                int(re.match(r"^\d+", text).group(0)) <= 9:
+            # An option number, alone or as "1: 0.0" for an option that asks
+            # for a value. Numbers above 9 are answers, not options.
+            k = int(re.match(r"^\d+", text).group(0))
+            value = re.match(r"^\d+\s*[.)]?\s*:\s*(.+)$", text)
+            value = value.group(1).strip() if value else None
             _, options = so.menu(q, source, test_sources, root, q.get("mutant"))
-            k = int(text.rstrip(".)"))
             if not 1 <= k <= len(options):
                 console.say(f"Q{n}: there is no option {k}; it is left open.")
                 rec["status"] = so.SKIP
             else:
                 o = options[k - 1]
-                if o["kind"] == so.BEHAVIOUR and o["pins"].get("returns", "") is None:
+                if o["kind"] == so.BEHAVIOUR and o["pins"].get("returns", "") is None \
+                        and value is None:
                     console.say(f"Q{n}: option {k} needs a value; write it as "
-                                f"your own words instead. It is left open.")
+                                f"{k}: <value>. It is left open.")
                     rec["status"] = so.SKIP
                 elif o["kind"] == so.BEHAVIOUR:
-                    rec.update(status="answered", criterion=so.criterion(o),
-                               function=o["function"], args=o["args"])
+                    rec.update(status="answered", criterion=so.criterion(o, value),
+                               function=o["function"], args=o["args"],
+                               kwargs=o.get("kwargs") or {})
                 elif o["kind"] == so.OWN:
                     console.say(f"Q{n}: write your own answer in words instead "
                                 f"of {k}. It is left open.")
                     rec["status"] = so.SKIP
                 else:
                     rec["status"] = o["kind"]
+        elif len(text.split()) < 3:
+            console.say(f"Q{n}: \"{text}\" is too short to be a criterion; write "
+                        f"the input and what should happen to it. It is left open.")
+            rec["status"] = so.SKIP
         else:
             rec.update(status="answered", criterion=text)
         state["answers"][key] = rec
     columns = starter_columns(source)
-    if rows and columns:
+    if columns == []:
+        state["rows"], state["columns"], state["rows_typed"] = [["none"]], ["input"], False
+    elif rows and columns:
         state["rows"], state["columns"] = [r for r in rows if len(r) == len(columns)], columns
         state["rows_typed"] = True
     elif columns and not state.get("rows_typed"):
         # Rebuilt each time, so an answer added since adds its row.
         state["rows"] = build_rows(state, columns, source, test_sources)
         state["columns"] = columns
+    elif columns is None and not state.get("sample"):
+        console.say(f"{os.path.basename(paths.module)} reads files, so it needs a "
+                    f"real sample file: run qikly --start in a terminal to give "
+                    f"its path, or copy one to {paths.rel(paths.data)}.")
     save_state(paths, state)
     data = write_files(console, paths, state)
-    console.say(f"saved to {paths.rel(paths.task)} and {paths.rel(data)}")
+    console.say(f"saved to {paths.rel(paths.task)}"
+                + (f" and {paths.rel(data)}" if os.path.exists(data) else ""))
     return state, data

@@ -2504,6 +2504,24 @@ def main():
             pass
 
     if args.start is not None:
+        # --start returns before the misattached-flag guard below, so it does
+        # its own: `--start pricing.py --task-id X --fresh` ran as PRICING and
+        # silently dropped both.
+        ignored = [flag for flag, given in (
+            ("--tasks", bool(getattr(args, "tasks", None))),
+            ("--task-id", args.task_id is not None),
+            ("--fresh", bool(args.fresh)),
+            ("--from-doc", args.from_doc is not None),
+            ("--scaffold", bool(args.scaffold)),
+            ("--score-code", bool(args.score_code)),
+            ("--score-tests", bool(args.score_tests)),
+            ("--score-suite", bool(args.score_suite)),
+        ) if given]
+        if ignored:
+            print(f"--start takes a path and, optionally, --answers; it would "
+                  f"ignore {', '.join(ignored)}. Run it without "
+                  f"{'that' if len(ignored) == 1 else 'those'}.", file=sys.stderr)
+            return 2
         return _do_start(args.start, args.answers)
 
     # These run before anything else and exit: they exist to make a project
