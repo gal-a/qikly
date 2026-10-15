@@ -30,6 +30,39 @@ MARKER = "# Written by qikly from your answers"
 FOLDER = "qikly_generated"
 
 
+_CONFTEST = '''"""
+Written by qikly. Keeps a plain `pytest` from the project root out of this
+folder: the tests here are qikly's working copies, already copied to your own
+tests by `qikly --take-tests`, and collecting both ran every test twice.
+Naming a path inside outputs/ still runs it, which is how qikly runs them.
+"""
+import os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+
+def pytest_ignore_collect(collection_path, config):
+    base = str(config.invocation_params.dir)
+    asked = [os.path.abspath(os.path.join(base, str(a).split("::")[0]))
+             for a in config.args]
+    if any(a == HERE or a.startswith(HERE + os.sep) for a in asked):
+        return None
+    return True
+'''
+
+
+def keep_outputs_out_of_pytest(cwd):
+    """Write outputs/conftest.py unless one is there already."""
+    folder = os.path.join(cwd, "outputs")
+    path = os.path.join(folder, "conftest.py")
+    if os.path.exists(path):
+        return False
+    os.makedirs(folder, exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(_CONFTEST)
+    return True
+
+
 def _read(path):
     try:
         with open(path, encoding="utf-8-sig", errors="replace") as handle:
@@ -95,6 +128,7 @@ def take(cwd, task_id, test_dir, say=print):
                       f"with  qikly --start  or  qikly --tasks {task_id}")
     dest = os.path.join(test_dir, FOLDER)
     os.makedirs(dest, exist_ok=True)
+    keep_outputs_out_of_pytest(cwd)
     written, skipped = [], []
     for stage in STAGES:
         folder = os.path.join(source_root, stage)

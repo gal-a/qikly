@@ -80,10 +80,10 @@ def test_the_test_choice_and_the_score_are_reused(tmp_path, monkeypatch):
     again = start.load_session(str(tmp_path), code)
     second, _ = start._scored(Script([]).console, code, tests, str(tmp_path), again)
     assert len(calls) == 1 and second["total"] == first["total"]
-    s = Script(["1"])
+    s = Script([])
     assert start._choose_tests(s.console, code, str(tmp_path), again) == \
         os.path.abspath(tests)
-    assert "the same tests as last time" in s.text
+    assert "as you chose last time" in s.text, "reused without asking"
 
 
 def test_a_boundary_on_a_named_constant_with_a_defaulted_argument_is_concrete(tmp_path):

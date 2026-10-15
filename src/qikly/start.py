@@ -1217,8 +1217,13 @@ def estimate(task_ids, model):
 
 def run(console, cwd, task_ids):
     """The paid run, streamed as it happens. Returns (converged, lines)."""
+    from qikly.take_tests import keep_outputs_out_of_pytest
+    keep_outputs_out_of_pytest(cwd)
     lines = []
-    process = subprocess.Popen([sys.executable, "-m", "qikly", "--tasks"] + task_ids,
+    # One comma-separated argument: `--tasks A B` is an argparse error, and a
+    # whole-folder run never started, then was reported as not green.
+    process = subprocess.Popen([sys.executable, "-m", "qikly", "--tasks",
+                                ",".join(task_ids)],
                                cwd=cwd, env=_child_env(cwd), stdout=subprocess.PIPE,
                                stderr=subprocess.STDOUT, text=True, bufsize=1,
                                encoding="utf-8", errors="replace")
@@ -1448,6 +1453,12 @@ def report_result(console, paths, state, lines, converged):
     disagreed, tests_for, criteria, untagged = disagreements(paths, state, lines)
     console.say("")
     name = os.path.basename(paths.module)
+    started = any(line.startswith(f"[{paths.task_id}] [stage ") for line in lines)
+    if not converged and not started:
+        tail = [l for l in lines if l.strip()][-3:]
+        console.say(f"The run for {name} did not start, so nothing was tested. "
+                    f"What it printed last: " + (" | ".join(tail) or "nothing"))
+        return
     if not converged:
         console.say(f"The run for {name} did not finish green: some tests "
                     f"written from your answers still fail. That can be a "
@@ -1549,7 +1560,7 @@ def inputs_outputs(console, cwd, code, tests, report, results, ran):
         if os.path.isdir(os.path.join(cwd, "outputs", "reports")):
             console.say(f"    Other reports  {shown(os.path.join(cwd, 'outputs', 'reports'), cwd)}{os.sep}   "
                         f"metrics, JUnit XML, run summaries")
-        ids = " ".join(p.task_id for p, _, _ in results)
+        ids = ",".join(p.task_id for p, _, _ in results)
         console.say(f"    Their score    free:  qikly --score-suite --tasks {ids}")
     console.say("")
     console.say(f"  Everything above is under {cwd}.")
@@ -1591,7 +1602,8 @@ def _rule_example(questions, test_sources):
     return "a call to one of your functions, and what it should return"
 
 
-def module_flow(console, paths, questions, test_sources, root, answers_file=None):
+def module_flow(console, paths, questions, test_sources, root, answers_file=None,
+                many=False):
     """Questions, summary and data for one module. Returns its state."""
     source = _read(paths.module)
     state = load_state(paths) or {}
@@ -1618,8 +1630,14 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
                   f"{handled - answered} skipped, left open or either-is-fine)"
                 + ("." if not pending else
                    f". {len(pending)} still to go.")]
+        if complete and many:
+            # In a folder run the check and the run come after every module,
+            # so a finished one is kept and passed over, not asked again.
+            console.say(lead[0] + " Kept as they are; to change them, run "
+                        f"qikly --start {score_questions_pasteable(paths.module, paths.cwd)}.")
+            return state, write_files(console, paths, state)
         if complete:
-            options = ["go straight to the check and the run"]
+            options = ["keep these answers and go to the check and the run"]
         elif pending:
             options = [f"continue with question {keys.index(pending[0]) + 1}"]
         else:
@@ -1820,6 +1838,47 @@ def main(arg, cwd, console=None, answers=None, tests=None):
         return STOPPED
 
 
+def _choices_path(cwd):
+    return os.path.join(cwd, "inputs_private", "questions", "start_choices.json")
+
+
+def _remembered_code(console, arg, cwd):
+    """
+    The module or folder chosen last time for the same command. A rerun used
+    to ask again, which threw piped answers out of step with their questions.
+    """
+    if not arg:
+        return None
+    try:
+        with open(_choices_path(cwd), encoding="utf-8") as handle:
+            chosen = json.load(handle).get(arg)
+    except (OSError, ValueError, AttributeError):
+        return None
+    path = os.path.join(cwd, chosen) if chosen else None
+    # The same as the path given needs no note: there was nothing to choose.
+    if (not path or not os.path.exists(path)
+            or os.path.abspath(path) == os.path.abspath(os.path.join(cwd, arg))):
+        return None
+    console.say(f"Testing {chosen}, as you chose last time. To test something "
+                f"else, name it: qikly --start <module or folder>.")
+    return os.path.abspath(path)
+
+
+def _remember_code(arg, cwd, code):
+    if not arg:
+        return
+    path = _choices_path(cwd)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            found = json.load(handle)
+    except (OSError, ValueError):
+        found = {}
+    found[arg] = shown(code, cwd)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(found, handle, indent=1)
+
+
 def _choose_tests(console, code, cwd, session):
     """
     The tests, asked once. The choice is saved, so a rerun says which it is
@@ -1829,15 +1888,10 @@ def _choose_tests(console, code, cwd, session):
     if previous:
         path = os.path.join(cwd, previous)
         if os.path.exists(path):
-            picked = choose(console, [
-                f"the same tests as last time: {previous}",
-                "type a path to different tests",
-            ], lead=[f"Which tests should "
-                     f"{os.path.basename(code) if os.path.isfile(code) else shown(code, cwd) + os.sep} "
-                     f"be scored against?"])
-            if picked == 1:
-                return os.path.abspath(path)
-            return _typed_path(console, cwd, "a test file or folder")
+            # Reused without asking, so a rerun asks only what is still open.
+            console.say(f"Scoring against {previous}, as you chose last time. "
+                        f"To use other tests, add --score-tests <path>.")
+            return os.path.abspath(path)
     return pick_tests(console, code, cwd)
 
 
@@ -1915,7 +1969,8 @@ def _main(arg, cwd, console, answers, given_tests=None):
             console.say("No test files that import it were found.")
             return 2
     else:
-        code = pick_code(console, arg, cwd)
+        code = _remembered_code(console, arg, cwd) or pick_code(console, arg, cwd)
+        _remember_code(arg, cwd, code)
         announce(console, cwd, code)
         session = load_session(cwd, code)
         if given_tests:
@@ -1965,7 +2020,8 @@ def _main(arg, cwd, console, answers, given_tests=None):
             state, data = _from_answers(console, paths, qs, test_sources, root,
                                         answers)
         else:
-            state, data = module_flow(console, paths, qs, test_sources, root)
+            state, data = module_flow(console, paths, qs, test_sources, root,
+                                      many=len(modules) > 1)
         results.append((paths, state, data))
     if answers and file_module and not results:
         console.say(f"{shown(answers, cwd)} is about {file_module}, which this "
@@ -2039,7 +2095,7 @@ def _main(arg, cwd, console, answers, given_tests=None):
                                 os.path.join(cwd, "tests") if is_placeholder(tests, cwd)
                                 else tests if os.path.isdir(tests) else os.path.dirname(tests))
     elif ready:
-        console.say(f"To run it, which needs an API key:  qikly --tasks {' '.join(ready)}")
+        console.say(f"To run it, which needs an API key:  qikly --tasks {','.join(ready)}")
     inputs_outputs(console, cwd, code, tests, report, results, ran)
     if failed:
         return 1
