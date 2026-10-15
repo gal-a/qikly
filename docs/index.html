@@ -809,9 +809,8 @@ footer {
             the spec's acceptance criteria, that the rate may not exceed
             100.</li>
           <li><b>The Coding Agent never saw that acceptance bar and found that
-            bound from a failing test:</b><br>
-            it added <code style="white-space:nowrap">or rate &gt; 100</code>
-            by itself,<br>
+            bound from a failing test:</b> it added
+            <code style="white-space:nowrap">or rate &gt; 100</code> by itself,
             so the 9 of 9 is code eventually passing the bar after applying
             fixes in an automated repair loop.</li>
         </ol>
@@ -842,7 +841,7 @@ footer {
         <div class="step">
           <span class="n">Step 1 (optional)</span>
           <b>If you have a test suite, score it</b>
-          <code class="cmd"><span>qikly</span> <span>--score-code</span> <span>your_module.py</span> <span>--score-tests</span> <span>test_folder/</span><span class="or">or</span><span>qikly</span> <span>--score-code</span> <span>your_project_folder</span> <span>--score-tests</span> <span>test_folder/</span></code>
+          <code class="cmd"><span>qikly</span> <span>--score-code</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--score-code</span> <span>your_project_folder</span></code>
           <p>Plants faults in a copy of your code, one at a time, and names the
             ones your tests did not notice. Nothing of yours is changed, and no
             model is called.</p>
@@ -860,10 +859,9 @@ footer {
           <b>Answer what your tests never check</b>
           <code class="cmd"><span>qikly</span> <span>--start</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--start</span> <span>your_project_folder</span></code>
           <p>If you have tests, it scores them first, as in step 1, so you can
-            start here directly: it finds them, or add
-            <code>--score-tests test_folder/</code>. No tests yet? It asks about
-            the whole module instead. Every question is a numbered menu, and your
-            answers are saved as you go.</p>
+            start here directly. No tests yet? It asks about the whole module
+            instead. Every question is a numbered menu, and your answers are
+            saved as you go.</p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
@@ -909,8 +907,10 @@ qikly fixed this in a copy, not in your file pricing.py.
         </figure>
       </li>
     </ol>
-    <p class="audit-note">It ends by providing a full audit, listing every
-      file it read, saved and wrote, and where.</p>
+    <p class="audit-note">Steps 1 and 2 find your tests themselves: the test
+      files that import your code. To name them instead, add
+      <code>--score-tests test_folder/</code>. It ends by providing a full
+      audit, listing every file it read, saved and wrote, and where.</p>
 
     <p class="eyebrow also">Other ways in</p>
     <ul class="also-list">

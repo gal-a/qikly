@@ -915,7 +915,8 @@ def _parse_args():
     parser.add_argument(
         "--score-code", metavar="PATH", default=None,
         help="Score a suite qikly did not write. The module or package to "
-             "plant faults in, with --score-tests. Absolute, or relative to "
+             "plant faults in. Without --score-tests it finds the test files "
+             "that import it, searched from the project root. Absolute, or relative to "
              "where you run the command, not to the project root. Needs no "
              "task file and no "
              "run: point it at code and tests you already have, and it reports "
@@ -926,8 +927,8 @@ def _parse_args():
         "--score-tests", metavar="PATH", default=None,
         help="The suite to run against those planted faults: a test file or a "
              "directory of them, absolute or relative the same way. Goes with "
-             "--score-code, and neither works alone. With --start, it names "
-             "the tests to score instead of being asked."
+             "--score-code or --start, and names the tests instead of letting "
+             "them be found."
     )
     parser.add_argument(
         "--score-mutants", type=int, default=None,
@@ -1683,10 +1684,25 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
     stamp(project_root_matters=not (code or tests))
 
     if code or tests:
+        if code and not tests:
+            # Found the way --start finds them, so step 1 and step 2 on the
+            # home page read the same: the test files that import the code,
+            # searched from the project root.
+            from qikly.start import auto_tests
+            where = code if os.path.isabs(code) else os.path.join(INVOKED_FROM, code)
+            found = auto_tests(os.path.abspath(where), INVOKED_FROM) \
+                if os.path.exists(where) else None
+            if not found:
+                print("No test files that import it were found (test_*.py or "
+                      "*_test.py, searched from the project root). Name them "
+                      "with --score-tests <file or folder>.", file=sys.stderr)
+                return 2
+            tests = os.path.relpath(found, INVOKED_FROM)
+            print(f"Scoring against {tests}, the test files that import it. "
+                  f"To name others, add --score-tests <file or folder>.")
         if not (code and tests):
-            missing = "--score-tests" if code else "--score-code"
-            print(f"{missing} is needed too: one says what to break, the other "
-                  f"says what should notice.", file=sys.stderr)
+            print("--score-code is needed too: one says what to break, the "
+                  "other says what should notice.", file=sys.stderr)
             return 2
         # Relative to where the user typed the command, not to the project
         # root this process moved to at import. Scaffold already does this;

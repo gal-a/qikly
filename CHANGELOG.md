@@ -7,6 +7,10 @@ packaging tools would read as `1.1`.
 ## Unreleased
 
 ### Changed
+- **`--score-code` finds your tests when you do not name them**, the way
+  `--start` does: the `test_*.py` and `*_test.py` files that import the code,
+  searched from the project root, and it says which it used.
+  `--score-tests` still names them, and is still needed with nothing to break.
 - **`--start` no longer starts a background run.** It was an old alias of
   `--run TASK`, and is now the guided first run above. A task id passed to it
   is told to use `qikly --run TASK`.

@@ -44,13 +44,16 @@ key away from the student: the coding agent never sees the acceptance criteria.*
 
 ```bash
 pip install --upgrade qikly
-qikly --score-code my_module.py --score-tests tests/   # optional: score the suite you have
-qikly --start my_module.py                              # or a folder: qikly --start my_project
+qikly --score-code my_module.py     # optional: score the suite you have
+qikly --start my_module.py          # or a folder: qikly --start my_project
 ```
 
 **Have a test suite? Score it first.** `--score-code` plants faults in a copy
 of your code, one at a time, and names the ones your tests did not notice.
 Free, no key, nothing of yours changed. It takes a module or a whole folder.
+Both commands find your tests themselves: the `test_*.py` and `*_test.py`
+files that import your code, searched from the project root. To name them
+instead, add `--score-tests tests/`.
 
 **Then, or instead, start on your own code, not on ours.** `--start` needs no task file, no
 specification and, until its last step, no API key. Point it at one module or

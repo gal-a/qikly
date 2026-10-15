@@ -117,12 +117,15 @@ The same three steps as [the home page](https://test.qikly.com/?ref=quick-start)
 1. **If you have a test suite, score it.** Optional, free, no key:
 
    ```bash
-   qikly --score-code my_metrics.py --score-tests tests/
-   qikly --score-code my_project --score-tests tests/     # or a whole folder
+   qikly --score-code my_metrics.py
+   qikly --score-code my_project       # or a whole folder
    ```
 
    It plants faults in a copy of your code, one at a time, and names the ones
-   your tests did not notice.
+   your tests did not notice. It finds your tests itself, the `test_*.py`
+   and `*_test.py` files that import your code, searched from the project
+   root; to name them instead, add `--score-tests tests/`. Step 2 finds them
+   the same way.
 
 2. **Answer what your tests never check.** Free until its last step:
 

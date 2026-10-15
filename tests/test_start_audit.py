@@ -576,3 +576,23 @@ def test_take_tests_and_start_together_are_refused(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["qikly", "--start", "p.py", "--take-tests", "X"])
     assert cli.main() == 2
     assert "separate steps" in capsys.readouterr().err
+
+
+def test_score_code_finds_the_tests_when_none_are_named(tmp_path, monkeypatch, capsys):
+    _project(tmp_path)
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    found = {}
+    import qikly.mutation_score as ms
+    monkeypatch.setattr(ms, "from_paths", lambda code, tests: found.update(tests=tests)
+                        or (_ for _ in ()).throw(ValueError("stop here")))
+    cli._do_score_suite(None, None, None, code="pricing.py", tests=None)
+    out = capsys.readouterr()
+    assert found["tests"].endswith(os.path.join("tests", "test_pricing.py"))
+    assert "the test files that import it" in out.out
+
+
+def test_score_code_says_how_to_name_tests_when_none_import_it(tmp_path, monkeypatch, capsys):
+    (tmp_path / "pricing.py").write_text(PRICING)
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    assert cli._do_score_suite(None, None, None, code="pricing.py", tests=None) == 2
+    assert "--score-tests" in capsys.readouterr().err

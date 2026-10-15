@@ -151,10 +151,18 @@ def test_a_directory_of_code_works_as_well_as_one_file(tmp_path):
         done.stdout + done.stderr)
 
 
-def test_one_flag_without_the_other_is_refused_clearly(project):
-    done = _run(["--score-code", "pricing.py"], str(project))
+def test_score_tests_alone_is_refused_and_score_code_alone_finds_them(project):
+    """
+    Since 0.6.0 `--score-code` finds the test files that import the code, as
+    `--start` does, so the two steps on the home page read the same. Tests
+    with nothing to break are still refused.
+    """
+    done = _run(["--score-tests", "test_pricing.py"], str(project))
     assert done.returncode == 2
-    assert "--score-tests" in done.stderr
+    assert "--score-code" in done.stderr
+    done = _run(["--score-code", "pricing.py"], str(project))
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "the test files that import it" in done.stdout
 
 
 def test_a_path_that_does_not_exist_is_reported_not_raised(project):

@@ -442,8 +442,16 @@ def auto_tests(code, cwd=None):
         return None
     if len(found) == 1:
         return found[0]
-    folders = set(os.path.dirname(f) for f in found)
-    return folders.pop() if len(folders) == 1 else os.path.commonpath(found)
+    folders = [os.path.dirname(f) for f in found]
+    if len(set(folders)) == 1:
+        return folders[0]
+    common = os.path.commonpath(found)
+    code_dir = os.path.abspath(code if os.path.isdir(code) else os.path.dirname(code))
+    # A common folder holding the code itself would be scored as both, which
+    # scoring refuses; the folder with most of the tests is the better guess.
+    if code_dir == common or code_dir.startswith(common + os.sep):
+        return max(set(folders), key=folders.count)
+    return common
 
 
 def pick_tests(console, code, cwd):
