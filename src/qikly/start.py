@@ -1191,6 +1191,21 @@ def run(console, cwd, task_ids):
     return process.returncode == 0, lines
 
 
+def _failed_tasks(lines, task_ids, converged):
+    """
+    Which tasks did not finish green. The run exits non-zero if any one task
+    fails, and reading that alone reported every module in a folder as
+    failed; its "Task(s) failed:" line names the ones that did.
+    """
+    if converged:
+        return set()
+    for line in reversed(lines):
+        found = re.match(r"^Task\(s\) failed: (.+)$", line.strip())
+        if found:
+            return {t.strip() for t in found.group(1).split(",")}
+    return set(task_ids)
+
+
 _STAGE = re.compile(r"^\[(\w+)\].*\[stage ([12])/\d\] \[iteration 1\] (\d+)/(\d+) passed"
                     r"(?: \| FAILED: (.+))?$")
 
@@ -1797,6 +1812,18 @@ def _main(arg, cwd, console, answers):
     for paths, state, data in results:
         errors, warnings = validate(console, paths)
         console.say("")
+        criteria = sum(1 for r in state["answers"].values()
+                       if r.get("status") == "answered") + len(state.get("extra", []))
+        if not criteria:
+            # Every question skipped or left open leaves the template's TODO as
+            # the only criterion, which --validate only warns about, and a run
+            # went ahead testing a placeholder.
+            refused = True
+            console.say(f"{paths.task_id} has no answers yet, so there is nothing "
+                        f"to test your code against. Run this command again and "
+                        f"answer at least one question, or add a rule of your own "
+                        f"at the summary.")
+            continue
         if errors:
             refused = True
             console.say(f"{paths.task_id} cannot run yet:")
@@ -1836,9 +1863,11 @@ def _main(arg, cwd, console, answers):
         if offer_run(console, cwd, ready, module_arg):
             converged, lines = run(console, cwd, ready)
             ran, failed = True, not converged
+            not_green = _failed_tasks(lines, ready, converged)
             for paths, state, data in results:
                 if paths.task_id in ready:
-                    report_result(console, paths, state, lines, converged)
+                    report_result(console, paths, state, lines,
+                                  paths.task_id not in not_green)
     elif ready:
         console.say(f"To run it, which needs an API key:  qikly --tasks {' '.join(ready)}")
     inputs_outputs(console, cwd, code, tests, report, results, ran)

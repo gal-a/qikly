@@ -408,3 +408,11 @@ def test_a_boundary_between_two_categories_offers_both(tmp_path):
     assert "return 'A', as p 91 does now" in labels
     chosen = next(o for o in options if o["label"].startswith("return 'A'"))
     assert so.criterion(chosen) == "grade(90) returns 'A'"
+
+
+def test_only_the_tasks_the_run_names_are_reported_as_failed():
+    lines = ["...", "Task(s) failed: COUPONS_VERIFY"]
+    assert start._failed_tasks(lines, ["CART_VERIFY", "COUPONS_VERIFY"], False) == \
+        {"COUPONS_VERIFY"}
+    assert start._failed_tasks(["boom"], ["A", "B"], False) == {"A", "B"}
+    assert start._failed_tasks(lines, ["A"], True) == set()
