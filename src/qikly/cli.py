@@ -2181,9 +2181,10 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
             with open(data, "w", encoding="utf-8", newline="\n") as handle:
                 handle.write(",".join(columns) + "\n")
             steps.append(
-                "add a few example rows to the data file, under the column"
-                + nl_indent + "names already in its first line: one row per call, values"
-                + nl_indent + "separated by commas, such as the values your answers name:"
+                "add a few example rows to the data file. Its first line"
+                + nl_indent + "already names the columns, one per argument, so add rows"
+                + nl_indent + "of values below it, separated by commas, including the"
+                + nl_indent + "values your answers name:"
                 + nl_indent + data)
         else:
             steps.append(
