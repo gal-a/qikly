@@ -1241,7 +1241,7 @@ def disagreements(paths, state, lines):
             # be imported. "No failures" here is not agreement, and saying
             # "your code agrees" was the one false thing this report printed.
             return "unknown", {}, [r["criterion"] for r in state["answers"].values()
-                                   if r["status"] == "answered"] + state.get("extra", [])
+                                   if r["status"] == "answered"] + state.get("extra", []), []
         found = _STAGE.match(line)
         if not found or found.group(1) != paths.task_id:
             continue
@@ -1257,7 +1257,7 @@ def disagreements(paths, state, lines):
     if _batched():
         # Each batch numbers its criteria from 1, so a test's "Criteria: 2"
         # cannot be traced to one answer. Say nothing rather than misattribute.
-        return None, {}, criteria
+        return None, {}, criteria, []
     bodies = {}
     for stage in ("integration", "system"):
         folder = os.path.join(paths.tests, stage)
@@ -1267,13 +1267,18 @@ def disagreements(paths, state, lines):
             source = _read(os.path.join(folder, name))
             for test, doc in _test_docstrings(source):
                 bodies[test] = _test_body(source, test)
-                numbers = re.search(r"#\s*Criteria:\s*([\d,\s]+)", doc)
+                # With or without "#", in the docstring or in a comment after
+                # the body: the generator writes all of these, and a test
+                # tagged "Criteria: 2" in its docstring was linked to nothing,
+                # which turned a real disagreement into "your code agrees".
+                numbers = _CRITERIA_TAG.search(doc + "\n" + _test_text(source, test))
                 for n in re.findall(r"\d+", numbers.group(1) if numbers else ""):
                     tests_for.setdefault(int(n), []).append(test)
     # The tags are the test writer's own, and it sometimes tags a test with
     # answers it does not check: a free-shipping answer was listed against
     # two express-delivery tests. Where an answer names a call, only tests
     # that make that call are kept; if none does, the tags stand, marked.
+    tagged = {n: list(names) for n, names in tests_for.items()}
     unconfirmed = set()
     module_source = _read(paths.module)
     for n, names in tests_for.items():
@@ -1287,10 +1292,30 @@ def disagreements(paths, state, lines):
             tests_for[n] = kept
         else:
             unconfirmed.add(n)
-    disagreed = [criteria[n - 1] for n, names in sorted(tests_for.items())
+    # A disagreement is a failing test tagged with the answer, whether or not
+    # it makes the answer's exact call: the exact-call check only tidies the
+    # list shown, and must never hide a failure.
+    disagreed = [criteria[n - 1] for n, names in sorted(tagged.items())
                  if 0 < n <= len(criteria) and set(names) & failed]
+    every_tagged = set(t for names in tagged.values() for t in names)
+    untagged = sorted(failed - every_tagged)
     tests_for = {n: (names, n in unconfirmed) for n, names in tests_for.items()}
-    return disagreed, tests_for, criteria
+    return disagreed, tests_for, criteria, untagged
+
+
+_CRITERIA_TAG = re.compile(r"(?:#\s*)?Criteria:\s*([\d,\s]+)")
+
+
+def _test_text(source, name):
+    """A test's lines, from its def to the next def, comments included."""
+    lines = source.splitlines()
+    start = next((i for i, l in enumerate(lines)
+                  if re.match(r"\s*(?:async\s+)?def %s\(" % re.escape(name), l)), None)
+    if start is None:
+        return ""
+    end = next((i for i in range(start + 1, len(lines))
+                if re.match(r"\s*(?:async\s+)?def |\s*class |@", lines[i])), len(lines))
+    return "\n".join(lines[start:end])
 
 
 def _test_body(source, name):
@@ -1377,7 +1402,7 @@ def _newest(folder, prefix=""):
 
 
 def report_result(console, paths, state, lines, converged):
-    disagreed, tests_for, criteria = disagreements(paths, state, lines)
+    disagreed, tests_for, criteria, untagged = disagreements(paths, state, lines)
     console.say("")
     name = os.path.basename(paths.module)
     if not converged:
@@ -1398,12 +1423,22 @@ def report_result(console, paths, state, lines, converged):
                     f"the test writer in batches (criteria_per_batch in your "
                     f"settings), so which answer each failure came from cannot "
                     f"be told apart; the step-by-step report shows the failures.")
-    elif disagreed:
-        console.say("Your code disagrees with your only answer:" if len(criteria) == 1
-                    else f"Your code disagrees with {len(disagreed)} of your "
-                         f"{len(criteria)} answers:")
-        for c in disagreed:
-            console.say(f"  - {c}")
+    elif disagreed or untagged:
+        if disagreed:
+            console.say("Your code disagrees with your only answer:" if len(criteria) == 1
+                        else f"Your code disagrees with {len(disagreed)} of your "
+                             f"{len(criteria)} answers:")
+            for c in disagreed:
+                console.say(f"  - {c}")
+        if untagged:
+            # A failure on the user's own code is never hidden because the
+            # test did not say which answer it came from.
+            console.say(("Also failed on your code as it is, without saying which "
+                         "answer it was written from:" if disagreed else
+                         "Some tests failed on your code as it is, without saying "
+                         "which answer they were written from:"))
+            for t in untagged:
+                console.say(f"  - {t}")
         patches = _newest(os.path.join(paths.cwd, "outputs", "logs", "patches",
                                        paths.task_id))
         # A run's patches sit in a folder per run; name the diff itself.

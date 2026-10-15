@@ -249,7 +249,7 @@ def test_failing_parametrized_and_class_tests_are_matched(tmp_path):
         "b": {"status": "answered", "criterion": "c2"}}}
     lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/2 passed | FAILED: "
              f"test_a[100], TestB::test_b"]
-    disagreed, _, _ = start.disagreements(paths, state, lines)
+    disagreed, _, _, _ = start.disagreements(paths, state, lines)
     assert disagreed == ["c1", "c2"]
 
 
@@ -431,3 +431,32 @@ def test_a_default_passed_explicitly_is_the_same_call():
     source = "def shipping_cost(order_total, weight_kg, express=False):\n    return 0.0\n"
     body = "def t():\n    assert shipping_cost(50.0, weight_kg=2, express=False) == 0.0\n"
     assert start._makes_call(body, ("shipping_cost", [50.0, 2], {}), source)
+
+
+def test_a_tag_without_a_hash_still_links_the_test(tmp_path):
+    """'Criteria: 2' in a docstring was linked to nothing, and a real
+    disagreement was reported as agreement."""
+    _project(tmp_path)
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    folder = tmp_path / "outputs" / "tests" / paths.task_id / "integration"
+    folder.mkdir(parents=True)
+    (folder / "test_integration.py").write_text(
+        'def test_upper():\n    """rate 100 raises.\n\n    Criteria: 2\n    """\n'
+        '    try:\n        apply_discount(100, 100)\n        assert False\n'
+        '    except ValueError:\n        pass\n    # Criteria: 2\n')
+    state = {"extra": [], "answers": {
+        "a": {"status": "answered", "criterion": "apply_discount(100, 0) returns 100.0"},
+        "b": {"status": "answered", "criterion": "apply_discount(100, 100) raises ValueError"}}}
+    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_upper"]
+    assert start.disagreements(paths, state, lines)[0] == \
+        ["apply_discount(100, 100) raises ValueError"]
+
+
+def test_a_failure_with_no_tag_is_still_reported(tmp_path):
+    _project(tmp_path)
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
+    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_odd"]
+    s = Script([])
+    start.report_result(s.console, paths, state, lines, True)
+    assert "test_odd" in s.text and "agrees" not in s.text
