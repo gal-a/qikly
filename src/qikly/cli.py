@@ -1106,17 +1106,32 @@ def _parse_args():
     )
     parser.add_argument(
         # `--run` is the spelling that matches the MCP tool this shares its
-        # machinery with, `qikly_run`. `--start` was the original and still
-        # works, so nothing that already scripts it breaks. Note the neighbour:
-        # `--runs`, plural, lists past runs and starts nothing.
-        "--run", "--start", metavar="TASK", dest="run",
+        # machinery with, `qikly_run`. `--start` was its original alias until
+        # 0.6.0, which gave that name to the guided first run; a task id
+        # passed to `--start` is told so. Note the neighbour: `--runs`,
+        # plural, lists past runs and starts nothing.
+        "--run", metavar="TASK", dest="run",
         help="Start a run in the background and print its run id, without waiting. "
              "A run takes minutes to hours, so this is for when the terminal is not "
              "where you want to spend them: start it, close the window, ask later "
              "with --status. This is the same action the MCP server exposes as "
              "`qikly_run`, and it is the mechanism that server is built on. "
-             "(`--start` is the old spelling and still works. `--runs`, plural, is "
-             "a different flag that lists past runs.)"
+             "(`--runs`, plural, is a different flag that lists past runs.)"
+    )
+    parser.add_argument(
+        "--start", nargs="?", const="", default=None, metavar="PATH",
+        help="THE PLACE TO START. A guided first run on your own code: scores "
+             "the tests you already have, asks you a question about each "
+             "thing they never check, saves your answers, and offers to write "
+             "a suite from them. PATH is a module or a folder of modules; "
+             "leave it out to be asked. Every prompt is a numbered menu. "
+             "Nothing of yours is changed."
+    )
+    parser.add_argument(
+        "--answers", metavar="FILE", default=None,
+        help="With --start, answer its questions from a file instead of "
+             "prompting: the open-questions file --start writes when it is not "
+             "run in a terminal, with an answer after each Q number."
     )
     parser.add_argument(
         "--status", metavar="RUN_ID",
@@ -2076,6 +2091,28 @@ def _fill_criteria_from(text, doc, root):
     return fd.merge(text, criteria)
 
 
+def _do_start(path, answers=None):
+    """`qikly --start [PATH]`: see start.py."""
+    import re
+
+    # Until 0.6.0 `--start TASK` started a background run, so a script may
+    # still pass a task id. Doing something different with it silently would
+    # be worse than refusing.
+    if (path and re.match(r"^[A-Z][A-Z0-9_]*$", path)
+            and not os.path.exists(os.path.join(INVOKED_FROM, path))):
+        print(f"--start now starts the guided first run on a module or folder. "
+              f"To start a background run of the task {path}, use:  "
+              f"qikly --run {path}")
+        return 2
+    if answers and not os.path.isabs(answers):
+        answers = os.path.join(INVOKED_FROM, answers)
+    if answers and not os.path.isfile(answers):
+        print(f"There is no answers file at {answers}.")
+        return 2
+    from qikly import start
+    return start.main(path or None, INVOKED_FROM, answers=answers)
+
+
 def _do_scaffold(source, task_id, doc=None, fresh=False):
     """
     Write the task file for an existing Python module.
@@ -2466,6 +2503,9 @@ def main():
         except Exception:
             pass
 
+    if args.start is not None:
+        return _do_start(args.start, args.answers)
+
     # These run before anything else and exit: they exist to make a project
     # runnable, so they must work when nothing is configured yet and must not
     # require a provider key.
@@ -2501,6 +2541,8 @@ def main():
     # and, with a provider key set, started a real one. The default now lives
     # in _do_trends and the flag is guarded like every other.
     for flag, given, wants, example in (
+        ("--answers", args.answers is not None, "--start",
+         "qikly --start my_module.py --answers my_answers.txt"),
         ("--fresh", args.fresh, "--scaffold",
          "qikly --scaffold my_module.py --fresh"),
         ("--from-doc", args.from_doc is not None, "--scaffold",
@@ -2546,6 +2588,7 @@ def main():
         if not given:
             continue
         attached = {
+            "--answers": args.start is not None,
             "--fresh": bool(args.scaffold),
             "--from-doc": bool(args.scaffold),
             "--task-id": bool(args.scaffold or args.criteria_from
