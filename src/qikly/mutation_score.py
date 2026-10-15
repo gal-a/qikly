@@ -902,7 +902,7 @@ def headline(caught, total):
 
 
 def render(result, gaps):
-    """The report, with what the number does not mean stated above it."""
+    """The report, with what the number does not mean stated after the lists."""
     task = result["task"]
     lines = [f"# Suite score for {task}", "",
              f"Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}. "
@@ -934,17 +934,13 @@ def render(result, gaps):
     total = result["total"]
     caught = len(result["caught"])
     if total:
-        lines += [f"**{headline(caught, total)}.**", ""]
-        # The sentence that stops the number being read as a grade. A suite
-        # scored 8 of 8 here while a suite written from the specification found
-        # four real bugs in the same file: mutation scoring asks whether your
-        # tests notice changes to the code that exists, and nothing can plant a
-        # fault in a rule nobody implemented.
-        lines += ["Read that as a floor rather than a verdict. It says how much "
-                  "of the code that **is** here your tests would notice being "
-                  "changed. It cannot say anything about a rule nobody "
-                  "implemented, because there is nothing there to break, so a "
-                  "high score is not a clean bill of health.", ""]
+        # Both counts, each on its own line, so neither has to be worked out
+        # from the other. The console keeps the one-line headline().
+        missed = total - caught
+        lines += [f"**{caught} of {total} planted faults caught "
+                  f"({caught * 100 // total}%).**", "",
+                  f"**{missed} of {total} planted faults missed "
+                  f"({missed * 100 // total}%).**", ""]
 
     if gaps is None:
         lines += ["Reachability could not be checked for this task, so read "
@@ -982,8 +978,8 @@ def render(result, gaps):
                   "passed. Some are equivalent to the original and cannot be "
                   "caught by any test, which is why a miss is a question "
                   "rather than a verdict.", ""]
-        for item in result["missed"]:
-            lines.append(f"- `{item['file']}`: {item['change']} ({item['family']})")
+        for number, item in enumerate(result["missed"], 1):
+            lines.append(f"{number}. `{item['file']}`: {item['change']} ({item['family']})")
         lines.append("")
         if result.get("questions"):
             from qikly import score_questions
@@ -994,9 +990,23 @@ def render(result, gaps):
 
     if result["caught"]:
         lines += ["## What it caught", ""]
-        for item in result["caught"]:
-            lines.append(f"- `{item['file']}`: {item['change']} ({item['family']})")
+        for number, item in enumerate(result["caught"], 1):
+            lines.append(f"{number}. `{item['file']}`: {item['change']} ({item['family']})")
         lines.append("")
+    if total:
+        # The sentence that stops the number being read as a grade. A suite
+        # scored 8 of 8 here while a suite written from the specification found
+        # four real bugs in the same file: mutation scoring asks whether your
+        # tests notice changes to the code that exists, and nothing can plant a
+        # fault in a rule nobody implemented. At the end, after the lists it
+        # qualifies, so the counts are the first thing read.
+        lines += ["## What the score cannot tell you", "",
+                  "The score says how much of the code that **is** here your "
+                  "tests would notice being changed. It cannot say anything "
+                  "about a rule nobody implemented, because there is nothing "
+                  "there to break, so a high score is not a clean bill of "
+                  "health (read the result as a floor rather than a verdict).",
+                  ""]
     lines += _invite_lines(result)
     return "\n".join(lines) + "\n"
 

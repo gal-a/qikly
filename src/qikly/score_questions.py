@@ -456,7 +456,8 @@ def report_lines(questions, misses, advice_lines):
              f"see; skip a question with no sensible answer.", ""]
     lines += [line for line in advice_lines] + [""]
     last = None
-    for q in questions:
+    # Numbered across the groups, so "question 3" names one question.
+    for number, q in enumerate(questions, 1):
         place = (q["file"], q["line"])
         if place != last:
             last = place
@@ -468,7 +469,7 @@ def report_lines(questions, misses, advice_lines):
             lines += [f"### {where}", ""]
             if q["code"]:
                 lines += [_inline(q["code"]), ""]
-        lines += [f"- {q['question']}", ""]
+        lines += [f"{number}. {q['question']}", ""]
     return lines
 
 

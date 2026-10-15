@@ -11,6 +11,10 @@ packaging tools would read as `1.1`.
   planted faults missed (41%), 7 caught" rather than "7 of 12 caught". The
   misses are the finding, and a caught count read as a pass mark. Scripts
   that parsed the old line need the new form.
+- **The saved report gives both counts on their own lines**, caught then
+  missed, and numbers the misses, the questions and the catches. The note
+  that a score is a floor rather than a verdict moved to the end, after the
+  lists it qualifies.
 
 ### Added
 - **`--score-code` asks a question about every fault your tests missed, and
