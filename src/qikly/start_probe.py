@@ -35,7 +35,7 @@ _CHILD = r'''
 import ast, contextlib, importlib.util, io, json, os, sys
 spec_in = json.loads(sys.stdin.read())
 path, root, dotted = spec_in["path"], spec_in["root"], spec_in["dotted"]
-for entry in (os.path.dirname(path), root):
+for entry in (os.path.dirname(path), root, spec_in.get("base")):
     if entry and entry not in sys.path:
         sys.path.insert(0, entry)
 
@@ -79,8 +79,7 @@ print("\n" + json.dumps(reply))
 '''
 
 
-def dotted_name(path, root):
-    """`shop.pricing` for root/shop/pricing.py when shop is a package, else `pricing`."""
+def _package_walk(path, root):
     path, root = os.path.abspath(path), os.path.abspath(root)
     parts = [os.path.splitext(os.path.basename(path))[0]]
     folder = os.path.dirname(path)
@@ -88,7 +87,21 @@ def dotted_name(path, root):
            and os.path.isfile(os.path.join(folder, "__init__.py"))):
         parts.insert(0, os.path.basename(folder))
         folder = os.path.dirname(folder)
-    return ".".join(parts)
+    return parts, folder
+
+
+def dotted_name(path, root):
+    """`shop.pricing` for root/shop/pricing.py when shop is a package, else `pricing`."""
+    return ".".join(_package_walk(path, root)[0])
+
+
+def import_base(path, root):
+    """
+    The folder the top-level package sits in, which has to be importable: in
+    a `src/` layout that is `src/`, and without it a relative import such as
+    `from .util import clamp` failed, so no question got concrete options.
+    """
+    return _package_walk(path, root)[1]
 
 
 def sendable(value):
@@ -112,7 +125,8 @@ def run_calls(path, root, calls, mutant=None):
         return None
     payload = json.dumps({
         "path": os.path.abspath(path), "root": os.path.abspath(root),
-        "dotted": dotted_name(path, root), "mutant": mutant,
+        "dotted": dotted_name(path, root), "base": import_base(path, root),
+        "mutant": mutant,
         "calls": [[f, [repr(a) for a in args],
                    {k: repr(v) for k, v in kwargs.items()}]
                   for f, args, kwargs in calls]})

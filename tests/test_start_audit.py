@@ -98,7 +98,10 @@ def test_a_boundary_on_a_named_constant_with_a_defaulted_argument_is_concrete(tm
          "kind": "> became >="}
     prompt, options = so.menu(q, source, ["cost(20, 2)\n"], str(tmp_path))
     assert prompt and "THRESHOLD (50.0)" in prompt and "cost(50.0, 2)" in prompt
-    assert any("as total 50.01 does now" in o["label"] for o in options)
+    # Both sides return a value here, so one option shows both neighbours.
+    assert any("total 49.99 returns 5.0 now" in o["label"]
+               and "total 50.01 returns 0.0" in o["label"] for o in options)
+    assert sum(o["kind"] == so.BEHAVIOUR for o in options) == 1
 
 
 def test_a_line_outside_any_function_is_labelled_as_such():
@@ -336,3 +339,27 @@ def test_start_refuses_flags_it_would_ignore(monkeypatch, capsys):
 def test_the_rule_example_comes_from_the_module():
     q = [{"function": "apply_discount"}]
     assert start._rule_example(q, [TESTS]) == "apply_discount(100, 10) returns ..."
+
+
+# ------------------------------------------------- the eight-project matrix --
+
+def test_calls_through_an_import_alias_are_found_for_the_right_module():
+    """`from lib.a.util import scale as a_scale` hid every call from the menus."""
+    tests = ("from lib.a.util import scale as a_scale\n"
+             "from lib.b.util import scale as b_scale\n\n"
+             "def test_a():\n    assert a_scale(2) == 4\n\n"
+             "def test_b():\n    assert b_scale(7) == 21\n")
+    assert so.literal_calls([tests], "scale", "lib.a.util") == [([2], {})]
+    assert so.literal_calls([tests], "scale", "lib.b.util") == [([7], {})]
+
+
+def test_a_src_layout_package_can_be_probed(tmp_path):
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='acme'\n")
+    pkg = tmp_path / "src" / "acme"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("")
+    (pkg / "util.py").write_text("def clamp(v, lo, hi):\n    return max(lo, min(hi, v))\n")
+    (pkg / "scoring.py").write_text("from .util import clamp\n\ndef grade(p):\n"
+                                    "    return clamp(p, 0, 100)\n")
+    assert start_probe.run_calls(str(pkg / "scoring.py"), str(tmp_path),
+                                 [("grade", [150], {})]) == [{"returns": "100"}]

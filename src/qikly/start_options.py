@@ -32,11 +32,35 @@ from qikly import start_probe
 BEHAVIOUR, EITHER, ASK, SKIP, OWN = "behaviour", "either", "ask", "skip", "own"
 
 
-def literal_calls(test_sources, function):
+def _names_for(tree, function, module):
+    """
+    The names a test file calls `function` by. `from lib.a.util import scale
+    as a_scale` calls it `a_scale`, which matching on the bare name missed,
+    and two modules' `scale` must not be mixed up: when the file imports the
+    function by name, only imports from `module` (its dotted name) count.
+    """
+    imported, matching = False, set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                if alias.name == function:
+                    imported = True
+                    source = node.module or ""
+                    if (module is None or source == module
+                            or module.endswith("." + source)
+                            or source.endswith("." + module)):
+                        matching.add(alias.asname or alias.name)
+    if not imported:
+        return {function}
+    return matching
+
+
+def literal_calls(test_sources, function, module=None):
     """
     The calls of `function` in the tests whose arguments are all literals, as
     (args, kwargs), in the order they appear. These are the inputs the user
-    already chose, so building on them never invents a scenario.
+    already chose, so building on them never invents a scenario. `module`,
+    the function's dotted module name, keeps same-named functions apart.
     """
     found = []
     for source in test_sources:
@@ -44,13 +68,18 @@ def literal_calls(test_sources, function):
             tree = ast.parse(source)
         except SyntaxError:
             continue
+        names = _names_for(tree, function, module)
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
             callee = node.func
-            name = (callee.id if isinstance(callee, ast.Name)
-                    else callee.attr if isinstance(callee, ast.Attribute) else None)
-            if name != function:
+            if isinstance(callee, ast.Name):
+                ok = callee.id in names
+            elif isinstance(callee, ast.Attribute):
+                ok = callee.attr == function
+            else:
+                ok = False
+            if not ok:
                 continue
             try:
                 args = [ast.literal_eval(a) for a in node.args]
@@ -187,9 +216,9 @@ def literal_defaults(source, function):
     return {}
 
 
-def _usable_calls(test_sources, function, positional, keyword_only):
+def _usable_calls(test_sources, function, positional, keyword_only, module=None):
     known = set(positional) | set(keyword_only)
-    return [(a, k) for a, k in literal_calls(test_sources, function)
+    return [(a, k) for a, k in literal_calls(test_sources, function, module)
             if len(a) <= len(positional) and set(k) <= known]
 
 
@@ -209,7 +238,8 @@ def boundary_options(question, source, test_sources, root):
     positional, keyword_only = found
     if variable not in positional and variable not in keyword_only:
         return None
-    bases = _usable_calls(test_sources, function, positional, keyword_only)
+    bases = _usable_calls(test_sources, function, positional, keyword_only,
+                          start_probe.dotted_name(question["path"], root))
     if not bases:
         return None
     at, below, above = near
@@ -240,6 +270,16 @@ def boundary_options(question, source, test_sources, root):
                            "kwargs": built[0][1], "function": function})
     prompt = (f"Your tests never try {variable} at exactly {shown_edge}. "
               f"What should {call} do?")
+    if all("raises" not in o for o in outcomes):
+        # Both sides return a value, so "return a value, as 9 does" and
+        # "return a value, as 11 does" were two options that both led to the
+        # same question. One option, with both neighbours shown, is clearer.
+        context = (f"{variable} {below!r} returns {outcomes[0]['returns']} now, "
+                   f"and {variable} {above!r} returns {outcomes[1]['returns']}")
+        return prompt, [{"kind": BEHAVIOUR, "call": call, "args": built[0][0],
+                         "kwargs": built[0][1], "function": function,
+                         "pins": {"returns": None, "like": outcomes[0]["returns"]},
+                         "label": f"type the value it should return ({context})"}]
     return prompt, _shuffled(behaviours, question["question"])
 
 
@@ -282,7 +322,8 @@ def difference_options(question, source, test_sources, root, mutant):
     if not found:
         return None
     positional, keyword_only = found
-    bases = _usable_calls(test_sources, function, positional, keyword_only)
+    bases = _usable_calls(test_sources, function, positional, keyword_only,
+                          start_probe.dotted_name(question["path"], root))
     if not bases:
         return None
     candidates = []
