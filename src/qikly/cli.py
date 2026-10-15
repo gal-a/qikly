@@ -2077,7 +2077,8 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
     from qikly.scaffold import build_task
 
     root = INVOKED_FROM
-    source = source if os.path.isabs(source) else os.path.join(root, source)
+    source = os.path.normpath(
+        source if os.path.isabs(source) else os.path.join(root, source))
     if os.path.isdir(source):
         # `--score-code` takes a folder, so `--scaffold` on the same folder is
         # the natural next command, and "no such file" read like a typo.
