@@ -845,6 +845,10 @@ footer {
           <p>Plants faults in a copy of your code, one at a time, and names the
             ones your tests did not notice. Nothing of yours is changed, and no
             model is called.</p>
+          <p>Your tests can be anywhere in your project, such as a
+            <code>tests/</code> folder or beside your code, in files named
+            <code>test_*.py</code> that import your module. qikly finds them;
+            to name them instead, add <code>--score-tests test_folder/</code>.</p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
@@ -907,10 +911,9 @@ qikly fixed this in a copy, not in your file pricing.py.
         </figure>
       </li>
     </ol>
-    <p class="audit-note">Steps 1 and 2 find your tests themselves: the test
-      files that import your code. To name them instead, add
-      <code>--score-tests test_folder/</code>. It ends by providing a full
-      audit, listing every file it read, saved and wrote, and where.</p>
+    <p class="audit-note">Step 2 finds your tests the same way as step 1. It
+      ends by providing a full audit, listing every file it read, saved and
+      wrote, and where.</p>
 
     <p class="eyebrow also">Other ways in</p>
     <ul class="also-list">
