@@ -433,7 +433,7 @@ def test_the_project_root_line_is_not_shown_where_it_would_be_false(monkeypatch)
 def test_a_missing_tests_folder_names_the_test_file_beside_the_code(project):
     """
     A first run had test_pricing.py beside pricing.py and typed
-    --score-tests tests/, as the docs show. "no suite at ...\tests" said
+    --score-tests tests/, as the docs show. "no suite at ...\\tests" said
     nothing about the file that was there; the message now names it.
     """
     done = _run(["--score-code", "pricing.py", "--score-tests", "tests/"],
