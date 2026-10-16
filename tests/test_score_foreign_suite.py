@@ -159,7 +159,7 @@ def test_score_tests_alone_is_refused_and_score_code_alone_finds_them(project):
     """
     done = _run(["--score-tests", "test_pricing.py"], str(project))
     assert done.returncode == 2
-    assert "--score-code" in done.stderr
+    assert "--score " in done.stderr
     done = _run(["--score-code", "pricing.py"], str(project))
     assert done.returncode == 0, done.stdout + done.stderr
     assert "the test files that import it" in done.stdout

@@ -101,7 +101,7 @@ criteria and keeps those criteria from the agent that writes the code, so that
 a passing suite means something.
 
 **The command to reach for first**, because it costs nothing and runs on code
-that already exists: `qikly --score-code PATH --score-tests PATH`. It plants
+that already exists: `qikly --score PATH --score-tests PATH`. It plants
 one fault at a time and reports which ones the tests did not notice. No API
 key, no model call, and nothing in the repository is modified.
 """ % SKILL_NAME

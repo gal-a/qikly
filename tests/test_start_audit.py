@@ -493,7 +493,7 @@ def test_decimal_neighbours_are_typed_not_pinned(tmp_path, monkeypatch):
 def test_take_tests_and_start_together_are_refused(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["qikly", "--start", "p.py", "--take-tests", "X"])
     assert cli.main() == 2
-    assert "separate steps" in capsys.readouterr().err
+    assert "separate step" in capsys.readouterr().err
 
 
 def test_score_code_finds_the_tests_when_none_are_named(tmp_path, monkeypatch, capsys):

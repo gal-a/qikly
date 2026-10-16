@@ -913,8 +913,10 @@ def _parse_args():
              "the reachability warning the report prints above it."
     )
     parser.add_argument(
-        "--score-code", metavar="PATH", default=None,
-        help="Score a suite qikly did not write. The module or package to "
+        "--score", "--score-code", dest="score_code", metavar="PATH", default=None,
+        help="Score your tests: the module or package to plant faults in, one "
+             "at a time, to see which ones your tests notice. (--score-code is "
+             "the older name.) "
              "plant faults in. Without --score-tests it finds the test files "
              "that import it, searched from the project root. Absolute, or relative to "
              "where you run the command, not to the project root. Needs no "
@@ -927,7 +929,7 @@ def _parse_args():
         "--score-tests", metavar="PATH", default=None,
         help="The suite to run against those planted faults: a test file or a "
              "directory of them, absolute or relative the same way. Goes with "
-             "--score-code or --start, and names the tests instead of letting "
+             "--score, --questions or --answers, and names the tests instead of letting "
              "them be found."
     )
     parser.add_argument(
@@ -957,7 +959,7 @@ def _parse_args():
              "signatures of its public functions, and a guessed entrypoint. Leaves "
              "requirements and acceptance_criteria for you, because criteria derived "
              "from an implementation can only describe what it already does. If "
-             "--score-code was run on the same file from this directory, its "
+             "--score was run on the same file from this directory, its "
              "questions are written into acceptance_criteria for you to answer "
              "(not with --fresh or --from-doc)."
     )
@@ -1127,11 +1129,13 @@ def _parse_args():
              "(`--runs`, plural, is a different flag that lists past runs.)"
     )
     parser.add_argument(
-        "--start", nargs="?", const="", default=None, metavar="PATH",
-        help="THE PLACE TO START. Scores the tests you already have and writes "
-             "one file of questions about what they never check, to answer in "
-             "your editor; the command to run next is at its top. PATH is a "
-             "module or a folder of modules. Nothing of yours is changed."
+        "--questions", "--start", dest="start", nargs="?", const="", default=None,
+        metavar="PATH",
+        help="Step 2. Scores the tests you already have and writes one file of "
+             "questions about what they never check, to answer in your editor. "
+             "PATH is a module or a folder of modules. Then run "
+             "qikly --answers PATH. Nothing of yours is changed. (--start is "
+             "the older name.)"
     )
     parser.add_argument(
         "--take-tests", metavar="TASK", default=None,
@@ -1141,11 +1145,12 @@ def _parse_args():
              "compare with its answer. Free."
     )
     parser.add_argument(
-        "--answers", metavar="FILE", default=None,
-        help="With --start, read your answers from the questions file --start "
-             "wrote, check the task, and in a terminal offer the run, where "
-             "your code disagrees with you, and the copy of the new tests "
-             "into yours."
+        "--answers", nargs="?", const="", metavar="PATH", default=None,
+        help="Step 3. Reads your answers from the file --questions wrote for "
+             "PATH (or give the file itself), checks the task, and in a "
+             "terminal offers the run, which needs an API key, shows where your "
+             "code disagrees with you, and offers to copy the new tests into "
+             "yours."
     )
     parser.add_argument(
         "--status", metavar="RUN_ID",
@@ -1704,7 +1709,7 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
                 # named a --score-tests the user never typed.
                 print(f"The tests that import it sit inside {shown_path(found, INVOKED_FROM)}, "
                       f"the folder being scored. Score one module instead, such "
-                      f"as  qikly --score-code <module>.py, or name the tests "
+                      f"as  qikly --score <module>.py, or name the tests "
                       f"with --score-tests <file>.", file=sys.stderr)
                 return 2
             # Absolute, not relative: a project on another drive than the
@@ -1713,7 +1718,7 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
             print(f"Scoring against {shown_path(found, INVOKED_FROM)}, the test files that "
                   f"import it. To name others, add --score-tests <file or folder>.")
         if not (code and tests):
-            print("--score-code is needed too: one says what to break, the "
+            print("--score is needed too: one says what to break, the "
                   "other says what should notice.", file=sys.stderr)
             return 2
         # Relative to where the user typed the command, not to the project
@@ -2133,8 +2138,40 @@ def _fill_criteria_from(text, doc, root):
     return fd.merge(text, criteria)
 
 
+def _do_answers(path, tests=None):
+    """`qikly --answers PATH`: the answers file for PATH, or PATH itself."""
+    from qikly import start
+    if not path:
+        print("Name the code, such as  qikly --answers pricing.py", file=sys.stderr)
+        return 2
+    where = path if os.path.isabs(path) else os.path.join(INVOKED_FROM, path)
+    if not os.path.exists(where):
+        print(f"There is no file or folder at {where}.", file=sys.stderr)
+        return 2
+    if os.path.isfile(where) and not where.endswith(".py"):
+        # The file itself: its module: line says which code it is about.
+        module = start.parse_answers(where)[3]
+        if not module:
+            print(f"{path} has no module: line, so qikly cannot tell which code "
+                  f"it answers for.", file=sys.stderr)
+            return 2
+        return start.main(module, INVOKED_FROM, answers=where, tests=tests)
+    found = start.answers_file_for(where, INVOKED_FROM)
+    if isinstance(found, list):
+        if not found:
+            print(f"There are no answers for {path} yet. Write the questions first:  "
+                  f"qikly --questions {path}", file=sys.stderr)
+        else:
+            print(f"{path} has answers for several modules; name one file:", file=sys.stderr)
+            for f in found:
+                print(f"  qikly --answers {start.score_questions_pasteable(f, INVOKED_FROM)}",
+                      file=sys.stderr)
+        return 2
+    return start.main(path, INVOKED_FROM, answers=found, tests=tests)
+
+
 def _do_start(path, answers=None, tests=None):
-    """`qikly --start [PATH]`: see start.py."""
+    """`qikly --questions [PATH]`: see start.py."""
     import re
 
     # Until 0.6.0 `--start TASK` started a background run, so a script may
@@ -2142,9 +2179,8 @@ def _do_start(path, answers=None, tests=None):
     # be worse than refusing.
     if (path and re.match(r"^[A-Z][A-Z0-9_]*$", path)
             and not os.path.exists(os.path.join(INVOKED_FROM, path))):
-        print(f"--start now starts the guided first run on a module or folder. "
-              f"To start a background run of the task {path}, use:  "
-              f"qikly --run {path}")
+        print(f"--questions (once --start) takes a module or folder. To start a "
+              f"background run of the task {path}, use:  qikly --run {path}")
         return 2
     if answers and not os.path.isabs(answers):
         answers = os.path.join(INVOKED_FROM, answers)
@@ -2276,7 +2312,7 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
         print("  criteria and says so if the two say the same thing.")
     elif asked:
         print(f"  Its acceptance_criteria hold the {asked} question"
-              f"{'' if asked == 1 else 's'} your --score-code run of {asked_on}")
+              f"{'' if asked == 1 else 's'} your --score run of {asked_on}")
         print("  raised, each above a TODO. Replace each TODO with your answer,")
         print("  and delete any question you skip. Answer from what the code is")
         print("  meant to do, not from what it does now: that is what is in question.")
@@ -2546,15 +2582,14 @@ def main():
             pass
 
     if args.take_tests:
-        if args.start is not None:
-            print("--take-tests and --start are separate steps: run one, then the "
-                  "other.", file=sys.stderr)
+        if args.start is not None or args.answers is not None:
+            print("--take-tests is a separate step: run it on its own.", file=sys.stderr)
             return 2
         from qikly import take_tests
         return take_tests.main(args.take_tests, INVOKED_FROM)
 
-    if args.start is not None:
-        # --start returns before the misattached-flag guard below, so it does
+    if args.start is not None or args.answers is not None:
+        # --questions returns before the misattached-flag guard below, so it does
         # its own: `--start pricing.py --task-id X --fresh` ran as PRICING and
         # silently dropped both.
         ignored = [flag for flag, given in (
@@ -2563,18 +2598,21 @@ def main():
             ("--fresh", bool(args.fresh)),
             ("--from-doc", args.from_doc is not None),
             ("--scaffold", bool(args.scaffold)),
-            ("--score-code", bool(args.score_code)),
+            ("--score", bool(args.score_code)),
             ("--score-suite", bool(args.score_suite)),
             ("--score-mutants", args.score_mutants is not None),
             ("--score-seed", args.score_seed is not None),
         ) if given]
         if ignored:
-            print(f"--start takes a path and, optionally, --score-tests and "
-                  f"--answers; it would "
-                  f"ignore {', '.join(ignored)}. Run it without "
+            print(f"--questions and --answers take a path and, optionally, "
+                  f"--score-tests; they would "
+                  f"ignore {', '.join(ignored)}. Run without "
                   f"{'that' if len(ignored) == 1 else 'those'}.", file=sys.stderr)
             return 2
-        return _do_start(args.start, args.answers, args.score_tests)
+        if args.start is None:
+            return _do_answers(args.answers, args.score_tests)
+        # The older form, --start PATH --answers FILE, still works.
+        return _do_start(args.start, args.answers or None, args.score_tests)
 
     # These run before anything else and exit: they exist to make a project
     # runnable, so they must work when nothing is configured yet and must not
@@ -2611,8 +2649,6 @@ def main():
     # and, with a provider key set, started a real one. The default now lives
     # in _do_trends and the flag is guarded like every other.
     for flag, given, wants, example in (
-        ("--answers", args.answers is not None, "--start",
-         "qikly --start my_module.py --answers my_answers.txt"),
         ("--fresh", args.fresh, "--scaffold",
          "qikly --scaffold my_module.py --fresh"),
         ("--from-doc", args.from_doc is not None, "--scaffold",
@@ -2630,10 +2666,10 @@ def main():
         # over every bundled task. An audit reproduced it by accident and spent
         # money doing so.
         ("--score-mutants", args.score_mutants is not None,
-         "--score-suite, or --score-code with --score-tests",
+         "--score-suite, or --score with --score-tests",
          "qikly --score-suite --tasks CALC_TAX --score-mutants 8"),
         ("--score-seed", args.score_seed is not None,
-         "--score-suite, or --score-code with --score-tests",
+         "--score-suite, or --score with --score-tests",
          "qikly --score-suite --tasks CALC_TAX --score-seed 3"),
         # Found by the audit of the fix above, which is the point of auditing
         # a fix: the same unguarded fallthrough, in the sibling flag nobody
@@ -2658,7 +2694,6 @@ def main():
         if not given:
             continue
         attached = {
-            "--answers": args.start is not None,
             "--fresh": bool(args.scaffold),
             "--from-doc": bool(args.scaffold),
             "--task-id": bool(args.scaffold or args.criteria_from

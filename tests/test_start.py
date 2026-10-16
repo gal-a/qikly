@@ -278,7 +278,7 @@ def test_the_answers_file_makes_a_task_ready_to_run(tmp_path, monkeypatch):
     assert start.main("pricing.py", str(tmp_path), console=s.console,
                       answers=str(written)) == 0, s.text[-2000:]
     assert "Checked PRICING_VERIFY: ready to run." in s.text
-    assert "qikly --start pricing.py --answers" in s.text
+    assert "qikly --answers pricing.py" in s.text
     task = yaml.safe_load((tmp_path / "inputs_private" / "config" / "tasks" /
                            "PRICING_VERIFY.yaml").read_text(encoding="utf-8"))
     assert "apply_discount(80, 25) returns 60.0" in task["acceptance_criteria"]
@@ -305,10 +305,10 @@ def test_an_old_style_start_with_a_task_id_points_at_run(capsys, monkeypatch, tm
     assert "qikly --run CALC_TAX" in capsys.readouterr().out
 
 
-def test_answers_without_start_is_refused(monkeypatch, capsys):
+def test_answers_for_a_missing_file_says_so(monkeypatch, capsys):
     monkeypatch.setattr(sys, "argv", ["qikly", "--answers", "x.txt"])
     assert cli.main() == 2
-    assert "--answers goes with --start" in capsys.readouterr().err
+    assert "There is no file or folder at" in capsys.readouterr().err
 
 
 def test_the_interactive_variable_forces_prompts_for_a_terminal_python_cannot_see(monkeypatch):
@@ -318,3 +318,15 @@ def test_the_interactive_variable_forces_prompts_for_a_terminal_python_cannot_se
     monkeypatch.setenv("QIKLY_INTERACTIVE", "")
     monkeypatch.setattr(sys, "stdin", None)
     assert start.is_terminal() is False
+
+
+def test_questions_then_answers_by_the_module_name(tmp_path, monkeypatch, capsys):
+    """The two new names: --answers finds the file --questions wrote."""
+    _project(tmp_path)
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["qikly", "--questions", "pricing.py"])
+    assert cli.main() == start.NEEDS_ANSWERS
+    assert "qikly --answers pricing.py" in capsys.readouterr().out
+    assert start.answers_file_for(str(tmp_path / "pricing.py"), str(tmp_path)) == \
+        str(tmp_path / "inputs_private" / "questions" / "PRICING_open_questions.txt")

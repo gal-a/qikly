@@ -273,7 +273,7 @@ def from_paths(code, tests):
         # so all of it was set aside as suite. Saying "no Python files" would
         # send the reader looking for a missing file instead.
         raise ValueError(
-            f"--score-code and --score-tests are the same directory, so "
+            f"--score and --score-tests are the same directory, so "
             f"every file in it counts as a test and there is nothing left to "
             f"mutate.\n  {code}\nPoint --score-tests at the test files "
             f"themselves, for example {os.path.join(code, 'test_*.py')}, or "
@@ -352,7 +352,7 @@ def _workspace(target, tmp, code_root=CODE_ROOT):
                 raise ValueError(
                     f"a directory link under {target.root} points back at "
                     f"something already inside it, so there is no finite tree "
-                    f"to copy:\n  {base}\nPoint --score-code and --score-tests "
+                    f"to copy:\n  {base}\nPoint --score and --score-tests "
                     f"at directories that do not contain that link.")
             seen.add(real)
             dirs[:] = [d for d in dirs if d not in _SKIP]
@@ -361,7 +361,7 @@ def _workspace(target, tmp, code_root=CODE_ROOT):
                 raise ValueError(
                     f"{target.root} holds more than {_MAX_FILES} files, which "
                     f"is almost certainly wider than you meant. Point "
-                    f"--score-code and --score-tests at directories closer to "
+                    f"--score and --score-tests at directories closer to "
                     f"the code.")
         # Dereferencing, deliberately, now that the count above follows links
         # too. Recreating the links instead was tried and is worse: a link with

@@ -415,7 +415,7 @@ def yaml_block(questions, written=None):
     count = len(questions)
     lines = ["acceptance_criteria:"]
     lines += _comment(
-        f"{count} question{'' if count == 1 else 's'} from qikly --score-code"
+        f"{count} question{'' if count == 1 else 's'} from qikly --score"
         f"{when}, about behaviour your tests do not check. Replace each TODO "
         f"with your answer, naming a value someone could check, and delete any "
         f"you skip. Answer from what the code is meant to do, not from what "
@@ -501,8 +501,8 @@ def advice(questions, invoked_from=None):
     # one at a time; `--scaffold` stays as the way to answer them by hand.
     if len(paths) > 1:
         folder = os.path.commonpath([os.path.dirname(p) for p in paths])
-        return ["Next: `qikly --start %s` asks these one at a time, one task "
-                "per module, and saves your answers. They are about %d files: "
+        return ["Next: `qikly --questions %s` writes these to one file per "
+                "module, to answer at your own pace. They are about %d files: "
                 "%s. By hand instead: `qikly --scaffold FILE` writes one file's "
                 "questions into a task file." % (
                     shown(folder), len(paths), ", ".join(shown(p) for p in paths))]
@@ -515,10 +515,10 @@ def advice(questions, invoked_from=None):
                 "%s, each above your answer." % (os.path.basename(module), MARK)]
     existing = os.path.join(here, "inputs_private", "config", "tasks", f"{task}.yaml")
     if os.path.isfile(existing):
-        return ["Next: `qikly --start %s` asks these one at a time and saves "
-                "your answers. %s already exists, so `--scaffold` would not "
+        return ["Next: `qikly --questions %s` writes these to a file to answer "
+                "at your own pace. %s already exists, so `--scaffold` would not "
                 "rewrite it." % (shown(module), task)]
-    return ["Next: `qikly --start %s` asks these one at a time and saves your "
-            "answers. By hand instead: `qikly --scaffold %s` writes them into "
+    return ["Next: `qikly --questions %s` writes these to a file to answer at "
+            "your own pace. By hand instead: `qikly --scaffold %s` writes them into "
             "the task file, each above a TODO, and `qikly --validate --tasks %s` "
             "says how many are still unanswered." % (shown(module), shown(module), task)]

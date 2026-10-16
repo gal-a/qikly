@@ -235,7 +235,7 @@ def take(cwd, task_id, test_dir, say=print):
     source_root = os.path.join(cwd, "outputs", "tests", task_id)
     if not os.path.isdir(source_root):
         return None, (f"{task_id} has no generated tests yet: run it first, "
-                      f"with  qikly --start  or  qikly --tasks {task_id}")
+                      f"with  qikly --answers <module>  or  qikly --tasks {task_id}")
     home = os.path.join(test_dir, FOLDER)
     dest_root = os.path.join(home, task_id.lower())
     written, skipped, refused, extras = [], [], [], []

@@ -368,7 +368,7 @@ def test_score_then_scaffold_puts_the_questions_where_criteria_live(scored):
 
     made = _run(["--scaffold", "pricing.py"], str(project))
     assert made.returncode == 0, made.stdout + made.stderr
-    assert "questions your --score-code run" in made.stdout
+    assert "questions your --score run" in made.stdout
     task_file = project / "inputs_private" / "config" / "tasks" / "PRICING_VERIFY.yaml"
     text = task_file.read_text(encoding="utf-8")
     criteria = yaml.safe_load(text)["acceptance_criteria"]
