@@ -81,7 +81,7 @@ and runs in one converge exactly as before. The guard only speaks up.
 If it was not what you wanted, the fix is usually one line: seed the package
 that holds `utils.py` instead of the single module.
 
-## `--score-code` has no such limit
+## `--score` has no such limit
 
 It neither writes code nor calls a model. Point it at a package and it plants
 faults throughout it, helpers included, and tells you which ones your suite

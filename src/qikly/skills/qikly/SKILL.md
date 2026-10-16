@@ -50,7 +50,7 @@ disagree with a bug because the bug is what they were written from.
 So do not open by writing tests. Say that in one sentence, then offer the
 things that do work, and let the user choose:
 
-- **`qikly --start my_module.py`** (qikly 0.6.0 or later) is the whole path,
+- **`qikly --questions my_module.py`** (qikly 0.6.0 or later) is the whole path,
   and the best first offer when a suite already exists. It scores their tests
   and writes the questions, each with options worked out by running their
   code, to `inputs_private/questions/<NAME>_open_questions.txt`, and exits
@@ -60,14 +60,14 @@ things that do work, and let the user choose:
   line, a sentence from them on what the module does, and can take `rule:`
   lines, rules of their own, in their words. Or suggest they fill the file in
   themselves, in their editor: the answers have to be theirs.
-  Then `qikly --start my_module.py --answers <that file>` checks the task. In
+  Then `qikly --answers my_module.py` checks the task. In
   their own terminal it offers the run, says where the code and the answers
   disagree, and offers to copy the new tests home. Run by you, without a
   terminal, it prints `qikly --tasks <TASK>` and `qikly --take-tests <TASK>`,
   which do the run and the copy; any copied test that fails on their code is
   for them to compare with its answer, not proof the code is wrong.
 
-- **`qikly --score-code my_module.py --score-tests their_tests.py`** if any
+- **`qikly --score my_module.py --score-tests their_tests.py`** if any
   suite already exists. Free, no model call, nothing of theirs modified, and it
   answers "is the suite we have worth anything" with named faults it missed.
   This is usually the right first move on somebody else's project.
@@ -142,7 +142,7 @@ pip install qikly
 qikly --version          # version, package directory and interpreter
 ```
 
-**This Skill needs qikly 0.5.4 or later**, which is where `--score-code`
+**This Skill needs qikly 0.5.4 or later**, which is where `--score`
 arrives, alongside `--score-suite` and the reachability warning in `--validate`
 from 0.5.3. Against an older install an
 agent following this page will recommend a flag that does not exist, so check
@@ -365,7 +365,7 @@ Skill exists to prevent, and it is the one an agent commits while believing it
 is being careful.
 
 **Which command fits depends on what they have.** With a suite already
-written, `--score-code` scores it and needs nothing else. With no suite and no
+written, `--score` scores it and needs nothing else. With no suite and no
 spec, which is the case this paragraph is usually about, the route is
 `qikly --scaffold their_module.py` and then filling in the two sections with
 them. Everything else in the table below needs a task file that does not exist
@@ -376,7 +376,7 @@ yet.
 | `qikly --validate --tasks X` | free | always, before any run. Catches a missing input file, a leftover TODO, a criterion made of adjectives, a requirement restating a criterion, and criteria the data cannot reach |
 | `qikly --explain X` | free | to show the user exactly what each agent receives, criteria present on one side and absent on the other |
 | `qikly --score-suite --tasks X` | free, and slow | after a run converges, to find what the suite would not have noticed. It plants one fault at a time in the code and reports which ones the tests missed. Free because every fault is an edit to the code's syntax tree and no model is asked anything; slow because each fault means running your whole suite again |
-| `qikly --score-code PATH --score-tests PATH` | free, and slow | **for a suite qikly did not write**, which is what somebody already has before they have anything else. Point it at a module or package and the tests for it, and it reports which planted faults the tests did not notice, with a question for the user about each, which `--scaffold` then writes into the task file. No task file, no run, no model call. The report lands in `qikly-suite-score/` in the directory they ran it from |
+| `qikly --score PATH --score-tests PATH` | free, and slow | **for a suite qikly did not write**, which is what somebody already has before they have anything else. Point it at a module or package and the tests for it, and it reports which planted faults the tests did not notice, with a question for the user about each, which `--scaffold` then writes into the task file. No task file, no run, no model call. The report lands in `qikly-suite-score/` in the directory they ran it from |
 | `qikly --check-criteria --tasks X` | one model call | when a spec may contradict itself, before spending a run on it |
 | `qikly --propose-fixtures --tasks X` | one model call | when `--validate` says a criterion's values are missing from the data, to get the rows it would take |
 
@@ -393,14 +393,14 @@ reading the code scored at the top of the scale while a suite written from the
 specification found four genuine bugs in the same file. The number is a floor,
 not a verdict.
 
-**`--score-code` prints no such warning, and you must not imply it does.**
+**`--score` prints no such warning, and you must not imply it does.**
 There is no task file and therefore no criteria to be unreachable, so the
 report carries the score and nothing above it. The underlying problem has not
 gone away: a fault that survives may be on a line no test ever executes, which
 is a gap in what the tests reach rather than in what they assert. Say that to
 the user rather than handing them a percentage as a verdict on their suite.
 
-**When `--score-code` reports misses, its report ends with a question about
+**When `--score` reports misses, its report ends with a question about
 each one** (qikly 0.6.0 or later), such as whether `rate > 100` or
 `rate >= 100` is what they meant, and what should happen at exactly 100.
 `qikly --scaffold` on the same module then writes those questions into the
@@ -465,7 +465,7 @@ on somebody's real code rather than after.
 **In CI**, qikly ships a GitHub Action. A run costs a model call per attempt,
 so per pull request is a budget decision rather than a technical one, and the
 free checks are the ones that belong on every commit: `--validate`,
-`--score-suite` for a suite qikly generated, and `--score-code` for one that
+`--score-suite` for a suite qikly generated, and `--score` for one that
 predates it, which on most real repositories is the relevant half.
 
 ## What to tell the user honestly

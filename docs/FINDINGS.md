@@ -59,7 +59,7 @@ discount and VAT, and a seven-test suite written by reading the code. The suite
 passed.
 
 ```
-qikly --score-code pricing.py --score-tests test_pricing.py
+qikly --score pricing.py --score-tests test_pricing.py
 ```
 
 **What it found.** 3 of 8 planted faults caught, the same in ten runs, five

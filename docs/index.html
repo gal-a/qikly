@@ -831,19 +831,19 @@ footer {
   <section class="band">
     <p class="eyebrow">Start</p>
     <h2>Create a test suite for your own code</h2>
-    <!-- 2026-10-16: real excerpts from qikly --start on pricing.py with a
+    <!-- 2026-10-16: real excerpts from qikly --questions on pricing.py with a
          two-test suite, branch build of 0.6.0, gemini-3.5-flash-lite: Q3 of
          the 6 in the questions file it wrote, and the finding the
          --answers run ended with, with the diff it made to its copy. The run
          took 5 model calls, about $0.002. Lines are trimmed, not reworded.
-         Step 1's excerpt is qikly --score-code on the same module and suite
+         Step 1's excerpt is qikly --score on the same module and suite
          with --score-seed 1, 2026-10-15. -->
     <ol class="steps">
       <li class="row">
         <div class="step">
           <span class="n">Step 1 (optional)</span>
           <b>If you have a test suite, score it</b>
-          <code class="cmd"><span>qikly</span> <span>--score-code</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--score-code</span> <span>your_project_folder</span></code>
+          <code class="cmd"><span>qikly</span> <span>--score</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--score</span> <span>your_project_folder</span></code>
           <p>Plants faults in a copy of your code, one at a time, and names the
             ones your tests did not notice. Nothing of yours is changed.
             <a class="small-link" href="#your-tests">Where your tests can be</a></p>
@@ -859,7 +859,7 @@ footer {
         <div class="step">
           <span class="n">Step 2</span>
           <b>Answer what your tests never check</b>
-          <code class="cmd"><span>qikly</span> <span>--start</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--start</span> <span>your_project_folder</span></code>
+          <code class="cmd"><span>qikly</span> <span>--questions</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--questions</span> <span>your_project_folder</span></code>
           <p>Scores your tests first, so you can start here, then writes one
             file of questions to answer at your own pace. Each comes with the
             choices qikly found by running your code, and you can add rules of
@@ -885,7 +885,7 @@ Q3: <span class="you-ins">2</span></pre>
         <div class="step">
           <span class="n">Step 3</span>
           <b>Get a fresh test suite written from your answers</b>
-          <code class="cmd"><span>qikly</span> <span>--start</span> <span>your_module.py</span> <span>--answers</span> <span>&lt;the file&gt;</span></code>
+          <code class="cmd"><span>qikly</span> <span>--answers</span> <span>your_module.py</span></code>
           <p>The exact command is at the top of the file. It checks your
             answers and offers the full run, which needs an API key (Google
             Gemini, Anthropic or OpenAI). A test agent writes tests from your
@@ -925,7 +925,7 @@ qikly changed its copy to make them pass, not your file pricing.py.
     </ul>
     <p class="eyebrow also">Read more</p>
     <ul class="also-list">
-      <li><a href="https://github.com/gal-a/qikly#start-here" data-goatcounter-click="start-readme">Every other way in</a><span>the separate commands behind --start, for scripts and CI</span></li>
+      <li><a href="https://github.com/gal-a/qikly#start-here" data-goatcounter-click="start-readme">Every other way in</a><span>the separate commands behind --questions and --answers, for scripts and CI</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-provider-keys">API key setup</a><span>for the run: Gemini, OpenAI or Anthropic, and what a wrong key looks like</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="start-quick-start">Quick start</a><span>the same path, command by command</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">Design 1: the case</a><span>why an agent that writes its own tests grades its own homework</span></li>

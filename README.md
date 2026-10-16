@@ -44,18 +44,18 @@ key away from the student: the coding agent never sees the acceptance criteria.*
 
 ```bash
 pip install --upgrade qikly
-qikly --score-code my_module.py     # optional: score the suite you have
-qikly --start my_module.py          # or a folder: qikly --start my_project
+qikly --score my_module.py     # optional: score the suite you have
+qikly --questions my_module.py          # or a folder: qikly --questions my_project
 ```
 
-**Have a test suite? Score it first.** `--score-code` plants faults in a copy
+**Have a test suite? Score it first.** `--score` plants faults in a copy
 of your code, one at a time, and names the ones your tests did not notice.
 Free, no key, nothing of yours changed. It takes a module or a whole folder.
 Both commands find your tests themselves: the `test_*.py` and `*_test.py`
 files that import your code, searched from the project root. To name them
 instead, add `--score-tests tests/`.
 
-**Then, or instead, start on your own code, not on ours.** `--start` needs no task file, no
+**Then, or instead, start on your own code, not on ours.** `--questions` needs no task file, no
 specification and, until its last step, no API key. Point it at one module or
 a whole folder. It:
 
@@ -81,7 +81,7 @@ a whole folder. It:
 
    The file also has a line for what the module does, `rule:` lines for rules
    of your own, and example input rows built from your tests.
-3. **`qikly --start my_module.py --answers <the file>`**, the command at the
+3. **`qikly --answers my_module.py`**, the command at the
    top of the file, saves your answers as acceptance criteria, checks them,
    and in a terminal offers the run, which needs an API key. A test agent
    writes tests from your answers before any code is shown to it; a separate
@@ -104,11 +104,11 @@ the task and prints the two commands that run it, `qikly --tasks <TASK>` and
 
 ### The same path, command by command
 
-`--start` runs these, and they remain for scripts and CI:
+`--questions` runs these, and they remain for scripts and CI:
 
 | Step | Command | Costs |
 |---|---|---|
-| Score your tests, and turn each miss into a question | `qikly --score-code my_module.py --score-tests tests/` | free, no key |
+| Score your tests, and turn each miss into a question | `qikly --score my_module.py --score-tests tests/` | free, no key |
 | Write the task file with those questions in it, to answer by hand | `qikly --scaffold my_module.py` | free, no key |
 | Check the task file | `qikly --validate --tasks MY_MODULE_VERIFY` | free, no key |
 | Run it | `qikly --tasks MY_MODULE_VERIFY` | needs an API key |
@@ -131,7 +131,7 @@ implementation of the same interface.
 
 ### Good to know
 
-- **`--score-code` on its own is the one to try in a meeting.** Point it at a module or a
+- **`--score` on its own is the one to try in a meeting.** Point it at a module or a
   package, with the tests you already have. It plants one fault at a time in a
   copy of your code, runs those tests against each one, and names the faults
   nothing noticed. Both flags are needed: one says what to break, the other says

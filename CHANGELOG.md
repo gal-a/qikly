@@ -7,14 +7,18 @@ packaging tools would read as `1.1`.
 ## Unreleased
 
 ### Changed
-- **`--score-code` finds your tests when you do not name them**, the way
-  `--start` does: the `test_*.py` and `*_test.py` files that import the code,
+- **New names for the three steps:** `qikly --score` scores your tests
+  (`--score-code` still works), `qikly --questions` writes the questions file
+  (`--start` still works), and `qikly --answers my_module.py` reads it, finding
+  the file itself, then runs and reports.
+- **`--score` finds your tests when you do not name them**, the way
+  `--questions` does: the `test_*.py` and `*_test.py` files that import the code,
   searched from the project root, and it says which it used.
   `--score-tests` still names them, and is still needed with nothing to break.
-- **`--start` no longer starts a background run.** It was an old alias of
+- **`--questions` no longer starts a background run.** It was an old alias of
   `--run TASK`, and is now the guided first run above. A task id passed to it
   is told to use `qikly --run TASK`.
-- **`--score-code` and `--score-suite` lead with what was missed:** "5 of 12
+- **`--score` and `--score-suite` lead with what was missed:** "5 of 12
   planted faults missed (42%), 7 caught" rather than "7 of 12 caught". The
   misses are the finding, and a caught count read as a pass mark. Scripts
   that parsed the old line need the new form.
@@ -32,15 +36,15 @@ packaging tools would read as `1.1`.
 - **A run that passes says where the new tests are**, that they add to the
   ones you have, and that `qikly --score-suite --tasks <TASK>` shows how many
   planted faults they catch.
-- **`--score-code` on a folder says its faults were shared**: the 12 are
+- **`--score` on a folder says its faults were shared**: the 12 are
   spread at random over every file, so a larger folder gets fewer per file.
 
 ### Added
-- **`qikly --start my_module.py`: the whole path, through one file of
+- **`qikly --questions my_module.py`: the whole path, through one file of
   answers.** It scores the tests you already have and writes, per module, one
   file to answer at your own pace in your editor:
   `inputs_private/questions/<NAME>_open_questions.txt`. Then
-  `qikly --start my_module.py --answers <that file>`, the command at the top
+  `qikly --answers my_module.py`, the command at the top
   of the file, saves your answers as acceptance criteria, checks the task,
   and in a terminal offers the run, says where your code and your answers
   disagree, and offers to copy the new tests home. It takes one module or a
@@ -59,7 +63,7 @@ packaging tools would read as `1.1`.
     a sample file for code that reads files.
   - "Either is fine" and "save it for later" are options, and a blank answer
     stays open. The file is yours: change anything and run `--answers` again;
-    qikly never writes over it, and rerunning `--start` leaves a file you have
+    qikly never writes over it, and rerunning `--questions` leaves a file you have
     answered alone.
   - Without a terminal, as under a coding agent, `--answers` checks the task
     and prints `qikly --tasks <TASK>` and `qikly --take-tests <TASK>`.
@@ -83,10 +87,10 @@ packaging tools would read as `1.1`.
   import your module, and files that could not be collected. A file it did
   not write is never overwritten, a rerun removes its own stale copies, the
   folder is remembered, and `outputs/conftest.py` keeps a plain `pytest` from
-  running qikly's own copies as well. `--start` offers it after a green run.
-- **The Skill offers `--start` first**, and says to relay the questions in its
+  running qikly's own copies as well. `--questions` offers it after a green run.
+- **The Skill offers `--questions` first**, and says to relay the questions in its
   file to the user word for word, or to let them fill it in themselves.
-- **`--score-code` asks a question about every fault your tests missed, and
+- **`--score` asks a question about every fault your tests missed, and
   `--scaffold` puts the questions where the answers belong.** The report ends
   with a plain question for each miss, naming the file, line and function,
   and the comparison itself when it is the only one of its kind on the line,
@@ -121,7 +125,7 @@ packaging tools would read as `1.1`.
   ten times the untouched suite's time, and at least a minute; one that runs
   past it is stopped and counted as caught, and the report says how many.
   cachetools' scoring had stopped for good on one.
-- **`--start` never says your code agrees with an answer no test checked.**
+- **`--questions` never says your code agrees with an answer no test checked.**
   An answer whose tests all failed on an import, or that no test is tagged
   with, is listed as not checked instead.
 - **A function defined under an `if` or `try` is not "missing".** Such a test
@@ -138,7 +142,7 @@ packaging tools would read as `1.1`.
   imported through its package (`from isodate import parse_date`) is found.
 - **An answers file keeps a row for each answer's own call**, and a value
   with leading spaces survives the round trip.
-- **`--score-code` on a folder with its tests inside** says to score one
+- **`--score` on a folder with its tests inside** says to score one
   module, instead of refusing a `--score-tests` you never typed; tests on
   another drive no longer crash it, and the path it prints can be pasted.
 - **`import os.path` no longer counts as importing a project's `path.py`.**
@@ -150,13 +154,13 @@ packaging tools would read as `1.1`.
   a `$` too for `fullmatch`. Those faults could never be caught, and counted
   as misses: validators' card module was scored 6 of 41 missed and is 1 of 36.
   Scores on code without such patterns do not change.
-- **`--start` asks one question where the same gap repeats.** A table of 37
+- **`--questions` asks one question where the same gap repeats.** A table of 37
   rules missing the same anchor asked the same thing 37 times; it is now one
   question naming the other lines. Questions about public functions come
   first, private helpers last.
 - **Concrete options from parametrized tests**, including rows kept in a
   module-level table, annotated or not. Real suites pass inputs that way, and
-  `--start` offered no concrete call for them.
+  `--questions` offered no concrete call for them.
 - **A test that imports a name your module lacks is no longer a
   disagreement.** It failed before checking anything, and the report said
   your code disagreed with an answer it met. It is now listed apart.
@@ -178,8 +182,8 @@ packaging tools would read as `1.1`.
   - an input passed through a variable (`txt = "..."; slugify(txt)`) counts
     for the concrete options, as a literal does;
   - the suite is timed once, the scoring time is said, and above five minutes
-    `--start` offers a smaller sample of faults, or takes one without a terminal;
-  - when a suite fails on the untouched code, `--score-code` shows what pytest
+    `--questions` offers a smaller sample of faults, or takes one without a terminal;
+  - when a suite fails on the untouched code, `--score` shows what pytest
     said, such as a module generated at build time.
 - **A run's log reads plainly.** Lines no longer carry the task id twice
   (`[TASK] [TASK] ...`), and three research-flavoured lines say what they mean:
@@ -203,7 +207,7 @@ packaging tools would read as `1.1`.
   `qikly --score-suite --tasks <TASK>`.
 - **`--scaffold` on a folder says it takes one file** and lists the files,
   instead of "no such file".
-- **`--score-code` no longer prints a request for feedback.** It came straight
+- **`--score` no longer prints a request for feedback.** It came straight
   after the result, in project jargon, and read as part of it. The request is
   now a short, optional last section of the report, below the misses it asks
   about, and `QIKLY_NO_INVITE` is no longer needed.

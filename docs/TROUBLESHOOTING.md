@@ -35,7 +35,7 @@ what happened, then fixes to the task file, and only then more attempts.
 | Steady progress, then the budget ran out | [10. Give it more attempts](#10-give-it-more-attempts) | Raise `orchestrator.max_retries_per_stage` (default 10), only when the report shows progress |
 | **Nothing has run yet, and files you were told about are missing** | [Before a run](#before-a-run-where-did-my-files-go) | Read the first line of the command's output: it names the directory it worked in, and says when the project root is somewhere else |
 | **You are in a `demo/throwaway_<timestamp>/` folder** | [Before a run](#before-a-run-where-did-my-files-go) | That is a throwaway copy. Start your own project somewhere else |
-| `--score-code` says the suite does not pass | [Before a run](#before-a-run-where-did-my-files-go) | Usually pytest collected no tests at the path given to `--score-tests` |
+| `--score` says the suite does not pass | [Before a run](#before-a-run-where-did-my-files-go) | Usually pytest collected no tests at the path given to `--score-tests` |
 | **On macOS, no patch ever applies, on any task** | [12. On macOS, no patch ever applies](#12-on-macos-no-patch-ever-applies) | `brew install gpatch`. The system `patch` is BSD and rejects the options qikly sends |
 | Integration and system pass, unit does not | [11. Expect the unit stage to be where it fails](#11-expect-the-unit-stage-to-be-where-it-fails) | Expected. Accept it, or leave the unit stage out with `orchestrator.test_order` |
 
@@ -395,7 +395,7 @@ pip install qikly
 `qikly --version` also prints the package directory and the interpreter, which
 is what to check when a flag the documentation describes does not exist.
 
-### `--score-code` says your suite does not pass
+### `--score` says your suite does not pass
 
 It refuses to score a suite that does not pass your untouched code, because
 every planted fault would then fail for the reason the original does and the

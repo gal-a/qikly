@@ -56,9 +56,9 @@ dependency chain and pip installs qikly itself last, so there is a window where
 its dependencies are present and qikly is not, which looks exactly like a
 broken install.
 
-A key is needed only for a run: `--demo`, the run at the end of `--start`,
-and `--tasks`, `--run` and `--repeat`. `--version`, `--score-code`, `--start`
-until its run, `--take-tests`, `--explain`, `--validate`, `--init`,
+A key is needed only for a run: `--demo`, the run `--answers` offers,
+and `--tasks`, `--run` and `--repeat`. `--version`, `--score`, `--questions`,
+`--answers` until its run, `--take-tests`, `--explain`, `--validate`, `--init`,
 `--example` and `--scaffold` make no model call and cost nothing.
 
 Gemini is the default and its key is `GEMINI_API_KEY`. For OpenAI or
@@ -117,8 +117,8 @@ The same three steps as [the home page](https://test.qikly.com/?ref=quick-start)
 1. **If you have a test suite, score it.** Optional, free, no key:
 
    ```bash
-   qikly --score-code my_metrics.py
-   qikly --score-code my_project       # or a whole folder
+   qikly --score my_metrics.py
+   qikly --score my_project       # or a whole folder
    ```
 
    It plants faults in a copy of your code, one at a time, and names the ones
@@ -130,7 +130,7 @@ The same three steps as [the home page](https://test.qikly.com/?ref=quick-start)
 2. **Answer what your tests never check.** Free, no key:
 
    ```bash
-   qikly --start my_metrics.py        # or: qikly --start my_project
+   qikly --questions my_metrics.py        # or: qikly --questions my_project
    ```
 
    It scores your tests first, so you can start here directly, then writes
@@ -145,7 +145,7 @@ The same three steps as [the home page](https://test.qikly.com/?ref=quick-start)
    the top of the file:
 
    ```bash
-   qikly --start my_metrics.py --answers inputs_private/questions/MY_METRICS_open_questions.txt
+   qikly --answers my_metrics.py
    ```
 
    It checks your answers and offers the run, which needs a key. A test agent
@@ -160,7 +160,7 @@ The same three steps as [the home page](https://test.qikly.com/?ref=quick-start)
 
 ## Command by command
 
-The separate commands `--start` runs, for scripts and CI, or when you would
+The separate commands behind `--questions` and `--answers`, for scripts and CI, or when you would
 rather write the task file yourself.
 
 Rather see it work before you point it at your own code?

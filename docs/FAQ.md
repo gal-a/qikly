@@ -29,27 +29,27 @@ Yes, three things, all offline and free:
 qikly --explain MERGE_SALES          # what each agent is shown, and the difference
 qikly --explain MERGE_SALES --html   # the same as one page you can share
 qikly --validate                     # check your task files
-qikly --score-code src/yours.py --score-tests tests/test_yours.py
+qikly --score src/yours.py --score-tests tests/test_yours.py
 ```
 
 `--explain` is the one worth running first: no model call, about a second.
 
-`--score-code` is the one that runs on **your** code rather than on a bundled
+`--score` is the one that runs on **your** code rather than on a bundled
 task. It plants one fault at a time and reports which ones your existing tests
 did not notice. No task file, no run, no key, and nothing of yours is modified.
 Read the score as a floor: it says how much of the code that is there your
 tests would notice changing, and nothing about a rule nobody implemented.
 
-## 4. What is the difference between `--score-code` and `--score-tests`?
+## 4. What is the difference between `--score` and `--score-tests`?
 
 They are not alternatives. They are the two halves of one command, and it does
 nothing useful without both:
 
 ```bash
-qikly --score-code src/pricing.py --score-tests tests/test_pricing.py
+qikly --score src/pricing.py --score-tests tests/test_pricing.py
 ```
 
-`--score-code` is **the code to plant faults in**, a module or a whole package.
+`--score` is **the code to plant faults in**, a module or a whole package.
 `--score-tests` is **the suite to run against each planted fault**, a file or a
 directory of them. The report names the faults your tests did not notice.
 
