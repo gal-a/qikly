@@ -356,6 +356,7 @@ h1 {
 /* The line of the user's own code a question is about, in the accent teal. */
 .eg pre .code-line { color: var(--accent); }
 .audit-note { margin: 28px 0 32px; }
+.try-first { margin: 0 0 28px; padding: 14px 18px; border-left: 3px solid var(--accent, #2bb3a3); background: rgba(127, 127, 127, 0.07); border-radius: 4px; }
 .audit-note + .audit-note { margin-top: -16px; }
 .step .small-link { display: block; margin-top: 6px; font-size: .8rem; }
 .step p { margin: 0; font-size: .92rem; color: var(--ink-soft); flex: 1; }
@@ -831,6 +832,11 @@ footer {
   <section class="band">
     <p class="eyebrow">Start</p>
     <h2>Create a test suite for your own code</h2>
+    <p class="try-first"><b>See it work first:</b> <code>qikly --demo</code> runs the
+      whole loop on a bundled task, nothing to fill in: tests written before any
+      code, a coding agent that never sees the criteria, and a repair. About
+      thirty seconds, well under a cent with a Gemini, OpenAI or Anthropic key.
+      <a class="small-link" href="#demo">Watch one run</a></p>
     <!-- 2026-10-16: real excerpts from qikly --questions on pricing.py with a
          two-test suite, branch build of 0.6.0, gemini-3.5-flash-lite: Q3 of
          the 6 in the questions file it wrote, and the finding the
@@ -920,7 +926,6 @@ qikly changed its copy to make them pass, not your file pricing.py.
 
     <p class="eyebrow also">Other ways in</p>
     <ul class="also-list">
-      <li><code>qikly --demo</code><span>a bundled task end to end, well under a cent with a Gemini, OpenAI or Anthropic key</span></li>
       <li><code>qikly --install-skill</code><span>teaches Claude Code, Gemini CLI, Codex or Cursor to drive qikly</span></li>
     </ul>
     <p class="eyebrow also">Read more</p>
@@ -1091,7 +1096,7 @@ qikly changed its copy to make them pass, not your file pricing.py.
     </p>
   </section>
 
-  <section class="band">
+  <section class="band" id="demo">
     <p class="eyebrow">See it run end-to-end on a bundled task</p>
     <h2>One command, about thirty seconds, nothing written outside its folder</h2>
     <figure class="demo">
