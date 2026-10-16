@@ -117,6 +117,24 @@ packaging tools would read as `1.1`.
   answer, never its own, and how the answers become a task.
 
 ### Fixed
+- **`--start` asks one question where the same gap repeats.** A table of 37
+  rules missing the same anchor asked the same thing 37 times; it is now one
+  question naming the other lines. Questions about public functions come
+  first, private helpers last.
+- **Concrete options from parametrized tests**, including rows kept in a
+  module-level table, annotated or not. Real suites pass inputs that way, and
+  `--start` offered no concrete call for them.
+- **A test that imports a name your module lacks is no longer a
+  disagreement.** It failed before checking anything, and the report said
+  your code disagreed with an answer it met. It is now listed apart.
+- **An answer's call made through a variable counts as made**, so the list of
+  answers and their tests no longer marks it "none makes this exact call".
+- **The questions file shows the code each question is about**, as the
+  terminal does, and asks for the example inputs with `row:` lines, filled in
+  where your tests provide them. Without them a run stopped on "input file
+  not found".
+- **A folder holding one module is that module** with or without a terminal.
+  The two had scored different things, so a file of answers did not match.
 - **Real libraries, found by running the three steps on python-slugify,
   inflection, tabulate, validators and humanize:**
   - a package's `__init__.py` is scored and asked about when it holds code;

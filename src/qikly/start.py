@@ -913,6 +913,31 @@ def enrich(questions, missed):
     return questions
 
 
+def group(questions):
+    """
+    One question per (file, function, question): a table of 37 regexes that
+    all miss the same anchor asked the same thing 37 times on a real library,
+    and nobody answers that. The first line is kept, the rest are listed.
+    Questions about public functions come first, then the top level, then
+    private helpers, because those are the ones a person can answer.
+    """
+    kept, seen = [], {}
+    for q in questions:
+        mark = (q.get("path") or q.get("file"), q.get("function"), q.get("question"))
+        if mark in seen:
+            seen[mark].setdefault("also", []).append(q.get("line"))
+            continue
+        seen[mark] = q
+        kept.append(q)
+
+    def rank(q):
+        name = q.get("function")
+        if not name:
+            return 1
+        return 2 if name.split(".")[-1].startswith("_") else 0
+    return sorted(kept, key=rank)
+
+
 # -------------------------------------------------------------- one module --
 
 def _context(source, line):
@@ -964,10 +989,15 @@ def where(q):
     "apply_discount, line 3", or "shipping.py, top level, line 6" for a line
     outside any function, which used to read "None, line 6".
     """
+    also = q.get("also") or []
+    more = ""
+    if also:
+        shown_ = ", ".join(str(n) for n in also[:5]) + (", ..." if len(also) > 5 else "")
+        more = f" (and {len(also)} more line{'' if len(also) == 1 else 's'} like it: {shown_})"
     if q.get("function"):
-        return f"{q['function']}, line {q.get('line')}"
+        return f"{q['function']}, line {q.get('line')}{more}"
     name = os.path.basename(q.get("path") or q.get("file") or "the module")
-    return f"{name}, top level, line {q.get('line')}"
+    return f"{name}, top level, line {q.get('line')}{more}"
 
 
 def ask_question(console, number, total, q, source, test_sources, root,
@@ -1333,6 +1363,13 @@ def write_open_questions(paths, state):
         lines += [f"# {rec['where']}: {rec['question']}",
                   f"# id {rec.get('key', '')}",
                   f"Q{rec.get('number', n)}: ", ""]
+    if state.get("columns") and not state.get("rows"):
+        # Still needed, so still asked for: this file replaces the one the
+        # rows were to be written in.
+        lines += ["# Example inputs, one row per line, the values in this order:",
+                  "#   " + ", ".join(state["columns"]),
+                  "# These are real inputs, not expected outputs.",
+                  "row: ", ""]
     with open(paths.open, "w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(lines))
     return paths.open
@@ -1484,7 +1521,7 @@ def disagreements(paths, state, lines):
             # be imported. "No failures" here is not agreement, and saying
             # "your code agrees" was the one false thing this report printed.
             return "unknown", {}, [r["criterion"] for r in state["answers"].values()
-                                   if r["status"] == "answered"] + state.get("extra", []), []
+                                   if r["status"] == "answered"] + state.get("extra", []), [], {}
         found = _STAGE.match(line)
         if not found or found.group(1) != paths.task_id:
             continue
@@ -1511,7 +1548,7 @@ def disagreements(paths, state, lines):
     if _batched():
         # Each batch numbers its criteria from 1, so a test's "Criteria: 2"
         # cannot be traced to one answer. Say nothing rather than misattribute.
-        return None, {}, criteria, []
+        return None, {}, criteria, [], {}
     bodies = {}
     for stage in ("integration", "system"):
         folder = os.path.join(paths.tests, stage)
@@ -1538,6 +1575,16 @@ def disagreements(paths, state, lines):
     tagged = {n: list(names) for n, names in tests_for.items()}
     unconfirmed = set()
     module_source = _read(paths.module)
+    # A test that imports a name the module does not have fails before it
+    # checks anything. validators' card.py was reported as disagreeing with
+    # an answer its code met: the test imported ValidationError from card.py,
+    # which takes it from another module, and the agent added the import.
+    unchecked = {}
+    for test in sorted(failed):
+        missing = _missing_imports(bodies.get(test, ""), paths, module_source)
+        if missing:
+            unchecked[test] = missing
+    failed -= set(unchecked)
     for n, names in tests_for.items():
         if not 0 < n <= len(criteria):
             continue
@@ -1557,7 +1604,41 @@ def disagreements(paths, state, lines):
     every_tagged = set(t for names in tagged.values() for t in names)
     untagged = sorted(failed - every_tagged)
     tests_for = {n: (names, n in unconfirmed) for n, names in tests_for.items()}
-    return disagreed, tests_for, criteria, untagged
+    return disagreed, tests_for, criteria, untagged, unchecked
+
+
+def _missing_imports(body, paths, module_source):
+    """
+    The names a test imports from the user's module that the module does not
+    define or import, read from the test's own `from ... import` lines.
+    """
+    import ast
+    import textwrap
+    try:
+        tree = ast.parse(textwrap.dedent(body))
+        module_tree = ast.parse(module_source)
+    except SyntaxError:
+        return []
+    own = set()
+    for node in module_tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            own.add(node.name)
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            own.update((a.asname or a.name).split(".")[0] for a in node.names)
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+            for target in (node.targets if isinstance(node, ast.Assign) else [node.target]):
+                own.update(n.id for n in ast.walk(target) if isinstance(n, ast.Name))
+    if any(isinstance(n, ast.ImportFrom) and any(a.name == "*" for a in n.names)
+           for n in module_tree.body):
+        return []
+    stem = os.path.splitext(os.path.basename(paths.module))[0]
+    if stem == "__init__":
+        stem = os.path.basename(os.path.dirname(paths.module))
+    missing = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[-1] == stem:
+            missing += [a.name for a in node.names if a.name not in own and a.name != "*"]
+    return missing
 
 
 _CRITERIA_TAG = re.compile(r"(?:#\s*)?Criteria:\s*([\d,\s]+)")
@@ -1634,9 +1715,13 @@ def _makes_call(body, call, source=None):
                 else node.func.attr if isinstance(node.func, ast.Attribute) else None)
         if name != function:
             continue
+        # A value passed through a name, `word = "mousetrap"` then
+        # `pluralize(word)`, is the same call: read literally, all three of
+        # inflection's answers were marked as made by no test.
+        known = so._literals_around(tree, node)
         try:
-            found_args = [ast.literal_eval(a) for a in node.args]
-            found_kwargs = {k.arg: ast.literal_eval(k.value) for k in node.keywords}
+            found_args = [so._value(a, known) for a in node.args]
+            found_kwargs = {k.arg: so._value(k.value, known) for k in node.keywords}
         except (ValueError, SyntaxError, TypeError):
             continue
         if meaning(found_args, found_kwargs) == wanted:
@@ -1685,7 +1770,7 @@ def _newest(folder, prefix=""):
 
 
 def report_result(console, paths, state, lines, converged):
-    disagreed, tests_for, criteria, untagged = disagreements(paths, state, lines)
+    disagreed, tests_for, criteria, untagged, unchecked = disagreements(paths, state, lines)
     console.say("")
     name = os.path.basename(paths.module)
     started = any(line.startswith(f"[{paths.task_id}] [stage ") for line in lines)
@@ -1741,6 +1826,13 @@ def report_result(console, paths, state, lines, converged):
                      f"Your code agrees with all {len(criteria)} of your answers. ")
                     + "The new tests now pin that behaviour, so a later change "
                       "that breaks one of them will fail.")
+    if unchecked and converged:
+        console.say(f"Not counted either way: these failed because they import "
+                    f"something {name} does not have, so they say nothing about "
+                    f"your code. qikly's copy added it while fixing; your file did "
+                    f"not need it:")
+        for test, missing in unchecked.items():
+            console.say(f"  - {test}  imports {', '.join(missing)}")
     if tests_for:
         console.say("Each answer and the tests written from it:")
         for n, (names, unconfirmed) in sorted(tests_for.items()):
@@ -1779,7 +1871,7 @@ def inputs_outputs(console, cwd, code, tests, report, results, ran, copied=()):
         if data and os.path.exists(data):
             rows = state.get("rows")
             console.say(f"    Example data   {paths.rel(data)}"
-                        + (f"   {len(rows)} rows" if rows else ""))
+                        + (f"   {len(rows)} row{'' if len(rows) == 1 else 's'}" if rows else ""))
         console.say(f"    Progress       {paths.rel(paths.state)}")
     if ran:
         console.say("  WRITTEN BY THE RUN")
@@ -2205,11 +2297,25 @@ def _test_sources(tests):
     return [_read(p) for p in ([tests] if os.path.isfile(tests) else _test_files(tests))]
 
 
+def _one_module(code):
+    """
+    A folder holding one module is that module, as pick_code makes it in a
+    terminal. Without this, `--start inflection` scored the folder with no
+    terminal and the module in one, so a file of answers given to the first
+    met different questions in the second.
+    """
+    if os.path.isdir(code):
+        modules = modules_in(code)
+        if len(modules) == 1:
+            return modules[0]
+    return code
+
+
 def _main(arg, cwd, console, answers, given_tests=None):
     if not console.interactive and not answers:
         return _non_interactive(arg, cwd, console, given_tests)
     if answers:
-        code = os.path.abspath(os.path.join(cwd, arg or "."))
+        code = _one_module(os.path.abspath(os.path.join(cwd, arg or ".")))
         if not os.path.exists(code):
             console.say(f"There is no file or folder at {code}.")
             return 2
@@ -2240,7 +2346,7 @@ def _main(arg, cwd, console, answers, given_tests=None):
     result, report = _scored(console, code, tests, cwd, session)
     if result is None:
         return 2
-    questions = enrich(list(result.get("questions") or []), result["missed"])
+    questions = group(enrich(list(result.get("questions") or []), result["missed"]))
     _say_score(console, result, report, cwd, questions)
     if not questions:
         console.say("Your tests caught every fault qikly planted, so there is "
@@ -2428,7 +2534,7 @@ def _non_interactive(arg, cwd, console, given_tests=None):
         console.say("qikly --start needs a module or folder when it is not run "
                     "in a terminal, such as  qikly --start pricing.py")
         return 2
-    code = os.path.abspath(os.path.join(cwd, arg))
+    code = _one_module(os.path.abspath(os.path.join(cwd, arg)))
     if not os.path.exists(code):
         console.say(f"There is no file or folder at {code}.")
         return 2
@@ -2449,7 +2555,7 @@ def _non_interactive(arg, cwd, console, given_tests=None):
     result, report = _scored(console, code, tests, cwd, session)
     if result is None:
         return 2
-    questions = enrich(list(result.get("questions") or []), result["missed"])
+    questions = group(enrich(list(result.get("questions") or []), result["missed"]))
     _say_score(console, result, report, cwd, questions)
     if not questions:
         console.say("Your tests caught every fault qikly planted, so there is "
@@ -2481,11 +2587,29 @@ def _non_interactive(arg, cwd, console, given_tests=None):
         for n, q in enumerate(qs, 1):
             prompt, options = so.menu(q, source, test_sources, root, q.get("mutant"))
             lines.append(f"# {where(q)}: {q['question']}")
+            # The code itself, as the terminal shows it. With only "line 143"
+            # to go on, an answer about slugify's separator check was written
+            # about the max_length check two lines above it.
+            lines += ["#" + line for line in _context(source, q.get("line"))]
             if prompt:
                 lines.append(f"# {prompt}")
             for i, o in enumerate(options, 1):
                 lines.append(f"#   {i}. {o['label']}")
             lines += [f"# id {_key(q)}", f"Q{n}: ", ""]
+        # The rows, which a terminal run asks for last. Left out of this file,
+        # inflection's run stopped on "input file not found" with no word on
+        # how to give them here.
+        from qikly.scaffold import starter_columns
+        columns = starter_columns(source)
+        if columns:
+            built = build_rows({"answers": {}, "extra": []}, columns, source, test_sources)
+            lines += ["# Example inputs, one row per line, the values in this order:",
+                      "#   " + ", ".join(columns),
+                      "# qikly filled in the rows it could build from your tests"
+                      + ("." if built else "; none could be built, so add at least one."),
+                      "# These are real inputs, not expected outputs."]
+            lines += ["row: " + _csv_line(r) for r in built] or ["row: "]
+            lines.append("")
         os.makedirs(os.path.dirname(paths.open), exist_ok=True)
         with open(paths.open, "w", encoding="utf-8", newline="\n") as handle:
             handle.write("\n".join(lines))
@@ -2538,6 +2662,13 @@ def parse_answers(path):
         if row and row.group(1).strip():
             rows.append(next(csv.reader([row.group(1)], skipinitialspace=True)))
     return found, requirements, rows, module, ids
+
+
+def _csv_line(values):
+    """One row as `--answers` reads it back, quoted where a value has a comma."""
+    out = io.StringIO()
+    csv.writer(out, lineterminator="").writerow(values)
+    return out.getvalue()
 
 
 def _from_answers(console, paths, questions, test_sources, root, answers_path):
@@ -2617,6 +2748,10 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
         console.say(f"{os.path.basename(paths.module)} reads files, so it needs a "
                     f"real sample file: run qikly --start in a terminal to give "
                     f"its path, or copy one to {paths.rel(paths.data)}.")
+    if columns and not state.get("rows"):
+        console.say(f"{shown(answers_path, paths.cwd)} gives no example inputs. Add "
+                    f"at least one line  row: <values>  with the values in this "
+                    f"order: {', '.join(columns)}")
     save_state(paths, state)
     data = write_files(console, paths, state)
     console.say(f"saved to {paths.rel(paths.task)}"

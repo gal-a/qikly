@@ -12,6 +12,7 @@ What these pin, in order of how much a failure would cost a first-time user:
 """
 import json
 import os
+import re
 import sys
 
 import pytest
@@ -319,6 +320,14 @@ def test_without_a_terminal_it_never_waits_and_writes_the_questions(tmp_path, mo
     text = written.read_text(encoding="utf-8")
     assert "Q1: " in text and "--answers" in text
     assert not any(str(x).startswith("Type a number") for x in s.seen)
+    # The code each question is about, not just its line number.
+    assert re.search(r"^#  >\s+\d+ ", text, re.M), text
+    # The example inputs are asked for in the file too: left out, a real
+    # library's --answers run stopped on "input file not found".
+    assert "#   price, rate, code" in text
+    assert any(line.startswith("row: ") and line.strip() != "row:" for line in text.splitlines())
+    found, _, rows, _, _ = start.parse_answers(str(written))
+    assert rows and all(len(r) == 3 for r in rows)
 
 
 def test_a_folder_beside_its_tests_finds_them_without_a_project_marker(tmp_path):

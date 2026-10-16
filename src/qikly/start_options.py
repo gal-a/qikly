@@ -74,6 +74,58 @@ def _value(node, known):
     return ast.literal_eval(node)
 
 
+def _module_literals(tree):
+    """Module-level `NAME = <literal>`, such as a table of parametrize rows."""
+    out = {}
+    for node in tree.body:
+        # inflection annotates its tables, `ROWS: TestParameters = (...)`.
+        if isinstance(node, ast.AnnAssign) and node.value is not None:
+            target, value = node.target, node.value
+        elif isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target, value = node.targets[0], node.value
+        else:
+            continue
+        if isinstance(target, ast.Name):
+            try:
+                out[target.id] = ast.literal_eval(value)
+            except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+                pass
+    return out
+
+
+def _parametrized(func, module_level):
+    """
+    A test's parameters bound to the first row of its `pytest.mark.parametrize`,
+    which is how most real suites pass inputs: inflection and slugify both do,
+    with the rows in a module-level list, and no call had a literal argument.
+    """
+    for deco in func.decorator_list:
+        if not (isinstance(deco, ast.Call) and getattr(deco.func, "attr", "") == "parametrize"
+                and len(deco.args) >= 2):
+            continue
+        try:
+            names = ast.literal_eval(deco.args[0])
+        except (ValueError, SyntaxError):
+            continue
+        if isinstance(names, str):
+            names = [n.strip() for n in names.split(",") if n.strip()]
+        rows_node = deco.args[1]
+        if isinstance(rows_node, ast.Name):
+            rows = module_level.get(rows_node.id)
+        else:
+            try:
+                rows = ast.literal_eval(rows_node)
+            except (ValueError, SyntaxError):
+                rows = None
+        if not rows:
+            continue
+        first = list(rows)[0]
+        values = [first] if len(names) == 1 else list(first) if isinstance(
+            first, (list, tuple)) else None
+        if values and len(values) == len(names):
+            yield from zip(names, values)
+
+
 def _literals_around(tree, call):
     """
     Names bound to a literal, once, in the test function holding `call`. Real
@@ -82,17 +134,21 @@ def _literals_around(tree, call):
     libraries. A name bound more than once is left out: which value reached
     the call would be a guess.
     """
+    module_level = _module_literals(tree)
     for func in ast.walk(tree):
         if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         if not any(n is call for n in ast.walk(func)):
             continue
-        seen, out = {}, {}
+        out = dict(_parametrized(func, module_level))
+        seen = {name: 1 for name in out}
         for node in ast.walk(func):
             if isinstance(node, ast.Assign) and len(node.targets) == 1 and \
                     isinstance(node.targets[0], ast.Name):
                 name = node.targets[0].id
                 seen[name] = seen.get(name, 0) + 1
+                if seen[name] > 1:
+                    continue
                 try:
                     out[name] = ast.literal_eval(node.value)
                 except (ValueError, TypeError, SyntaxError):

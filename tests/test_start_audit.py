@@ -249,7 +249,7 @@ def test_failing_parametrized_and_class_tests_are_matched(tmp_path):
         "b": {"status": "answered", "criterion": "c2"}}}
     lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/2 passed | FAILED: "
              f"test_a[100], TestB::test_b"]
-    disagreed, _, _, _ = start.disagreements(paths, state, lines)
+    disagreed, _, _, _, _ = start.disagreements(paths, state, lines)
     assert disagreed == ["c1", "c2"]
 
 
@@ -499,7 +499,7 @@ def test_a_failure_tagged_beyond_the_answers_is_still_reported(tmp_path):
     paths = _tagged_project(tmp_path, 'def test_x():\n    """# Criteria: 3"""\n')
     state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
     lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_x"]
-    _, _, _, untagged = start.disagreements(paths, state, lines)
+    _, _, _, untagged, _ = start.disagreements(paths, state, lines)
     assert untagged == ["test_x"]
 
 
@@ -519,7 +519,7 @@ def test_a_tag_above_the_next_test_belongs_to_that_test(tmp_path):
     paths = _tagged_project(tmp_path, body)
     state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
     lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 1/2 passed | FAILED: test_a"]
-    disagreed, _, _, untagged = start.disagreements(paths, state, lines)
+    disagreed, _, _, untagged, _ = start.disagreements(paths, state, lines)
     assert disagreed == [] and untagged == ["test_a"]
 
 
@@ -663,3 +663,74 @@ def test_scoring_prints_a_heartbeat(tmp_path, monkeypatch, capsys):
     ms.score(ms.from_paths(str(tmp_path / "pricing.py"), str(tmp_path / "tests")),
              mutants=4, seed=1)
     assert "still scoring:" in capsys.readouterr().out
+
+
+def test_parametrize_rows_give_the_call_its_arguments():
+    # Real suites pass inputs through parametrize, often from a module-level
+    # table; before this, inflection and slugify offered no concrete calls.
+    test = (
+        "import pytest\n"
+        "from shop import price\n"
+        "ROWS: list = [(3, 30), (4, 40)]\n"
+        "@pytest.mark.parametrize(('qty', 'total'), ROWS)\n"
+        "def test_price(qty, total):\n"
+        "    assert price(qty) == total\n"
+        "@pytest.mark.parametrize('word', ['a b'])\n"
+        "def test_inline(word):\n"
+        "    assert price(word)\n"
+    )
+    calls = so.literal_calls([test], "price", "shop")
+    assert ([3], {}) in calls
+    assert (["a b"], {}) in calls
+
+
+def test_the_same_question_on_many_lines_is_asked_once():
+    # inflection's table of 37 regexes all missing an anchor asked one
+    # question 37 times; public functions now come before private helpers.
+    q = "Your tests pass when this pattern matches only part of a value?"
+    questions = [{"path": "m.py", "function": None, "line": n, "question": q}
+                 for n in (22, 23, 24)]
+    questions.insert(0, {"path": "m.py", "function": "_helper", "line": 5,
+                         "question": "Private?"})
+    questions.append({"path": "m.py", "function": "titleize", "line": 90,
+                      "question": "Public?"})
+    grouped = start.group(questions)
+    assert [g["question"] for g in grouped] == ["Public?", q, "Private?"]
+    assert grouped[1]["also"] == [23, 24]
+    assert start.where(grouped[1]) == "m.py, top level, line 22 (and 2 more lines like it: 23, 24)"
+
+
+def test_a_test_importing_a_name_the_module_lacks_is_not_a_disagreement(tmp_path):
+    # validators' card.py met the answer, but the test imported ValidationError
+    # from card.py, which does not have it, and the report said "disagrees".
+    _project(tmp_path)
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    folder = tmp_path / "outputs" / "tests" / paths.task_id / "system"
+    folder.mkdir(parents=True)
+    (folder / "test_system.py").write_text(
+        'def test_s():\n    """z\n    # Criteria: 1\n    """\n'
+        '    from pricing import apply_discount, NoSuchError\n'
+        '    assert apply_discount(1, 2)\n')
+    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
+    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_s"]
+    disagreed, _, _, untagged, unchecked = start.disagreements(paths, state, lines)
+    assert disagreed == [] and untagged == []
+    assert unchecked == {"test_s": ["NoSuchError"]}
+
+
+def test_a_folder_of_one_module_is_that_module_with_or_without_a_terminal(tmp_path):
+    # inflection's code is its __init__.py: a terminal run tested the module
+    # and a run without one the folder, each with its own questions.
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("def f(x):\n    return x + 1\n", encoding="utf-8")
+    assert start._one_module(str(pkg)) == str(pkg / "__init__.py")
+    s = Script(["1"])
+    assert start.pick_code(s.console, "pkg", str(tmp_path)) == str(pkg / "__init__.py")
+
+
+def test_a_call_through_a_variable_is_the_answers_call():
+    body = ('def test_p():\n    word = "mousetrap"\n'
+            '    assert pluralize(word) == "mousetraps"\n')
+    assert start._makes_call(body, ("pluralize", ["mousetrap"], {}))
+    assert not start._makes_call(body, ("pluralize", ["cowboy"], {}))
