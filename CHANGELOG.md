@@ -36,51 +36,43 @@ packaging tools would read as `1.1`.
   spread at random over every file, so a larger folder gets fewer per file.
 
 ### Added
-- **`qikly --start my_module.py`: the whole path in one guided command.** It
-  scores the tests you already have, asks you about each thing they never
-  check, saves your answers as acceptance criteria, builds a few rows of
-  example inputs from your answers and tests, checks the task, and offers the
-  run. It takes one module or a whole folder (one task per module), or asks
-  when no path is given.
-  - Every prompt is a numbered menu whose last option is free text, says on
-    its last line what to type, and answers wrong input with a reason and
-    the same prompt. Nothing is chosen by default.
-  - Where it can, the options are concrete behaviours, such as "raise
-    ValueError, as rate 101 does now". A boundary is only ever run on either
-    side of the value in question, never at it; other changes show an input
-    where the code and the changed code differ, with the current result
-    labelled. The order of the two is shuffled per question. Where the input
-    cannot be known, the only options are to skip or type your own answer.
-  - "Either is fine" and "save it for later" are options; open questions go
-    to `inputs_private/questions/<NAME>_open_questions.txt`, to send to
-    whoever owns the spec.
-  - It says where it writes before it starts, after each save and at the end,
-    and the run's first line is where your code and your answers disagree.
-  - Answers are saved as you go, so stopping is safe and the same command
-    continues. Without a terminal it never waits: it writes the questions to
-    that file and exits 3, and `--answers <file>` reads them back.
-  - The landing page's three steps are now this one command, and the README
-    lists the separate commands behind it for scripts and CI.
-  - A rerun reuses the tests you chose and, when neither the code nor the
-    tests changed, the score. Deleting your answers asks to confirm.
-  - Boundaries on a named constant (`FREE_SHIPPING_THRESHOLD`) and calls that
-    leave an argument at its default get concrete options too; your code is
-    tried in a separate process in an empty folder, never in your project.
-  - Two modules with the same file name get two tasks, and an answers file
-    names its module, so its answers never land on another one.
+- **`qikly --start my_module.py`: the whole path, through one file of
+  answers.** It scores the tests you already have and writes, per module, one
+  file to answer at your own pace in your editor:
+  `inputs_private/questions/<NAME>_open_questions.txt`. Then
+  `qikly --start my_module.py --answers <that file>`, the command at the top
+  of the file, saves your answers as acceptance criteria, checks the task,
+  and in a terminal offers the run, says where your code and your answers
+  disagree, and offers to copy the new tests home. It takes one module or a
+  whole folder, one task and one file per module.
+  - The file holds only questions qikly can offer a choice for, such as
+    "raise ValueError, as rate 101 does now", worked out by running your code
+    in a separate process in an empty folder. A boundary is only ever run on
+    either side of the value in question, never at it; other changes show an
+    input where the code and the changed code differ, with the current
+    result labelled, through the public functions and classes your tests
+    call when the line itself has none. The order of the two is shuffled per
+    question, and the same call with the same choices is asked once.
+  - Each question shows the code it is about. The file also has a
+    `requirements:` line for what the module does, `rule:` lines for rules of
+    your own, and example input rows built from your tests, or where to copy
+    a sample file for code that reads files.
+  - "Either is fine" and "save it for later" are options, and a blank answer
+    stays open. The file is yours: change anything and run `--answers` again;
+    qikly never writes over it, and rerunning `--start` leaves a file you have
+    answered alone.
+  - Without a terminal, as under a coding agent, `--answers` checks the task
+    and prints `qikly --tasks <TASK>` and `qikly --take-tests <TASK>`.
   - A module inside a package is seeded as its whole top-level package and
     named by its dotted path (`acme.scoring`), so a relative import such as
     `from .util import clamp` works in qikly's copy and the first tests run
-    on your code as it is. Test calls are found through import aliases, and
-    `src/` layouts are tried correctly.
-  - `--start my_module.py --score-tests tests/` names the tests instead of
-    being asked. Code with no tests yet works too: "I have no tests for it
-    yet" scores it against a placeholder that only imports it, kept under
-    `qikly-suite-score/`, so every planted fault becomes a question.
+    on your code as it is. Test calls are found through import aliases,
+    parametrize rows and variables, and `src/` layouts are tried correctly.
   - If nothing ran on your code as it is, the result says it cannot tell
-    where your code and your answers disagree, rather than that they agree.
-  - Each answer is listed only against the tests that make the call it
-    names; where none does, the test writer's own tags are shown, marked.
+    where your code and your answers disagree, rather than that they agree;
+    agreement is claimed only for answers a test checked.
+  - A one-question-at-a-time terminal flow was built and shelved before
+    release: it was easy to get lost in, and a mistake felt final.
 - **`qikly --take-tests <TASK>`: tests you can take home.** The tests a run
   wrote import qikly's copy of your code; this copies each stage's files into
   `qikly_generated/<task>/<stage>/` beside your tests, keeping their names,
@@ -92,8 +84,8 @@ packaging tools would read as `1.1`.
   not write is never overwritten, a rerun removes its own stale copies, the
   folder is remembered, and `outputs/conftest.py` keeps a plain `pytest` from
   running qikly's own copies as well. `--start` offers it after a green run.
-- **The Skill offers `--start` first**, and says to relay its questions to the
-  user word for word when it runs without a terminal.
+- **The Skill offers `--start` first**, and says to relay the questions in its
+  file to the user word for word, or to let them fill it in themselves.
 - **`--score-code` asks a question about every fault your tests missed, and
   `--scaffold` puts the questions where the answers belong.** The report ends
   with a plain question for each miss, naming the file, line and function,
@@ -116,24 +108,6 @@ packaging tools would read as `1.1`.
 - **Skill 0.3.7** tells an assistant that those questions are the user's to
   answer, never its own, and how the answers become a task.
 
-- **`--start` asks at most ten questions about a module at a time.** With
-  more, the ones it can offer answers for come first, and it asks how many
-  to answer now: the rest are saved as open questions, and the same command
-  asks them next time. A folder run stops to ask after about 25.
-- **Concrete answers for code your tests reach only through other
-  functions.** Where the line's own function has no test call, such as a
-  private helper, the public functions the tests call are tried instead, and
-  the question says the call runs through the helper. A check switched off or
-  an error never raised gets the same search, so it can offer the input the
-  check exists for. Every row of a parametrize table is tried, and a call
-  that leaves out an argument with a default.
-
-- **A way to stop at the questions that need typing.** The questions qikly
-  can offer answers for come first, and every question with none offers
-  "skip this and every other question that needs typing": the rest are
-  saved, the run goes ahead on what is answered, and the same command asks
-  them next time.
-
 ### Fixed
 - **A failing test no answer is behind is never called a disagreement.**
   `--take-tests` told the user to apply qikly's change to code that was
@@ -143,8 +117,6 @@ packaging tools would read as `1.1`.
   answer is no longer called a disagreement either: the test can assert
   more than the answer said, and qikly's change to its copy, which on one
   library altered a documented default, is offered to read, not to apply.
-- **The sample-file prompt is a numbered menu**, with a way out and the file
-  already in place offered first. It had looped on a path that did not exist.
 - **Scoring no longer hangs on a fault that loops forever.** Each fault gets
   ten times the untouched suite's time, and at least a minute; one that runs
   past it is stopped and counted as caught, and the report says how many.
@@ -190,11 +162,11 @@ packaging tools would read as `1.1`.
   your code disagreed with an answer it met. It is now listed apart.
 - **An answer's call made through a variable counts as made**, so the list of
   answers and their tests no longer marks it "none makes this exact call".
-- **The questions file shows the code each question is about**, as the
-  terminal does, and asks for the example inputs with `row:` lines, filled in
-  where your tests provide them. Without them a run stopped on "input file
+- **The questions file shows the code each question is about**, and asks for
+  the example inputs with `row:` lines, filled in where your tests provide
+  them. Without them a run stopped on "input file
   not found".
-- **A folder holding one module is that module** with or without a terminal.
+- **A folder holding one module is that module.**
   The two had scored different things, so a file of answers did not match.
 - **Real libraries, found by running the three steps on python-slugify,
   inflection, tabulate, validators and humanize:**

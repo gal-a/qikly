@@ -57,50 +57,50 @@ instead, add `--score-tests tests/`.
 
 **Then, or instead, start on your own code, not on ours.** `--start` needs no task file, no
 specification and, until its last step, no API key. Point it at one module or
-a whole folder, or leave the path out to be asked. It:
+a whole folder. It:
 
 1. **Scores the tests you already have**, by planting faults in a copy of your
    code one at a time and seeing which ones your tests do not notice. Free, and
-   no model is called. It finds your tests, or name them with
-   `--score-tests tests/`. No tests yet? Choose "I have no tests for it yet"
-   and it asks about the whole module instead.
-2. **Asks you about each thing they never check**, as a numbered menu. Where
-   it can, the options are concrete, worked out by running your code beside
-   the value in question, never at it:
+   no model is called. It finds the tests that import your code, or name them
+   with `--score-tests tests/`.
+2. **Writes one file of questions about what they never check**, to answer at
+   your own pace in your editor. Only questions qikly can offer a choice for
+   go in, worked out by running your code beside the value in question, never
+   at it; the same call is asked once:
 
    ```
-   Your tests never try rate at exactly 100.
-   What should apply_discount(100, 100) do?
-     1. return a value, as rate 99 does now
-     2. raise ValueError, as rate 101 does now
-     3. either is fine, I do not mind
-     4. save it (no decision now, maybe later)
-     5. type my own answer
-   Type a number from 1 to 5, then press Enter:
+   #  >    2     if rate < 0 or rate > 100:
+   # Your tests never try rate at exactly 100.
+   # What should apply_discount(100, 100) do?
+   #   1. return a value, as rate 99 does now
+   #   2. raise ValueError, as rate 101 does now
+   #   3. either is fine, I do not mind
+   #   4. save it (no decision now, maybe later)
+   Q3: 2
    ```
 
-   It also asks what the module does, in a sentence, and builds a few rows of
-   example inputs from your answers and your tests for you to confirm.
-3. **Saves your answers as acceptance criteria**, checks them, and offers the
-   run, which needs an API key. A test agent writes tests from your answers
-   before any code is shown to it; a separate coding agent, which never sees
-   your answers, repairs a copy of your code until they pass. It tells you
-   first where your code and your answers disagree.
-4. **After a green run, offers to copy the new tests into your own tests
+   The file also has a line for what the module does, `rule:` lines for rules
+   of your own, and example input rows built from your tests.
+3. **`qikly --start my_module.py --answers <the file>`**, the command at the
+   top of the file, saves your answers as acceptance criteria, checks them,
+   and in a terminal offers the run, which needs an API key. A test agent
+   writes tests from your answers before any code is shown to it; a separate
+   coding agent, which never sees your answers, repairs a copy of your code
+   until they pass. It tells you first where your code and your answers
+   disagree.
+4. **After a green run, it offers to copy the new tests into your own tests
    folder**, under `qikly_generated/` beside the tests it scored, rewritten to
    import your module rather than qikly's copy of it, and runs them on your
-   code. It names which failures are disagreements between your code and
-   your answers, and which only call a helper qikly's copy has or could not
-   import your module. `qikly --take-tests <TASK>` does the same later.
+   code. It names failures that are worth comparing with your answers, and
+   those that only call a helper qikly's copy has or could not import your
+   module. `qikly --take-tests <TASK>` does the same later.
 
-It says where it writes before it starts, and ends with a full audit: every
-file it read, saved and wrote, and where.
-Your own files are never edited. Answers are saved as you go, so Ctrl+C is
-safe, and running the same command again continues where you stopped. Not in
-a terminal, as in CI or under a coding agent, it never waits: it writes the
-questions to a file and exits with code 3, and `qikly --start my_module.py
---answers <that file>` reads them back. In Git Bash, whose window Python
-does not recognise as a terminal, set `QIKLY_INTERACTIVE=1` first to be asked.
+Change anything in the file and run the same `--answers` command again; the
+file is yours and is never written over. Your own files are never edited, and
+the command ends with a full audit: every file it read, saved and wrote, and
+where. Without a terminal, as in CI or under a coding agent, `--answers` checks
+the task and prints the two commands that run it, `qikly --tasks <TASK>` and
+`qikly --take-tests <TASK>`.
 
 ### The same path, command by command
 

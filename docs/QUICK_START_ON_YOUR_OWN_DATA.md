@@ -127,30 +127,36 @@ The same three steps as [the home page](https://test.qikly.com/?ref=quick-start)
    root; to name them instead, add `--score-tests tests/`. Step 2 finds them
    the same way.
 
-2. **Answer what your tests never check.** Free until its last step:
+2. **Answer what your tests never check.** Free, no key:
 
    ```bash
    qikly --start my_metrics.py        # or: qikly --start my_project
    ```
 
-   It scores your tests first, so you can start here directly, then asks you
-   a numbered-menu question about each thing they never check, what the
-   module does in a sentence, and a few rows of example inputs, which it
-   builds from your answers and your tests for you to confirm. It says where
-   it writes before it starts, saves as you go, and Ctrl+C is safe: the same
-   command continues where you stopped. Not in a terminal, as in CI or under
-   a coding agent, it writes the questions to a file instead, and
-   `--answers <that file>` reads them back.
+   It scores your tests first, so you can start here directly, then writes
+   one file of questions per module, under `inputs_private/questions/`. Each
+   question comes with the choices qikly found by running your code; write the
+   option's number after its `Q`. The file also has a line for what the module
+   does in a sentence, `rule:` lines for rules of your own, and example input
+   rows built from your tests. Answer at your own pace and change anything
+   before you run it: the file is yours and is never written over.
 
-3. **Get a fresh test suite written from your answers.** `--start` offers
-   the run at the end, which needs a key. A test agent writes tests from your
-   answers before any code is shown to it, and a separate coding agent, which
-   never sees them, repairs a copy of your code until they pass. Your files
-   are never edited. It tells you first where your code and your answers
-   disagree. After a green run it offers to copy the new tests into
-   `qikly_generated/` beside the tests it scored, importing your own module
-   (`qikly --take-tests <TASK>` does the same later), and it ends with a full
-   audit of every file it read, saved and wrote.
+3. **Get a fresh test suite written from your answers.** Run the command at
+   the top of the file:
+
+   ```bash
+   qikly --start my_metrics.py --answers inputs_private/questions/MY_METRICS_open_questions.txt
+   ```
+
+   It checks your answers and offers the run, which needs a key. A test agent
+   writes tests from your answers before any code is shown to it, and a
+   separate coding agent, which never sees them, repairs a copy of your code
+   until they pass. Your files are never edited. It tells you first where your
+   code and your answers disagree. After a green run it offers to copy the new
+   tests into `qikly_generated/` beside the tests it scored, importing your
+   own module (`qikly --take-tests <TASK>` does the same later), and it ends
+   with a full audit of every file it read, saved and wrote. Without a
+   terminal it prints the two commands that run it instead.
 
 ## Command by command
 

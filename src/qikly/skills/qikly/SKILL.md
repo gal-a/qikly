@@ -50,22 +50,22 @@ disagree with a bug because the bug is what they were written from.
 So do not open by writing tests. Say that in one sentence, then offer the
 things that do work, and let the user choose:
 
-- **`qikly --start my_module.py`** (qikly 0.6.0 or later) is the whole path in
-  one command, and the best first offer when a suite already exists. It scores
-  their tests, asks them a numbered-menu question about each thing the tests
-  never check, saves the answers as acceptance criteria and offers the run.
-  **Suggest they run it in their own terminal**: the answers have to be
-  theirs, and there it asks them directly. If you run it, it has no terminal
-  to ask in, so it writes the questions, with their options, to
-  `inputs_private/questions/<NAME>_open_questions.txt` and exits with code 3.
-  Then put each question and its options to the user **word for word**, write
-  what they choose or say after its `Q` number, never an answer of your own or
-  one read off the code, and run `qikly --start my_module.py --answers <that
-  file>`. It also needs a `requirements:` line, a sentence from them on what
-  the module does.
-  After a green run, `qikly --take-tests <TASK>` copies the new tests into
-  `qikly_generated/` beside the tests it scored, importing the user's own module, and runs them
-  on it: any that fail there are where the code and the answers disagree.
+- **`qikly --start my_module.py`** (qikly 0.6.0 or later) is the whole path,
+  and the best first offer when a suite already exists. It scores their tests
+  and writes the questions, each with options worked out by running their
+  code, to `inputs_private/questions/<NAME>_open_questions.txt`, and exits
+  with code 3. Put each question and its options to the user **word for
+  word**, and write what they choose after its `Q` number, never an answer of
+  your own or one read off the code. The file also needs a `requirements:`
+  line, a sentence from them on what the module does, and can take `rule:`
+  lines, rules of their own, in their words. Or suggest they fill the file in
+  themselves, in their editor: the answers have to be theirs.
+  Then `qikly --start my_module.py --answers <that file>` checks the task. In
+  their own terminal it offers the run, says where the code and the answers
+  disagree, and offers to copy the new tests home. Run by you, without a
+  terminal, it prints `qikly --tasks <TASK>` and `qikly --take-tests <TASK>`,
+  which do the run and the copy; any copied test that fails on their code is
+  for them to compare with its answer, not proof the code is wrong.
 
 - **`qikly --score-code my_module.py --score-tests their_tests.py`** if any
   suite already exists. Free, no model call, nothing of theirs modified, and it

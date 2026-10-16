@@ -1128,25 +1128,24 @@ def _parse_args():
     )
     parser.add_argument(
         "--start", nargs="?", const="", default=None, metavar="PATH",
-        help="THE PLACE TO START. A guided first run on your own code: scores "
-             "the tests you already have, asks you a question about each "
-             "thing they never check, saves your answers, and offers to write "
-             "a suite from them. PATH is a module or a folder of modules; "
-             "leave it out to be asked. Every prompt is a numbered menu. "
-             "Nothing of yours is changed."
+        help="THE PLACE TO START. Scores the tests you already have and writes "
+             "one file of questions about what they never check, to answer in "
+             "your editor; the command to run next is at its top. PATH is a "
+             "module or a folder of modules. Nothing of yours is changed."
     )
     parser.add_argument(
         "--take-tests", metavar="TASK", default=None,
         help="Copy the tests a run wrote for TASK into tests/qikly_generated/, "
              "rewritten to import your own module rather than qikly's copy of "
-             "it, and run them on your code. A test that fails there is a "
-             "place your code disagrees with your answers. Free."
+             "it, and run them on your code. A test that fails there is one to "
+             "compare with its answer. Free."
     )
     parser.add_argument(
         "--answers", metavar="FILE", default=None,
-        help="With --start, answer its questions from a file instead of "
-             "prompting: the open-questions file --start writes when it is not "
-             "run in a terminal, with an answer after each Q number."
+        help="With --start, read your answers from the questions file --start "
+             "wrote, check the task, and in a terminal offer the run, where "
+             "your code disagrees with you, and the copy of the new tests "
+             "into yours."
     )
     parser.add_argument(
         "--status", metavar="RUN_ID",
