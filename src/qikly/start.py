@@ -55,6 +55,13 @@ class Stop(Exception):
     """The user asked to stop, or input ran out. Never an error."""
 
 
+class Back(Exception):
+    """The user asked to go back to the menu the typing started from."""
+
+
+_BACK = {"back", "b"}
+
+
 def is_terminal():
     """
     Whether someone can answer. `isatty()` alone is not enough on Windows,
@@ -180,7 +187,7 @@ def choose(console, options, lead=None):
                         f"type a number from 1 to {count}.")
 
 
-def free_text(console, what, example=None, value=False):
+def free_text(console, what, example=None, value=False, back=False):
     """
     A line of text, never empty. `what` says what kind of text is wanted.
     `value` marks a prompt whose answer may well be a bare number, such as
@@ -188,27 +195,39 @@ def free_text(console, what, example=None, value=False):
     only get in the way.
     """
     prompt = what + (f", such as {example}" if example else "") + \
-        ". Then press Enter:"
+        (". Then press Enter, or type back to return to the menu:" if back
+         else ". Then press Enter:")
     while True:
         raw = console.ask(prompt)
         if raw.lower() in _QUIT:
             raise Stop()
+        if back and raw.strip().lower() in _BACK:
+            raise Back()
         if not value and raw and raw.rstrip(".)").isdigit() and len(raw) <= 3:
             # A bare small number where words were asked for is almost always
             # a menu choice typed one prompt too late.
             console.say(f"You typed only \"{raw}\", which looks like a menu "
                         f"number, but this prompt wants words.")
-            for number, label in enumerate([f"keep \"{raw}\" as it is",
-                                            "type it again"], 1):
+            labels = [f"keep \"{raw}\" as it is"]
+            # A way out: typing "1" again and again, kept and then refused as
+            # too short, was a loop a person could not leave.
+            labels += ["go back to the menu I came from"] if back else []
+            labels += ["type it again"]
+            for number, label in enumerate(labels, 1):
                 console.say(f"  {number}. {label}")
-            again = console.ask("Type a number from 1 to 2, then press Enter:")
-            while again.rstrip(".)") not in ("1", "2"):
+            top = str(len(labels))
+            prompt_n = f"Type a number from 1 to {top}, then press Enter:"
+            again = console.ask(prompt_n)
+            while again.rstrip(".)") not in [str(i) for i in range(1, len(labels) + 1)]:
                 if again.lower() in _QUIT:
                     raise Stop()
-                console.say("Please type 1 or 2.")
-                again = console.ask("Type a number from 1 to 2, then press Enter:")
-            if again.rstrip(".)") == "1":
+                console.say(f"Please type a number from 1 to {top}.")
+                again = console.ask(prompt_n)
+            choice = labels[int(again.rstrip(".)")) - 1]
+            if choice.startswith("keep"):
                 return raw
+            if choice.startswith("go back"):
+                raise Back()
             continue
         if raw:
             return raw
@@ -228,7 +247,7 @@ def own_answer(console, example):
     at whatever rate the generator happens to pick.
     """
     text = free_text(console, "Type your answer in plain words, naming a value",
-                     f'"{example}"')
+                     f'"{example}"', back=True)
     # A criterion of one word is never a rule, and a bare "1" kept as one
     # made the run refuse the task: it appears elsewhere in the file, so it
     # cannot be withheld.
@@ -236,21 +255,24 @@ def own_answer(console, example):
         console.say("A criterion needs a few words: the input, and what should "
                     "happen to it.")
         text = free_text(console, "Type your answer in plain words, naming a value",
-                         f'"{example}"')
+                         f'"{example}"', back=True)
     while not _names_a_value(text):
         picked = choose(console, [
             "add a value to it",
             "keep it as it is",
+            "go back to the menu I came from",
             "type it again",
         ], lead=["That answer names no value, and a test needs one to check."])
         if picked == 1:
             text = text + " " + free_text(console, "Type the value to add",
-                                          '"at exactly 100"')
+                                          '"at exactly 100"', back=True)
         elif picked == 2:
             break
+        elif picked == 3:
+            raise Back()
         else:
             text = free_text(console, "Type your answer again, naming a value",
-                             f'"{example}"')
+                             f'"{example}"', back=True)
     return text
 
 
@@ -1060,7 +1082,15 @@ def ask_question(console, number, total, q, source, test_sources, root,
     else:
         console.say(q["question"])
     lead = [prompt] if prompt else []
-    picked = options[choose(console, [o["label"] for o in options], lead=lead) - 1]
+    while True:
+        picked = options[choose(console, [o["label"] for o in options], lead=lead) - 1]
+        if picked["kind"] != so.OWN:
+            break
+        try:
+            typed = own_answer(console, _example(q, test_sources))
+            break
+        except Back:
+            console.say("  back to the question's options.")
     if picked["kind"] == so.SKIP_TYPED:
         return {"question": q["question"], "where": where_, "status": so.SKIP,
                 "key": _key(q), "deferred": True, "skip_typed": True}
@@ -1076,8 +1106,7 @@ def ask_question(console, number, total, q, source, test_sources, root,
                       function=picked["function"], args=picked["args"],
                       kwargs=picked.get("kwargs") or {})
     elif picked["kind"] == so.OWN:
-        record.update(status="answered",
-                      criterion=own_answer(console, _example(q, test_sources)))
+        record.update(status="answered", criterion=typed)
     return record
 
 
@@ -1120,14 +1149,21 @@ def summary(console, paths, state, questions_by_key, example="f(1) returns 2"):
                                                  "(the N in \"answer N\")")
             key, rec = rows[which - 1]
             if key is None:
+                try:
+                    new = own_answer(console, rec)
+                except Back:
+                    continue
                 state["extra"].remove(rec)
-                state["extra"].append(own_answer(console, rec))
+                state["extra"].append(new)
             else:
                 yield key
         else:
             # The example comes from this module's own calls: a fixed one
             # named a function the user's module does not have.
-            state.setdefault("extra", []).append(own_answer(console, example))
+            try:
+                state.setdefault("extra", []).append(own_answer(console, example))
+            except Back:
+                continue
             yield None
 
 

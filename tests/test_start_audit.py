@@ -1259,3 +1259,19 @@ def test_skipping_the_typed_questions_puts_off_the_rest_without_asking(tmp_path)
     assert "4 questions that need typing put off" in s.text
     answers = start.load_state(paths)["answers"]
     assert len(answers) == 4 and all(r.get("deferred") for r in answers.values())
+
+
+def test_a_typed_answer_can_go_back_to_the_questions_menu(tmp_path):
+    # Typing "1" where words were wanted, keeping it, and being told it was
+    # too short, went round with no way out but Ctrl+C.
+    q = {"file": "pricing.py", "path": str(tmp_path / "pricing.py"), "line": 2,
+         "function": "apply_discount", "question": "q?", "kind": "guard disabled"}
+    (tmp_path / "pricing.py").write_text(PRICING, encoding="utf-8")
+    # 3 = type my own answer, "1", 2 = go back, then 1 = skip.
+    s = Script(["3", "1", "2", "1"])
+    rec = start.ask_question(s.console, 1, 1, q, PRICING, [TESTS], str(tmp_path))
+    assert rec["status"] == "skip" and "back to the question's options" in s.text
+    # And "back" typed at the prompt does the same.
+    s = Script(["3", "back", "1"])
+    assert start.ask_question(s.console, 1, 1, q, PRICING, [TESTS],
+                              str(tmp_path))["status"] == "skip"
