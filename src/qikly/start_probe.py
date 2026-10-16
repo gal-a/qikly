@@ -40,7 +40,7 @@ span = spec_in.get("span")
 top = dotted.split(".")[0]
 # A memory address differs on every run and says nothing about behaviour:
 # two reprs of one function, or of one object, compared as different.
-ADDRESS = re.compile(r" at 0x[0-9A-Fa-f]+")
+ADDRESS = re.compile(r" at 0x[0-9A-Fa-f]+(?=>)")
 is_init = os.path.basename(path) == "__init__.py"
 for entry in (os.path.dirname(path), root, spec_in.get("base")):
     if entry and entry not in sys.path:

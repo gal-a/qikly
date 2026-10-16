@@ -2184,7 +2184,9 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
     # Answers to questions this score no longer asks are dropped: the code or
     # the tests changed, and an answer to a question nobody asked is noise.
     state["answers"] = {k: v for k, v in state["answers"].items() if k in by_key}
-    pending = _still_to_ask(keys, state)
+    # In the order they will be asked, so "continue with question N" names
+    # the one that comes next.
+    pending = _most_useful_first(_still_to_ask(keys, state), by_key, test_sources, root)
     if (state["answers"] or state.get("requirements")) and console.interactive:
         # Shown on every return, so it is never a surprise. Deleting answers
         # sits behind its own confirmation: a first-time user piping answers
@@ -2269,9 +2271,8 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
     previous = None
     for key in pending:
         number = keys.index(key) + 1
-        # The question asked just before, not the one numbered before it.
+        # The question shown just before, not the one numbered before it.
         same = bool(previous and previous.get("line") == by_key[key].get("line"))
-        previous = by_key[key]
         state["answers"][key] = ask_question(console, number, total, by_key[key],
                                              source, test_sources, root, same,
                                              skip_typed=bool(skip_typed))
@@ -2279,18 +2280,22 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
         save_state(paths, state)
         write_files(console, paths, state)
         rec = state["answers"][key]
-        if rec.pop("skip_typed", False):
+        chose = rec.pop("skip_typed", False)
+        if chose:
             skip_typed = True
         if skip_typed and rec.get("deferred"):
             put_off += 1
+            if chose:
+                previous = by_key[key]
             continue
+        previous = by_key[key]
         if rec["status"] in (so.ASK, so.SKIP):
             console.say(f"  saved, as an open question, to {paths.rel(paths.open)}")
         else:
             console.say(f"  saved to {paths.rel(paths.task)}")
     if put_off:
         console.say("")
-        console.say(f"{put_off} question{'' if put_off == 1 else 's'} that need typing "
+        console.say(f"{put_off} question{' that needs' if put_off == 1 else 's that need'} typing "
                     f"put off, saved to {paths.rel(paths.open)}; running the same "
                     f"command again asks {'it' if put_off == 1 else 'them'}.")
     # Keep the answers in the order the questions are asked.
@@ -2302,6 +2307,8 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
             n = keys.index(changed) + 1
             state["answers"][changed] = ask_question(console, n, total, by_key[changed],
                                                      source, test_sources, root)
+            # Outside the question loop it puts off only this one question.
+            state["answers"][changed].pop("skip_typed", None)
             state["answers"][changed]["number"] = n
         save_state(paths, state)
         write_files(console, paths, state)
@@ -3034,7 +3041,8 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
                     rec["status"] = so.SKIP
                 elif o["kind"] == so.SKIP_TYPED:
                     # In a file every question is answered on its own, so
-                    # this one is simply put off.
+                    # this one is simply put off, and said so.
+                    console.say(f"Q{n}: put off; it is asked again next time.")
                     rec["status"], rec["deferred"] = so.SKIP, True
                 else:
                     rec["status"] = o["kind"]

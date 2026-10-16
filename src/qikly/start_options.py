@@ -547,10 +547,20 @@ def _is_number(text):
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+_FILE_EXT = re.compile(
+    r"\.(txt|csv|tsv|json|ya?ml|toml|ini|cfg|env|py|log|md|xml|html?|pdf|png|jpe?g|gif|"
+    r"dat|db|sqlite|zip|gz|tar|parquet|xlsx?|docx?|pptx?)$", re.IGNORECASE)
+
+
 def _pathlike(value):
-    """A string that names a file: a path, or a name with an extension."""
-    return isinstance(value, str) and bool(
-        re.search(r"[/\\]", value) or re.fullmatch(r"[\w.-]+\.[A-Za-z]\w{0,4}", value))
+    """
+    A string that names a file: one ending in a file extension, or an
+    absolute path. "example.com", "john.smith" and "1/2" are ordinary values,
+    and dropping them lost every menu of a library about names or URLs.
+    """
+    if not isinstance(value, str) or "://" in value:
+        return False
+    return bool(_FILE_EXT.search(value) or re.match(r"^([A-Za-z]:[\\/]|[\\/])", value))
 
 
 def _variants(value):
@@ -568,7 +578,7 @@ def _variants(value):
         return [value + 0.333, round(value * 1.37, 4), value + 1,
                 -value - 1.0, 0.0, value * 20 + 1.0]
     if isinstance(value, str):
-        if re.search(r"[/\\]", value) or re.fullmatch(r"[\w.-]+\.[A-Za-z]\w{0,4}", value):
+        if _pathlike(value):
             # A path is left as the tests gave it: `out.txt` + "x" made a
             # function write a new file beside the user's own.
             return []
@@ -622,36 +632,65 @@ def _readable(a, b):
 _IO = re.compile(r"\bopen\(|\bos\.|\bshutil\.|\bPath\(|\.write\w*\(|\bsubprocess\.|\bsocket\.")
 
 
+_IO_MODULES = {"os", "shutil", "subprocess", "socket", "pathlib", "tempfile", "glob",
+               "requests", "urllib", "http", "ftplib", "smtplib", "sqlite3"}
+_IO_NAMES = {"open", "Path", "remove", "unlink", "rmtree", "makedirs", "mkdir", "system",
+             "urlopen"}
+_IO_METHODS = {"write_text", "write_bytes", "read_text", "read_bytes", "unlink",
+               "mkdir", "rmdir", "touch", "rename", "replace", "chmod"}
+
+
 def _does_io(source, name):
     """
-    Whether a function or class, or anything in this module it calls, touches
-    files or the system. Through a helper too: public `save` calling `_dump`,
-    which opened the file, overwrote a user's real report while a menu was
-    built for an unrelated question.
+    Whether a function or class, or a function or method of this module it
+    calls by name or through `self`, touches files or the system. Read from
+    the calls themselves, not the text: a docstring naming os.environ, or a
+    write to an io.StringIO, hid menus from pure code. Through a helper too:
+    public `save` calling `_dump`, which opened the file, overwrote a user's
+    real report while a menu was built for an unrelated question.
     """
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return True
-    defs = {}
-    for n in ast.walk(tree):
-        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            defs.setdefault(n.name, n)
+    functions, classes = {}, {}
+    for n in tree.body:
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            functions[n.name] = n
+        elif isinstance(n, ast.ClassDef):
+            classes[n.name] = n
+            for m in n.body:
+                if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    functions.setdefault(n.name + "." + m.name, m)
+
+    def root(node):
+        while isinstance(node, ast.Attribute):
+            node = node.value
+        return node.id if isinstance(node, ast.Name) else None
+
     seen, todo = set(), [name]
     while todo:
         current = todo.pop()
-        if current in seen or current not in defs:
+        if current in seen:
             continue
         seen.add(current)
-        node = defs[current]
-        text = ast.get_source_segment(source, node) or ""
-        if _IO.search(text):
-            return True
+        node = functions.get(current) or classes.get(current)
+        if node is None:
+            continue
+        owner = current.split(".")[0] if current in classes or "." in current else None
         for call in ast.walk(node):
-            if isinstance(call, ast.Call):
-                f = call.func
-                todo.append(f.id if isinstance(f, ast.Name) else
-                            f.attr if isinstance(f, ast.Attribute) else "")
+            if not isinstance(call, ast.Call):
+                continue
+            f = call.func
+            if isinstance(f, ast.Name):
+                if f.id in _IO_NAMES:
+                    return True
+                todo.append(f.id)
+            elif isinstance(f, ast.Attribute):
+                if root(f) in _IO_MODULES or f.attr in _IO_METHODS:
+                    return True
+                if isinstance(f.value, ast.Name) and f.value.id in ("self", "cls") and owner:
+                    todo.append(owner + "." + f.attr)
     return False
 
 
