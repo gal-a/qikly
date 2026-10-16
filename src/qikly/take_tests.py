@@ -287,7 +287,8 @@ def take(cwd, task_id, test_dir, say=print):
         say(f"  not copied, because it still refers to qikly's copy: {path}")
     keep_outputs_out_of_pytest(cwd)
     _remember(cwd, task_id, test_dir)
-    return written + extras, _run(cwd, written)
+    return written + extras, _run(cwd, written,
+                                  len(task.get("acceptance_criteria") or []))
 
 
 def _remove_stale(dest_root, keep):
@@ -332,36 +333,35 @@ def remembered_folder(cwd, task_id):
 _MISSING = re.compile(r"cannot import name|module '[\w.]+' has no attribute")
 
 
-_TAG = re.compile(r"Criteria:\s*\d")
-
-
-def _tagged_tests(paths):
+def _tagged_tests(paths, criteria_count):
     """
-    The names of the tests the writer tagged with one of the answers. Only
-    those can disagree with an answer: an untagged test is the writer's own
-    reading of the code or the requirements, and on semantic_version two such
-    tests misused its API, the coding agent bent its copy to fit them, and
-    the user was told to apply that change to code that was right.
+    The (file stem, test name) pairs the writer tagged with one of the
+    answers, read the way the rest of qikly reads tags (traceability), and
+    only for numbers that are answers. Only those can disagree with an
+    answer: an untagged test is the writer's own reading of the code or the
+    requirements, and on semantic_version two such tests misused its API.
+    Keyed by file too: a tagged test_sum in one file made an untagged
+    test_sum in another read as tagged.
     """
-    import ast
-    names = set()
+    from qikly import traceability
+    pairs = set()
     for path in paths:
         if not path.endswith(".py"):
             continue
         try:
             with open(path, encoding="utf-8") as handle:
-                source = handle.read()
-            tree = ast.parse(source)
-        except (OSError, SyntaxError, ValueError):
+                traced = traceability.trace_source(handle.read())
+        except (OSError, ValueError):
             continue
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and \
-                    _TAG.search(ast.get_source_segment(source, node) or ""):
-                names.add(node.name)
-    return names
+        stem = os.path.splitext(os.path.basename(path))[0]
+        for name, indices in traced.items():
+            if isinstance(indices, list) and any(
+                    0 < i <= criteria_count for i in indices):
+                pairs.add((stem, name))
+    return pairs
 
 
-def _run(cwd, paths):
+def _run(cwd, paths, criteria_count=0):
     """
     The copied tests on the user's own code, each failure classified from
     pytest's JUnit XML: (summary, disagree, missing, no_import, broken,
@@ -383,7 +383,7 @@ def _run(cwd, paths):
     summary = next((l for l in reversed(lines)
                     if re.search(r"\b(passed|failed|error)", l)), "").strip("= ").strip()
     disagree, missing, no_import, broken, unanswered = [], [], [], [], []
-    tagged = _tagged_tests(paths)
+    tagged = _tagged_tests(paths, criteria_count)
     try:
         tree = ET.parse(xml_path)
     except (ET.ParseError, OSError):
@@ -410,12 +410,20 @@ def _run(cwd, paths):
             broken.append(label)
         elif problem.tag == "error" and not case.get("name"):
             broken.append(label)
-        elif case.get("name", "").split("[")[0] in tagged:
+        elif (_stem_of(case.get("classname", "")),
+              case.get("name", "").split("[")[0]) in tagged:
             disagree.append(label)
         else:
             unanswered.append(label)
     shutil.rmtree(os.path.dirname(xml_path), ignore_errors=True)
     return summary, disagree, missing, no_import, broken, unanswered
+
+
+def _stem_of(classname):
+    """The test file's stem from a JUnit classname, `a.b.test_system[.Class]`."""
+    parts = classname.split(".")
+    files = [p for p in parts if p.startswith("test")]
+    return files[-1] if files else (parts[-1] if parts else "")
 
 
 def report(say, cwd, written, result, task_id):

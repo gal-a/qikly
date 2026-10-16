@@ -32,10 +32,15 @@ import tempfile
 TIMEOUT = 15
 
 _CHILD = r'''
-import ast, contextlib, importlib, importlib.util, io, json, os, sys
+import ast, contextlib, importlib, importlib.util, io, json, os, re, sys
 spec_in = json.loads(sys.stdin.read())
 path, root, dotted = spec_in["path"], spec_in["root"], spec_in["dotted"]
 line = spec_in.get("line")
+span = spec_in.get("span")
+top = dotted.split(".")[0]
+# A memory address differs on every run and says nothing about behaviour:
+# two reprs of one function, or of one object, compared as different.
+ADDRESS = re.compile(r" at 0x[0-9A-Fa-f]+")
 is_init = os.path.basename(path) == "__init__.py"
 for entry in (os.path.dirname(path), root, spec_in.get("base")):
     if entry and entry not in sys.path:
@@ -71,6 +76,11 @@ class Serve(object):
             module.__path__ = [os.path.dirname(path)]
         exec(compile(self.source, path, "exec"), module.__dict__)
 
+def forget():
+    """The package and everything in it out of sys.modules, for a fresh start."""
+    for name in [n for n in sys.modules if n == top or n.startswith(top + ".")]:
+        del sys.modules[name]
+
 def by_package(source):
     """
     Through its package, for a module the package imports back, which met
@@ -79,9 +89,7 @@ def by_package(source):
     it see its classes, and the code is never run twice side by side, which
     reported a sibling's exception as the module's own.
     """
-    top = dotted.split(".")[0]
-    for name in [n for n in sys.modules if n == top or n.startswith(top + ".")]:
-        del sys.modules[name]
+    forget()
     finder = Serve(source) if source is not None else None
     if finder:
         sys.meta_path.insert(0, finder)
@@ -108,19 +116,23 @@ def outcomes(module, calls, trace=False):
             if is_ours(frame.f_code):
                 if event == "line" and frame.f_lineno == line:
                     hit[0] = True
+                # A line in a signature, a default such as width=4, never
+                # runs as a line: calling the function is what reaches it.
+                if event == "call" and span and span[0] <= frame.f_code.co_firstlineno <= span[1]:
+                    hit[0] = True
                 return tracer
             return None
         try:
             args = [ast.literal_eval(a) for a in args]
             kwargs = {k: ast.literal_eval(v) for k, v in kwargs.items()}
-            if trace and line:
+            if trace and (line or span):
                 sys.settrace(tracer)
             try:
                 with contextlib.redirect_stdout(io.StringIO()):
                     value = getattr(module, func)(*args, **kwargs)
             finally:
                 sys.settrace(None)
-            out.append({"returns": repr(value)})
+            out.append({"returns": ADDRESS.sub(" at 0x...", repr(value))})
         except BaseException as exc:
             out.append({"raises": type(exc).__name__})
         reached.append(hit[0])
@@ -131,7 +143,9 @@ calls = spec_in["calls"]
 try:
     try:
         load, real = by_file, by_file(None)
-    except ImportError:
+    except Exception:
+        # Any failure, not only ImportError: a circular `from . import mod`
+        # then `mod.Thing()` in the package raised AttributeError by file.
         load, real = by_package, by_package(None)
     reply["now"], reply["reached"] = outcomes(real, calls, trace=True)
     # Twice: a call whose outcome changes from one run to the next, a uuid
@@ -141,7 +155,10 @@ except BaseException as exc:
     reply["load"] = type(exc).__name__
 if "load" not in reply and spec_in.get("mutant") is not None:
     try:
-        sys.modules.pop(dotted, None)
+        # The whole package, not only the module: a sibling left loaded kept
+        # the first copy's exception class, and the changed copy then raised
+        # where neither version of the code does.
+        forget()
         reply["changed"] = outcomes(load(spec_in["mutant"]), calls)[0]
     except BaseException as exc:
         reply["load"] = type(exc).__name__
@@ -193,7 +210,7 @@ def sendable(value):
     return type(back) is type(value) and back == value
 
 
-def run_calls(path, root, calls, mutant=None, line=None):
+def run_calls(path, root, calls, mutant=None, line=None, span=None):
     """
     The outcome of each call, or None when the module could not be run at
     all. With `mutant`, a pair: (outcomes now, outcomes with the change).
@@ -210,7 +227,7 @@ def run_calls(path, root, calls, mutant=None, line=None):
     payload = json.dumps({
         "path": os.path.abspath(path), "root": os.path.abspath(root),
         "dotted": dotted_name(path, root), "base": import_base(path, root),
-        "mutant": mutant, "line": line,
+        "mutant": mutant, "line": line, "span": span,
         "calls": [[f, [repr(a) for a in args],
                    {k: repr(v) for k, v in kwargs.items()}]
                   for f, args, kwargs in calls]})
@@ -237,7 +254,7 @@ def run_calls(path, root, calls, mutant=None, line=None):
     if not isinstance(changed, list) or len(changed) != len(calls):
         return None
     changed = [c if ok else n for c, n, ok in zip(changed, now, stable)]
-    if line is not None:
+    if line is not None or span is not None:
         reached = reply.get("reached") or [False] * len(calls)
         return now, changed, reached
     return now, changed

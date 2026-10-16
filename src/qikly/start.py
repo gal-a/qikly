@@ -1793,10 +1793,16 @@ def _makes_call(body, call, source=None, test_file=None, test=None):
             tree = ast.parse(test_file)
         except SyntaxError:
             tree = None
-        last = test.split("::")[-1].split("[")[0]
-        scope = next((n for n in ast.walk(tree) if isinstance(
-            n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == last), None) \
-            if tree else None
+        parts = test.split("[")[0].split("::")
+        scope = tree
+        # Down the named classes first: TestB::test_x is not the first
+        # test_x in the file, which named the wrong test's calls.
+        for part in parts[:-1]:
+            scope = next((n for n in ast.walk(scope) if isinstance(n, ast.ClassDef)
+                          and n.name == part), None) if scope else None
+        scope = next((n for n in ast.walk(scope) if isinstance(
+            n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == parts[-1]), None) \
+            if scope else None
     if scope is None:
         try:
             tree = ast.parse(body)
@@ -1921,9 +1927,15 @@ def report_result(console, paths, state, lines, converged):
                 console.say(f"  - {t}")
             # Not a verdict on the code: on semantic_version both were the
             # test writer misreading the API, and the copy was bent to fit.
-            console.say("  These are the test writer's own reading of your code or "
-                        "requirements, which can be wrong. Check each before "
-                        "changing anything.")
+            # Said only of tests the run named: of an unnamed failure qikly
+            # cannot say even that.
+            if untagged == [UNNAMED]:
+                console.say("  qikly could not tell which test failed; the "
+                            "step-by-step report has the run's own output.")
+            else:
+                console.say("  These are the test writer's own reading of your code or "
+                            "requirements, which can be wrong. Check each before "
+                            "changing anything.")
         patches = _newest(os.path.join(paths.cwd, "outputs", "logs", "patches",
                                        paths.task_id))
         # A run's patches sit in a folder per run; name the diff itself.
@@ -2088,6 +2100,8 @@ def _most_useful_first(pending, by_key, test_sources, root):
     """
     def callable_(key):
         q = by_key[key]
+        if so._on_a_comparison(q, _read(q["path"])):
+            return False
         module = so.path_module(q["path"], root)
         names = [q["function"]] if q.get("function") else []
         names += so._public_functions(_read(q["path"]))
@@ -2761,7 +2775,10 @@ def _cannot_task(paths):
 
 def _complete(paths):
     state = load_state(paths)
+    # Put-off questions are still to ask: counted complete, a module holding
+    # twenty of them passed the folder prompt by.
     return bool(state and state.get("requirements") and state.get("answers")
+                and not any(r.get("deferred") for r in state["answers"].values())
                 and (state.get("rows") or state.get("sample")))
 
 

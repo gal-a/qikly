@@ -33,7 +33,8 @@ def _project(tmp_path, implementation="pricing.py", module=None, stage_files=Non
     (tasks / "PRICING_VERIFY.yaml").write_text(yaml.safe_dump({
         "task_id": "PRICING_VERIFY",
         "interface": {"module": module or "outputs.agent_src.code.PRICING_VERIFY.pricing"},
-        "seed": {"implementation": implementation}}))
+        "seed": {"implementation": implementation},
+        "acceptance_criteria": ["apply_discount(100, 100) raises ValueError"]}))
     for rel, text in (stage_files or {"system/test_system.py": GEN}).items():
         path = tmp_path / "outputs" / "tests" / "PRICING_VERIFY" / rel
         path.parent.mkdir(parents=True, exist_ok=True)

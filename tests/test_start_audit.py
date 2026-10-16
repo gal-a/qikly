@@ -1149,3 +1149,95 @@ def test_the_sample_file_prompt_is_a_menu_with_a_way_out(tmp_path):
     start.ask_data(s.console, paths, state, source, [])
     assert state["sample"] == paths.data
     start.write_files(s.console, paths, state)
+
+
+# -------------------------------------------- the fifth audit, 2026-10-16 --
+
+def test_a_menu_never_writes_through_a_helper_or_the_lines_own_function(tmp_path):
+    report = tmp_path / "report.txt"
+    report.write_text("the user's real report\n", encoding="utf-8")
+    source = ("def _dump(path, text):\n"
+              "    with open(path, 'w') as f:\n"
+              "        f.write(text)\n\n\n"
+              "def save(path, text):\n"
+              "    if not text:\n"
+              "        raise ValueError('empty')\n"
+              "    _dump(path, text)\n"
+              "    return len(text)\n")
+    (tmp_path / "shop.py").write_text(source, encoding="utf-8")
+    tests = (f"from shop import save\n\ndef test_save():\n"
+             f"    assert save({report.as_posix()!r}, 'abc') == 3\n")
+    for line, function in ((7, "save"), (2, "_dump")):
+        q = {"path": str(tmp_path / "shop.py"), "line": line, "function": function,
+             "kind": "guard disabled", "question": "Which input should it catch?"}
+        so.menu(q, source, [tests], str(tmp_path), _guard_mutant(source))
+    assert report.read_text(encoding="utf-8") == "the user's real report\n"
+
+
+def test_two_reprs_of_one_function_are_not_a_difference(tmp_path):
+    source = ("def _fast(x):\n    return x\n\n\ndef _slow(x):\n    return x\n\n\n"
+              "def parser_for(size):\n    if size < 0:\n        raise ValueError(size)\n"
+              "    return _fast\n")
+    (tmp_path / "disp.py").write_text(source, encoding="utf-8")
+    now, changed = start_probe.run_calls(str(tmp_path / "disp.py"), str(tmp_path),
+                                         [("parser_for", [5], {})], mutant=source)
+    assert now == changed and "0x..." in now[0]["returns"]
+
+
+def test_an_object_now_against_a_raise_after_is_a_difference(tmp_path):
+    source = ("class Spec:\n"
+              "    def __init__(self, text):\n"
+              "        self.text = text\n")
+    changed = source.replace("        self.text = text\n",
+                             "        raise ValueError(text)\n")
+    (tmp_path / "spec.py").write_text(source, encoding="utf-8")
+    now, after = start_probe.run_calls(str(tmp_path / "spec.py"), str(tmp_path),
+                                       [("Spec", ["1.2"], {})], mutant=changed)
+    assert "returns" in now[0] and after[0] == {"raises": "ValueError"}
+
+
+def test_a_default_and_a_constant_are_reached_through_public_calls(tmp_path):
+    from qikly.mutation import count_sites, make_mutant
+    source = ("FREE = 50\n\n\n"
+              "def _pad(text, width=4):\n    return text.rjust(width, '0')\n\n\n"
+              "def fmt(n):\n    return _pad(str(n))\n\n\n"
+              "def shipping(total):\n    return 0 if total >= FREE else 5\n")
+    (tmp_path / "shop.py").write_text(source, encoding="utf-8")
+    tests = ("from shop import fmt, shipping\n\ndef test_f():\n    assert fmt(985)\n\n"
+             "def test_s():\n    assert shipping(60) == 0\n")
+    for change, line, function in (("int 4 -> 5", 4, "_pad"),):
+        mutant = next(m for m, d in (make_mutant(source, i, "arithmetic")
+                                     for i in range(count_sites(source, "arithmetic")))
+                      if d.startswith(change))
+        q = {"path": str(tmp_path / "shop.py"), "line": line, "function": function,
+             "kind": change, "question": "What should it be?"}
+        prompt, _ = so.menu(q, source, [tests], str(tmp_path), mutant)
+        assert prompt, change
+
+
+def test_tags_are_read_per_file_and_only_for_answers(tmp_path):
+    a = tmp_path / "test_one.py"
+    a.write_text('def test_sum():\n    """Criteria: 1"""\n\n'
+                 'def test_far():\n    """Criteria: 7"""\n\n'
+                 'def test_tail():\n    assert 1\n    # Criteria: 1\n', encoding="utf-8")
+    b = tmp_path / "test_two.py"
+    b.write_text("def test_sum():\n    assert 1\n", encoding="utf-8")
+    from qikly import take_tests
+    tagged = take_tests._tagged_tests([str(a), str(b)], 2)
+    assert ("test_one", "test_sum") in tagged and ("test_one", "test_tail") in tagged
+    assert ("test_two", "test_sum") not in tagged and ("test_one", "test_far") not in tagged
+
+
+def test_a_class_test_is_read_inside_its_own_class():
+    test_file = ("class TestA:\n    def test_x(self):\n        assert parse('1')\n\n"
+                 "class TestB:\n    def test_x(self):\n        assert parse('2')\n")
+    assert start._makes_call("", ("parse", ["2"], {}), None, test_file, "TestB::test_x")
+    assert not start._makes_call("", ("parse", ["1"], {}), None, test_file, "TestB::test_x")
+
+
+def test_a_module_with_put_off_questions_is_not_complete(tmp_path):
+    _project(tmp_path)
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    start.save_state(paths, {"requirements": "r", "extra": [], "rows": [["1", "2"]],
+                             "answers": {"a": {"status": "skip", "deferred": True}}})
+    assert not start._complete(paths)

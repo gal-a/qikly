@@ -545,6 +545,12 @@ def _is_number(text):
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
+def _pathlike(value):
+    """A string that names a file: a path, or a name with an extension."""
+    return isinstance(value, str) and bool(
+        re.search(r"[/\\]", value) or re.fullmatch(r"[\w.-]+\.[A-Za-z]\w{0,4}", value))
+
+
 def _variants(value):
     """Nearby inputs for one argument, built from a value the tests used."""
     if isinstance(value, bool):
@@ -615,20 +621,36 @@ _IO = re.compile(r"\bopen\(|\bos\.|\bshutil\.|\bPath\(|\.write\w*\(|\bsubprocess
 
 
 def _does_io(source, name):
-    """Whether a top-level function's or class's own code touches files or the system."""
+    """
+    Whether a function or class, or anything in this module it calls, touches
+    files or the system. Through a helper too: public `save` calling `_dump`,
+    which opened the file, overwrote a user's real report while a menu was
+    built for an unrelated question.
+    """
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return True
-    node = next((n for n in tree.body if isinstance(
-        n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and n.name == name), None)
-    if node is None:
-        return False
-    try:
+    defs = {}
+    for n in ast.walk(tree):
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            defs.setdefault(n.name, n)
+    seen, todo = set(), [name]
+    while todo:
+        current = todo.pop()
+        if current in seen or current not in defs:
+            continue
+        seen.add(current)
+        node = defs[current]
         text = ast.get_source_segment(source, node) or ""
-    except Exception:
-        return True
-    return bool(_IO.search(text))
+        if _IO.search(text):
+            return True
+        for call in ast.walk(node):
+            if isinstance(call, ast.Call):
+                f = call.func
+                todo.append(f.id if isinstance(f, ast.Name) else
+                            f.attr if isinstance(f, ast.Attribute) else "")
+    return False
 
 
 def difference_options(question, source, test_sources, root, mutant):
@@ -647,7 +669,7 @@ def difference_options(question, source, test_sources, root, mutant):
     module = path_module(question["path"], root)
     function = question.get("function")
     rounds = []
-    if function:
+    if function and not _does_io(source, function):
         rounds.append([(function, a, k) for a, k in
                        _candidates(source, test_sources, function, module, 60)])
     # Then through the public functions, sharing the 60 calls between them,
@@ -658,7 +680,7 @@ def difference_options(question, source, test_sources, root, mutant):
     share = max(5, 60 // max(len(public), 1))
     rounds.append([(name, a, k) for name in public
                    for a, k in _candidates(source, test_sources, name, module, share)][:60])
-    for through, calls in enumerate(rounds, 1 if function else 2):
+    for through, calls in enumerate(rounds, 1 if len(rounds) == 2 else 2):
         found = _first_difference(question, function, calls, root, mutant,
                                   through=through == 2)
         if found:
@@ -666,7 +688,33 @@ def difference_options(question, source, test_sources, root, mutant):
     return None
 
 
-_ADDRESS = re.compile(r"<([\w.]+) object at 0x[0-9A-Fa-f]+>")
+_ADDRESS = re.compile(r"<([\w.]+) object at 0x[0-9A-Fa-f.]+>")
+
+
+def _line_place(question, line):
+    """
+    ("body", None) for a line inside a function body, ("signature", (first,
+    last)) for one in a def line or its defaults, ("top", None) otherwise.
+    """
+    try:
+        tree = ast.parse(open(question["path"], encoding="utf-8-sig").read())
+    except (OSError, SyntaxError, ValueError, KeyError):
+        return "top", None
+    if not line:
+        return "top", None
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and \
+                node.lineno <= line <= (node.end_lineno or node.lineno):
+            first = min([node.lineno] + [d.lineno for d in node.decorator_list])
+            if node.body and line < node.body[0].lineno:
+                return "signature", (first, node.body[0].lineno - 1)
+            # The innermost function holding it decides, so keep looking.
+            inner = [n for n in ast.walk(node) if n is not node and isinstance(
+                n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and n.lineno <= line <= (n.end_lineno or n.lineno)]
+            if not inner:
+                return "body", None
+    return "top", None
 
 
 def _first_difference(question, function, calls, root, mutant, through=False):
@@ -678,12 +726,21 @@ def _first_difference(question, function, calls, root, mutant, through=False):
     """
     if not calls:
         return None
-    result = start_probe.run_calls(question["path"], root, calls, mutant=mutant,
-                                   line=question.get("line") if through else None)
+    line = question.get("line")
+    where, span = _line_place(question, line)
+    traced = through and where in ("body", "signature")
+    result = start_probe.run_calls(
+        question["path"], root, calls, mutant=mutant,
+        line=line if traced and where == "body" else None,
+        span=span if traced and where == "signature" else None)
     if not result:
         return None
     now, changed_outcomes = result[0], result[1]
-    reached = result[2] if through else [True] * len(calls)
+    # A line at the top level, a constant such as FREE_SHIPPING = 50, runs at
+    # import, not in the call: the only change between the two versions is
+    # on that line, and each call ran twice to the same outcome, so a
+    # difference can come from nowhere else.
+    reached = result[2] if traced and len(result) > 2 else [not traced] * len(calls)
     for (name, args, kwargs), a, b, ran in zip(calls, now, changed_outcomes, reached):
         if not ran or a == b:
             continue
@@ -701,8 +758,10 @@ def _first_difference(question, function, calls, root, mutant, through=False):
             prompt = f"What should {call} do?"
             if name != function:
                 # Said, so the call is not mistaken for the line's own.
-                prompt += (f" (It runs through {function or 'this line'}, "
-                           f"line {question.get('line')}.)")
+                prompt += (f" (It runs through {function}, line {line}.)"
+                           if where in ("body", "signature") and function else
+                           (f" (It depends on line {line}.)" if line else
+                            " (It depends on the code that was changed.)"))
             return prompt, _shuffled(behaviours, question["question"])
     return None
 
@@ -716,7 +775,9 @@ def _candidates(source, test_sources, function, module, limit):
     if not found:
         return []
     positional, keyword_only = found
-    bases = _usable_calls(test_sources, function, positional, keyword_only, module)
+    bases = [b for b in _usable_calls(test_sources, function, positional,
+                                      keyword_only, module)
+             if not any(_pathlike(v) for v in list(b[0]) + list(b[1].values()))]
     if not bases:
         return []
     candidates = []
