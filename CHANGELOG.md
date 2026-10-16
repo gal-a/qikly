@@ -117,6 +117,11 @@ packaging tools would read as `1.1`.
   answer, never its own, and how the answers become a task.
 
 ### Fixed
+- **No fault is planted by removing an anchor that changes nothing.** A `^`
+  on a pattern only given to `match`, which anchors at the start already, and
+  a `$` too for `fullmatch`. Those faults could never be caught, and counted
+  as misses: validators' card module was scored 6 of 41 missed and is 1 of 36.
+  Scores on code without such patterns do not change.
 - **`--start` asks one question where the same gap repeats.** A table of 37
   rules missing the same anchor asked the same thing 37 times; it is now one
   question naming the other lines. Questions about public functions come

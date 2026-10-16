@@ -349,3 +349,24 @@ def test_every_flag_the_score_handler_reads_exists_on_the_parser():
     assert not missing, (
         "--score-suite reads %s off args and the parser defines no such flag"
         % ", ".join(missing))
+
+
+def test_an_anchor_that_match_already_gives_is_not_stripped():
+    # validators' card patterns are used with .match(), which anchors at the
+    # start: stripping their "^" planted five faults no test could catch.
+    from qikly.mutation import count_sites, make_mutant
+    source = (
+        "import re\n"
+        "P = re.compile(r'^4[0-9]+')\n"
+        "Q = re.compile(r'^(a|b)$')\n"
+        "R = re.compile(r'^x[0-9]$')\n"
+        "def visa(v):\n    return P.match(v)\n"
+        "def other(v):\n    return Q.search(v)\n"
+        "def full(v):\n    return re.fullmatch(r'^[a-z]+$', v)\n"
+        "def r(v):\n    return R.match(v)\n"
+    )
+    mutants = [make_mutant(source, i, "validation")[0]
+               for i in range(count_sites(source, "validation"))]
+    assert len(mutants) == 2
+    assert any("re.compile('(a|b)')" in m for m in mutants), "search keeps both faults"
+    assert any("re.compile('^x[0-9]')" in m for m in mutants), "match keeps only the $"

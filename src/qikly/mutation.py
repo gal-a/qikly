@@ -87,6 +87,73 @@ def _looks_like_regex(v):
         t in v for t in ("\\d", "\\w", "\\s", "[", "+", "*", "(", "{"))
 
 
+_ANCHORED_CALLS = {"match": {"^"}, "fullmatch": {"^", "$"}}
+
+
+def _is_re(node, attr):
+    return (isinstance(node, ast.Attribute) and node.attr == attr
+            and isinstance(node.value, ast.Name) and node.value.id == "re")
+
+
+def _redundant_anchors(tree):
+    """
+    The anchors in each pattern constant that change nothing, by id of the
+    constant: `^` on a pattern only ever given to `match`, which anchors at
+    the start already, and `$` too for `fullmatch`. Stripping those planted a
+    fault no test can catch, and asked a question nobody could answer: all
+    five of validators' card patterns were reported missed for it.
+
+    Only usage that can be read for certain counts: `re.match(P, ...)`,
+    `re.compile(P).match(...)`, and a name bound to `re.compile(P)` whose
+    every use in the module is `.match(...)` or `.fullmatch(...)`.
+    """
+    out = {}
+    compiled = {}  # name -> constants compiled into it
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        for attr, anchors in _ANCHORED_CALLS.items():
+            if (_is_re(node.func, attr) and node.args
+                    and isinstance(node.args[0], ast.Constant)):
+                out[id(node.args[0])] = set(anchors)
+            if (isinstance(node.func, ast.Attribute) and node.func.attr == attr
+                    and isinstance(node.func.value, ast.Call)
+                    and _is_re(node.func.value.func, "compile")
+                    and node.func.value.args
+                    and isinstance(node.func.value.args[0], ast.Constant)):
+                out[id(node.func.value.args[0])] = set(anchors)
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and isinstance(node.value, ast.Call)
+                and _is_re(node.value.func, "compile") and node.value.args
+                and isinstance(node.value.args[0], ast.Constant)):
+            compiled.setdefault(node.targets[0].id, []).append(node.value.args[0])
+    if not compiled:
+        return out
+    # Every load of each name, and what it is used for.
+    uses = {name: [] for name in compiled}
+    methods = set()
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id in uses):
+            methods.add(id(node.func.value))
+            uses[node.func.value.id].append(node.func.attr)
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Name) and node.id in uses
+                and isinstance(node.ctx, ast.Load) and id(node) not in methods):
+            uses[node.id].append(None)  # passed on, returned: unknown use
+    for name, constants in compiled.items():
+        used = uses[name]
+        if not used or any(u not in _ANCHORED_CALLS for u in used):
+            continue
+        anchors = set.intersection(*(_ANCHORED_CALLS[u] for u in used))
+        for constant in constants:
+            out[id(constant)] = anchors
+    return out
+
+
 class _Mutator(ast.NodeTransformer):
     """Applies exactly the nth candidate mutation of one family, nothing else."""
 
@@ -95,6 +162,12 @@ class _Mutator(ast.NodeTransformer):
         self.family = family
         self.seen = -1
         self.applied = None
+        self.redundant = {}
+
+    def visit_Module(self, node):
+        self.redundant = _redundant_anchors(node)
+        self.generic_visit(node)
+        return node
 
     def _hit(self, kind, node=None):
         """Record the nth candidate, and where it is.
@@ -146,7 +219,12 @@ class _Mutator(ast.NodeTransformer):
         # validation: a regex that no longer anchors matches substrings, so a
         # malformed value with a valid fragment inside it starts passing.
         if _looks_like_regex(node.value):
-            loosened = node.value.lstrip("^").rstrip("$")
+            redundant = self.redundant.get(id(node), set())
+            loosened = node.value
+            if "^" not in redundant:
+                loosened = loosened.lstrip("^")
+            if "$" not in redundant:
+                loosened = loosened.rstrip("$")
             if loosened != node.value and self._hit("regex anchors stripped", node):
                 return ast.copy_location(ast.Constant(value=loosened), node)
         return node
