@@ -179,6 +179,9 @@ def _nearby_suite(code, tests):
             f"{pick if ' ' not in pick else repr(pick)}")
 
 
+HEARTBEAT_SECONDS = 15
+
+
 def has_code(path):
     """Whether a file defines a function or a class at top level."""
     import ast
@@ -868,7 +871,23 @@ def _score_once(target, mutants, seed, code_root):
         # really is untested. Named, so its misses are not read as weak tests.
         never_ran = sorted(unreached)
 
-        for path, relative, source, family, index, described in candidates:
+        # A heartbeat. Each fault reruns the whole suite, and on a real library
+        # scoring ran for over an hour with nothing on screen, which reads as
+        # a hang. A line about every 15 seconds says how far it is and what
+        # is left, estimated from the faults so far.
+        import time
+        began = last_beat = time.monotonic()
+        for done_count, (path, relative, source, family, index, described) in \
+                enumerate(candidates):
+            now = time.monotonic()
+            if done_count and now - last_beat >= HEARTBEAT_SECONDS:
+                last_beat = now
+                left = (now - began) / done_count * (len(candidates) - done_count)
+                print(f"  still scoring: {done_count} of {len(candidates)} faults "
+                      f"planted, {len(caught)} caught so far, about "
+                      + (f"{left / 60:.0f} minute{'' if round(left / 60) == 1 else 's'}"
+                         if left >= 90 else f"{left:.0f} seconds")
+                      + " left", flush=True)
             mutant, _ = make_mutant(source, index, family)
             if mutant is None:
                 unscorable += 1

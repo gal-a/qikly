@@ -651,3 +651,15 @@ def test_a_slow_suite_is_sampled_without_a_terminal(tmp_path, monkeypatch):
     s = Script([], interactive=False)
     assert start._fit_to_time(s.console, "tests", str(tmp_path), 150) == 15
     assert "about 50 minutes" in s.text
+
+
+def test_scoring_prints_a_heartbeat(tmp_path, monkeypatch, capsys):
+    """A slow suite ran for over an hour on a real library with nothing on screen."""
+    import qikly.mutation_score as ms
+    monkeypatch.setattr(ms, "HEARTBEAT_SECONDS", 0)
+    (tmp_path / "pricing.py").write_text(PRICING)
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_pricing.py").write_text(TESTS)
+    ms.score(ms.from_paths(str(tmp_path / "pricing.py"), str(tmp_path / "tests")),
+             mutants=4, seed=1)
+    assert "still scoring:" in capsys.readouterr().out
