@@ -1035,9 +1035,17 @@ def where(q):
 
 
 def ask_question(console, number, total, q, source, test_sources, root,
-                 same_line=False):
-    """One question. Returns the record saved for it."""
+                 same_line=False, skip_typed=False):
+    """
+    One question. Returns the record saved for it. With `skip_typed`, a
+    question with no answers to choose from is put off without being shown.
+    """
     where_ = where(q)
+    if skip_typed:
+        prompt, options = so.menu(q, source, test_sources, root, q.get("mutant"))
+        if not prompt:
+            return {"question": q["question"], "where": where_, "status": so.SKIP,
+                    "key": _key(q), "deferred": True}
     console.say("")
     console.say(f"Question {number} of {total}: {where_}"
                 + ("  (another question about the same line)" if same_line else ""))
@@ -1053,6 +1061,9 @@ def ask_question(console, number, total, q, source, test_sources, root,
         console.say(q["question"])
     lead = [prompt] if prompt else []
     picked = options[choose(console, [o["label"] for o in options], lead=lead) - 1]
+    if picked["kind"] == so.SKIP_TYPED:
+        return {"question": q["question"], "where": where_, "status": so.SKIP,
+                "key": _key(q), "deferred": True, "skip_typed": True}
     record = {"question": q["question"], "where": where_, "status": picked["kind"],
               "key": _key(q)}
     if picked["kind"] == so.BEHAVIOUR:
@@ -2247,23 +2258,37 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
                     "to offer concrete answers. Nothing of yours is changed. If "
                     f"a function takes longer than {start_probe_timeout()} "
                     "seconds, that question offers only skip or your own answer.")
+    # The ones qikly can try the code on first, so a person who stops at the
+    # questions that need typing has already had the easy ones.
+    pending = _most_useful_first(pending, by_key, test_sources, root)
     if len(pending) > QUESTION_CAP:
-        pending = _cap(console, paths, state,
-                       _most_useful_first(pending, by_key, test_sources, root), by_key, keys)
+        pending = _cap(console, paths, state, pending, by_key, keys)
+    skip_typed = put_off = 0
     for key in pending:
         number = keys.index(key) + 1
         previous = by_key[keys[number - 2]] if number > 1 else None
         same = bool(previous and previous.get("line") == by_key[key].get("line"))
         state["answers"][key] = ask_question(console, number, total, by_key[key],
-                                             source, test_sources, root, same)
+                                             source, test_sources, root, same,
+                                             skip_typed=bool(skip_typed))
         state["answers"][key]["number"] = number
         save_state(paths, state)
         write_files(console, paths, state)
         rec = state["answers"][key]
+        if rec.pop("skip_typed", False):
+            skip_typed = True
+        if skip_typed and rec.get("deferred"):
+            put_off += 1
+            continue
         if rec["status"] in (so.ASK, so.SKIP):
             console.say(f"  saved, as an open question, to {paths.rel(paths.open)}")
         else:
             console.say(f"  saved to {paths.rel(paths.task)}")
+    if put_off:
+        console.say("")
+        console.say(f"{put_off} question{'' if put_off == 1 else 's'} that need typing "
+                    f"put off, saved to {paths.rel(paths.open)}; running the same "
+                    f"command again asks {'it' if put_off == 1 else 'them'}.")
     # Keep the answers in the order the questions are asked.
     state["answers"] = {k: state["answers"][k] for k in keys if k in state["answers"]}
 
@@ -3003,6 +3028,10 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
                     console.say(f"Q{n}: write your own answer in words instead "
                                 f"of {k}. It is left open.")
                     rec["status"] = so.SKIP
+                elif o["kind"] == so.SKIP_TYPED:
+                    # In a file every question is answered on its own, so
+                    # this one is simply put off.
+                    rec["status"], rec["deferred"] = so.SKIP, True
                 else:
                     rec["status"] = o["kind"]
         elif len(text.split()) < 3:

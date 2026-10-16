@@ -128,6 +128,12 @@ packaging tools would read as `1.1`.
   check exists for. Every row of a parametrize table is tried, and a call
   that leaves out an argument with a default.
 
+- **A way to stop at the questions that need typing.** The questions qikly
+  can offer answers for come first, and every question with none offers
+  "skip this and every other question that needs typing": the rest are
+  saved, the run goes ahead on what is answered, and the same command asks
+  them next time.
+
 ### Fixed
 - **A failing test no answer is behind is never called a disagreement.**
   `--take-tests` told the user to apply qikly's change to code that was

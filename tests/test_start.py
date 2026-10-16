@@ -160,8 +160,9 @@ def test_where_the_input_cannot_be_known_only_skip_and_own_are_offered(tmp_path,
     prompt, options = so.menu(_question(tmp_path, edge=None, kind=kind), PRICING,
                               [TESTS], str(tmp_path))
     assert prompt is None
-    assert [o["label"] for o in options] == ["skip this question for now",
-                                             "type my own answer"]
+    labels = [o["label"] for o in options]
+    assert labels[0] == "skip this question for now" and labels[-1] == "type my own answer"
+    assert labels[1].startswith("skip this and every other question that needs typing")
 
 
 def test_a_difference_is_offered_with_the_current_one_labelled(tmp_path):

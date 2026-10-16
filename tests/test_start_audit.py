@@ -1241,3 +1241,21 @@ def test_a_module_with_put_off_questions_is_not_complete(tmp_path):
     start.save_state(paths, {"requirements": "r", "extra": [], "rows": [["1", "2"]],
                              "answers": {"a": {"status": "skip", "deferred": True}}})
     assert not start._complete(paths)
+
+
+def test_skipping_the_typed_questions_puts_off_the_rest_without_asking(tmp_path):
+    _project(tmp_path)
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    questions = [{"file": "pricing.py", "path": paths.module, "line": 2,
+                  "function": "apply_discount", "question": f"question {n}?",
+                  "kind": "guard disabled"} for n in range(4)]
+    start.save_state(paths, {"requirements": "applies a discount", "extra": [],
+                             "answers": {}})
+    # continue, then "skip this and every other question that needs typing"
+    s = Script(["1", "2"])
+    with pytest.raises(start.Stop):
+        start.module_flow(s.console, paths, questions, [TESTS], str(tmp_path))
+    assert s.text.count("Question ") == 1
+    assert "4 questions that need typing put off" in s.text
+    answers = start.load_state(paths)["answers"]
+    assert len(answers) == 4 and all(r.get("deferred") for r in answers.values())
