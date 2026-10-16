@@ -140,8 +140,8 @@ The same three steps as [the home page](https://test.qikly.com/?ref=quick-start)
    does in a sentence, `rule:` lines for rules of your own, and example input
    rows built from your tests. Answer at your own pace and change anything
    before you run it. If your code changes, run `--questions` again: it
-   refreshes the file and carries your answers over, keeping the old one as
-   `.bak`.
+   refreshes the file, keeps your answers on their questions and any it can no
+   longer place at the end as comments, and keeps a dated copy of the old file.
 
 3. **Get a fresh test suite written from your answers.** Run the command at
    the top of the file:

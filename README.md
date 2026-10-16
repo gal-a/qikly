@@ -72,11 +72,11 @@ a whole folder. It:
    #  >    2     if rate < 0 or rate > 100:
    # Your tests never try rate at exactly 100.
    # What should apply_discount(100, 100) do?
-   #   1. return a value, as rate 99 does now
-   #   2. raise ValueError, as rate 101 does now
+   #   1. raise ValueError, as rate 101 does now
+   #   2. return a value, as rate 99 does now
    #   3. either is fine, I do not mind
    #   4. save it (no decision now, maybe later)
-   Q3: 2
+   Q3: 1
    ```
 
    The file also has a line for what the module does, `rule:` lines for rules
@@ -97,8 +97,9 @@ a whole folder. It:
 
 Change anything in the file and run the same `--answers` command again; the
 task is rebuilt from it each time. If your code changes, `--questions` again
-refreshes the file and carries your answers over, keeping the old one as
-`.bak`. Your own files are never edited, and
+refreshes the file: your answers stay on their questions, any it can no longer
+place are kept at the end as comments, and a dated copy of the old file is
+kept beside it. Your own files are never edited, and
 the command ends with a full audit: every file it read, saved and wrote, and
 where. Without a terminal, as in CI or under a coding agent, `--answers` checks
 the task and prints the two commands that run it, `qikly --tasks <TASK>` and

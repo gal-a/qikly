@@ -31,6 +31,7 @@ import csv
 import hashlib
 import io
 import json
+import random
 import os
 import re
 import shutil
@@ -938,7 +939,7 @@ def write_files(console, paths, state, quiet=False):
             writer = csv.writer(handle, lineterminator="\n")
             writer.writerow(state["columns"])
             writer.writerows(state["rows"])
-    # The answers file is the person's own, and is never written over.
+    # The answers file is not written here: only --questions refreshes it.
     return data
 
 
@@ -1881,7 +1882,7 @@ def _answers_command(code, answers_file, cwd):
     return f"qikly --answers {score_questions_pasteable(answers_file, cwd)}"
 
 
-def answers_file_for(code, cwd):
+def answers_file_for(code, cwd, answered_only=True):
     """
     The answers files --questions wrote about `code`: found by the module:
     line each file carries, so a module scored as part of a folder is found
@@ -1892,7 +1893,8 @@ def answers_file_for(code, cwd):
     target = os.path.normcase(_one_module(os.path.abspath(code)))
     folder = target if os.path.isdir(target) else None
     files = []
-    for f in sorted(glob.glob(os.path.join(cwd, "inputs_private", "questions",
+    # Escaped: a project in a folder called pG[1] matched no file at all.
+    for f in sorted(glob.glob(os.path.join(glob.escape(cwd), "inputs_private", "questions",
                                            "*_open_questions.txt"))):
         module = _field(f, "module")
         if not module:
@@ -1902,7 +1904,7 @@ def answers_file_for(code, cwd):
             files.append(f)
     # For a folder, only the files someone has answered; one module's file is
     # found answered or not, so --answers can say what is missing from it.
-    if folder:
+    if folder and answered_only:
         files = [f for f in files if _has_answers(f)]
     return files[0] if len(files) == 1 else files
 
@@ -1961,19 +1963,26 @@ def write_questions(arg, cwd, console, given_tests=None):
         # A file already answered is refreshed, never lost: every answer
         # whose question is still asked is carried over by its id, with the
         # requirements, rules and rows, and the old file is kept beside it.
-        carried, dropped, old = {}, [], None
+        carried, kept_back, old = {}, [], None
         if _has_answers(paths.open):
-            given, req, old_rows, _, old_ids = parse_answers(paths.open)
+            _, req, old_rows, _, _ = parse_answers(paths.open)
+            old_text = _read(paths.open)
             old = {"requirements": req or "", "rules": parse_rules(paths.open),
-                   "rows": old_rows}
-            current = {e["id"] for e in sharp}
-            for n, text in given.items():
-                fid = (old_ids.get(n) or "").split(" ")[0]
-                if fid in current:
-                    carried[fid] = text
+                   "rows": old_rows,
+                   # Answers kept back by an earlier refresh stay kept back.
+                   "kept": [l for l in old_text.splitlines() if l.startswith("#   was Q")]}
+            for fe, entry in _match_entries(_file_entries(paths.open), sharp):
+                if not fe["text"]:
+                    continue
+                stale = entry is not None and _is_option_number(fe["text"]) and \
+                    fe["choices"] and fe["choices"] != entry["choices"]
+                if entry is not None and not stale:
+                    carried[id(entry)] = fe["text"]
                 else:
-                    dropped.append(n)
-            shutil.copy2(paths.open, paths.open + ".bak")
+                    # Never dropped: an answer qikly cannot place is written
+                    # into the file as a comment, for the person to move.
+                    kept_back.append(f"#   was Q{fe['n']}: {fe['text']}"
+                                     + (f"   ({fe['prompt']})" if fe["prompt"] else ""))
         name = os.path.basename(module)
         lines = [f"# Your answers for {name}, from qikly --questions.",
                  "#",
@@ -1985,7 +1994,7 @@ def write_questions(arg, cwd, console, given_tests=None):
                  "# Keep the id lines: they tie each answer to its question.",
                  "",
                  f"module: {shown(module, cwd)}",
-                 f"scored: {score_questions_pasteable(code, cwd)}",
+                 f"scored: {shown(code, cwd)}",
                  "",
                  f"# 1. What {name} should do, in one sentence. The coding agent is",
                  "#    told this, so give its purpose, not its rules or boundary values.",
@@ -2012,7 +2021,8 @@ def write_questions(arg, cwd, console, given_tests=None):
                     lines.append(f"#   (This answer also covers {len(group_) - 1} more "
                                  f"place{'s' if len(group_) > 2 else ''} your tests "
                                  f"leave open on the same call.)")
-                lines += [f"# id {entry['id']}", f"Q{n}: {carried.get(entry['id'], '')}", ""]
+                lines += ["# id " + " ".join(entry["ids"]), f"# choices {entry['choices']}",
+                          f"Q{n}: {carried.get(id(entry), '')}", ""]
         else:
             lines += ["# 2. Questions: none with answers qikly could work out by running",
                       "#    your code. Write what you know as rules, below.", ""]
@@ -2027,13 +2037,19 @@ def write_questions(arg, cwd, console, given_tests=None):
                       if report else "#    the score report lists them."]
         lines += ["rule: " + r for r in (old["rules"] if old else [])] or ["rule: "]
         lines.append("")
+        kept = (old["kept"] if old else []) + kept_back
+        if kept:
+            lines += ["# Earlier answers whose question is no longer asked, or whose",
+                      "# choices changed, kept so nothing is lost. Move any that still",
+                      "# apply to its question above, or write it as a rule."] + kept + [""]
         from qikly.scaffold import starter_columns
         columns = starter_columns(source)
         if columns:
             built = build_rows({"answers": {}, "extra": []}, columns, source, test_sources)
             # A value with a line break cannot sit on one line.
             built = [r for r in built if not any("\n" in v or "\r" in v for v in r)]
-            if old and old["rows"]:
+            # The rows a person kept or edited, while they still fit the code.
+            if old and old["rows"] and all(len(r) == len(columns) for r in old["rows"]):
                 built = [list(r) for r in old["rows"]]
             lines += ["# 4. Example inputs the run tries the code on, one row per line,",
                       "#    the values in this order:  " + ", ".join(columns),
@@ -2047,8 +2063,17 @@ def write_questions(arg, cwd, console, given_tests=None):
                       f"#      {shown(paths.data, cwd)}",
                       "#    before you run the command above.", ""]
         os.makedirs(os.path.dirname(paths.open), exist_ok=True)
-        with open(paths.open, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write("\n".join(lines))
+        text = "\n".join(lines)
+        backup = None
+        if old and text != old_text:
+            # A dated copy each time it changes, never one overwritten: a
+            # second refresh replaced the only backup with an emptied file.
+            import time
+            backup = f"{paths.open}.{time.strftime('%Y%m%d-%H%M%S')}.bak"
+            shutil.copy2(paths.open, backup)
+        if not old or text != old_text:
+            with open(paths.open, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(text)
         written.append((paths.open, again))
         console.say("")
         console.say(f"{shown(module, cwd)}: {len(sharp)} question"
@@ -2056,13 +2081,16 @@ def write_questions(arg, cwd, console, given_tests=None):
                     + (f"; {others} more need{'s' if others == 1 else ''} someone who "
                        f"knows the code, listed in the score report" if others else "")
                     + ".")
-        if old:
+        if old and backup:
             console.say(f"  The file already held your answers: refreshed, with "
-                        f"{len(carried)} answer{'' if len(carried) == 1 else 's'} carried "
-                        f"over"
-                        + (f" and {len(dropped)} about questions no longer asked left "
-                           f"out" if dropped else "")
-                        + f". The previous file is kept as {shown(paths.open + '.bak', cwd)}.")
+                        f"{len(carried)} answer{'' if len(carried) == 1 else 's'} in place"
+                        + (f" and {len(kept_back)} kept at the end of the file, for "
+                           f"questions no longer asked or whose choices changed"
+                           if kept_back else "")
+                        + f". The file as it was is kept as {shown(backup, cwd)}.")
+        elif old:
+            console.say("  The file already held your answers, and nothing has "
+                        "changed, so it is left as it is.")
     console.say("")
     if not written:
         # A folder where nothing was missed has no file to point to.
@@ -2203,16 +2231,34 @@ def _csv_line(values):
     return out.getvalue()
 
 
+def _member_id(q):
+    """
+    One planted fault's question, named by things that do not change when the
+    code runs: its function, its question, and the shape of its line with the
+    literal values blanked. Not the line number, which an edit above it
+    moves, and not what the probe returned, which a set's print order or a
+    timeout changes from one run to the next.
+    """
+    lines = _read(q.get("path")).splitlines() if q.get("path") else []
+    n = q.get("line") or 0
+    text = lines[n - 1] if 0 < n <= len(lines) else ""
+    text = re.sub(r"(['\"]).*?\1", "S", text.strip())
+    text = re.sub(r"\b\d+(\.\d+)?\b", "N", text)
+    mark = json.dumps([q.get("function"), q.get("question"), text])
+    return hashlib.sha1(mark.encode("utf-8")).hexdigest()[:12]
+
+
 def sharp_questions(questions, source, test_sources, root):
     """
     (entries, others): the questions the file shows, and how many it leaves
     out for having no choice to offer. Each entry is one question as the file
     shows it, with the planted faults that led to the same call and choices
-    grouped under it, and an id made from that call and those choices, not
-    from a line number. An id tied to the line lost every answer when a line
-    was added above it, and one tied to the scoring scope lost them all for a
-    module in a subfolder. The writer and the reader both build this list, so
-    a file's numbers and ids always mean the same questions.
+    grouped under it. Its ids are those faults' own (see _member_id), so a
+    file answered against an earlier run still finds its question, and its
+    `choices` fingerprint says whether the options are still the ones the
+    answer picked a number from. The options come in an order fixed by those
+    choices, not by which fault happened to be first, so a number keeps its
+    meaning when the group changes. Writer and reader both build this list.
     """
     entries, by_mark, others = [], {}, 0
     for q in questions:
@@ -2220,18 +2266,79 @@ def sharp_questions(questions, source, test_sources, root):
         if not prompt:
             others += 1
             continue
-        mark = (re.sub(r"\bline \d+", "line", prompt),
-                sorted(json.dumps(o.get("pins"), sort_keys=True)
-                       for o in options if o["kind"] == so.BEHAVIOUR))
-        text = json.dumps(mark)
+        pins = sorted(json.dumps(o.get("pins"), sort_keys=True)
+                      for o in options if o["kind"] == so.BEHAVIOUR)
+        text = json.dumps([re.sub(r"\bline \d+", "line", prompt), pins])
         if text in by_mark:
             by_mark[text]["group"].append(q)
+            by_mark[text]["ids"].append(_member_id(q))
             continue
-        entry = {"id": hashlib.sha1(text.encode("utf-8")).hexdigest()[:12],
-                 "prompt": prompt, "options": options, "group": [q]}
+        choices = hashlib.sha1(json.dumps(pins).encode("utf-8")).hexdigest()[:8]
+        behaviours = sorted((o for o in options if o["kind"] == so.BEHAVIOUR),
+                            key=lambda o: json.dumps(o.get("pins"), sort_keys=True))
+        random.Random(int(choices, 16)).shuffle(behaviours)
+        rest = [o for o in options if o["kind"] != so.BEHAVIOUR]
+        entry = {"ids": [_member_id(q)], "choices": choices, "prompt": prompt,
+                 "options": behaviours + rest, "group": [q]}
         by_mark[text] = entry
         entries.append(entry)
     return entries, others
+
+
+def _file_entries(path):
+    """
+    The questions in an answers file, in its order: each one's Q number, its
+    ids and choices fingerprint where the file has them, the question as the
+    file showed it, and the answer written after it.
+    """
+    out, ids, choices, prompt = [], [], None, None
+    for line in _read(path).splitlines():
+        found = re.match(r"^\s*#\s*id\s+([0-9a-f]{6,}(?:\s+[0-9a-f]{6,})*)\s*$", line)
+        if found:
+            ids = found.group(1).split()
+            continue
+        found = re.match(r"^\s*#\s*choices\s+([0-9a-f]{6,})\s*$", line)
+        if found:
+            choices = found.group(1)
+            continue
+        found = re.match(r"^\s*#\s+((?:Your tests never try|What should).*)$", line)
+        if found:
+            prompt = found.group(1).strip()
+            continue
+        found = re.match(r"^\s*Q(\d+)\s*:\s*(.*)$", line)
+        if found:
+            out.append({"n": int(found.group(1)), "ids": ids, "choices": choices,
+                        "prompt": prompt,
+                        "text": _UNSAFE.sub("", found.group(2)).strip()})
+            ids, choices, prompt = [], None, None
+    return out
+
+
+def _match_entries(file_entries, entries):
+    """
+    [(file entry, current entry or None)]: by shared id, or by position for a
+    file entry whose id line was deleted.
+    """
+    by_id = {}
+    for e in entries:
+        for i in e["ids"]:
+            by_id.setdefault(i, e)
+    claimed, out = set(), []
+    for position, fe in enumerate(file_entries):
+        found = next((by_id[i] for i in fe["ids"] if i in by_id), None)
+        if found is None and not fe["ids"] and position < len(entries):
+            found = entries[position]
+        if found is not None and id(found) in claimed:
+            found = None
+        if found is not None:
+            claimed.add(id(found))
+        out.append((fe, found))
+    return out
+
+
+def _is_option_number(text):
+    return bool(re.match(r"^\d+\s*[.):]?\s*(?::\s*(.+))?$", text or "")) and \
+        int(re.match(r"^\d+", text).group(0)) <= 9
 
 
 def _interpret(console, n, text, options):
@@ -2251,6 +2358,14 @@ def _interpret(console, n, text, options):
             console.say(f"Q{n}: there is no option {k}; it is left open.")
             return {"status": so.SKIP}
         o = options[k - 1]
+        if value is not None and not (o["kind"] == so.BEHAVIOUR
+                                      and o["pins"].get("returns", "") is None):
+            # A value given to an option that takes none is almost always the
+            # wrong option; taking the option and dropping the value saved the
+            # opposite of what was meant.
+            console.say(f"Q{n}: option {k} takes no value, so {k}: {value} is "
+                        f"probably not the option you meant; it is left open.")
+            return {"status": so.SKIP}
         if o["kind"] == so.BEHAVIOUR and o["pins"].get("returns", "") is None \
                 and value is None:
             console.say(f"Q{n}: option {k} needs a value; write it as {k}: <value>. "
@@ -2276,7 +2391,7 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
     """
     from qikly.scaffold import starter_columns
 
-    given, requirements, rows, _, ids = parse_answers(answers_path)
+    _, requirements, rows, _, _ = parse_answers(answers_path)
     source = _read(paths.module)
     state = {"answers": {}, "extra": parse_rules(answers_path)}
     if requirements:
@@ -2286,23 +2401,20 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
                     f"so the coding agent would not be told what the module "
                     f"does. Add one, such as  requirements: applies a discount.")
     entries, _ = sharp_questions(questions, source, test_sources, root)
-    by_id = {e["id"]: e for e in entries}
-    numbers = sorted(set(given) | set(ids))
-    unmatched = []
-    for n in numbers:
-        if ids:
-            entry = by_id.get((ids.get(n) or "").split(" ")[0])
-            if entry is None:
-                if given.get(n):
-                    unmatched.append(n)
-                continue
-        else:
-            # A file whose id lines were deleted: by position, in the same
-            # order the file was written in.
-            if not 1 <= n <= len(entries):
-                continue
-            entry = entries[n - 1]
-        fields = _interpret(console, n, given.get(n), entry["options"])
+    unmatched, changed = [], []
+    for fe, entry in _match_entries(_file_entries(answers_path), entries):
+        n, text = fe["n"], fe["text"]
+        if entry is None:
+            if text:
+                unmatched.append(n)
+            continue
+        if text and _is_option_number(text) and fe["choices"] and \
+                fe["choices"] != entry["choices"]:
+            # The options are no longer the ones the number was picked from:
+            # taken as it is, "1" could now mean the opposite behaviour.
+            changed.append(n)
+            text = ""
+        fields = _interpret(console, n, text, entry["options"])
         first, rest = entry["group"][0], entry["group"][1:]
         state["answers"][_key(first)] = dict(
             fields, question=first["question"], where=where(first), number=n,
@@ -2318,27 +2430,38 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
         # Every question the file does not answer stays open in the task.
         state["answers"].setdefault(_key(q), {
             "question": q["question"], "where": where(q), "key": _key(q),
-            "status": so.SKIP, "deferred": True})
+            "status": so.SKIP})
+    scope = _scope_of(answers_path, paths)
     if unmatched:
         console.say(f"{', '.join('Q%d' % n for n in unmatched)} in "
                     f"{shown(answers_path, paths.cwd)} "
                     f"{'is' if len(unmatched) == 1 else 'are'} about questions your "
-                    f"code no longer raises: it or its tests changed since the file "
-                    f"was written, so {'it is' if len(unmatched) == 1 else 'they are'} "
-                    f"left out. To refresh the file and keep the answers that still "
-                    f"apply, run  qikly --questions {_scope_of(answers_path, paths)}")
+                    f"code no longer raises, so {'it is' if len(unmatched) == 1 else 'they are'} "
+                    f"left out. To refresh the file, keeping every answer, run  "
+                    f"qikly --questions {scope}")
+    if changed:
+        console.say(f"{', '.join('Q%d' % n for n in changed)}: the choices changed "
+                    f"since you answered, so the option number may mean something "
+                    f"else now; left open. To see the new choices, run  "
+                    f"qikly --questions {scope}")
     columns = starter_columns(source)
     if columns == []:
-        state["rows"], state["columns"], state["rows_typed"] = [["none"]], ["input"], False
+        state["rows"], state["columns"] = [["none"]], ["input"]
     elif rows and columns:
         # The file's rows, plus a row for each answer's own call: the file is
         # filled in from the tests before anything is answered, so an answer
         # such as apply_discount(7, 0.5) had no row of its own.
         given_rows = [r for r in rows if len(r) == len(columns)]
+        if len(given_rows) < len(rows):
+            console.say(f"{len(rows) - len(given_rows)} row: line"
+                        f"{'s' if len(rows) - len(given_rows) != 1 else ''} in "
+                        f"{shown(answers_path, paths.cwd)} "
+                        f"{'do' if len(rows) - len(given_rows) != 1 else 'does'} not "
+                        f"have one value for each of {', '.join(columns)}, and "
+                        f"{'are' if len(rows) - len(given_rows) != 1 else 'is'} left out.")
         answered = build_rows(state, columns, source, [])
         state["rows"] = given_rows + [r for r in answered if r not in given_rows]
         state["columns"] = columns
-        state["rows_typed"] = True
     elif columns:
         state["rows"] = build_rows(state, columns, source, test_sources)
         state["columns"] = columns
@@ -2362,7 +2485,8 @@ def _field(path, name):
     for line in _read(path).splitlines():
         found = re.match(r"^\s*%s\s*:\s*(.*)$" % re.escape(name), line, re.I)
         if found and found.group(1).strip():
-            return found.group(1).strip()
+            # Quotes around a path with a space in it are not part of it.
+            return found.group(1).strip().strip('"')
     return None
 
 

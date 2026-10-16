@@ -161,10 +161,10 @@ def test_a_difference_is_offered_with_the_current_one_labelled(tmp_path):
 
 # ------------------------------------------------------- what is written --
 
-def _project(tmp_path):
-    (tmp_path / "pricing.py").write_text(PRICING, encoding="utf-8")
+def _project(tmp_path, source=PRICING, tests=TESTS):
+    (tmp_path / "pricing.py").write_text(source, encoding="utf-8")
     (tmp_path / "tests").mkdir()
-    (tmp_path / "tests" / "test_pricing.py").write_text(TESTS, encoding="utf-8")
+    (tmp_path / "tests" / "test_pricing.py").write_text(tests, encoding="utf-8")
     return tmp_path
 
 
@@ -259,11 +259,9 @@ def test_start_never_writes_over_answers_a_person_wrote(tmp_path, monkeypatch):
     written.write_text(text, encoding="utf-8")
     s = Script([], interactive=False)
     start.main("pricing.py", str(tmp_path), console=s.console)
-    # Refreshed, never lost: what the person wrote is carried over, and the
-    # file as it was is kept beside it.
-    assert "requirements: mine" in written.read_text(encoding="utf-8")
-    assert (written.parent / (written.name + ".bak")).read_text(encoding="utf-8") == text
-    assert "refreshed" in s.text
+    # Nothing changed, so the file is left exactly as the person wrote it.
+    assert written.read_text(encoding="utf-8") == text
+    assert "left as it is" in s.text
 
 
 def test_the_answers_file_makes_a_task_ready_to_run(tmp_path, monkeypatch):
@@ -347,9 +345,16 @@ def _write_and_answer(tmp_path, monkeypatch, answers):
     text = re.sub(r"^requirements: $", "requirements: applies a discount and labels codes",
                   text, flags=re.M)
     for n, a in answers.items():
-        text = re.sub(rf"^Q{n}: $", f"Q{n}: {a}", text, flags=re.M)
+        text = re.sub(rf"^Q{n}: $", f"Q{n}: {_option(text, n, a)}", text, flags=re.M)
     f.write_text(text, encoding="utf-8")
     return f
+
+
+def _option(text, n, label):
+    """The number of Q`n`'s option whose label starts with `label`, else `label`."""
+    block = re.search(rf"# Q{n}\.(.*?)\nQ{n}:", text, re.S)
+    found = re.search(rf"#   (\d+)\. {re.escape(label)}", block.group(1)) if block else None
+    return found.group(1) if found else label
 
 
 def _criteria(tmp_path):
@@ -365,10 +370,10 @@ def _answer(tmp_path, f):
 
 
 def test_a_blanked_answer_leaves_the_task(tmp_path, monkeypatch):
-    f = _write_and_answer(tmp_path, monkeypatch, {1: "1"})
+    f = _write_and_answer(tmp_path, monkeypatch, {1: "raise"})
     _answer(tmp_path, f)
     assert len(_criteria(tmp_path)) == 1
-    f.write_text(re.sub(r"^Q1: 1$", "Q1: ", f.read_text(encoding="utf-8"), flags=re.M),
+    f.write_text(re.sub(r"^Q1: \d+$", "Q1: ", f.read_text(encoding="utf-8"), flags=re.M),
                  encoding="utf-8")
     _answer(tmp_path, f)
     assert _criteria(tmp_path) == [] or all("TODO" in c for c in _criteria(tmp_path))
@@ -376,7 +381,7 @@ def test_a_blanked_answer_leaves_the_task(tmp_path, monkeypatch):
 
 def test_an_edit_above_the_code_keeps_every_answer(tmp_path, monkeypatch):
     # Ids came from line numbers, and one added line lost all six answers.
-    f = _write_and_answer(tmp_path, monkeypatch, {1: "1"})
+    f = _write_and_answer(tmp_path, monkeypatch, {1: "raise"})
     _answer(tmp_path, f)
     before = _criteria(tmp_path)
     (tmp_path / "pricing.py").write_text('"""Pricing."""\n' + PRICING, encoding="utf-8")
@@ -385,17 +390,24 @@ def test_an_edit_above_the_code_keeps_every_answer(tmp_path, monkeypatch):
 
 
 def test_questions_again_refreshes_the_file_and_keeps_the_answers(tmp_path, monkeypatch):
-    f = _write_and_answer(tmp_path, monkeypatch, {1: "1"})
+    f = _write_and_answer(tmp_path, monkeypatch, {1: "raise"})
     s = Script([], interactive=False)
     start.main("pricing.py", str(tmp_path), console=s.console)
-    assert "refreshed, with 1 answer carried over" in s.text
-    assert re.search(r"^Q1: 1$", f.read_text(encoding="utf-8"), re.M)
+    assert "nothing has changed, so it is left as it is" in s.text
+    answered = f.read_text(encoding="utf-8")
+    # A change to the code: refreshed, with the answer still on its question.
+    (tmp_path / "pricing.py").write_text('"""Pricing."""\n' + PRICING, encoding="utf-8")
+    s = Script([], interactive=False)
+    start.main("pricing.py", str(tmp_path), console=s.console)
+    assert "refreshed, with 1 answer in place" in s.text
+    assert re.search(r"^Q1: \d+$", f.read_text(encoding="utf-8"), re.M)
     assert "applies a discount" in f.read_text(encoding="utf-8")
-    assert (f.parent / (f.name + ".bak")).exists()
+    backups = list(f.parent.glob(f.name + ".*.bak"))
+    assert len(backups) == 1 and backups[0].read_text(encoding="utf-8") == answered
 
 
 def test_a_file_without_its_id_lines_answers_by_position(tmp_path, monkeypatch):
-    f = _write_and_answer(tmp_path, monkeypatch, {1: "1"})
+    f = _write_and_answer(tmp_path, monkeypatch, {1: "raise"})
     _answer(tmp_path, f)
     with_ids = _criteria(tmp_path)
     f.write_text("\n".join(l for l in f.read_text(encoding="utf-8").splitlines()
@@ -422,7 +434,8 @@ def test_a_module_in_a_subfolder_keeps_its_answers(tmp_path, monkeypatch):
     text = f.read_text(encoding="utf-8")
     assert "scored: lib" in text
     text = re.sub(r"^requirements: $", "requirements: applies a discount", text, flags=re.M)
-    f.write_text(re.sub(r"^Q1: $", "Q1: 1", text, flags=re.M), encoding="utf-8")
+    f.write_text(re.sub(r"^Q1: $", f"Q1: {_option(text, 1, 'raise')}", text, flags=re.M),
+                 encoding="utf-8")
     monkeypatch.setattr(sys, "argv", ["qikly", "--answers", "lib/sub/pricing.py"])
     monkeypatch.setattr(sys, "stdin", None)
     cli.main()
@@ -442,9 +455,46 @@ def test_the_same_call_asked_three_times_is_one_answer_and_one_criterion(tmp_pat
 
 
 def test_questions_and_answers_without_a_value_runs_the_answers(tmp_path, monkeypatch, capsys):
-    _write_and_answer(tmp_path, monkeypatch, {1: "1"})
+    _write_and_answer(tmp_path, monkeypatch, {1: "raise"})
     monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
     monkeypatch.setattr(sys, "argv", ["qikly", "--questions", "pricing.py", "--answers"])
     monkeypatch.setattr(sys, "stdin", None)
     cli.main()
     assert "ready to run" in capsys.readouterr().out
+
+
+def test_a_set_returned_by_the_code_keeps_its_answer_across_runs(tmp_path, monkeypatch):
+    # A set printed in a different order each run, so its id changed and every
+    # answer was reported as about a question no longer asked.
+    source = "def tags(code):\n    return {'gold', 'member', code.lower()}\n"
+    _project(tmp_path, source=source,
+             tests="from pricing import tags\n\ndef test_t():\n    assert 'gold' in tags('x1')\n")
+    monkeypatch.chdir(tmp_path)
+    start.main("pricing.py", str(tmp_path), console=Script([], interactive=False).console)
+    f = tmp_path / "inputs_private" / "questions" / "PRICING_open_questions.txt"
+    first = f.read_text(encoding="utf-8")
+    assert "# What should tags(" in first and "{'gold', 'member', 'x1'}" in first
+    for _ in range(3):
+        f.unlink()
+        start.main("pricing.py", str(tmp_path), console=Script([], interactive=False).console)
+        assert f.read_text(encoding="utf-8") == first
+
+
+def test_a_value_on_an_option_that_takes_none_is_left_open(tmp_path, monkeypatch):
+    f = _write_and_answer(tmp_path, monkeypatch, {})
+    text = f.read_text(encoding="utf-8")
+    raise_n = _option(text, 1, "raise")
+    f.write_text(re.sub(r"^Q1: $", f"Q1: {raise_n}: 100.0", text, flags=re.M),
+                 encoding="utf-8")
+    s = _answer(tmp_path, f)
+    assert "takes no value" in s.text and not any("100, 0" in c for c in _criteria(tmp_path))
+
+
+def test_a_refresh_never_drops_an_answer_it_cannot_place(tmp_path, monkeypatch):
+    f = _write_and_answer(tmp_path, monkeypatch, {1: "raise"})
+    text = f.read_text(encoding="utf-8")
+    # An answer whose question is gone: its id belongs to nothing now.
+    text = re.sub(r"^# id [0-9a-f ]+$", "# id 000000000000", text, count=1, flags=re.M)
+    f.write_text(text, encoding="utf-8")
+    start.main("pricing.py", str(tmp_path), console=Script([], interactive=False).console)
+    assert re.search(r"^#   was Q1: \d+", f.read_text(encoding="utf-8"), re.M)

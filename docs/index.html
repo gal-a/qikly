@@ -878,11 +878,11 @@ footer {
 <pre><span class="code-line">#  &gt;    2     if rate &lt; 0 or rate &gt; 100:</span>
 # Your tests never try rate at exactly 100.
 # What should apply_discount(100, 100) do?
-#   1. return a value, as rate 99 does now
-#   2. raise ValueError, as rate 101 does now
+#   1. raise ValueError, as rate 101 does now
+#   2. return a value, as rate 99 does now
 #   3. either is fine, I do not mind
 #   4. save it (no decision now, maybe later)
-Q3: <span class="you-ins">2</span></pre>
+Q3: <span class="you-ins">1</span></pre>
           <p class="legend">qikly runs your code beside the value in question,
             never at it: <span class="you-ins">the answer</span> is yours</p>
         </figure>

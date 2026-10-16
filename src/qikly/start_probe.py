@@ -108,6 +108,24 @@ def is_ours(code):
         ours[code] = os.path.normcase(os.path.abspath(code.co_filename)) == target
     return ours[code]
 
+def show(value):
+    """
+    A repr that is the same on every run. A set prints in hash order, which
+    changes with each process, so the same outcome read as two different ones.
+    """
+    if isinstance(value, (set, frozenset)):
+        body = ", ".join(sorted(show(v) for v in value))
+        if isinstance(value, frozenset):
+            return "frozenset({%s})" % body if body else "frozenset()"
+        return "{%s}" % body if body else "set()"
+    if isinstance(value, dict):
+        return "{%s}" % ", ".join("%s: %s" % (show(k), show(v)) for k, v in value.items())
+    if isinstance(value, (list, tuple)) and any(isinstance(v, (set, frozenset, dict)) for v in value):
+        inner = ", ".join(show(v) for v in value)
+        return "[%s]" % inner if isinstance(value, list) else \
+            "(%s%s)" % (inner, "," if len(value) == 1 else "")
+    return repr(value)
+
 def outcomes(module, calls, trace=False):
     out, reached = [], []
     for func, args, kwargs in calls:
@@ -132,7 +150,7 @@ def outcomes(module, calls, trace=False):
                     value = getattr(module, func)(*args, **kwargs)
             finally:
                 sys.settrace(None)
-            out.append({"returns": ADDRESS.sub(" at 0x...", repr(value))})
+            out.append({"returns": ADDRESS.sub(" at 0x...", show(value))})
         except BaseException as exc:
             out.append({"raises": type(exc).__name__})
         reached.append(hit[0])

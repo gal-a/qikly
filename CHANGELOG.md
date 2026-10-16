@@ -64,10 +64,14 @@ packaging tools would read as `1.1`.
   - "Either is fine" and "save it for later" are options, and a blank answer
     stays open. The file is yours: change anything and run `--answers` again,
     and the task is rebuilt from the file each time. Rerunning `--questions`
-    after the code changed refreshes the file, carrying over every answer whose
-    question is still asked and keeping the old file as `.bak`. Each question's
-    id comes from its call and its choices, not its line, so an edit elsewhere
-    in the code does not lose an answer.
+    leaves an answered file alone when nothing changed; otherwise it refreshes
+    the file, keeps each answer on its question, writes any it can no longer
+    place at the end of the file as a comment, and keeps a dated copy of the
+    file as it was. Each question's id comes from its function, its question
+    and the shape of its line, not its line number or what the code printed,
+    so an edit elsewhere in the code does not lose an answer; an option number
+    whose choices have since changed is left open rather than read as another
+    choice.
   - Without a terminal, as under a coding agent, `--answers` checks the task
     and prints `qikly --tasks <TASK>` and `qikly --take-tests <TASK>`.
   - A module inside a package is seeded as its whole top-level package and

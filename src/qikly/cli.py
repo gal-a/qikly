@@ -1202,7 +1202,10 @@ def _parse_args():
         "--criteria-from-docs", metavar="DOC", nargs="+", default=None,
         help=argparse.SUPPRESS
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    # Kept for the guard in main: which flags were given, against their defaults.
+    args._parser = parser
+    return args
 
 
 def _print_run(info, brief=False):
@@ -2153,12 +2156,22 @@ def _do_answers(path, tests=None):
     if not os.path.exists(where):
         print(f"There is no file or folder at {where}.", file=sys.stderr)
         return 2
-    if os.path.isfile(where) and not where.endswith(".py"):
+    if os.path.isfile(where) and not where.lower().endswith(".py"):
         found = where
     else:
         found = start.answers_file_for(where, INVOKED_FROM)
         if isinstance(found, list):
-            if not found:
+            unanswered = start.answers_file_for(where, INVOKED_FROM, answered_only=False) \
+                if not found and os.path.isdir(where) else []
+            if not found and unanswered:
+                # Written but not answered yet: say where, not "write them".
+                print(f"None of the questions files for {path} has an answer yet. "
+                      f"Answer one, then run  qikly --answers <that file>:",
+                      file=sys.stderr)
+                for f in (unanswered if isinstance(unanswered, list) else [unanswered]):
+                    print(f"  {start.score_questions_pasteable(f, INVOKED_FROM)}",
+                          file=sys.stderr)
+            elif not found:
                 print(f"There are no answers for {path} yet. Write the questions "
                       f"first:  qikly --questions {path}", file=sys.stderr)
             else:
@@ -2170,6 +2183,12 @@ def _do_answers(path, tests=None):
                           file=sys.stderr)
             return 2
     scope = start._field(found, "scored") or start._field(found, "module")
+    if scope and not os.path.exists(os.path.join(INVOKED_FROM, scope)):
+        print(f"{start.score_questions_pasteable(found, INVOKED_FROM)} was written "
+              f"for {scope} (its scored: line), which is not there any more. Run  "
+              f"qikly --questions <where the code is now>  to write it again.",
+              file=sys.stderr)
+        return 2
     if not scope:
         print(f"{path} has no module: line, so qikly cannot tell which code it "
               f"answers for.", file=sys.stderr)
@@ -2599,22 +2618,12 @@ def main():
         # --questions returns before the misattached-flag guard below, so it does
         # its own: `--start pricing.py --task-id X --fresh` ran as PRICING and
         # silently dropped both.
-        ignored = [flag for flag, given in (
-            ("--tasks", bool(getattr(args, "tasks", None))),
-            ("--task-id", args.task_id is not None),
-            ("--fresh", bool(args.fresh)),
-            ("--validate", bool(getattr(args, "validate", False))),
-            ("--explain", getattr(args, "explain", None) is not None),
-            ("--run", bool(getattr(args, "run", None))),
-            ("--runs", bool(getattr(args, "runs", False))),
-            ("--status", bool(getattr(args, "status", None))),
-            ("--from-doc", args.from_doc is not None),
-            ("--scaffold", bool(args.scaffold)),
-            ("--score", bool(args.score_code)),
-            ("--score-suite", bool(args.score_suite)),
-            ("--score-mutants", args.score_mutants is not None),
-            ("--score-seed", args.score_seed is not None),
-        ) if given]
+        # An allowlist, not a list of refused flags: --demo, --json, --force
+        # and others slipped through a list and were dropped without a word.
+        allowed = {"start", "answers", "score_tests", "help", "_parser"}
+        ignored = [action.option_strings[0] for action in args._parser._actions
+                   if action.option_strings and action.dest not in allowed
+                   and getattr(args, action.dest, action.default) != action.default]
         if ignored:
             print(f"--questions and --answers take a path and, optionally, "
                   f"--score-tests; they would "

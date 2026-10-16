@@ -265,7 +265,7 @@ def test_an_option_that_asks_for_a_value_can_take_one_from_a_file(tmp_path, monk
     monkeypatch.setattr(so, "menu", lambda *a, **k: ("p", [option]))
     answers = tmp_path / "a.txt"
     entry = start.sharp_questions([q], PRICING, [TESTS], str(tmp_path))[0][0]
-    answers.write_text(f"requirements: applies a discount\n# id {entry['id']}\nQ1: 1: 100.0\n")
+    answers.write_text(f"requirements: applies a discount\n# id {entry['ids'][0]}\nQ1: 1: 100.0\n")
     state, _ = start._from_answers(Script([], interactive=False).console, paths, [q],
                                    [TESTS], str(tmp_path), str(answers))
     assert state["answers"][start._key(q)]["criterion"] == \
