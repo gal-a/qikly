@@ -33,8 +33,6 @@ from qikly import start_probe
 # What an option does when chosen. A behaviour carries the call and the
 # outcome it would pin; the others record a decision about the question.
 BEHAVIOUR, EITHER, ASK, SKIP, OWN = "behaviour", "either", "ask", "skip", "own"
-# Skip this and every later question that offers no answers to choose from.
-SKIP_TYPED = "skip_typed"
 
 
 def path_module(path, root):
@@ -912,13 +910,8 @@ def menu(question, source, test_sources, root, mutant=None):
     else:
         built = difference_options(question, source, test_sources, root, mutant)
     if built is None:
-        # The middle option is the way out: on real libraries nearly every
-        # question offered only these, each needing the code read, and a
-        # person who has answered enough can stop and still get a run.
         return None, [
             {"kind": SKIP, "label": "skip this question for now"},
-            {"kind": SKIP_TYPED, "label": "skip this and every other question that "
-                                           "needs typing; they are saved for later"},
             {"kind": OWN, "label": "type my own answer"},
         ]
     prompt, behaviours = built

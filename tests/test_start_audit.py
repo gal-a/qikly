@@ -48,23 +48,8 @@ def _project(tmp_path, source=PRICING, tests=TESTS, name="pricing.py"):
 
 # ------------------------------------------------------ the first-time user --
 
-def test_deleting_answers_needs_its_own_confirmation(tmp_path):
-    """A piped "2" meant for the next question wiped every answer."""
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    q = {"file": "pricing.py", "path": paths.module, "line": 2,
-         "function": "apply_discount", "question": "q?", "kind": "guard disabled"}
-    start.save_state(paths, {"requirements": "applies a discount", "extra": [],
-                             "answers": {start._key(q): {"status": "skip", "question": "q?",
-                                                         "where": "w"}}})
-    s = Script(["3", "1"])
-    with pytest.raises(start.Stop):
-        start.module_flow(s.console, paths, [q], [TESTS], str(tmp_path))
-    assert "This cannot be undone." in s.text
-    assert start.load_state(paths)["answers"], "answers kept after 'no, keep'"
 
-
-def test_the_test_choice_and_the_score_are_reused(tmp_path, monkeypatch):
+def test_the_score_is_reused(tmp_path, monkeypatch):
     _project(tmp_path)
     calls = []
     real = start.score
@@ -76,15 +61,10 @@ def test_the_test_choice_and_the_score_are_reused(tmp_path, monkeypatch):
     monkeypatch.setattr(start, "score", counting)
     code = str(tmp_path / "pricing.py")
     tests = str(tmp_path / "tests")
-    session = {}
-    first, _ = start._scored(Script([]).console, code, tests, str(tmp_path), session)
+    first, _ = start._scored(Script([]).console, code, tests, str(tmp_path), {})
     again = start.load_session(str(tmp_path), code)
     second, _ = start._scored(Script([]).console, code, tests, str(tmp_path), again)
     assert len(calls) == 1 and second["total"] == first["total"]
-    s = Script([])
-    assert start._choose_tests(s.console, code, str(tmp_path), again) == \
-        os.path.abspath(tests)
-    assert "as you chose last time" in s.text, "reused without asking"
 
 
 def test_a_boundary_on_a_named_constant_with_a_defaulted_argument_is_concrete(tmp_path):
@@ -210,19 +190,6 @@ def test_a_crashed_validate_is_an_error_not_ready(tmp_path, monkeypatch):
     assert errors and "cannot be stripped" in errors[0]
 
 
-def test_a_one_word_criterion_is_refused():
-    s = Script(["1", "1", "apply_discount(100, 0) returns 100.0"])
-    assert start.own_answer(s.console, "f(1) returns 2") == \
-        "apply_discount(100, 0) returns 100.0"
-    assert "A criterion needs a few words" in s.text
-
-
-def test_a_value_prompt_takes_a_bare_number():
-    s = Script(["2"])
-    assert start.free_text(s.console, "Type what it should return", "1.0",
-                           value=True) == "2"
-
-
 def test_a_rename_writes_a_task_that_names_itself(tmp_path):
     _project(tmp_path)
     paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
@@ -277,33 +244,14 @@ def test_a_module_with_no_public_functions_is_skipped_before_any_question(tmp_pa
     assert not os.path.exists(paths.task)
 
 
-def test_functions_without_arguments_need_no_sample_file(tmp_path):
-    (tmp_path / "settings_mod.py").write_text("def defaults():\n    return 1\n")
-    paths = start.Paths(str(tmp_path), str(tmp_path / "settings_mod.py"))
-    state = {"answers": {}, "extra": []}
-    s = Script([])
-    start.ask_data(s.console, paths, state, "def defaults():\n    return 1\n", [])
-    assert "take no arguments" in s.text and state["rows"] == [["none"]]
-
-
-def test_an_existing_task_is_not_asked_about_without_a_terminal(tmp_path):
+def test_an_existing_task_this_command_did_not_write_is_left_alone(tmp_path):
     _project(tmp_path)
     paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
     os.makedirs(os.path.dirname(paths.task))
     open(paths.task, "w").write("task_id: x\n")
-    s = Script([], interactive=False)
-    assert start._existing_task(s.console, paths, can_ask=False) is False
-    assert not any(str(x).startswith("Type a number") for x in s.seen)
-
-
-def test_printed_commands_paste_into_git_bash(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    start.write_open_questions(paths, {"answers": {"a": {
-        "status": "skip", "question": "q", "where": "w", "number": 1, "key": "abc123"}}})
-    text = open(paths.open, encoding="utf-8").read()
-    assert "inputs_private/questions/PRICING_open_questions.txt" in text
-    assert "# id abc123" in text
+    s = Script([])
+    assert start._existing_task(s.console, paths) is False
+    assert "left alone" in s.text and not any(str(x).startswith("Type a number") for x in s.seen)
 
 
 def test_an_option_that_asks_for_a_value_can_take_one_from_a_file(tmp_path, monkeypatch):
@@ -335,11 +283,6 @@ def test_start_refuses_flags_it_would_ignore(monkeypatch, capsys):
     assert cli.main() == 2
     err = capsys.readouterr().err
     assert "--task-id" in err and "--fresh" in err
-
-
-def test_the_rule_example_comes_from_the_module():
-    q = [{"function": "apply_discount"}]
-    assert start._rule_example(q, [TESTS]) == "apply_discount(100, 10) returns ..."
 
 
 # ------------------------------------------------- the eight-project matrix --
@@ -473,18 +416,6 @@ def test_start_takes_its_tests_from_score_tests(monkeypatch, tmp_path):
     assert cli.main() == 0 and seen["tests"] == "tests/"
 
 
-def test_code_with_no_tests_gets_questions_about_every_fault(tmp_path, monkeypatch):
-    (tmp_path / "pricing.py").write_text(PRICING)
-    monkeypatch.chdir(tmp_path)
-    s = Script([])
-    suite = start.no_tests_suite(s.console, str(tmp_path / "pricing.py"), str(tmp_path))
-    assert start.is_placeholder(suite, str(tmp_path))
-    assert "qikly-suite-score" in suite and not (tmp_path / "tests").exists()
-    result, _ = start.score(s.console, str(tmp_path / "pricing.py"), suite,
-                            str(tmp_path), False)
-    assert result and result["total"] and not result["caught"]
-
-
 # ---------------------------------------------- second audit, 2026-10-15 --
 
 def _tagged_project(tmp_path, body):
@@ -545,20 +476,6 @@ def test_a_package_named_like_the_standard_library_stays_a_file_seed(tmp_path):
         "question": "q", "where": "w"}}}
     task = yaml.safe_load(start.task_text(paths, state))
     assert task["seed"]["implementation"].endswith("pricing.py")
-
-
-def test_the_placeholder_leaves_out_main_and_unimportable_modules(tmp_path):
-    pkg = tmp_path / "app"
-    pkg.mkdir()
-    (pkg / "__init__.py").write_text("")
-    (pkg / "__main__.py").write_text("import sys\nsys.exit(2)\n")
-    (pkg / "broken.py").write_text("import nonexistent_module_xyz\n")
-    (pkg / "rules.py").write_text("def f(x):\n    return x\n")
-    s = Script([])
-    path = start.no_tests_suite(s.console, str(pkg), str(tmp_path))
-    text = open(path).read()
-    assert "app.rules" in text and "__main__" not in text and "broken" not in text
-    assert "left out" in s.text
 
 
 def test_decimal_neighbours_are_typed_not_pinned(tmp_path, monkeypatch):
@@ -719,15 +636,12 @@ def test_a_test_importing_a_name_the_module_lacks_is_not_a_disagreement(tmp_path
     assert unchecked == {"test_s": ["NoSuchError"]}
 
 
-def test_a_folder_of_one_module_is_that_module_with_or_without_a_terminal(tmp_path):
-    # inflection's code is its __init__.py: a terminal run tested the module
-    # and a run without one the folder, each with its own questions.
+def test_a_folder_of_one_module_is_that_module(tmp_path):
+    # inflection's code is its __init__.py.
     pkg = tmp_path / "pkg"
     pkg.mkdir()
     (pkg / "__init__.py").write_text("def f(x):\n    return x + 1\n", encoding="utf-8")
     assert start._one_module(str(pkg)) == str(pkg / "__init__.py")
-    s = Script(["1"])
-    assert start.pick_code(s.console, "pkg", str(tmp_path)) == str(pkg / "__init__.py")
 
 
 def test_a_call_through_a_variable_is_the_answers_call():
@@ -904,29 +818,6 @@ def test_a_fault_that_hangs_is_stopped_and_counted_caught(tmp_path, monkeypatch)
 
 # ------------------------------------- the cap and answers through public calls --
 
-def test_more_than_ten_questions_asks_ten_and_keeps_the_rest_for_later(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    questions = [{"file": "pricing.py", "path": paths.module, "line": 2,
-                  "function": "apply_discount", "question": f"question {n}?",
-                  "kind": "guard disabled"} for n in range(12)]
-    start.save_state(paths, {"requirements": "applies a discount", "extra": [],
-                             "answers": {}})
-    # "1" continues past the saved requirements, "1" takes the first ten, and
-    # each text-only question is then skipped with "1".
-    s = Script(["1", "1"] + ["1"] * 10)
-    with pytest.raises(start.Stop):
-        start.module_flow(s.console, paths, questions, [TESTS], str(tmp_path))
-    assert "12 questions about pricing.py" in s.text
-    answers = start.load_state(paths)["answers"]
-    assert sum(1 for r in answers.values() if r.get("deferred")) == 2
-    assert sum(1 for r in answers.values() if not r.get("deferred")) == 10
-    # The same command again asks the two that were put off.
-    s = Script(["1", "1", "1"])
-    with pytest.raises(start.Stop):
-        start.module_flow(s.console, paths, questions, [TESTS], str(tmp_path))
-    assert "2 still to go" in s.text and "Question 11 of 12" in s.text
-
 
 def test_a_helper_reached_only_through_a_public_function_gets_options(tmp_path):
     # On real libraries most missed faults sat in private helpers that tests
@@ -1100,22 +991,6 @@ def test_building_a_menu_never_writes_a_new_file_beside_the_users_data(tmp_path)
     assert list((tmp_path / "data").iterdir()) == []
 
 
-def test_put_off_questions_keep_their_numbers_in_the_questions_file(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    questions = [{"file": "pricing.py", "path": paths.module, "line": 2,
-                  "function": "apply_discount", "question": f"question {n}?",
-                  "kind": "guard disabled"} for n in range(12)]
-    start.save_state(paths, {"requirements": "applies a discount", "extra": [],
-                             "answers": {}})
-    with pytest.raises(start.Stop):
-        start.module_flow(Script(["1", "1"] + ["1"] * 10).console, paths, questions,
-                          [TESTS], str(tmp_path))
-    numbers = [l.split(":")[0] for l in open(paths.open, encoding="utf-8").read().splitlines()
-               if l.startswith("Q")]
-    assert len(numbers) == len(set(numbers)) == 12
-
-
 def test_a_blank_answer_in_the_file_is_asked_again_in_a_terminal(tmp_path, monkeypatch):
     _project(tmp_path)
     monkeypatch.chdir(tmp_path)
@@ -1130,25 +1005,6 @@ def test_a_blank_answer_in_the_file_is_asked_again_in_a_terminal(tmp_path, monke
     paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
     state = start.load_state(paths)
     assert state["answers"] and all(r.get("deferred") for r in state["answers"].values())
-
-
-def test_the_sample_file_prompt_is_a_menu_with_a_way_out(tmp_path):
-    # python-dotenv reads files: the bare path prompt looped 400 times on a
-    # path that did not exist, and ignored the sample already in place.
-    source = "def load(path):\n    return open(path).read()\n"
-    (tmp_path / "envfile.py").write_text(source, encoding="utf-8")
-    paths = start.Paths(str(tmp_path), str(tmp_path / "envfile.py"))
-    state = {"answers": {}, "extra": []}
-    s = Script(["1"])
-    start.ask_data(s.console, paths, state, source, [])
-    assert "not now" in s.text and "sample" not in state
-    os.makedirs(os.path.dirname(paths.data))
-    with open(paths.data, "w", encoding="utf-8") as handle:
-        handle.write("A=1\n")
-    s = Script(["1"])
-    start.ask_data(s.console, paths, state, source, [])
-    assert state["sample"] == paths.data
-    start.write_files(s.console, paths, state)
 
 
 # -------------------------------------------- the fifth audit, 2026-10-16 --
@@ -1235,43 +1091,3 @@ def test_a_class_test_is_read_inside_its_own_class():
     assert not start._makes_call("", ("parse", ["1"], {}), None, test_file, "TestB::test_x")
 
 
-def test_a_module_with_put_off_questions_is_not_complete(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    start.save_state(paths, {"requirements": "r", "extra": [], "rows": [["1", "2"]],
-                             "answers": {"a": {"status": "skip", "deferred": True}}})
-    assert not start._complete(paths)
-
-
-def test_skipping_the_typed_questions_puts_off_the_rest_without_asking(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    questions = [{"file": "pricing.py", "path": paths.module, "line": 2,
-                  "function": "apply_discount", "question": f"question {n}?",
-                  "kind": "guard disabled"} for n in range(4)]
-    start.save_state(paths, {"requirements": "applies a discount", "extra": [],
-                             "answers": {}})
-    # continue, then "skip this and every other question that needs typing"
-    s = Script(["1", "2"])
-    with pytest.raises(start.Stop):
-        start.module_flow(s.console, paths, questions, [TESTS], str(tmp_path))
-    assert s.text.count("Question ") == 1
-    assert "4 questions that need typing put off" in s.text
-    answers = start.load_state(paths)["answers"]
-    assert len(answers) == 4 and all(r.get("deferred") for r in answers.values())
-
-
-def test_a_typed_answer_can_go_back_to_the_questions_menu(tmp_path):
-    # Typing "1" where words were wanted, keeping it, and being told it was
-    # too short, went round with no way out but Ctrl+C.
-    q = {"file": "pricing.py", "path": str(tmp_path / "pricing.py"), "line": 2,
-         "function": "apply_discount", "question": "q?", "kind": "guard disabled"}
-    (tmp_path / "pricing.py").write_text(PRICING, encoding="utf-8")
-    # 3 = type my own answer, "1", 2 = go back, then 1 = skip.
-    s = Script(["3", "1", "2", "1"])
-    rec = start.ask_question(s.console, 1, 1, q, PRICING, [TESTS], str(tmp_path))
-    assert rec["status"] == "skip" and "back to the question's options" in s.text
-    # And "back" typed at the prompt does the same.
-    s = Script(["3", "back", "1"])
-    assert start.ask_question(s.console, 1, 1, q, PRICING, [TESTS],
-                              str(tmp_path))["status"] == "skip"

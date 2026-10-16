@@ -16,6 +16,7 @@ import re
 import sys
 
 import pytest
+import yaml
 
 from qikly import cli, start
 from qikly import start_options as so
@@ -84,29 +85,10 @@ def test_quitting_or_running_out_of_input_stops_cleanly(typed):
         start.choose(Script([]).console, ["a"])
 
 
-def test_free_text_refuses_empty_and_checks_a_bare_number():
-    s = Script(["", "4", "2", "a rate of 0 is accepted"])
-    assert start.free_text(s.console, "Type it") == "a rate of 0 is accepted"
+def test_free_text_refuses_empty():
+    s = Script(["", "gemini"])
+    assert start.free_text(s.console, "Type it") == "gemini"
     assert "Nothing was typed." in s.text
-    assert 'You typed only "4"' in s.text
-    s = Script(["4", "1"])
-    assert start.free_text(s.console, "Type it") == "4"
-
-
-def test_an_answer_with_no_value_gets_one_follow_up():
-    s = Script(["rates must be sensible", "1", "at exactly 100"])
-    text = start.own_answer(s.console, "f(1) returns 2")
-    assert text == "rates must be sensible at exactly 100"
-    assert "names no value" in s.text
-    s = Script(["rates must be sensible", "2"])
-    assert start.own_answer(s.console, "x") == "rates must be sensible"
-
-
-def test_rows_with_the_wrong_number_of_values_are_asked_again():
-    s = Script(["", "80, 25", "80, 25, vip", ""])
-    assert start.ask_rows(s.console, ["price", "rate", "code"]) == [["80", "25", "vip"]]
-    assert "At least one row is needed." in s.text
-    assert "That row has 2 values, and price, rate, code needs 3." in s.text
 
 
 # ------------------------------------------------- the answer is theirs --
@@ -160,9 +142,8 @@ def test_where_the_input_cannot_be_known_only_skip_and_own_are_offered(tmp_path,
     prompt, options = so.menu(_question(tmp_path, edge=None, kind=kind), PRICING,
                               [TESTS], str(tmp_path))
     assert prompt is None
-    labels = [o["label"] for o in options]
-    assert labels[0] == "skip this question for now" and labels[-1] == "type my own answer"
-    assert labels[1].startswith("skip this and every other question that needs typing")
+    assert [o["label"] for o in options] == ["skip this question for now",
+                                             "type my own answer"]
 
 
 def test_a_difference_is_offered_with_the_current_one_labelled(tmp_path):
@@ -222,18 +203,6 @@ def test_the_coding_agent_never_sees_an_answer_or_an_open_question(tmp_path):
     assert "applies a discount" in seen
 
 
-def test_open_questions_keep_their_own_numbers(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    state = {"answers": {"b": {"status": so.SKIP, "question": "q5", "where": "w",
-                               "number": 5}}}
-    start.write_open_questions(paths, state)
-    assert "Q5: " in (tmp_path / "inputs_private" / "questions" /
-                      "PRICING_open_questions.txt").read_text(encoding="utf-8")
-    found, _, _, module, ids = start.parse_answers(paths.open)
-    assert found == {} and module == "pricing.py"
-
-
 def test_rows_are_built_from_typed_answers_and_test_calls():
     state = {"answers": {"a": {"status": "answered",
                                "criterion": "apply_discount(100, 0) returns 100.0"}},
@@ -260,75 +229,60 @@ def test_answers_file_parsing():
 
 # ------------------------------------------------------- the whole flow --
 
-def test_the_guided_flow_on_a_module_without_a_model(tmp_path, monkeypatch):
-    """
-    Every prompt answered, ending at "not now". The tests are chosen, the
-    questions answered or skipped, the rows accepted, and the check passes.
-    No model is called: the run is declined.
-    """
+
+def test_start_writes_the_questions_file_and_never_asks(tmp_path, monkeypatch):
     _project(tmp_path)
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(start, "provider",
-                        lambda: ("gemini", "gemini-test", "GEMINI_API_KEY"))
-    answers = ["1", "applies a percentage discount to a price, and labels codes"]
-    # Skip or say either-is-fine to every question, whatever its menu.
-    answers += ["1"] * 0
-    s = Script(answers)
-    real_choose = start.choose
-
-    def choosing(console, options, lead=None):
-        labels = list(options)
-        if console is s.console and not s.answers:
-            for wanted in ("either is fine, I do not mind", "skip this question for now",
-                           "these are right, continue", "use these rows",
-                           "continue anyway"):
-                if wanted in labels:
-                    s.answers.append(str(labels.index(wanted) + 1))
-                    break
-            else:
-                if any(l.startswith("not now") for l in labels):
-                    s.answers.append(str(next(i for i, l in enumerate(labels, 1)
-                                              if l.startswith("not now"))))
-        return real_choose(console, options, lead)
-
-    monkeypatch.setattr(start, "choose", choosing)
-    # Every question skipped leaves no criterion, which --validate refuses, so
-    # add one rule at the summary.
-    original_summary = start.summary
-
-    def summary(console, paths, state, by_key, example=None):
-        if not state.get("extra"):
-            state["extra"] = ["apply_discount(100, 0) returns 100.0"]
-        return original_summary(console, paths, state, by_key, example)
-
-    monkeypatch.setattr(start, "summary", summary)
-    code = start.main("pricing.py", str(tmp_path), console=s.console)
-    assert code == 0, s.text[-2000:]
-    assert (tmp_path / "inputs_private" / "config" / "tasks" / "PRICING_VERIFY.yaml").exists()
-    data = (tmp_path / "inputs_private" / "data" / "PRICING" / "input_01.csv")
-    assert data.read_text(encoding="utf-8").startswith("price,rate,code\n")
-    assert "Checked PRICING_VERIFY: ready to run." in s.text
-    assert "SAVED BY THIS COMMAND" in s.text and "Everything above is under" in s.text
-    assert "It writes into" in s.text, "where things go is said up front"
-
-
-def test_without_a_terminal_it_never_waits_and_writes_the_questions(tmp_path, monkeypatch):
-    _project(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    s = Script([], interactive=False)
-    assert start.main("pricing.py", str(tmp_path), console=s.console) == start.NEEDS_ANSWERS
+    # A terminal or not, --start asks nothing: the file is where answers go.
+    for interactive in (True, False):
+        s = Script([], interactive=interactive)
+        assert start.main("pricing.py", str(tmp_path), console=s.console) == start.NEEDS_ANSWERS
+        assert not any(str(x).startswith("Type a number") for x in s.seen)
     written = tmp_path / "inputs_private" / "questions" / "PRICING_open_questions.txt"
     text = written.read_text(encoding="utf-8")
-    assert "Q1: " in text and "--answers" in text
-    assert not any(str(x).startswith("Type a number") for x in s.seen)
+    assert "Q1: " in text and "--answers" in text and "requirements: " in text
+    assert "rule: " in text
     # The code each question is about, not just its line number.
     assert re.search(r"^#  >\s+\d+ ", text, re.M), text
-    # The example inputs are asked for in the file too: left out, a real
-    # library's --answers run stopped on "input file not found".
-    assert "#   price, rate, code" in text
-    assert any(line.startswith("row: ") and line.strip() != "row:" for line in text.splitlines())
+    # Only questions with answers to choose from: every Q has a "What should".
+    assert text.count("\nQ") == text.count("# What should") + text.count("# Your tests never try")
     found, _, rows, _, _ = start.parse_answers(str(written))
     assert rows and all(len(r) == 3 for r in rows)
+
+
+def test_start_never_writes_over_answers_a_person_wrote(tmp_path, monkeypatch):
+    _project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    start.main("pricing.py", str(tmp_path), console=Script([], interactive=False).console)
+    written = tmp_path / "inputs_private" / "questions" / "PRICING_open_questions.txt"
+    text = written.read_text(encoding="utf-8").replace("requirements: ", "requirements: mine", 1)
+    written.write_text(text, encoding="utf-8")
+    s = Script([], interactive=False)
+    start.main("pricing.py", str(tmp_path), console=s.console)
+    assert written.read_text(encoding="utf-8") == text
+    assert "already holds your answers" in s.text
+
+
+def test_the_answers_file_makes_a_task_ready_to_run(tmp_path, monkeypatch):
+    """The whole of step 2 without a model: write, answer, check."""
+    _project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    start.main("pricing.py", str(tmp_path), console=Script([], interactive=False).console)
+    written = tmp_path / "inputs_private" / "questions" / "PRICING_open_questions.txt"
+    text = written.read_text(encoding="utf-8")
+    text = re.sub(r"^requirements: $", "requirements: applies a discount and labels codes",
+                  text, flags=re.M)
+    text = re.sub(r"^rule: $", "rule: apply_discount(80, 25) returns 60.0", text, flags=re.M)
+    written.write_text(text, encoding="utf-8")
+    s = Script([], interactive=False)
+    assert start.main("pricing.py", str(tmp_path), console=s.console,
+                      answers=str(written)) == 0, s.text[-2000:]
+    assert "Checked PRICING_VERIFY: ready to run." in s.text
+    assert "qikly --start pricing.py --answers" in s.text
+    task = yaml.safe_load((tmp_path / "inputs_private" / "config" / "tasks" /
+                           "PRICING_VERIFY.yaml").read_text(encoding="utf-8"))
+    assert "apply_discount(80, 25) returns 60.0" in task["acceptance_criteria"]
+    assert written.read_text(encoding="utf-8") == text, "the answers file is never rewritten"
 
 
 def test_a_folder_beside_its_tests_finds_them_without_a_project_marker(tmp_path):
@@ -340,22 +294,7 @@ def test_a_folder_beside_its_tests_finds_them_without_a_project_marker(tmp_path)
     (tmp_path / "tests" / "test_shop.py").write_text(
         "from shop.pricing import apply_discount\n\ndef test_a():\n"
         "    assert apply_discount(100, 10) == 90\n", encoding="utf-8")
-    s = Script(["1"])
-    tests = start.pick_tests(s.console, str(shop), str(tmp_path))
-    assert tests == str(tmp_path / "tests" / "test_shop.py")
-
-
-def test_a_folder_offers_the_whole_folder_or_one_module(tmp_path):
-    shop = tmp_path / "shop"
-    shop.mkdir()
-    for name in ("pricing.py", "shipping.py", "test_x.py", "conftest.py"):
-        (shop / name).write_text("def f(x):\n    return x\n", encoding="utf-8")
-    s = Script(["1"])
-    assert start.pick_code(s.console, "shop", str(tmp_path)) == str(shop)
-    assert "2 modules, one task each" in s.text
-    assert "test_x.py" not in s.text and "conftest.py" not in s.text
-    s = Script(["3"])
-    assert start.pick_code(s.console, "shop", str(tmp_path)) == str(shop / "shipping.py")
+    assert start.auto_tests(str(shop), str(tmp_path)) == str(tmp_path / "tests" / "test_shop.py")
 
 
 # -------------------------------------------------------------- the flags --
