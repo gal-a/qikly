@@ -1043,8 +1043,7 @@ def ask_question(console, number, total, q, source, test_sources, root,
                 + ("  (another question about the same line)" if same_line else ""))
     for line in _context(source, q.get("line")):
         console.say(line)
-    prompt, options = q.get("_built") or so.menu(q, source, test_sources, root,
-                                                 q.get("mutant"))
+    prompt, options = so.menu(q, source, test_sources, root, q.get("mutant"))
     if prompt:
         # The concrete question replaces the general one's last sentence,
         # which asked the same thing in the abstract.
@@ -1224,15 +1223,30 @@ def ask_data(console, paths, state, source, test_sources):
         console.say(f"{os.path.basename(paths.module)} works on files rather "
                     f"than values, so the example data is a real file of that "
                     f"kind.")
+        # A menu, like every other prompt: a bare path prompt had no way out
+        # but a valid path or Ctrl+C, and it ignored a sample already there.
         while True:
+            there = [f for f in (os.path.splitext(paths.data)[0] + e
+                                 for e in ("", ".csv", ".txt", ".env", ".json"))
+                     if os.path.isfile(f)] if os.path.isdir(os.path.dirname(paths.data)) else []
+            options = ([f"use the file already at {paths.rel(there[0])}"] if there else [])
+            options += [f"not now: the run waits until a sample file is at "
+                        f"{paths.rel(paths.data)}",
+                        "type the path of a small real sample file; it is copied, not moved"]
+            picked = choose(console, options)
+            if there and picked == 1:
+                state["sample"], state["rows"] = there[0], None
+                return
+            if picked == len(options) - 1:
+                return
             raw = free_text(console, "Type the path of a small real sample "
-                            "file. It is copied, not moved", "data/sample.csv")
+                            "file", "data/sample.csv")
             sample = os.path.abspath(os.path.join(paths.cwd, raw.strip('"')))
             if os.path.isfile(sample):
                 state["sample"] = sample
                 state["rows"] = None
                 return
-            console.say(f"There is no file at {sample}. Please type the path again.")
+            console.say(f"There is no file at {sample}.")
     built = build_rows(state, columns, source, test_sources)
     console.say("")
     # Why a value-taking module needs a data file at all, and what a row is:
@@ -1363,7 +1377,11 @@ def write_files(console, paths, state, quiet=False):
         ext = os.path.splitext(state["sample"])[1] or ".csv"
         data = data[:-len(".csv")] + ext
         os.makedirs(os.path.dirname(data), exist_ok=True)
-        shutil.copy2(state["sample"], data)
+        # The file already in place is used where it is: copied onto itself,
+        # shutil raises.
+        if os.path.normcase(os.path.abspath(state["sample"])) != \
+                os.path.normcase(os.path.abspath(data)):
+            shutil.copy2(state["sample"], data)
     elif state.get("rows"):
         os.makedirs(os.path.dirname(data), exist_ok=True)
         with open(data, "w", encoding="utf-8", newline="") as handle:
@@ -1584,7 +1602,7 @@ def disagreements(paths, state, lines):
         # Each batch numbers its criteria from 1, so a test's "Criteria: 2"
         # cannot be traced to one answer. Say nothing rather than misattribute.
         return None, {}, criteria, [], {}
-    bodies = {}
+    bodies, files = {}, {}
     for stage in ("integration", "system"):
         folder = os.path.join(paths.tests, stage)
         for name in (sorted(os.listdir(folder)) if os.path.isdir(folder) else []):
@@ -1593,6 +1611,7 @@ def disagreements(paths, state, lines):
             source = _read(os.path.join(folder, name))
             for test, doc in _test_docstrings(source):
                 bodies[test] = _test_body(source, test)
+                files[test] = source
                 # With or without "#", in the docstring or in a comment after
                 # the body: the generator writes all of these, and a test
                 # tagged "Criteria: 2" in its docstring was linked to nothing,
@@ -1626,7 +1645,8 @@ def disagreements(paths, state, lines):
         call = _call_in(criteria[n - 1])
         if not call:
             continue
-        kept = [t for t in names if _makes_call(bodies.get(t, ""), call, module_source)]
+        kept = [t for t in names if _makes_call(bodies.get(t, ""), call, module_source,
+                                                files.get(t), t)]
         if kept:
             tests_for[n] = kept
         else:
@@ -1742,14 +1762,16 @@ def _test_body(source, name):
     return ""
 
 
-def _makes_call(body, call, source=None):
+def _makes_call(body, call, source=None, test_file=None, test=None):
     """
     Whether a test body makes exactly the call the answer names: the same
     values, and the same keyword arguments. Finding the values anywhere was
     not enough: `shipping_cost(50.0, 2, express=True)` holds both values of
     the free-shipping answer and tests something else. With the module's
     `source`, calls are compared by meaning, so `express=False` passed
-    explicitly matches leaving it at its default.
+    explicitly matches leaving it at its default. With the whole `test_file`
+    and the `test`'s name, every parametrize row counts: the body alone has
+    neither the decorators nor the tables the rows are kept in.
     """
     import ast
     function, args, kwargs = call
@@ -1765,11 +1787,23 @@ def _makes_call(body, call, source=None):
                 if not (n in defaults and defaults[n] == v)}
 
     wanted = meaning(args, kwargs)
-    try:
-        tree = ast.parse(body)
-    except SyntaxError:
-        return False
-    for node in ast.walk(tree):
+    scope = None
+    if test_file and test:
+        try:
+            tree = ast.parse(test_file)
+        except SyntaxError:
+            tree = None
+        last = test.split("::")[-1].split("[")[0]
+        scope = next((n for n in ast.walk(tree) if isinstance(
+            n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == last), None) \
+            if tree else None
+    if scope is None:
+        try:
+            tree = ast.parse(body)
+        except SyntaxError:
+            return False
+        scope = tree
+    for node in ast.walk(scope):
         if not isinstance(node, ast.Call):
             continue
         name = (node.func.id if isinstance(node.func, ast.Name)
@@ -2034,32 +2068,33 @@ QUESTION_CAP = 10
 FOLDER_CAP = 25
 
 
-def _most_useful_first(console, questions, source, test_sources, root):
+def _most_useful_first(pending, by_key, test_sources, root):
     """
-    The questions with concrete answers to choose from first, then the rest,
-    each group in the order it came: public functions, top level, helpers.
-    Each menu is built once here and kept, so asking does not build it again.
+    The questions qikly can try your code on first: those whose function, or
+    a public function of the module, the tests call. A cheap test, read from
+    the tests, not by running anything: building every menu up front ran a
+    process per question, up to half a minute each, for questions that were
+    then put off. Each keeps its own number, as in the questions file.
     """
-    console.say(f"{len(questions)} questions. Working out which ones qikly can "
-                f"offer answers for, by running your code in a separate process, "
-                f"so those come first...")
-    for q in questions:
-        q["_built"] = so.menu(q, source, test_sources, root, q.get("mutant"))
-    return ([q for q in questions if q["_built"][0]]
-            + [q for q in questions if not q["_built"][0]])
+    def callable_(key):
+        q = by_key[key]
+        module = so.path_module(q["path"], root)
+        names = [q["function"]] if q.get("function") else []
+        names += so._public_functions(_read(q["path"]))
+        return any(so.literal_calls(test_sources, n, module) for n in names)
+    first = [k for k in pending if callable_(k)]
+    return first + [k for k in pending if k not in first]
 
 
-def _cap(console, paths, state, pending, by_key):
+def _cap(console, paths, state, pending, by_key, keys):
     """
     How many to ask now. More than ten questions about one module is more
     than anyone answers in a sitting; the rest are saved, not dropped, and
     the same command asks them next time.
     """
     n = len(pending)
-    concrete = sum(1 for k in pending if (by_key[k].get("_built") or (None,))[0])
-    lead = [f"{n} questions about {os.path.basename(paths.module)}"
-            + (f", {concrete} with answers to choose from, which come first." if concrete
-               else ".")]
+    lead = [f"{n} questions about {os.path.basename(paths.module)}. The ones qikly "
+            f"can try your code on come first."]
     picked = choose(console, [
         f"answer the first {QUESTION_CAP} now; the other {n - QUESTION_CAP} are saved "
         f"for later, and running the same command again asks them",
@@ -2074,14 +2109,30 @@ def _cap(console, paths, state, pending, by_key):
         now = _number(console, n, "questions to answer now")
     for key in pending[now:]:
         q = by_key[key]
+        # Its own number: without one, the questions file numbered these by
+        # position, two lines read Q2, and --answers put an answer on the
+        # wrong question.
         state["answers"][key] = {"question": q["question"], "where": where(q),
-                                 "status": so.SKIP, "key": key, "deferred": True}
+                                 "status": so.SKIP, "key": key, "deferred": True,
+                                 "number": keys.index(key) + 1}
     save_state(paths, state)
     write_files(console, paths, state)
     if now < n:
         console.say(f"  the other {n - now} saved, as open questions, to "
                     f"{paths.rel(paths.open)}")
     return pending[:now]
+
+
+def _answered(state):
+    """How many questions a state holds a decision on, put-off ones left out."""
+    return sum(1 for r in ((state or {}).get("answers") or {}).values()
+               if not r.get("deferred"))
+
+
+def _still_to_ask(keys, state):
+    """Questions not answered yet, and those put off by the cap, in order."""
+    return [k for k in keys if k not in state["answers"]
+            or state["answers"][k].get("deferred")]
 
 
 def module_flow(console, paths, questions, test_sources, root, answers_file=None,
@@ -2091,22 +2142,19 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
     state = load_state(paths) or {}
     state.setdefault("answers", {})
     state.setdefault("extra", [])
-    if len(questions) > QUESTION_CAP and console.interactive:
-        questions = _most_useful_first(console, questions, source, test_sources, root)
     keys = [_key(q) for q in questions]
     by_key = dict(zip(keys, questions))
     # Answers to questions this score no longer asks are dropped: the code or
     # the tests changed, and an answer to a question nobody asked is noise.
     state["answers"] = {k: v for k, v in state["answers"].items() if k in by_key}
-    # Questions put off by the cap are still to be asked, not answered.
-    pending = [k for k in keys if k not in state["answers"]
-               or state["answers"][k].get("deferred")]
+    pending = _still_to_ask(keys, state)
     if (state["answers"] or state.get("requirements")) and console.interactive:
         # Shown on every return, so it is never a surprise. Deleting answers
         # sits behind its own confirmation: a first-time user piping answers
         # a few at a time typed the next question's "2" here, which wiped
         # every answer, and the rest then landed one question off.
-        done = len(state["answers"]) + (1 if state.get("requirements") else 0)
+        done = (sum(1 for r in state["answers"].values() if not r.get("deferred"))
+                + (1 if state.get("requirements") else 0))
         complete = not pending and _complete(paths)
         handled = sum(1 for r in state["answers"].values() if not r.get("deferred"))
         answered = sum(1 for r in state["answers"].values() if r.get("status") == "answered")
@@ -2153,11 +2201,11 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
             elif sure == 3:
                 which = _number(console, len(keys), "the question")
                 state["answers"].pop(keys[which - 1], None)
-                pending = [k for k in keys if k not in state["answers"]]
+                pending = _still_to_ask(keys, state)
         elif picked == 4:
             which = _number(console, len(keys), "the question")
             state["answers"].pop(keys[which - 1], None)
-            pending = [k for k in keys if k not in state["answers"]]
+            pending = _still_to_ask(keys, state)
 
     if not state.get("requirements"):
         ask_requirements(console, paths, source, state)
@@ -2176,7 +2224,8 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
                     f"a function takes longer than {start_probe_timeout()} "
                     "seconds, that question offers only skip or your own answer.")
     if len(pending) > QUESTION_CAP:
-        pending = _cap(console, paths, state, pending, by_key)
+        pending = _cap(console, paths, state,
+                       _most_useful_first(pending, by_key, test_sources, root), by_key, keys)
     for key in pending:
         number = keys.index(key) + 1
         previous = by_key[keys[number - 2]] if number > 1 else None
@@ -2499,7 +2548,7 @@ def _main(arg, cwd, console, answers, given_tests=None):
         return 0
     test_sources = _test_sources(tests)
     root = project_root(code, cwd)
-    results, blocked, asked = [], False, 0
+    results, blocked, asked, skipped, went_on = [], False, 0, set(), False
     modules = _modules(questions, code, cwd, session)
     file_module = parse_answers(answers)[3] if answers else None
     for index, (module, qs, base) in enumerate(modules, 1):
@@ -2510,9 +2559,10 @@ def _main(arg, cwd, console, answers, given_tests=None):
         problem = _cannot_task(paths)
         if problem:
             console.say(f"{shown(module, cwd)} is skipped: {problem}")
+            skipped.add(shown(module, cwd))
             continue
         if (len(modules) > 1 and not answers and asked >= FOLDER_CAP
-                and not _complete(paths)):
+                and not went_on and not _complete(paths)):
             # A folder can hold far more questions than a sitting. What is
             # done is kept, and the same command picks up from here.
             left = len(modules) - index + 1
@@ -2527,7 +2577,8 @@ def _main(arg, cwd, console, answers, given_tests=None):
                     .startswith("s") else 1
             if picked == 2:
                 break
-        asked += len(qs)
+            # Asked once: "go on" is an answer for the rest of the folder.
+            went_on = True
         if len(modules) > 1:
             console.say("")
             console.say(f"Module {index} of {len(modules)}: {shown(module, cwd)}, "
@@ -2543,10 +2594,17 @@ def _main(arg, cwd, console, answers, given_tests=None):
             state, data = _from_answers(console, paths, qs, test_sources, root,
                                         answers)
         else:
+            # Counted as asked only what this run asked: a module finished
+            # earlier and passed over, or questions put off, were counted,
+            # and the prompt said 30 had been asked when none had.
+            before = _answered(load_state(paths))
             state, data = module_flow(console, paths, qs, test_sources, root,
                                       many=len(modules) > 1)
+            asked += max(0, _answered(state) - before)
         results.append((paths, state, data))
-    if answers and file_module and not results:
+    if answers and file_module and not results and file_module not in skipped:
+        # Said only when it is true: a module skipped above has questions,
+        # and the line after its reason contradicted it.
         console.say(f"{shown(answers, cwd)} is about {file_module}, which this "
                     f"score has no questions for.")
         return 2
@@ -2814,7 +2872,7 @@ def parse_answers(path):
     `requirements: text`, `row: a, b, c` and `module: path`.
     """
     found, requirements, rows, module, ids = {}, None, [], None, {}
-    pending_id = None
+    pending_id, seen = None, set()
     for line in _read(path).splitlines():
         marker = re.match(r"^\s*#\s*id\s+([0-9a-f]{6,})\s*$", line)
         if marker:
@@ -2824,11 +2882,18 @@ def parse_answers(path):
             continue
         q = re.match(r"^\s*Q(\d+)\s*:\s*(.*)$", line)
         if q:
+            n = int(q.group(1))
+            if n in seen and pending_id:
+                # A number already used, which a file edited by hand can
+                # have: kept apart under a number of its own, so the id it
+                # carries still matches its own answer, not the first Q<n>'s.
+                n = -len(seen) - 1
+            seen.add(n)
             if pending_id:
-                ids[int(q.group(1))] = pending_id
+                ids[n] = pending_id
             pending_id = None
             if q.group(2).strip():
-                found[int(q.group(1))] = _UNSAFE.sub("", q.group(2)).strip()
+                found[n] = _UNSAFE.sub("", q.group(2)).strip()
             continue
         r = re.match(r"^\s*requirements\s*:\s*(.*)$", line, re.I)
         if r and r.group(1).strip():
@@ -2880,7 +2945,9 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
             if key in state["answers"]:
                 state["answers"][key]["number"] = n
                 continue
-            rec["status"] = so.SKIP
+            # Put off, not skipped: the file says a blank one is asked again,
+            # and a terminal run then treated it as decided.
+            rec["status"], rec["deferred"] = so.SKIP, True
         elif text.lower() in ("skip", "either", "ask"):
             rec["status"] = {"skip": so.SKIP, "either": so.EITHER, "ask": so.ASK}[text.lower()]
         elif re.match(r"^\d+\s*[.):]?\s*(?::\s*(.+))?$", text) and \

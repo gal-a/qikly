@@ -14,8 +14,11 @@ off the code.** So:
   about which is which, and the prompt asks what it *should* do.
 - **The order of the two behaviours is shuffled**, seeded by the question, so
   "option 1" never comes to mean "what my code does".
-- **Where neither works**, a check switched off, an error never raised, a
-  function no test calls, the menu offers only "skip this question for now"
+- **Where the line's own function has no test call**, the public functions
+  and classes the tests call are tried, and only a call that ran the line
+  counts. A check switched off and an error never raised get the same search.
+- **Where nothing works**, a comparison whose edge is not known, or no call
+  that reaches the line, the menu offers only "skip this question for now"
   and "type my own answer".
 
 Every option set ends with free text, the user's rule for every menu.
@@ -173,48 +176,67 @@ def _parametrized(func, module_level, row=0):
                 yield name, value
 
 
-def _literals_around(tree, call, row=0):
+def _bindings(func, module_level, row, call):
     """
-    Names bound to a literal, once, in the test function holding `call`. Real
-    suites pass inputs through variables, `txt = "..."` then `slugify(txt)`,
-    and reading only literal arguments found no call at all in four real
-    libraries. A name bound more than once is left out: which value reached
-    the call would be a guess.
+    Names bound to a literal, once, in `func`, the test holding `call`, with
+    its parametrize names bound to `row`. Real suites pass inputs through
+    variables, `txt = "..."` then `slugify(txt)`, and reading only literal
+    arguments found no call at all in four real libraries. A name bound more
+    than once is left out: which value reached the call would be a guess.
     """
-    module_level = _module_literals(tree)
+    out = dict(_parametrized(func, module_level, row))
+    seen = {name: 1 for name in out}
+    # Every binding counts, not only `name = value`: `txt += " b"`, a loop
+    # or `with` target, or `txt, n = ...` each changes what reaches the
+    # call, and reading only the plain assignment named a call no test made.
+    for node in ast.walk(func):
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+        elif isinstance(node, (ast.AugAssign, ast.AnnAssign, ast.For, ast.AsyncFor,
+                               ast.comprehension, ast.NamedExpr)):
+            targets = [node.target]
+        elif isinstance(node, (ast.With, ast.AsyncWith)):
+            targets = [i.optional_vars for i in node.items if i.optional_vars]
+        else:
+            targets = []
+        for target in targets:
+            for name in ast.walk(target):
+                if isinstance(name, ast.Name):
+                    seen[name.id] = seen.get(name.id, 0) + 1
+        # A plain assignment made before the call is the value it gets.
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and node.lineno < getattr(call, "lineno", 0)):
+            value = _literal(node.value)
+            if value is not _NOT_LITERAL:
+                out[node.targets[0].id] = value
+    return {k: v for k, v in out.items() if seen.get(k) == 1}
+
+
+def _owners(tree):
+    """{id of each call: the outermost test function holding it}, built once."""
+    owner = {}
     for func in ast.walk(tree):
-        if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        if not any(n is call for n in ast.walk(func)):
-            continue
-        out = dict(_parametrized(func, module_level, row))
-        seen = {name: 1 for name in out}
-        # Every binding counts, not only `name = value`: `txt += " b"`, a loop
-        # or `with` target, or `txt, n = ...` each changes what reaches the
-        # call, and reading only the plain assignment named a call no test made.
-        for node in ast.walk(func):
-            if isinstance(node, ast.Assign):
-                targets = node.targets
-            elif isinstance(node, (ast.AugAssign, ast.AnnAssign, ast.For, ast.AsyncFor,
-                                   ast.comprehension, ast.NamedExpr)):
-                targets = [node.target]
-            elif isinstance(node, (ast.With, ast.AsyncWith)):
-                targets = [i.optional_vars for i in node.items if i.optional_vars]
-            else:
-                targets = []
-            for target in targets:
-                for name in ast.walk(target):
-                    if isinstance(name, ast.Name):
-                        seen[name.id] = seen.get(name.id, 0) + 1
-            # A plain assignment made before the call is the value it gets.
-            if (isinstance(node, ast.Assign) and len(node.targets) == 1
-                    and isinstance(node.targets[0], ast.Name)
-                    and node.lineno < getattr(call, "lineno", 0)):
-                value = _literal(node.value)
-                if value is not _NOT_LITERAL:
-                    out[node.targets[0].id] = value
-        return {k: v for k, v in out.items() if seen.get(k) == 1}
-    return {}
+        if isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for node in ast.walk(func):
+                if isinstance(node, ast.Call):
+                    owner.setdefault(id(node), func)
+    return owner
+
+
+def _literals_around(tree, call, row=0):
+    """The literal bindings around `call` in `tree`, for one parametrize row."""
+    func = _owners(tree).get(id(call))
+    return _bindings(func, _module_literals(tree), row, call) if func else {}
+
+
+def _rows_for(tree, call):
+    """How many parametrize rows the test holding `call` runs, up to ROWS_READ."""
+    func = _owners(tree).get(id(call))
+    return _parametrize_rows(func, _module_literals(tree)) if func else 1
+
+
+_CALLS = {}
 
 
 def literal_calls(test_sources, function, module=None):
@@ -223,7 +245,18 @@ def literal_calls(test_sources, function, module=None):
     (args, kwargs), in the order they appear. These are the inputs the user
     already chose, so building on them never invents a scenario. `module`,
     the function's dotted module name, keeps same-named functions apart.
+    Kept per sources, function and module: one menu asked for the same
+    calls dozens of times, and a large suite took over half a minute.
     """
+    key = (tuple(test_sources), function, module)
+    if key not in _CALLS:
+        if len(_CALLS) > 256:
+            _CALLS.clear()
+        _CALLS[key] = _literal_calls(test_sources, function, module)
+    return [(list(a), dict(k)) for a, k in _CALLS[key]]
+
+
+def _literal_calls(test_sources, function, module):
     found = []
     for source in test_sources:
         try:
@@ -231,6 +264,8 @@ def literal_calls(test_sources, function, module=None):
         except SyntaxError:
             continue
         names = _names_for(tree, function, module)
+        module_level = _module_literals(tree)
+        owner = _owners(tree)
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
@@ -245,8 +280,10 @@ def literal_calls(test_sources, function, module=None):
                 continue
             if any(isinstance(a, ast.Starred) for a in node.args):
                 continue
-            for row in range(_rows_for(tree, node)):
-                known = _literals_around(tree, node, row)
+            func = owner.get(id(node))
+            rows = _parametrize_rows(func, module_level) if func else 1
+            for row in range(rows):
+                known = _bindings(func, module_level, row, node) if func else {}
                 try:
                     args = [_value(a, known) for a in node.args]
                     kwargs = {k.arg: _value(k.value, known)
@@ -256,16 +293,6 @@ def literal_calls(test_sources, function, module=None):
                 if (args, kwargs) not in found:
                     found.append((args, kwargs))
     return found
-
-
-def _rows_for(tree, call):
-    """How many parametrize rows the test holding `call` runs, up to ROWS_READ."""
-    module_level = _module_literals(tree)
-    for func in ast.walk(tree):
-        if isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)) and \
-                any(n is call for n in ast.walk(func)):
-            return _parametrize_rows(func, module_level)
-    return 1
 
 
 def signature(source, function):
@@ -533,6 +560,10 @@ def _variants(value):
         return [value + 0.333, round(value * 1.37, 4), value + 1,
                 -value - 1.0, 0.0, value * 20 + 1.0]
     if isinstance(value, str):
+        if re.search(r"[/\\]", value) or re.fullmatch(r"[\w.-]+\.[A-Za-z]\w{0,4}", value):
+            # A path is left as the tests gave it: `out.txt` + "x" made a
+            # function write a new file beside the user's own.
+            return []
         out = [value.upper(), f" {value} ", value.capitalize(), value + "x"]
         return [v for v in out if v != value]
     return []
@@ -560,13 +591,44 @@ def _public_functions(source):
             and not n.name.startswith("_")]
 
 
-def _comparable(outcome):
+def _readable(a, b):
     """
-    Whether an outcome can be compared between two runs: a repr holding a
-    memory address, `<Spec object at 0x...>`, differs every time, and read
-    as a difference it would offer a choice between two identical behaviours.
+    The two outcomes in words that can be compared, or (None, None). A repr
+    holding a memory address, `<Spec object at 0x...>`, differs on every run,
+    so two of them say nothing; one beside a raise is still a real
+    difference, and reads as "a Spec object".
     """
-    return " at 0x" not in str(outcome.get("returns", ""))
+    def plain(o):
+        if "returns" in o and _ADDRESS.search(o["returns"]):
+            return dict(o, returns=_ADDRESS.sub(lambda m: "a %s object" % m.group(1).split(".")[-1],
+                                                o["returns"]))
+        return o
+    held = [o for o in (a, b) if "returns" in o and _ADDRESS.search(o["returns"])]
+    if not held:
+        return a, b
+    if len(held) == 2:
+        return None, None
+    return plain(a), plain(b)
+
+
+_IO = re.compile(r"\bopen\(|\bos\.|\bshutil\.|\bPath\(|\.write\w*\(|\bsubprocess\.|\bsocket\.")
+
+
+def _does_io(source, name):
+    """Whether a top-level function's or class's own code touches files or the system."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return True
+    node = next((n for n in tree.body if isinstance(
+        n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and n.name == name), None)
+    if node is None:
+        return False
+    try:
+        text = ast.get_source_segment(source, node) or ""
+    except Exception:
+        return True
+    return bool(_IO.search(text))
 
 
 def difference_options(question, source, test_sources, root, mutant):
@@ -588,28 +650,45 @@ def difference_options(question, source, test_sources, root, mutant):
     if function:
         rounds.append([(function, a, k) for a, k in
                        _candidates(source, test_sources, function, module, 60)])
-    # Then through the public functions, sharing the 60 calls between them.
-    public = [f for f in _public_functions(source) if f != function]
+    # Then through the public functions, sharing the 60 calls between them,
+    # leaving out any that reads or writes files or the system: a question
+    # about a helper ran `save(path)` and wrote next to the user's data.
+    public = [f for f in _public_functions(source)
+              if f != function and not _does_io(source, f)]
     share = max(5, 60 // max(len(public), 1))
     rounds.append([(name, a, k) for name in public
                    for a, k in _candidates(source, test_sources, name, module, share)][:60])
-    for calls in rounds:
-        found = _first_difference(question, function, calls, root, mutant)
+    for through, calls in enumerate(rounds, 1 if function else 2):
+        found = _first_difference(question, function, calls, root, mutant,
+                                  through=through == 2)
         if found:
             return found
     return None
 
 
-def _first_difference(question, function, calls, root, mutant):
-    """The menu for the first of `calls` whose outcome the change alters."""
+_ADDRESS = re.compile(r"<([\w.]+) object at 0x[0-9A-Fa-f]+>")
+
+
+def _first_difference(question, function, calls, root, mutant, through=False):
+    """
+    The menu for the first of `calls` whose outcome the change alters. Through
+    another function, only a call that ran the question's line counts: any
+    difference there might come from somewhere else, and the prompt says the
+    call runs through the line.
+    """
     if not calls:
         return None
-    result = start_probe.run_calls(question["path"], root, calls, mutant=mutant)
+    result = start_probe.run_calls(question["path"], root, calls, mutant=mutant,
+                                   line=question.get("line") if through else None)
     if not result:
         return None
-    now, changed_outcomes = result
-    for (name, args, kwargs), a, b in zip(calls, now, changed_outcomes):
-        if a != b and _comparable(a) and _comparable(b):
+    now, changed_outcomes = result[0], result[1]
+    reached = result[2] if through else [True] * len(calls)
+    for (name, args, kwargs), a, b, ran in zip(calls, now, changed_outcomes, reached):
+        if not ran or a == b:
+            continue
+        a, b = _readable(a, b)
+        if a is not None:
             call = call_text(name, args, kwargs)
             behaviours = [
                 {"kind": BEHAVIOUR, "call": call, "args": args, "kwargs": kwargs,

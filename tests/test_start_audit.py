@@ -1006,3 +1006,146 @@ def test_a_class_built_by_the_tests_reaches_a_fault_in_its_methods(tmp_path):
     prompt, options = so.menu(q, source, [tests], str(tmp_path), mutant)
     assert prompt and prompt.startswith("What should Version(")
     assert any(o["label"].startswith("raise ValueError") for o in options)
+
+
+# ------------------------------------------- the fourth audit, 2026-10-16 --
+
+def _guard_mutant(source):
+    from qikly.mutation import count_sites, make_mutant
+    return next(m for m, d in (make_mutant(source, i, "validation")
+                               for i in range(count_sites(source, "validation")))
+                if d.startswith("guard disabled"))
+
+
+def test_a_random_public_call_is_never_offered_as_a_difference(tmp_path):
+    # A uuid differs on every run; offered, it saved a criterion that never holds.
+    source = ("import uuid\n\n"
+              "def _check(rate):\n"
+              "    if not isinstance(rate, int):\n"
+              "        raise TypeError('rate')\n"
+              "    return rate\n\n\n"
+              "def make_id(prefix):\n"
+              "    return prefix + '-' + uuid.uuid4().hex\n")
+    (tmp_path / "shop.py").write_text(source, encoding="utf-8")
+    tests = "from shop import make_id\n\ndef test_id():\n    assert make_id('a')\n"
+    q = {"path": str(tmp_path / "shop.py"), "line": 4, "function": "_check",
+         "kind": "guard disabled", "question": "Which input should it catch?"}
+    prompt, _ = so.menu(q, source, [tests], str(tmp_path), _guard_mutant(source))
+    assert prompt is None
+
+
+def test_the_probe_sees_the_exception_classes_its_siblings_raise(tmp_path):
+    # Run a second time from its file, dates.py caught its own ParseError, not
+    # the one other.py raises, and the probe reported a raise the code never makes.
+    pkg = tmp_path / "src" / "iso"
+    pkg.mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='iso'\n")
+    (pkg / "__init__.py").write_text("from iso.dates import parse, ParseError\n")
+    (pkg / "other.py").write_text("from iso.dates import ParseError\n\ndef strict(text):\n"
+                                  "    if not text:\n        raise ParseError('empty')\n"
+                                  "    return text\n")
+    (pkg / "dates.py").write_text("class ParseError(ValueError):\n    pass\n\n"
+                                  "from iso import other\n\ndef parse(text):\n    try:\n"
+                                  "        return other.strict(text)\n    except ParseError:\n"
+                                  "        return 'fallback'\n")
+    assert start_probe.run_calls(str(pkg / "dates.py"), str(tmp_path),
+                                 [("parse", [""], {})]) == [{"returns": "'fallback'"}]
+
+
+def test_a_slow_package_init_does_not_slow_a_module_that_loads_alone(tmp_path):
+    import time
+    pkg = tmp_path / "src" / "slowpkg"
+    pkg.mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='slowpkg'\n")
+    (pkg / "__init__.py").write_text("import time\ntime.sleep(3)\n")
+    (pkg / "calc.py").write_text("def double(x):\n    return x * 2\n")
+    began = time.time()
+    assert start_probe.run_calls(str(pkg / "calc.py"), str(tmp_path),
+                                 [("double", [2], {})]) == [{"returns": "4"}]
+    assert time.time() - began < 3
+
+
+def test_a_raise_against_an_object_without_a_repr_is_a_difference(tmp_path):
+    source = ("class Spec:\n"
+              "    def __init__(self, text):\n"
+              "        if not text[0].isdigit():\n"
+              "            raise ValueError(text)\n"
+              "        self.text = text\n")
+    (tmp_path / "spec.py").write_text(source, encoding="utf-8")
+    tests = "from spec import Spec\n\ndef test_s():\n    assert Spec('1.2')\n"
+    q = {"path": str(tmp_path / "spec.py"), "line": 3, "function": "__init__",
+         "kind": "guard disabled", "question": "Which input should it catch?"}
+    prompt, options = so.menu(q, source, [tests], str(tmp_path), _guard_mutant(source))
+    labels = [o["label"] for o in options]
+    assert prompt and any("a Spec object" in l for l in labels)
+    assert not any("0x" in l for l in labels)
+
+
+def test_building_a_menu_never_writes_a_new_file_beside_the_users_data(tmp_path):
+    out = (tmp_path / "data" / "out.txt").as_posix()
+    (tmp_path / "data").mkdir()
+    source = ("def _check(rate):\n"
+              "    if not isinstance(rate, int):\n"
+              "        raise TypeError('rate')\n"
+              "    return rate\n\n\n"
+              "def save(path, text='x'):\n"
+              "    with open(path, 'w') as f:\n"
+              "        f.write(text)\n"
+              "    return len(text)\n")
+    (tmp_path / "shop.py").write_text(source, encoding="utf-8")
+    tests = f"from shop import save\n\ndef test_save():\n    assert save({out!r}) == 1\n"
+    q = {"path": str(tmp_path / "shop.py"), "line": 2, "function": "_check",
+         "kind": "guard disabled", "question": "Which input should it catch?"}
+    so.menu(q, source, [tests], str(tmp_path), _guard_mutant(source))
+    assert list((tmp_path / "data").iterdir()) == []
+
+
+def test_put_off_questions_keep_their_numbers_in_the_questions_file(tmp_path):
+    _project(tmp_path)
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    questions = [{"file": "pricing.py", "path": paths.module, "line": 2,
+                  "function": "apply_discount", "question": f"question {n}?",
+                  "kind": "guard disabled"} for n in range(12)]
+    start.save_state(paths, {"requirements": "applies a discount", "extra": [],
+                             "answers": {}})
+    with pytest.raises(start.Stop):
+        start.module_flow(Script(["1", "1"] + ["1"] * 10).console, paths, questions,
+                          [TESTS], str(tmp_path))
+    numbers = [l.split(":")[0] for l in open(paths.open, encoding="utf-8").read().splitlines()
+               if l.startswith("Q")]
+    assert len(numbers) == len(set(numbers)) == 12
+
+
+def test_a_blank_answer_in_the_file_is_asked_again_in_a_terminal(tmp_path, monkeypatch):
+    _project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    assert start.main("pricing.py", str(tmp_path),
+                      console=Script([], interactive=False).console) == start.NEEDS_ANSWERS
+    answers = tmp_path / "inputs_private" / "questions" / "PRICING_open_questions.txt"
+    text = re.sub(r"^requirements:.*$", "requirements: applies a discount",
+                  answers.read_text(encoding="utf-8"), flags=re.M)
+    answers.write_text(text, encoding="utf-8")
+    start.main("pricing.py", str(tmp_path), console=Script([], interactive=False).console,
+               answers=str(answers))
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    state = start.load_state(paths)
+    assert state["answers"] and all(r.get("deferred") for r in state["answers"].values())
+
+
+def test_the_sample_file_prompt_is_a_menu_with_a_way_out(tmp_path):
+    # python-dotenv reads files: the bare path prompt looped 400 times on a
+    # path that did not exist, and ignored the sample already in place.
+    source = "def load(path):\n    return open(path).read()\n"
+    (tmp_path / "envfile.py").write_text(source, encoding="utf-8")
+    paths = start.Paths(str(tmp_path), str(tmp_path / "envfile.py"))
+    state = {"answers": {}, "extra": []}
+    s = Script(["1"])
+    start.ask_data(s.console, paths, state, source, [])
+    assert "not now" in s.text and "sample" not in state
+    os.makedirs(os.path.dirname(paths.data))
+    with open(paths.data, "w", encoding="utf-8") as handle:
+        handle.write("A=1\n")
+    s = Script(["1"])
+    start.ask_data(s.console, paths, state, source, [])
+    assert state["sample"] == paths.data
+    start.write_files(s.console, paths, state)

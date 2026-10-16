@@ -32,29 +32,22 @@ import tempfile
 TIMEOUT = 15
 
 _CHILD = r'''
-import ast, contextlib, importlib.util, io, json, os, sys
+import ast, contextlib, importlib, importlib.util, io, json, os, sys
 spec_in = json.loads(sys.stdin.read())
 path, root, dotted = spec_in["path"], spec_in["root"], spec_in["dotted"]
+line = spec_in.get("line")
+is_init = os.path.basename(path) == "__init__.py"
 for entry in (os.path.dirname(path), root, spec_in.get("base")):
     if entry and entry not in sys.path:
         sys.path.insert(0, entry)
 
-def load(source, name):
-    # The package first: a module loaded by its file alone has no parent in
-    # sys.modules, so its own relative imports failed, and on real libraries,
-    # where nearly every module sits in a package, no question got answers.
-    parent = name.rpartition(".")[0]
-    if parent and parent not in sys.modules:
-        try:
-            with contextlib.redirect_stdout(io.StringIO()):
-                importlib.import_module(parent)
-        except BaseException:
-            pass
-    package = [os.path.dirname(path)] if os.path.basename(path) == "__init__.py" else None
+def by_file(source):
+    """The module from its own file, as before: no package code runs."""
+    package = [os.path.dirname(path)] if is_init else None
     spec = importlib.util.spec_from_file_location(
-        name, path, submodule_search_locations=package)
+        dotted, path, submodule_search_locations=package)
     module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
+    sys.modules[dotted] = module
     with contextlib.redirect_stdout(io.StringIO()):
         if source is None:
             spec.loader.exec_module(module)
@@ -62,32 +55,101 @@ def load(source, name):
             exec(compile(source, path, "exec"), module.__dict__)
     return module
 
-def outcomes(module, calls):
-    out = []
+class Serve(object):
+    """Serves the changed source under the module's own name, inside its package."""
+    def __init__(self, source):
+        self.source = source
+    def find_spec(self, name, target_path=None, target=None):
+        if name != dotted:
+            return None
+        return importlib.util.spec_from_loader(name, self, origin=path, is_package=is_init)
+    def create_module(self, spec):
+        return None
+    def exec_module(self, module):
+        module.__file__ = path
+        if is_init:
+            module.__path__ = [os.path.dirname(path)]
+        exec(compile(self.source, path, "exec"), module.__dict__)
+
+def by_package(source):
+    """
+    Through its package, for a module the package imports back, which met
+    itself half-built when loaded by file: isodate's isodates. The changed
+    copy is served inside a freshly imported package, so the modules beside
+    it see its classes, and the code is never run twice side by side, which
+    reported a sibling's exception as the module's own.
+    """
+    top = dotted.split(".")[0]
+    for name in [n for n in sys.modules if n == top or n.startswith(top + ".")]:
+        del sys.modules[name]
+    finder = Serve(source) if source is not None else None
+    if finder:
+        sys.meta_path.insert(0, finder)
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            return importlib.import_module(dotted)
+    finally:
+        if finder:
+            sys.meta_path.remove(finder)
+
+ours = {}
+target = os.path.normcase(os.path.abspath(path))
+
+def is_ours(code):
+    if code not in ours:
+        ours[code] = os.path.normcase(os.path.abspath(code.co_filename)) == target
+    return ours[code]
+
+def outcomes(module, calls, trace=False):
+    out, reached = [], []
     for func, args, kwargs in calls:
+        hit = [False]
+        def tracer(frame, event, arg):
+            if is_ours(frame.f_code):
+                if event == "line" and frame.f_lineno == line:
+                    hit[0] = True
+                return tracer
+            return None
         try:
             args = [ast.literal_eval(a) for a in args]
             kwargs = {k: ast.literal_eval(v) for k, v in kwargs.items()}
-            with contextlib.redirect_stdout(io.StringIO()):
-                value = getattr(module, func)(*args, **kwargs)
+            if trace and line:
+                sys.settrace(tracer)
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    value = getattr(module, func)(*args, **kwargs)
+            finally:
+                sys.settrace(None)
             out.append({"returns": repr(value)})
         except BaseException as exc:
             out.append({"raises": type(exc).__name__})
-    return out
+        reached.append(hit[0])
+    return out, reached
 
 reply = {}
+calls = spec_in["calls"]
 try:
-    reply["now"] = outcomes(load(None, dotted), spec_in["calls"])
+    try:
+        load, real = by_file, by_file(None)
+    except ImportError:
+        load, real = by_package, by_package(None)
+    reply["now"], reply["reached"] = outcomes(real, calls, trace=True)
+    # Twice: a call whose outcome changes from one run to the next, a uuid
+    # or the time, would otherwise be offered as a difference.
+    reply["again"] = outcomes(real, calls)[0]
 except BaseException as exc:
     reply["load"] = type(exc).__name__
 if "load" not in reply and spec_in.get("mutant") is not None:
     try:
         sys.modules.pop(dotted, None)
-        reply["changed"] = outcomes(load(spec_in["mutant"], dotted),
-                                    spec_in["calls"])
+        reply["changed"] = outcomes(load(spec_in["mutant"]), calls)[0]
     except BaseException as exc:
         reply["load"] = type(exc).__name__
-print("\n" + json.dumps(reply))
+sys.stdout.write("\n" + json.dumps(reply) + "\n")
+sys.stdout.flush()
+# Not a normal exit: a package that leaves a thread running kept the child
+# alive until the timeout, on every probe.
+os._exit(0)
 '''
 
 
@@ -131,12 +193,16 @@ def sendable(value):
     return type(back) is type(value) and back == value
 
 
-def run_calls(path, root, calls, mutant=None):
+def run_calls(path, root, calls, mutant=None, line=None):
     """
     The outcome of each call, or None when the module could not be run at
     all. With `mutant`, a pair: (outcomes now, outcomes with the change).
     None is never an error to the user; the question just falls back to
-    "type my own answer".
+    "type my own answer". With `line`, a third list says which calls ran it.
+
+    A call whose outcome is not the same twice running is never offered as
+    a difference: without a change it reads as no difference at all, and
+    without a mutant the whole answer is None, so nothing random is labelled.
     """
     if not all(sendable(a) for _, args, kwargs in calls
                for a in list(args) + list(kwargs.values())):
@@ -144,7 +210,7 @@ def run_calls(path, root, calls, mutant=None):
     payload = json.dumps({
         "path": os.path.abspath(path), "root": os.path.abspath(root),
         "dotted": dotted_name(path, root), "base": import_base(path, root),
-        "mutant": mutant,
+        "mutant": mutant, "line": line,
         "calls": [[f, [repr(a) for a in args],
                    {k: repr(v) for k, v in kwargs.items()}]
                   for f, args, kwargs in calls]})
@@ -160,14 +226,20 @@ def run_calls(path, root, calls, mutant=None):
         reply = json.loads(done.stdout.strip().splitlines()[-1])
     except (ValueError, IndexError):
         return None
-    now = reply.get("now")
-    if not isinstance(now, list) or len(now) != len(calls):
+    now, again = reply.get("now"), reply.get("again")
+    if not (isinstance(now, list) and isinstance(again, list)
+            and len(now) == len(again) == len(calls)):
         return None
+    stable = [a == b for a, b in zip(now, again)]
     if mutant is None:
-        return now
+        return now if all(stable) else None
     changed = reply.get("changed")
     if not isinstance(changed, list) or len(changed) != len(calls):
         return None
+    changed = [c if ok else n for c, n, ok in zip(changed, now, stable)]
+    if line is not None:
+        reached = reply.get("reached") or [False] * len(calls)
+        return now, changed, reached
     return now, changed
 
 
