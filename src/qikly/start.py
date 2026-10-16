@@ -309,8 +309,8 @@ def project_root(path, cwd=None):
 
 
 def _is_module(name):
-    return (name.endswith(".py") and name not in ("__init__.py", "conftest.py",
-                                                  "setup.py")
+    return (name.endswith(".py") and name not in ("__init__.py", "__main__.py",
+                                                  "conftest.py", "setup.py")
             and not name.startswith("test_") and not name.endswith("_test.py"))
 
 
@@ -378,9 +378,21 @@ def _read(path):
         return ""
 
 
-def _imports(source, stem):
-    return re.search(r"^\s*(?:from\s+[\w.]*\b%s\b|import\s+[\w.]*\b%s\b)"
-                     % (re.escape(stem), re.escape(stem)), source, re.M)
+def _imports(source, stem, own=None):
+    """
+    Whether a test imports `stem`, alone or inside a dotted name that starts
+    with one of `own`, the project's own names. `import os.path` is not an
+    import of a project's geo/path.py, and matching any dotted name said so.
+    """
+    own = set(own or ()) | {stem}
+    for found in re.finditer(r"^\s*(?:from\s+([\w.]+)|import\s+([\w., ]+))", source, re.M):
+        dotted = [found.group(1)] if found.group(1) else \
+            [n.strip().split(" ")[0] for n in found.group(2).split(",")]
+        for name in dotted:
+            parts = name.split(".")
+            if stem in parts and parts[0] in own:
+                return True
+    return False
 
 
 def _count_tests(paths):
@@ -497,17 +509,21 @@ def _imports_specifically(source, modules, public, packages):
     except SyntaxError:
         return False
     for node in ast.walk(tree):
+        # A dotted name counts only from its own top: `import os.path` is not
+        # an import of a project's geo/path.py.
+        own = packages | modules
         if isinstance(node, ast.Import):
-            if any(set(a.name.split(".")) & modules for a in node.names):
+            if any(set(a.name.split(".")) & modules and a.name.split(".")[0] in own
+                   for a in node.names):
                 return True
         elif isinstance(node, ast.ImportFrom) and node.module:
             parts = node.module.split(".")
-            if set(parts) & modules and parts[0] not in packages - modules:
+            if set(parts) & modules and parts[0] in own:
                 return True
             names = {a.name for a in node.names}
             if parts[-1] in packages and names & (modules | public):
                 return True
-            if parts[-1] in modules:
+            if parts[-1] in modules and parts[0] in own:
                 return True
     return False
 
@@ -529,7 +545,7 @@ def importing_tests(code, root):
               if _imports_specifically(_read(f), modules, public,
                                        set(import_names(code)) | packages)]
     names = import_names(code)
-    broad = [f for f in files if any(_imports(_read(f), s) for s in names)]
+    broad = [f for f in files if any(_imports(_read(f), s, names) for s in names)]
     if os.path.isdir(code):
         # A whole package is tested by everything that imports it, including
         # `import humanize` followed by `humanize.naturalsize(...)`.
@@ -840,10 +856,14 @@ def _fit_to_time(console, tests, cwd, planted):
 
     if total <= QUICK_ENOUGH:
         return planted
-    sample = max(12, min(planted, int(QUICK_ENOUGH / each)))
+    sample = min(planted, max(12, int(QUICK_ENOUGH / each)))
     console.say(f"Your tests take about {each:.0f} seconds to run, and each "
                 f"planted fault runs them once, so all {planted} would take "
                 f"about {minutes(total)}.")
+    if sample >= planted:
+        # A sample of 12 from 10 is all of them, and offering it read as a cut.
+        console.say(f"That is fewer than a useful sample, so all {planted} are planted.")
+        return planted
     if not console.interactive:
         console.say(f"Planting a sample of {sample} instead, about "
                     f"{minutes(each * sample)}. More questions come from more "
@@ -921,9 +941,23 @@ def group(questions):
     Questions about public functions come first, then the top level, then
     private helpers, because those are the ones a person can answer.
     """
-    kept, seen = [], {}
+    kept, seen, lines = [], {}, {}
+
+    def shape(q):
+        # The line's code with its literal values blanked: the question text
+        # alone is the same for every guard of a function, and two checks,
+        # `price < 0` and `rate > 1`, became one question about the first.
+        path = q.get("path") or q.get("file")
+        if path not in lines:
+            lines[path] = _read(path).splitlines() if path else []
+        n = q.get("line") or 0
+        text = lines[path][n - 1] if 0 < n <= len(lines[path]) else ""
+        text = re.sub(r"(['\"]).*?\1", "S", text.strip())
+        return re.sub(r"\b\d+(\.\d+)?\b", "N", text)
+
     for q in questions:
-        mark = (q.get("path") or q.get("file"), q.get("function"), q.get("question"))
+        mark = (q.get("path") or q.get("file"), q.get("function"), q.get("question"),
+                shape(q))
         if mark in seen:
             seen[mark].setdefault("also", []).append(q.get("line"))
             continue
@@ -1619,18 +1653,44 @@ def _missing_imports(body, paths, module_source):
         module_tree = ast.parse(module_source)
     except SyntaxError:
         return []
+    # Every name bound at module level, including under an `if`, `try`,
+    # `with` or loop: counting only top-level statements took a function
+    # defined under `if sys.version_info >= ...` as missing, and hid the one
+    # failure that was a real disagreement.
     own = set()
-    for node in module_tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            own.add(node.name)
-        elif isinstance(node, (ast.Import, ast.ImportFrom)):
-            own.update((a.asname or a.name).split(".")[0] for a in node.names)
-        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-            for target in (node.targets if isinstance(node, ast.Assign) else [node.target]):
-                own.update(n.id for n in ast.walk(target) if isinstance(n, ast.Name))
-    if any(isinstance(n, ast.ImportFrom) and any(a.name == "*" for a in n.names)
-           for n in module_tree.body):
+
+    def bind(statements):
+        for node in statements:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                own.add(node.name)
+                continue
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                own.update((a.asname or a.name).split(".")[0] for a in node.names)
+            for sub in ast.walk(node):
+                if isinstance(sub, ast.Name) and isinstance(sub.ctx, ast.Store):
+                    own.add(sub.id)
+            for field in ("body", "orelse", "finalbody"):
+                inner = getattr(node, field, None)
+                if isinstance(inner, list):
+                    bind(inner)
+            for handler in getattr(node, "handlers", None) or []:
+                bind(handler.body)
+
+    bind(module_tree.body)
+    # A name the module can serve without binding it: `from x import *` or a
+    # module-level __getattr__. Nothing can be said for certain, so nothing is.
+    if "__getattr__" in own or any(
+            isinstance(n, ast.ImportFrom) and any(a.name == "*" for a in n.names)
+            for n in ast.walk(module_tree)):
         return []
+    if os.path.basename(paths.module) == "__init__.py":
+        # A package also has its submodules: `from validators import card`.
+        folder = os.path.dirname(os.path.abspath(paths.module))
+        try:
+            own.update(os.path.splitext(n)[0] for n in os.listdir(folder)
+                       if n.endswith(".py") or os.path.isdir(os.path.join(folder, n)))
+        except OSError:
+            return []
     stem = os.path.splitext(os.path.basename(paths.module))[0]
     if stem == "__init__":
         stem = os.path.basename(os.path.dirname(paths.module))
@@ -1771,6 +1831,13 @@ def _newest(folder, prefix=""):
 
 def report_result(console, paths, state, lines, converged):
     disagreed, tests_for, criteria, untagged, unchecked = disagreements(paths, state, lines)
+    # Answers no test checked: none tagged with them, or every one tagged
+    # failed on an import before it checked anything.
+    not_checked = [n for n in range(1, len(criteria) + 1)
+                   if not tests_for.get(n, ([], False))[0]
+                   or all(t in unchecked for t in tests_for[n][0])]
+    if disagreed and disagreed not in (None, "unknown"):
+        not_checked = [n for n in not_checked if criteria[n - 1] not in disagreed]
     console.say("")
     name = os.path.basename(paths.module)
     started = any(line.startswith(f"[{paths.task_id}] [stage ") for line in lines)
@@ -1822,15 +1889,30 @@ def report_result(console, paths, state, lines, converged):
         if patches:
             console.say(f"  The fix: {paths.rel(patches)}")
     else:
-        console.say(("Your code agrees with your answer. " if len(criteria) == 1 else
-                     f"Your code agrees with all {len(criteria)} of your answers. ")
-                    + "The new tests now pin that behaviour, so a later change "
-                      "that breaks one of them will fail.")
-    if unchecked and converged:
+        # Agreement is claimed only for an answer a test checked: one whose
+        # every test failed on an import, or that no test is tagged with, was
+        # counted as agreeing with code nothing had compared it to.
+        checked = [c for n, c in enumerate(criteria, 1) if n not in not_checked]
+        if not checked:
+            console.say("No test that ran on your code checked any of your answers, "
+                        "so qikly cannot say whether your code agrees with them.")
+        elif not not_checked:
+            console.say(("Your code agrees with your answer. " if len(criteria) == 1 else
+                         f"Your code agrees with all {len(criteria)} of your answers. ")
+                        + "The new tests now pin that behaviour, so a later change "
+                          "that breaks one of them will fail.")
+        else:
+            console.say(f"Your code agrees with {len(checked)} of your "
+                        f"{len(criteria)} answers, the ones a test checked. The new "
+                        f"tests now pin that behaviour.")
+    if not_checked and disagreed not in (None, "unknown"):
+        console.say("Not checked by any test that ran on your code:")
+        for n in not_checked:
+            console.say(f"  - {criteria[n - 1]}")
+    if unchecked:
         console.say(f"Not counted either way: these failed because they import "
                     f"something {name} does not have, so they say nothing about "
-                    f"your code. qikly's copy added it while fixing; your file did "
-                    f"not need it:")
+                    f"your code:")
         for test, missing in unchecked.items():
             console.say(f"  - {test}  imports {', '.join(missing)}")
     if tests_for:
@@ -2514,7 +2596,17 @@ def offer_take_home(console, cwd, task_ids, test_dir):
 
 def _cannot_task(paths):
     """Why no task can be written for this module, before anything is asked."""
+    from qikly import start_probe
     from qikly.scaffold import build_task
+    if os.path.basename(paths.module) == "__init__.py":
+        root = project_root(paths.module, paths.cwd)
+        if start_probe.dotted_name(paths.module, root) == "__init__":
+            # Run from inside the package, its __init__.py has no package name
+            # to be imported by, and the task named a module "__init__".
+            pkg = os.path.dirname(os.path.abspath(paths.module))
+            return (f"it is the package {os.path.basename(pkg)} itself, run from "
+                    f"inside it. Run the command from the folder above: cd .. "
+                    f"then qikly --start {os.path.basename(pkg)}")
     _, problem = build_task(paths.module, paths.cwd, task_id=paths.base,
                             seed="existing")
     return problem
@@ -2608,6 +2700,9 @@ def _non_interactive(arg, cwd, console, given_tests=None):
                       "# qikly filled in the rows it could build from your tests"
                       + ("." if built else "; none could be built, so add at least one."),
                       "# These are real inputs, not expected outputs."]
+            # A value with a line break cannot sit on one line; such a row
+            # is left for the person to give, not split across two.
+            built = [r for r in built if not any("\n" in v or "\r" in v for v in r)]
             lines += ["row: " + _csv_line(r) for r in built] or ["row: "]
             lines.append("")
         os.makedirs(os.path.dirname(paths.open), exist_ok=True)
@@ -2665,9 +2760,15 @@ def parse_answers(path):
 
 
 def _csv_line(values):
-    """One row as `--answers` reads it back, quoted where a value has a comma."""
+    """
+    One row as `--answers` reads it back: quoted where a value has a comma,
+    and every value quoted when one starts or ends with a space, which the
+    reader would otherwise drop.
+    """
     out = io.StringIO()
-    csv.writer(out, lineterminator="").writerow(values)
+    spaced = any(v != v.strip() for v in values)
+    csv.writer(out, lineterminator="",
+               quoting=csv.QUOTE_ALL if spaced else csv.QUOTE_MINIMAL).writerow(values)
     return out.getvalue()
 
 
@@ -2738,7 +2839,13 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
     if columns == []:
         state["rows"], state["columns"], state["rows_typed"] = [["none"]], ["input"], False
     elif rows and columns:
-        state["rows"], state["columns"] = [r for r in rows if len(r) == len(columns)], columns
+        # The file's rows, plus a row for each answer's own call: the file is
+        # filled in from the tests before anything is answered, so an answer
+        # such as apply_discount(7, 0.5) had no row of its own.
+        given = [r for r in rows if len(r) == len(columns)]
+        answered = build_rows(state, columns, source, [])
+        state["rows"] = given + [r for r in answered if r not in given]
+        state["columns"] = columns
         state["rows_typed"] = True
     elif columns and not state.get("rows_typed"):
         # Rebuilt each time, so an answer added since adds its row.

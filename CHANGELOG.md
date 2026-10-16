@@ -117,6 +117,34 @@ packaging tools would read as `1.1`.
   answer, never its own, and how the answers become a task.
 
 ### Fixed
+- **Scoring no longer hangs on a fault that loops forever.** Each fault gets
+  ten times the untouched suite's time, and at least a minute; one that runs
+  past it is stopped and counted as caught, and the report says how many.
+  cachetools' scoring had stopped for good on one.
+- **`--start` never says your code agrees with an answer no test checked.**
+  An answer whose tests all failed on an import, or that no test is tagged
+  with, is listed as not checked instead.
+- **A function defined under an `if` or `try` is not "missing".** Such a test
+  was set aside as an import failure, which hid a real disagreement.
+- **Two different checks in one function are two questions.** Grouping now
+  also needs the same code on each line, not only the same question.
+- **No anchor fault is skipped where it matters:** `.match(s, pos)` and a
+  public module-level pattern keep the `^` fault; an escaped `\$` is no
+  longer stripped into a pattern that does not compile.
+- **Test calls are read only where the value is certain**: a name changed by
+  `+=`, a loop, a `with`, a tuple unpacking or a later assignment is left
+  out, and so is `indirect` parametrize. Rows in a table that also holds
+  objects, such as `date(...)`, are read value by value, and a function
+  imported through its package (`from isodate import parse_date`) is found.
+- **An answers file keeps a row for each answer's own call**, and a value
+  with leading spaces survives the round trip.
+- **`--score-code` on a folder with its tests inside** says to score one
+  module, instead of refusing a `--score-tests` you never typed; tests on
+  another drive no longer crash it, and the path it prints can be pasted.
+- **`import os.path` no longer counts as importing a project's `path.py`.**
+- **Smaller:** a timed sample is never bigger than the whole set; `__main__.py`
+  is not a module to test; a package run from inside its own folder is told
+  to run from the folder above.
 - **No fault is planted by removing an anchor that changes nothing.** A `^`
   on a pattern only given to `match`, which anchors at the start already, and
   a `$` too for `fullmatch`. Those faults could never be caught, and counted

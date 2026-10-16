@@ -4,6 +4,7 @@ the code, and a fresh first-time user who had only the landing page. Each test
 reproduces the reported case.
 """
 import os
+import re
 import subprocess
 import sys
 
@@ -734,3 +735,168 @@ def test_a_call_through_a_variable_is_the_answers_call():
             '    assert pluralize(word) == "mousetraps"\n')
     assert start._makes_call(body, ("pluralize", ["mousetrap"], {}))
     assert not start._makes_call(body, ("pluralize", ["cowboy"], {}))
+
+
+def test_a_row_with_an_object_in_it_still_gives_its_plain_values():
+    # isodate's rows hold date(...) beside the strings; reading the whole
+    # table as one literal threw out every row.
+    test = (
+        "import pytest\n"
+        "from datetime import date\n"
+        "from isodate import parse_date\n"
+        "CASES = [(4, '1985-04', date(1985, 4, 1)), (6, '+0019', None)]\n"
+        "@pytest.mark.parametrize('yeardigits, datestring, expected', CASES)\n"
+        "def test_parse(yeardigits, datestring, expected):\n"
+        "    assert parse_date(datestring, yeardigits) == expected\n"
+        "@pytest.mark.parametrize('s', [pytest.param('abc', id='x')])\n"
+        "def test_param(s):\n"
+        "    assert parse_date(s)\n"
+    )
+    # And by the package's name: the function lives in isodate.isodates.
+    calls = so.literal_calls([test], "parse_date", "src.isodate.isodates")
+    assert (["1985-04", 4], {}) in calls
+    assert (["abc"], {}) in calls
+
+
+# ------------------------------------------ the third audit, 2026-10-16 --
+
+def _system_test(tmp_path, paths, body):
+    folder = tmp_path / "outputs" / "tests" / paths.task_id / "system"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "test_system.py").write_text(body, encoding="utf-8")
+
+
+def test_a_name_defined_under_an_if_is_not_missing(tmp_path):
+    # Counting only top-level statements took this apply_discount as missing
+    # and hid the one failure that was a real disagreement.
+    source = ("import sys\nif sys.version_info >= (3,):\n"
+              "    def apply_discount(price, rate):\n        return 90\n")
+    _project(tmp_path, source=source)
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    _system_test(tmp_path, paths,
+                 'def test_s():\n    """z\n    # Criteria: 1\n    """\n'
+                 '    from pricing import apply_discount\n'
+                 '    assert apply_discount(100, 5) == 95\n')
+    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
+    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_s"]
+    disagreed, _, _, _, unchecked = start.disagreements(paths, state, lines)
+    assert disagreed == ["c1"] and unchecked == {}
+
+
+def test_a_module_getattr_means_nothing_is_called_missing(tmp_path):
+    source = "def __getattr__(name):\n    return 1\n"
+    _project(tmp_path, source=source)
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    assert start._missing_imports("from pricing import anything\n", paths, source) == []
+
+
+def test_agreement_is_never_claimed_for_an_answer_no_test_checked(tmp_path):
+    _project(tmp_path)
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    _system_test(tmp_path, paths,
+                 'def test_s():\n    """z\n    # Criteria: 1\n    """\n'
+                 '    from pricing import apply_discount, NoSuchError\n'
+                 '    assert apply_discount(1, 2)\n')
+    state = {"extra": [], "answers": {
+        "a": {"status": "answered", "criterion": "apply_discount(1, 2) returns 0.98"},
+        "b": {"status": "answered", "criterion": "apply_discount(5, 0) returns 5"}}}
+    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_s",
+             f"[{paths.task_id}] [stage 1/3] [iteration 2] 1/1 passed"]
+    s = Script([])
+    start.report_result(s.console, paths, state, lines, True)
+    assert "agrees with all" not in s.text and "agrees with your answer" not in s.text
+    assert "No test that ran on your code checked any of your answers" in s.text
+    assert "Not checked by any test" in s.text and "imports NoSuchError" in s.text
+
+
+def test_two_different_guards_in_one_function_stay_two_questions(tmp_path):
+    source = ("def apply_discount(price, rate):\n"
+              "    if price < 0:\n        raise ValueError('price')\n"
+              "    if rate > 1:\n        raise ValueError('rate')\n"
+              "    return price * (1 - rate)\n")
+    (tmp_path / "m.py").write_text(source, encoding="utf-8")
+    path = str(tmp_path / "m.py")
+    q = "Your tests pass with this check switched off. Which input?"
+    questions = [{"path": path, "function": "apply_discount", "line": n, "question": q}
+                 for n in (2, 4)]
+    assert len(start.group(questions)) == 2
+
+
+def test_rows_in_an_answers_file_keep_the_answers_own_calls(tmp_path, monkeypatch):
+    _project(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    assert start.main("pricing.py", str(tmp_path),
+                      console=Script([], interactive=False).console) == start.NEEDS_ANSWERS
+    answers = tmp_path / "inputs_private" / "questions" / "PRICING_open_questions.txt"
+    text = answers.read_text(encoding="utf-8")
+    text = re.sub(r"^requirements:.*$", "requirements: applies a discount", text, flags=re.M)
+    text = re.sub(r"^Q1:.*$", "Q1: apply_discount(7, 50) returns 3.5 exactly", text, flags=re.M)
+    answers.write_text(text, encoding="utf-8")
+    start.main("pricing.py", str(tmp_path), console=Script([], interactive=False).console,
+               answers=str(answers))
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    assert ["7", "50"] in start.load_state(paths)["rows"]
+
+
+def test_a_value_bound_more_than_one_way_is_not_used():
+    test = ("from m import slugify\n"
+            "def test_aug():\n    txt = 'a'\n    txt += ' b'\n    slugify(txt)\n"
+            "def test_loop():\n    for txt in ['a', 'b']:\n        slugify(txt)\n"
+            "def test_tuple():\n    txt, n = 'a', 1\n    slugify(txt)\n"
+            "def test_late():\n    slugify(txt)\n    txt = 'late'\n"
+            "def test_plain():\n    txt = 'plain'\n    slugify(txt)\n")
+    assert so.literal_calls([test], "slugify", "m") == [(["plain"], {})]
+
+
+def test_indirect_parametrize_is_not_read_as_the_call():
+    test = ("import pytest\nfrom m import slugify\n"
+            "@pytest.mark.parametrize('txt', ['raw'], indirect=True)\n"
+            "def test_i(txt):\n    slugify(txt)\n")
+    assert so.literal_calls([test], "slugify", "m") == []
+
+
+def test_a_stdlib_dotted_import_is_not_an_import_of_the_project(tmp_path):
+    (tmp_path / "src" / "geo").mkdir(parents=True)
+    (tmp_path / "src" / "geo" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "src" / "geo" / "path.py").write_text("def f(x):\n    return x\n",
+                                                     encoding="utf-8")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_io.py").write_text("import os.path\n\ndef test_a():\n"
+                                                  "    assert os.path\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
+    found = start.importing_tests(str(tmp_path / "src" / "geo" / "path.py"), str(tmp_path))
+    assert not found
+
+
+def test_a_sample_is_never_bigger_than_the_whole(monkeypatch):
+    # 40 seconds a run and 10 faults offered "a sample of 12 instead".
+    import time
+    clock = iter([0.0, 40.0])
+    monkeypatch.setattr(time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(start.subprocess, "run", lambda *a, **k: None)
+    s = Script([], interactive=False)
+    assert start._fit_to_time(s.console, "tests", ".", 10) == 10
+    assert "sample of" not in s.text and "all 10 are planted" in s.text
+
+
+def test_main_py_is_not_a_module_to_test(tmp_path):
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("def f(x):\n    return x\n", encoding="utf-8")
+    (pkg / "__main__.py").write_text("print('hi')\n", encoding="utf-8")
+    assert start._one_module(str(pkg)) == str(pkg / "__init__.py")
+
+
+def test_a_fault_that_hangs_is_stopped_and_counted_caught(tmp_path, monkeypatch):
+    # cachetools' scoring stopped for good on a fault that looped forever.
+    import qikly.mutation_score as ms
+    monkeypatch.setattr(ms, "FAULT_TIMEOUT_FLOOR", 3.0)
+    (tmp_path / "counter.py").write_text(
+        "def count(n):\n    i = 0\n    while i != n:\n        i += 1\n    return i\n")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_counter.py").write_text(
+        "from counter import count\n\ndef test_count():\n    assert count(3) == 3\n")
+    result = ms.score(ms.from_paths(str(tmp_path / "counter.py"), str(tmp_path / "tests")),
+                      mutants=50, seed=1)
+    assert result["timed_out"] >= 1
+    assert "counted as caught" in ms.render(result, [])

@@ -357,16 +357,39 @@ def test_an_anchor_that_match_already_gives_is_not_stripped():
     from qikly.mutation import count_sites, make_mutant
     source = (
         "import re\n"
-        "P = re.compile(r'^4[0-9]+')\n"
+        "_P = re.compile(r'^4[0-9]+')\n"
         "Q = re.compile(r'^(a|b)$')\n"
-        "R = re.compile(r'^x[0-9]$')\n"
-        "def visa(v):\n    return P.match(v)\n"
+        "_R = re.compile(r'^x[0-9]$')\n"
+        "def visa(v):\n    return _P.match(v)\n"
         "def other(v):\n    return Q.search(v)\n"
         "def full(v):\n    return re.fullmatch(r'^[a-z]+$', v)\n"
-        "def r(v):\n    return R.match(v)\n"
+        "def r(v):\n    return _R.match(v)\n"
     )
     mutants = [make_mutant(source, i, "validation")[0]
                for i in range(count_sites(source, "validation"))]
     assert len(mutants) == 2
     assert any("re.compile('(a|b)')" in m for m in mutants), "search keeps both faults"
     assert any("re.compile('^x[0-9]')" in m for m in mutants), "match keeps only the $"
+
+
+def test_anchors_kept_where_match_has_a_start_position_or_the_name_is_public():
+    # Found by the audit: `.match(s, 2)` does not anchor at the start, and a
+    # public module-level pattern may be given to `.search` by another module.
+    from qikly.mutation import count_sites
+    pos = ("import re\n"
+           "def f(s):\n    P = re.compile(r'^[0-9]+')\n    return P.match(s, 2)\n")
+    public = ("import re\nCARD = re.compile(r'^4[0-9]+')\n"
+              "def f(s):\n    return CARD.match(s)\n")
+    private = ("import re\n_CARD = re.compile(r'^4[0-9]+')\n"
+               "def f(s):\n    return _CARD.match(s)\n")
+    assert count_sites(pos, "validation") == 1
+    assert count_sites(public, "validation") == 1
+    assert count_sites(private, "validation") == 0
+
+
+def test_an_escaped_dollar_is_not_stripped():
+    from qikly.mutation import count_sites, make_mutant
+    source = "import re\ndef f(s):\n    return re.search(r'^[0-9]+\\$', s)\n"
+    mutants = [make_mutant(source, i, "validation")[0]
+               for i in range(count_sites(source, "validation"))]
+    assert mutants and all("\\\\$'" in m for m in mutants), mutants

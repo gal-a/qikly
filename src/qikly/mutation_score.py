@@ -180,6 +180,8 @@ def _nearby_suite(code, tests):
 
 
 HEARTBEAT_SECONDS = 15
+# The least time a fault gets before it counts as stuck, in seconds.
+FAULT_TIMEOUT_FLOOR = 60.0
 
 
 def has_code(path):
@@ -484,7 +486,7 @@ def _drop_bytecode(workspace):
             dirs.remove("__pycache__")
 
 
-def _suite_verdict(workspace, target, env=None, plugin=None):
+def _suite_verdict(workspace, target, env=None, plugin=None, timeout=None):
     """
     "pass", "fail" or "error" for the suite in this workspace.
 
@@ -499,14 +501,20 @@ def _suite_verdict(workspace, target, env=None, plugin=None):
         where = os.path.join(workspace, directory)
         if not os.path.exists(where):
             continue
-        result = subprocess.run(
-            [sys.executable, "-m", "pytest", where, "-q", "--tb=no",
-             # The project's own addopts already carry -q, and -qq suppresses
-             # the count line entirely, so every parsed count reads as zero,
-             # which looks exactly like a suite that ran and passed.
-             "-o", "addopts=", "-p", "no:cacheprovider"]
-            + (["-p", plugin] if plugin else []),
-            cwd=workspace, capture_output=True, text=True, env=env)
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "pytest", where, "-q", "--tb=no",
+                 # The project's own addopts already carry -q, and -qq suppresses
+                 # the count line entirely, so every parsed count reads as zero,
+                 # which looks exactly like a suite that ran and passed.
+                 "-o", "addopts=", "-p", "no:cacheprovider"]
+                + (["-p", plugin] if plugin else []),
+                cwd=workspace, capture_output=True, text=True, env=env,
+                timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # A fault that makes the code loop forever. cachetools' scoring
+            # stopped for good on one, with no time limit and no heartbeat.
+            return "timeout"
         if result.returncode >= 2:
             return "error"
         if result.returncode != 0:
@@ -833,7 +841,14 @@ def _score_once(target, mutants, seed, code_root):
         for path, relative in files:
             shutil.copy2(path, os.path.join(workspace, relative))
         env = _suite_env(workspace, target)
-        if not _suite_passes(workspace, target, env):
+        import time
+        baseline_began = time.monotonic()
+        baseline_passed = _suite_passes(workspace, target, env)
+        # Each fault gets ten times the untouched suite's time, and at least
+        # a minute: slower than that, it is stuck rather than slow.
+        fault_timeout = max(FAULT_TIMEOUT_FLOOR, 10 * (time.monotonic() - baseline_began))
+        timed_out = 0
+        if not baseline_passed:
             return {"task": target.label, "baseline": False, "caught": [],
                     "missed": [], "unscorable": 0, "total": 0,
                     "generated": target.task_id is not None}
@@ -895,7 +910,11 @@ def _score_once(target, mutants, seed, code_root):
             planted = os.path.join(workspace, relative)
             with open(planted, "w", encoding="utf-8", newline="\n") as handle:
                 handle.write(mutant)
-            verdict = _suite_verdict(workspace, target, env)
+            verdict = _suite_verdict(workspace, target, env, timeout=fault_timeout)
+            if verdict == "timeout":
+                # Counted as caught, as mutation testing does: the suite did
+                # not pass with the fault in. Said in the result, not hidden.
+                timed_out += 1
             if verdict == "error":
                 # pytest could not run the suite at all, so nothing was
                 # demonstrated about it. Counting this as caught would credit
@@ -930,6 +949,7 @@ def _score_once(target, mutants, seed, code_root):
             "generated": target.task_id is not None,
             "unreached": never_ran,
             "unverified": unverified,
+            "timed_out": timed_out,
             "site_files": site_files, "sites": site_count}
 
 
@@ -1026,6 +1046,13 @@ def render(result, gaps):
                   f"({100 - percent(missed, total)}%).**", "",
                   f"**{missed} of {total} planted faults missed "
                   f"({percent(missed, total)}%).**", ""]
+        if result.get("timed_out"):
+            n = result["timed_out"]
+            lines += [f"{n} of the caught {'fault' if n == 1 else 'faults'} made "
+                      f"the tests run on past ten times their usual time, so "
+                      f"{'it was' if n == 1 else 'they were'} stopped and "
+                      f"counted as caught: the tests did not pass with "
+                      f"{'it' if n == 1 else 'them'} in.", ""]
 
     if gaps is None:
         lines += ["Reachability could not be checked for this task, so read "
@@ -1214,7 +1241,7 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
             print(f"[{task_id}] your suite does not pass your untouched code, "
                   f"so planting a fault would prove nothing: every mutant "
                   f"would fail for the reason the original does. Check that "
-                  f"--score-tests points at tests that run and pass. Report "
+                  f"these tests run and pass on their own: {', '.join(target.suites)}. Report "
                   f"at {path}")
             # What pytest itself said, so the cause is on screen: on a real
             # library it was a module generated at build time, which no

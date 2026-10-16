@@ -1688,7 +1688,7 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
             # Found the way --start finds them, so step 1 and step 2 on the
             # home page read the same: the test files that import the code,
             # searched from the project root.
-            from qikly.start import auto_tests
+            from qikly.start import auto_tests, score_questions_pasteable as shown_path
             where = code if os.path.isabs(code) else os.path.join(INVOKED_FROM, code)
             found = auto_tests(os.path.abspath(where), INVOKED_FROM) \
                 if os.path.exists(where) else None
@@ -1697,9 +1697,22 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
                       "*_test.py, searched from the project root). Name them "
                       "with --score-tests <file or folder>.", file=sys.stderr)
                 return 2
-            tests = os.path.relpath(found, INVOKED_FROM)
-            print(f"Scoring against {tests}, the test files that import it. "
-                  f"To name others, add --score-tests <file or folder>.")
+            code_dir = os.path.abspath(where if os.path.isdir(where) else os.path.dirname(where))
+            if os.path.isdir(found) and (code_dir == os.path.abspath(found)
+                                         or code_dir.startswith(os.path.abspath(found) + os.sep)):
+                # Tests beside the code in the folder being scored: as one
+                # path they are both, which scoring refuses, and the refusal
+                # named a --score-tests the user never typed.
+                print(f"The tests that import it sit inside {shown_path(found, INVOKED_FROM)}, "
+                      f"the folder being scored. Score one module instead, such "
+                      f"as  qikly --score-code <module>.py, or name the tests "
+                      f"with --score-tests <file>.", file=sys.stderr)
+                return 2
+            # Absolute, not relative: a project on another drive than the
+            # one the command ran from has no relative path, and relpath raised.
+            tests = os.path.abspath(found)
+            print(f"Scoring against {shown_path(found, INVOKED_FROM)}, the test files that "
+                  f"import it. To name others, add --score-tests <file or folder>.")
         if not (code and tests):
             print("--score-code is needed too: one says what to break, the "
                   "other says what should notice.", file=sys.stderr)

@@ -58,9 +58,12 @@ def _names_for(tree, function, module):
                 if alias.name == function:
                     imported = True
                     source = node.module or ""
+                    # Or the package above it, which re-exports it: isodate's
+                    # tests import parse_date from isodate, not isodate.isodates.
                     if (module is None or source == module
                             or module.endswith("." + source)
-                            or source.endswith("." + module)):
+                            or source.endswith("." + module)
+                            or ("." + module).find("." + source + ".") >= 0):
                         matching.add(alias.asname or alias.name)
     if not imported:
         return {function}
@@ -75,7 +78,11 @@ def _value(node, known):
 
 
 def _module_literals(tree):
-    """Module-level `NAME = <literal>`, such as a table of parametrize rows."""
+    """
+    Module-level `NAME = <value>`, as the expression itself, such as a table
+    of parametrize rows. Kept unevaluated: isodate's rows hold `date(...)`
+    beside the strings, and evaluating the whole table threw out every row.
+    """
     out = {}
     for node in tree.body:
         # inflection annotates its tables, `ROWS: TestParameters = (...)`.
@@ -86,11 +93,18 @@ def _module_literals(tree):
         else:
             continue
         if isinstance(target, ast.Name):
-            try:
-                out[target.id] = ast.literal_eval(value)
-            except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
-                pass
+            out[target.id] = value
     return out
+
+
+_NOT_LITERAL = object()
+
+
+def _literal(node):
+    try:
+        return ast.literal_eval(node)
+    except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):
+        return _NOT_LITERAL
 
 
 def _parametrized(func, module_level):
@@ -98,32 +112,46 @@ def _parametrized(func, module_level):
     A test's parameters bound to the first row of its `pytest.mark.parametrize`,
     which is how most real suites pass inputs: inflection and slugify both do,
     with the rows in a module-level list, and no call had a literal argument.
+    Each value is read on its own, so a row with a `date(...)` in it still
+    gives its strings and numbers; `pytest.param(...)` rows are unwrapped.
     """
     for deco in func.decorator_list:
         if not (isinstance(deco, ast.Call) and getattr(deco.func, "attr", "") == "parametrize"
                 and len(deco.args) >= 2):
             continue
-        try:
-            names = ast.literal_eval(deco.args[0])
-        except (ValueError, SyntaxError):
+        if any(k.arg == "indirect" for k in deco.keywords):
+            # The rows go to fixtures, which may turn them into anything.
             continue
+        names = _literal(deco.args[0])
         if isinstance(names, str):
             names = [n.strip() for n in names.split(",") if n.strip()]
+        if not isinstance(names, (list, tuple)) or not names:
+            continue
         rows_node = deco.args[1]
         if isinstance(rows_node, ast.Name):
-            rows = module_level.get(rows_node.id)
-        else:
-            try:
-                rows = ast.literal_eval(rows_node)
-            except (ValueError, SyntaxError):
-                rows = None
-        if not rows:
+            rows_node = module_level.get(rows_node.id)
+        if not isinstance(rows_node, (ast.List, ast.Tuple)) or not rows_node.elts:
             continue
-        first = list(rows)[0]
-        values = [first] if len(names) == 1 else list(first) if isinstance(
-            first, (list, tuple)) else None
-        if values and len(values) == len(names):
-            yield from zip(names, values)
+        first = rows_node.elts[0]
+        if isinstance(first, ast.Call) and getattr(first.func, "attr", "") == "param":
+            if len(names) > 1:
+                first = ast.Tuple(elts=list(first.args), ctx=ast.Load())
+            else:
+                first = first.args[0] if first.args else None
+        if first is None:
+            continue
+        if len(names) == 1:
+            values = [first]
+        elif isinstance(first, (ast.List, ast.Tuple)):
+            values = list(first.elts)
+        else:
+            continue
+        if len(values) != len(names):
+            continue
+        for name, node in zip(names, values):
+            value = _literal(node)
+            if value is not _NOT_LITERAL:
+                yield name, value
 
 
 def _literals_around(tree, call):
@@ -142,17 +170,30 @@ def _literals_around(tree, call):
             continue
         out = dict(_parametrized(func, module_level))
         seen = {name: 1 for name in out}
+        # Every binding counts, not only `name = value`: `txt += " b"`, a loop
+        # or `with` target, or `txt, n = ...` each changes what reaches the
+        # call, and reading only the plain assignment named a call no test made.
         for node in ast.walk(func):
-            if isinstance(node, ast.Assign) and len(node.targets) == 1 and \
-                    isinstance(node.targets[0], ast.Name):
-                name = node.targets[0].id
-                seen[name] = seen.get(name, 0) + 1
-                if seen[name] > 1:
-                    continue
-                try:
-                    out[name] = ast.literal_eval(node.value)
-                except (ValueError, TypeError, SyntaxError):
-                    out.pop(name, None)
+            if isinstance(node, ast.Assign):
+                targets = node.targets
+            elif isinstance(node, (ast.AugAssign, ast.AnnAssign, ast.For, ast.AsyncFor,
+                                   ast.comprehension, ast.NamedExpr)):
+                targets = [node.target]
+            elif isinstance(node, (ast.With, ast.AsyncWith)):
+                targets = [i.optional_vars for i in node.items if i.optional_vars]
+            else:
+                targets = []
+            for target in targets:
+                for name in ast.walk(target):
+                    if isinstance(name, ast.Name):
+                        seen[name.id] = seen.get(name.id, 0) + 1
+            # A plain assignment made before the call is the value it gets.
+            if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                    and isinstance(node.targets[0], ast.Name)
+                    and node.lineno < getattr(call, "lineno", 0)):
+                value = _literal(node.value)
+                if value is not _NOT_LITERAL:
+                    out[node.targets[0].id] = value
         return {k: v for k, v in out.items() if seen.get(k) == 1}
     return {}
 

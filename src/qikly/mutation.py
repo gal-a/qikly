@@ -104,11 +104,19 @@ def _redundant_anchors(tree):
     five of validators' card patterns were reported missed for it.
 
     Only usage that can be read for certain counts: `re.match(P, ...)`,
-    `re.compile(P).match(...)`, and a name bound to `re.compile(P)` whose
-    every use in the module is `.match(...)` or `.fullmatch(...)`.
+    `re.compile(P).match(s)`, and a name bound to `re.compile(P)` whose every
+    use in the module is `.match(s)` or `.fullmatch(s)`. Never with a start
+    position, `.match(s, 2)`, where `^` does not match at all; and never a
+    public module-level name, which another module may give to `.search`.
     """
     out = {}
     compiled = {}  # name -> constants compiled into it
+
+    def from_start(call):
+        """A compiled pattern's match from the start of the string."""
+        return len(call.args) <= 1 and not any(k.arg in ("pos", "endpos")
+                                               for k in call.keywords)
+
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -120,15 +128,20 @@ def _redundant_anchors(tree):
                     and isinstance(node.func.value, ast.Call)
                     and _is_re(node.func.value.func, "compile")
                     and node.func.value.args
-                    and isinstance(node.func.value.args[0], ast.Constant)):
+                    and isinstance(node.func.value.args[0], ast.Constant)
+                    and from_start(node)):
                 out[id(node.func.value.args[0])] = set(anchors)
+    module_level = {id(n) for n in tree.body} if isinstance(tree, ast.Module) else set()
     for node in ast.walk(tree):
         if (isinstance(node, ast.Assign) and len(node.targets) == 1
                 and isinstance(node.targets[0], ast.Name)
                 and isinstance(node.value, ast.Call)
                 and _is_re(node.value.func, "compile") and node.value.args
                 and isinstance(node.value.args[0], ast.Constant)):
-            compiled.setdefault(node.targets[0].id, []).append(node.value.args[0])
+            name = node.targets[0].id
+            if id(node) in module_level and not name.startswith("_"):
+                continue
+            compiled.setdefault(name, []).append(node.value.args[0])
     if not compiled:
         return out
     # Every load of each name, and what it is used for.
@@ -139,7 +152,7 @@ def _redundant_anchors(tree):
                 and isinstance(node.func.value, ast.Name)
                 and node.func.value.id in uses):
             methods.add(id(node.func.value))
-            uses[node.func.value.id].append(node.func.attr)
+            uses[node.func.value.id].append(node.func.attr if from_start(node) else None)
     for node in ast.walk(tree):
         if (isinstance(node, ast.Name) and node.id in uses
                 and isinstance(node.ctx, ast.Load) and id(node) not in methods):
@@ -223,8 +236,13 @@ class _Mutator(ast.NodeTransformer):
             loosened = node.value
             if "^" not in redundant:
                 loosened = loosened.lstrip("^")
-            if "$" not in redundant:
-                loosened = loosened.rstrip("$")
+            if "$" not in redundant and loosened.endswith("$"):
+                # Not an escaped `\$`, a literal dollar: stripping it left a
+                # pattern ending in a lone backslash, which does not compile,
+                # and that broken mutant counted as a fault caught.
+                body = loosened[:-1]
+                if (len(body) - len(body.rstrip("\\"))) % 2 == 0:
+                    loosened = body
             if loosened != node.value and self._hit("regex anchors stripped", node):
                 return ast.copy_location(ast.Constant(value=loosened), node)
         return node
