@@ -2111,7 +2111,9 @@ def _most_useful_first(pending, by_key, test_sources, root):
     """
     def callable_(key):
         q = by_key[key]
-        if so._on_a_comparison(q, _read(q["path"])):
+        # A boundary with a known edge has the best menu of all; only a
+        # comparison without one is never answerable.
+        if not q.get("edge") and so._on_a_comparison(q, _read(q["path"])):
             return False
         module = so.path_module(q["path"], root)
         names = [q["function"]] if q.get("function") else []
@@ -2264,10 +2266,12 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
     if len(pending) > QUESTION_CAP:
         pending = _cap(console, paths, state, pending, by_key, keys)
     skip_typed = put_off = 0
+    previous = None
     for key in pending:
         number = keys.index(key) + 1
-        previous = by_key[keys[number - 2]] if number > 1 else None
+        # The question asked just before, not the one numbered before it.
         same = bool(previous and previous.get("line") == by_key[key].get("line"))
+        previous = by_key[key]
         state["answers"][key] = ask_question(console, number, total, by_key[key],
                                              source, test_sources, root, same,
                                              skip_typed=bool(skip_typed))
