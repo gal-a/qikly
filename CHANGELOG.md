@@ -133,7 +133,10 @@ packaging tools would read as `1.1`.
   `--take-tests` told the user to apply qikly's change to code that was
   right, when the failing tests were the test writer's own misreading of the
   API. Such failures are now listed as tests to check before changing
-  anything, and the run report says the same.
+  anything, and the run report says the same. A failure written from an
+  answer is no longer called a disagreement either: the test can assert
+  more than the answer said, and qikly's change to its copy, which on one
+  library altered a documented default, is offered to read, not to apply.
 - **The sample-file prompt is a numbered menu**, with a way out and the file
   already in place offered first. It had looped on a path that did not exist.
 - **Scoring no longer hangs on a fault that loops forever.** Each fault gets

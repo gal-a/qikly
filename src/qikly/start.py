@@ -1929,10 +1929,9 @@ def report_result(console, paths, state, lines, converged):
         # A run's patches sit in a folder per run; name the diff itself.
         if patches and os.path.isdir(patches):
             patches = _newest(patches) or patches
-        console.say(f"qikly fixed this in a copy, not in your file {name}."
-                    if disagreed else
-                    f"qikly changed its copy to make them pass, not your file "
-                    f"{name}; take that change only if the tests are right.")
+        console.say(f"qikly changed its copy to make them pass, not your file "
+                    f"{name}. Read the change before taking any of it: it can "
+                    f"change behaviour your answers never mentioned.")
         if patches:
             console.say(f"  The change: {paths.rel(patches)}")
     else:

@@ -446,10 +446,15 @@ def report(say, cwd, written, result, task_id):
         for name in unanswered:
             say(f"  {name}")
     if disagree:
-        say("These fail because your code disagrees with your answers. qikly "
-            "fixed its copy; apply the same fix to yours, from "
-            + os.path.join("outputs", "logs", "patches", task_id) + os.sep
-            + ", and they pass:")
+        # Never "apply the same fix": on python-dotenv the test asserted more
+        # than the answer said, and the copy's change to pass it altered a
+        # documented default. Which side is wrong is for a person to judge.
+        say("These fail on your code and were written from your answers. Either "
+            "your code disagrees with the answer, or the test asserts more than "
+            "the answer said. Compare each with its answer before changing "
+            "anything. qikly's change to its own copy, which makes them pass, is "
+            "in " + os.path.join("outputs", "logs", "patches", task_id) + os.sep
+            + "; read it before taking any of it:")
         for name in disagree:
             say(f"  {name}")
     if missing:
