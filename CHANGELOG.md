@@ -116,6 +116,18 @@ packaging tools would read as `1.1`.
 - **Skill 0.3.7** tells an assistant that those questions are the user's to
   answer, never its own, and how the answers become a task.
 
+- **`--start` asks at most ten questions about a module at a time.** With
+  more, the ones it can offer answers for come first, and it asks how many
+  to answer now: the rest are saved as open questions, and the same command
+  asks them next time. A folder run stops to ask after about 25.
+- **Concrete answers for code your tests reach only through other
+  functions.** Where the line's own function has no test call, such as a
+  private helper, the public functions the tests call are tried instead, and
+  the question says the call runs through the helper. A check switched off or
+  an error never raised gets the same search, so it can offer the input the
+  check exists for. Every row of a parametrize table is tried, and a call
+  that leaves out an argument with a default.
+
 ### Fixed
 - **Scoring no longer hangs on a fault that loops forever.** Each fault gets
   ten times the untouched suite's time, and at least a minute; one that runs

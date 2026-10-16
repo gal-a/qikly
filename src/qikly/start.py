@@ -1043,7 +1043,8 @@ def ask_question(console, number, total, q, source, test_sources, root,
                 + ("  (another question about the same line)" if same_line else ""))
     for line in _context(source, q.get("line")):
         console.say(line)
-    prompt, options = so.menu(q, source, test_sources, root, q.get("mutant"))
+    prompt, options = q.get("_built") or so.menu(q, source, test_sources, root,
+                                                 q.get("mutant"))
     if prompt:
         # The concrete question replaces the general one's last sentence,
         # which asked the same thing in the abstract.
@@ -1778,14 +1779,15 @@ def _makes_call(body, call, source=None):
         # A value passed through a name, `word = "mousetrap"` then
         # `pluralize(word)`, is the same call: read literally, all three of
         # inflection's answers were marked as made by no test.
-        known = so._literals_around(tree, node)
-        try:
-            found_args = [so._value(a, known) for a in node.args]
-            found_kwargs = {k.arg: so._value(k.value, known) for k in node.keywords}
-        except (ValueError, SyntaxError, TypeError):
-            continue
-        if meaning(found_args, found_kwargs) == wanted:
-            return True
+        for row in range(so._rows_for(tree, node)):
+            known = so._literals_around(tree, node, row)
+            try:
+                found_args = [so._value(a, known) for a in node.args]
+                found_kwargs = {k.arg: so._value(k.value, known) for k in node.keywords}
+            except (ValueError, SyntaxError, TypeError):
+                continue
+            if meaning(found_args, found_kwargs) == wanted:
+                return True
     return False
 
 
@@ -2028,6 +2030,60 @@ def _rule_example(questions, test_sources):
     return "a call to one of your functions, and what it should return"
 
 
+QUESTION_CAP = 10
+FOLDER_CAP = 25
+
+
+def _most_useful_first(console, questions, source, test_sources, root):
+    """
+    The questions with concrete answers to choose from first, then the rest,
+    each group in the order it came: public functions, top level, helpers.
+    Each menu is built once here and kept, so asking does not build it again.
+    """
+    console.say(f"{len(questions)} questions. Working out which ones qikly can "
+                f"offer answers for, by running your code in a separate process, "
+                f"so those come first...")
+    for q in questions:
+        q["_built"] = so.menu(q, source, test_sources, root, q.get("mutant"))
+    return ([q for q in questions if q["_built"][0]]
+            + [q for q in questions if not q["_built"][0]])
+
+
+def _cap(console, paths, state, pending, by_key):
+    """
+    How many to ask now. More than ten questions about one module is more
+    than anyone answers in a sitting; the rest are saved, not dropped, and
+    the same command asks them next time.
+    """
+    n = len(pending)
+    concrete = sum(1 for k in pending if (by_key[k].get("_built") or (None,))[0])
+    lead = [f"{n} questions about {os.path.basename(paths.module)}"
+            + (f", {concrete} with answers to choose from, which come first." if concrete
+               else ".")]
+    picked = choose(console, [
+        f"answer the first {QUESTION_CAP} now; the other {n - QUESTION_CAP} are saved "
+        f"for later, and running the same command again asks them",
+        f"answer all {n} now",
+        "type how many to answer now",
+    ], lead=lead)
+    if picked == 1:
+        now = QUESTION_CAP
+    elif picked == 2:
+        now = n
+    else:
+        now = _number(console, n, "questions to answer now")
+    for key in pending[now:]:
+        q = by_key[key]
+        state["answers"][key] = {"question": q["question"], "where": where(q),
+                                 "status": so.SKIP, "key": key, "deferred": True}
+    save_state(paths, state)
+    write_files(console, paths, state)
+    if now < n:
+        console.say(f"  the other {n - now} saved, as open questions, to "
+                    f"{paths.rel(paths.open)}")
+    return pending[:now]
+
+
 def module_flow(console, paths, questions, test_sources, root, answers_file=None,
                 many=False):
     """Questions, summary and data for one module. Returns its state."""
@@ -2035,12 +2091,16 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
     state = load_state(paths) or {}
     state.setdefault("answers", {})
     state.setdefault("extra", [])
+    if len(questions) > QUESTION_CAP and console.interactive:
+        questions = _most_useful_first(console, questions, source, test_sources, root)
     keys = [_key(q) for q in questions]
     by_key = dict(zip(keys, questions))
     # Answers to questions this score no longer asks are dropped: the code or
     # the tests changed, and an answer to a question nobody asked is noise.
     state["answers"] = {k: v for k, v in state["answers"].items() if k in by_key}
-    pending = [k for k in keys if k not in state["answers"]]
+    # Questions put off by the cap are still to be asked, not answered.
+    pending = [k for k in keys if k not in state["answers"]
+               or state["answers"][k].get("deferred")]
     if (state["answers"] or state.get("requirements")) and console.interactive:
         # Shown on every return, so it is never a surprise. Deleting answers
         # sits behind its own confirmation: a first-time user piping answers
@@ -2048,7 +2108,7 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
         # every answer, and the rest then landed one question off.
         done = len(state["answers"]) + (1 if state.get("requirements") else 0)
         complete = not pending and _complete(paths)
-        handled = len(state["answers"])
+        handled = sum(1 for r in state["answers"].values() if not r.get("deferred"))
         answered = sum(1 for r in state["answers"].values() if r.get("status") == "answered")
         lead = [f"Saved for {os.path.basename(paths.module)}: "
                 + ("what it does, and " if state.get("requirements") else "")
@@ -2115,6 +2175,8 @@ def module_flow(console, paths, questions, test_sources, root, answers_file=None
                     "to offer concrete answers. Nothing of yours is changed. If "
                     f"a function takes longer than {start_probe_timeout()} "
                     "seconds, that question offers only skip or your own answer.")
+    if len(pending) > QUESTION_CAP:
+        pending = _cap(console, paths, state, pending, by_key)
     for key in pending:
         number = keys.index(key) + 1
         previous = by_key[keys[number - 2]] if number > 1 else None
@@ -2437,7 +2499,7 @@ def _main(arg, cwd, console, answers, given_tests=None):
         return 0
     test_sources = _test_sources(tests)
     root = project_root(code, cwd)
-    results, blocked = [], False
+    results, blocked, asked = [], False, 0
     modules = _modules(questions, code, cwd, session)
     file_module = parse_answers(answers)[3] if answers else None
     for index, (module, qs, base) in enumerate(modules, 1):
@@ -2449,6 +2511,23 @@ def _main(arg, cwd, console, answers, given_tests=None):
         if problem:
             console.say(f"{shown(module, cwd)} is skipped: {problem}")
             continue
+        if (len(modules) > 1 and not answers and asked >= FOLDER_CAP
+                and not _complete(paths)):
+            # A folder can hold far more questions than a sitting. What is
+            # done is kept, and the same command picks up from here.
+            left = len(modules) - index + 1
+            picked = choose(console, [
+                f"go on to {shown(module, cwd)}, module {index} of {len(modules)}",
+                f"stop here and check and run the modules answered so far; the "
+                f"other {left} wait, and the same command asks them next time",
+                "type stop or go",
+            ], lead=[f"{asked} questions so far in this folder."])
+            if picked == 3:
+                picked = 2 if free_text(console, "Type stop or go", "go").lower() \
+                    .startswith("s") else 1
+            if picked == 2:
+                break
+        asked += len(qs)
         if len(modules) > 1:
             console.say("")
             console.say(f"Module {index} of {len(modules)}: {shown(module, cwd)}, "
@@ -2675,6 +2754,10 @@ def _non_interactive(arg, cwd, console, given_tests=None):
                  "# is told this, so describe its purpose, not its boundary values.",
                  "requirements: " + (state.get("requirements") or ""),
                  ""]
+        if len(qs) > QUESTION_CAP:
+            lines += [f"# {len(qs)} questions. Answer the ones you can and leave the",
+                      "# rest blank: a blank one stays open, and is asked again next time.",
+                      ""]
         source = _read(module)
         for n, q in enumerate(qs, 1):
             prompt, options = so.menu(q, source, test_sources, root, q.get("mutant"))

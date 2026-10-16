@@ -107,13 +107,32 @@ def _literal(node):
         return _NOT_LITERAL
 
 
-def _parametrized(func, module_level):
+ROWS_READ = 8
+
+
+def _parametrize_rows(func, module_level):
+    """How many rows a test's parametrize tables give, up to ROWS_READ."""
+    most = 1
+    for deco in func.decorator_list:
+        if (isinstance(deco, ast.Call) and getattr(deco.func, "attr", "") == "parametrize"
+                and len(deco.args) >= 2):
+            rows_node = deco.args[1]
+            if isinstance(rows_node, ast.Name):
+                rows_node = module_level.get(rows_node.id)
+            if isinstance(rows_node, (ast.List, ast.Tuple)):
+                most = max(most, len(rows_node.elts))
+    return min(most, ROWS_READ)
+
+
+def _parametrized(func, module_level, row=0):
     """
-    A test's parameters bound to the first row of its `pytest.mark.parametrize`,
+    A test's parameters bound to one row of its `pytest.mark.parametrize`,
     which is how most real suites pass inputs: inflection and slugify both do,
     with the rows in a module-level list, and no call had a literal argument.
     Each value is read on its own, so a row with a `date(...)` in it still
     gives its strings and numbers; `pytest.param(...)` rows are unwrapped.
+    Every row up to ROWS_READ is a call: the first alone never reached
+    isodate's six-digit years, which start further down its table.
     """
     for deco in func.decorator_list:
         if not (isinstance(deco, ast.Call) and getattr(deco.func, "attr", "") == "parametrize"
@@ -132,7 +151,7 @@ def _parametrized(func, module_level):
             rows_node = module_level.get(rows_node.id)
         if not isinstance(rows_node, (ast.List, ast.Tuple)) or not rows_node.elts:
             continue
-        first = rows_node.elts[0]
+        first = rows_node.elts[row % len(rows_node.elts)]
         if isinstance(first, ast.Call) and getattr(first.func, "attr", "") == "param":
             if len(names) > 1:
                 first = ast.Tuple(elts=list(first.args), ctx=ast.Load())
@@ -154,7 +173,7 @@ def _parametrized(func, module_level):
                 yield name, value
 
 
-def _literals_around(tree, call):
+def _literals_around(tree, call, row=0):
     """
     Names bound to a literal, once, in the test function holding `call`. Real
     suites pass inputs through variables, `txt = "..."` then `slugify(txt)`,
@@ -168,7 +187,7 @@ def _literals_around(tree, call):
             continue
         if not any(n is call for n in ast.walk(func)):
             continue
-        out = dict(_parametrized(func, module_level))
+        out = dict(_parametrized(func, module_level, row))
         seen = {name: 1 for name in out}
         # Every binding counts, not only `name = value`: `txt += " b"`, a loop
         # or `with` target, or `txt, n = ...` each changes what reaches the
@@ -224,18 +243,29 @@ def literal_calls(test_sources, function, module=None):
                 ok = False
             if not ok:
                 continue
-            known = _literals_around(tree, node)
-            try:
-                args = [_value(a, known) for a in node.args]
-                kwargs = {k.arg: _value(k.value, known)
-                          for k in node.keywords if k.arg}
-            except (ValueError, TypeError, SyntaxError):
-                continue
             if any(isinstance(a, ast.Starred) for a in node.args):
                 continue
-            if (args, kwargs) not in found:
-                found.append((args, kwargs))
+            for row in range(_rows_for(tree, node)):
+                known = _literals_around(tree, node, row)
+                try:
+                    args = [_value(a, known) for a in node.args]
+                    kwargs = {k.arg: _value(k.value, known)
+                              for k in node.keywords if k.arg}
+                except (ValueError, TypeError, SyntaxError):
+                    continue
+                if (args, kwargs) not in found:
+                    found.append((args, kwargs))
     return found
+
+
+def _rows_for(tree, call):
+    """How many parametrize rows the test holding `call` runs, up to ROWS_READ."""
+    module_level = _module_literals(tree)
+    for func in ast.walk(tree):
+        if isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)) and \
+                any(n is call for n in ast.walk(func)):
+            return _parametrize_rows(func, module_level)
+    return 1
 
 
 def signature(source, function):
@@ -244,14 +274,44 @@ def signature(source, function):
     Test calls often leave out an argument that has a default, or pass one by
     keyword, so both kinds are needed to rebuild a call.
     """
+    node = _callable(source, function)
+    if node is None:
+        return None
+    a = node.args
+    positional = [x.arg for x in a.posonlyargs + a.args]
+    if getattr(node, "_is_init", False):
+        positional = positional[1:]
+    return positional, [x.arg for x in a.kwonlyargs]
+
+
+def _callable(source, name):
+    """
+    The top-level function called `name`, or the `__init__` of the top-level
+    class called `name`, marked so its `self` is left out. A class is called
+    to build one: semantic_version's tests build `Version('1.0.0')`, and every
+    question about its parsing was text-only without it.
+    """
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return None
+    classes = {n.name: n for n in tree.body if isinstance(n, ast.ClassDef)}
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function:
-            a = node.args
-            return [x.arg for x in a.posonlyargs + a.args], [x.arg for x in a.kwonlyargs]
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+            return node
+    # A class's own __init__, or the first one up its bases in this module:
+    # semantic_version's SimpleSpec takes BaseSpec's.
+    seen, todo = set(), [name]
+    while todo:
+        current = todo.pop(0)
+        if current in seen or current not in classes:
+            continue
+        seen.add(current)
+        for item in classes[current].body:
+            if isinstance(item, ast.FunctionDef) and item.name == "__init__":
+                item._is_init = True
+                return item
+        todo += [b.id for b in classes[current].bases if isinstance(b, ast.Name)]
     return None
 
 
@@ -340,24 +400,20 @@ def _with(base, positional, keyword_only, name, value):
 
 def literal_defaults(source, function):
     """{name: default} for the arguments of a function whose default is a literal."""
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
+    node = _callable(source, function)
+    if node is None:
         return {}
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function:
-            a = node.args
-            named = a.posonlyargs + a.args
-            pairs = list(zip(named[len(named) - len(a.defaults):], a.defaults))
-            pairs += [(x, d) for x, d in zip(a.kwonlyargs, a.kw_defaults) if d is not None]
-            out = {}
-            for arg, default in pairs:
-                try:
-                    out[arg.arg] = ast.literal_eval(default)
-                except (ValueError, SyntaxError, TypeError):
-                    pass
-            return out
-    return {}
+    a = node.args
+    named = a.posonlyargs + a.args
+    pairs = list(zip(named[len(named) - len(a.defaults):], a.defaults))
+    pairs += [(x, d) for x, d in zip(a.kwonlyargs, a.kw_defaults) if d is not None]
+    out = {}
+    for arg, default in pairs:
+        try:
+            out[arg.arg] = ast.literal_eval(default)
+        except (ValueError, SyntaxError, TypeError):
+            pass
+    return out
 
 
 def _usable_calls(test_sources, function, positional, keyword_only, module=None):
@@ -489,27 +545,119 @@ def _verb(outcome):
     return f"return {outcome['returns']}"
 
 
+def _public_functions(source):
+    """
+    The module's top-level public functions, and its public classes that
+    take arguments to build, in the order they appear.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    return [n.name for n in tree.body
+            if (isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                or isinstance(n, ast.ClassDef) and _callable(source, n.name) is not None)
+            and not n.name.startswith("_")]
+
+
+def _comparable(outcome):
+    """
+    Whether an outcome can be compared between two runs: a repr holding a
+    memory address, `<Spec object at 0x...>`, differs every time, and read
+    as a difference it would offer a choice between two identical behaviours.
+    """
+    return " at 0x" not in str(outcome.get("returns", ""))
+
+
 def difference_options(question, source, test_sources, root, mutant):
     """
     Two behaviours from an input where the code and the code with the planted
     change disagree, or None when no such input turns up.
+
+    The function the line is in is tried first, from the calls the tests make
+    of it. Where it has none, which is what a private helper looks like, the
+    public functions the tests do call are tried instead: on real libraries
+    most missed faults sat in helpers such as slugify's `_modern_truncate`,
+    reached only through `slugify(...)`, and no question offered an answer.
     """
-    function = question.get("function")
-    if not (function and source and mutant):
+    if not (source and mutant):
         return None
+    module = path_module(question["path"], root)
+    function = question.get("function")
+    rounds = []
+    if function:
+        rounds.append([(function, a, k) for a, k in
+                       _candidates(source, test_sources, function, module, 60)])
+    # Then through the public functions, sharing the 60 calls between them.
+    public = [f for f in _public_functions(source) if f != function]
+    share = max(5, 60 // max(len(public), 1))
+    rounds.append([(name, a, k) for name in public
+                   for a, k in _candidates(source, test_sources, name, module, share)][:60])
+    for calls in rounds:
+        found = _first_difference(question, function, calls, root, mutant)
+        if found:
+            return found
+    return None
+
+
+def _first_difference(question, function, calls, root, mutant):
+    """The menu for the first of `calls` whose outcome the change alters."""
+    if not calls:
+        return None
+    result = start_probe.run_calls(question["path"], root, calls, mutant=mutant)
+    if not result:
+        return None
+    now, changed_outcomes = result
+    for (name, args, kwargs), a, b in zip(calls, now, changed_outcomes):
+        if a != b and _comparable(a) and _comparable(b):
+            call = call_text(name, args, kwargs)
+            behaviours = [
+                {"kind": BEHAVIOUR, "call": call, "args": args, "kwargs": kwargs,
+                 "function": name, "pins": a,
+                 "label": f"{_verb(a)}, as your code does now"},
+                {"kind": BEHAVIOUR, "call": call, "args": args, "kwargs": kwargs,
+                 "function": name, "pins": b,
+                 "label": _verb(b)},
+            ]
+            prompt = f"What should {call} do?"
+            if name != function:
+                # Said, so the call is not mistaken for the line's own.
+                prompt += (f" (It runs through {function or 'this line'}, "
+                           f"line {question.get('line')}.)")
+            return prompt, _shuffled(behaviours, question["question"])
+    return None
+
+
+def _candidates(source, test_sources, function, module, limit):
+    """
+    The calls of `function` to try: the tests' own calls, then each with one
+    argument changed, then a changed default with one other change.
+    """
     found = signature(source, function)
     if not found:
-        return None
+        return []
     positional, keyword_only = found
-    bases = _usable_calls(test_sources, function, positional, keyword_only,
-                          path_module(question["path"], root))
+    bases = _usable_calls(test_sources, function, positional, keyword_only, module)
     if not bases:
-        return None
+        return []
     candidates = []
     for base in bases[:3]:
         first = (list(base[0]), dict(base[1]))
         if first not in candidates:
             candidates.append(first)
+        # And the call with an argument that has a default left out: a
+        # changed default only shows on a call that does not pass it, and
+        # isodate's tests pass yeardigits every time.
+        defaults = literal_defaults(source, function)
+        args, kwargs = first
+        while args and len(args) <= len(positional) and positional[len(args) - 1] in defaults:
+            args = args[:-1]
+            if (list(args), dict(kwargs)) not in candidates:
+                candidates.append((list(args), dict(kwargs)))
+        for name in [k for k in first[1] if k in defaults]:
+            dropped = (list(first[0]), {k: v for k, v in first[1].items() if k != name})
+            if dropped not in candidates:
+                candidates.append(dropped)
         names = positional[:len(base[0])] + list(base[1])
         # And the arguments the call left at their default: a branch behind
         # `express=False` is only reached by trying `express=True`.
@@ -544,26 +692,7 @@ def difference_options(question, source, test_sources, root, mutant):
                         both = _with(flipped, positional, keyword_only, other, v)
                         if both and both not in candidates:
                             candidates.append(both)
-    candidates = candidates[:60]
-    calls = [(function, a, k) for a, k in candidates]
-    result = start_probe.run_calls(question["path"], root, calls, mutant=mutant)
-    if not result:
-        return None
-    now, changed_outcomes = result
-    for (args, kwargs), a, b in zip(candidates, now, changed_outcomes):
-        if a != b:
-            call = call_text(function, args, kwargs)
-            behaviours = [
-                {"kind": BEHAVIOUR, "call": call, "args": args, "kwargs": kwargs,
-                 "function": function, "pins": a,
-                 "label": f"{_verb(a)}, as your code does now"},
-                {"kind": BEHAVIOUR, "call": call, "args": args, "kwargs": kwargs,
-                 "function": function, "pins": b,
-                 "label": _verb(b)},
-            ]
-            prompt = f"What should {call} do?"
-            return prompt, _shuffled(behaviours, question["question"])
-    return None
+    return candidates[:limit]
 
 
 _COMPARISON = re.compile(r"^(<=|<|>=|>|==|!=|is not|is|not in|in) became ")
@@ -597,7 +726,7 @@ def menu(question, source, test_sources, root, mutant=None):
     kind = question.get("kind") or ""
     if question.get("edge"):
         built = boundary_options(question, source, test_sources, root)
-    elif kind in ("guard disabled", "raise swallowed") or _on_a_comparison(question, source):
+    elif _on_a_comparison(question, source):
         built = None
     else:
         built = difference_options(question, source, test_sources, root, mutant)

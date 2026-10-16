@@ -40,6 +40,16 @@ for entry in (os.path.dirname(path), root, spec_in.get("base")):
         sys.path.insert(0, entry)
 
 def load(source, name):
+    # The package first: a module loaded by its file alone has no parent in
+    # sys.modules, so its own relative imports failed, and on real libraries,
+    # where nearly every module sits in a package, no question got answers.
+    parent = name.rpartition(".")[0]
+    if parent and parent not in sys.modules:
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                importlib.import_module(parent)
+        except BaseException:
+            pass
     package = [os.path.dirname(path)] if os.path.basename(path) == "__init__.py" else None
     spec = importlib.util.spec_from_file_location(
         name, path, submodule_search_locations=package)

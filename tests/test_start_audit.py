@@ -900,3 +900,109 @@ def test_a_fault_that_hangs_is_stopped_and_counted_caught(tmp_path, monkeypatch)
                       mutants=50, seed=1)
     assert result["timed_out"] >= 1
     assert "counted as caught" in ms.render(result, [])
+
+
+# ------------------------------------- the cap and answers through public calls --
+
+def test_more_than_ten_questions_asks_ten_and_keeps_the_rest_for_later(tmp_path):
+    _project(tmp_path)
+    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
+    questions = [{"file": "pricing.py", "path": paths.module, "line": 2,
+                  "function": "apply_discount", "question": f"question {n}?",
+                  "kind": "guard disabled"} for n in range(12)]
+    start.save_state(paths, {"requirements": "applies a discount", "extra": [],
+                             "answers": {}})
+    # "1" continues past the saved requirements, "1" takes the first ten, and
+    # each text-only question is then skipped with "1".
+    s = Script(["1", "1"] + ["1"] * 10)
+    with pytest.raises(start.Stop):
+        start.module_flow(s.console, paths, questions, [TESTS], str(tmp_path))
+    assert "12 questions about pricing.py" in s.text
+    answers = start.load_state(paths)["answers"]
+    assert sum(1 for r in answers.values() if r.get("deferred")) == 2
+    assert sum(1 for r in answers.values() if not r.get("deferred")) == 10
+    # The same command again asks the two that were put off.
+    s = Script(["1", "1", "1"])
+    with pytest.raises(start.Stop):
+        start.module_flow(s.console, paths, questions, [TESTS], str(tmp_path))
+    assert "2 still to go" in s.text and "Question 11 of 12" in s.text
+
+
+def test_a_helper_reached_only_through_a_public_function_gets_options(tmp_path):
+    # On real libraries most missed faults sat in private helpers that tests
+    # reach only through public functions, and no question offered an answer.
+    from qikly.mutation import count_sites, make_mutant
+    source = ("def _check(rate):\n"
+              "    if not isinstance(rate, int):\n"
+              "        raise TypeError('rate must be a whole number')\n"
+              "    return rate\n\n\n"
+              "def apply(price, rate):\n"
+              "    return price - _check(rate)\n")
+    (tmp_path / "shop.py").write_text(source, encoding="utf-8")
+    tests = "from shop import apply\n\ndef test_apply():\n    assert apply(100, 5) == 95\n"
+    mutant = next(m for m, d in (make_mutant(source, i, "validation")
+                                 for i in range(count_sites(source, "validation")))
+                  if d.startswith("guard disabled"))
+    q = {"path": str(tmp_path / "shop.py"), "line": 2, "function": "_check",
+         "kind": "guard disabled", "question": "Your tests pass with this check "
+         "switched off. Which input, if any, should it catch?"}
+    prompt, options = so.menu(q, source, [tests], str(tmp_path), mutant)
+    assert prompt and prompt.startswith("What should apply(") and "runs through _check" in prompt
+    labels = [o["label"] for o in options]
+    assert any(l.startswith("raise TypeError") and "as your code does now" in l for l in labels)
+    assert labels[-1] == "type my own answer"
+
+
+def test_every_parametrize_row_is_a_call_and_a_default_is_tried_left_out():
+    test = ("import pytest\nfrom m import parse\n"
+            "ROWS = [(4, '1985'), (6, '+001985')]\n"
+            "@pytest.mark.parametrize('digits, text', ROWS)\n"
+            "def test_p(digits, text):\n    assert parse(text, digits)\n")
+    calls = so.literal_calls([test], "parse", "m")
+    assert (["1985", 4], {}) in calls and (["+001985", 6], {}) in calls
+    source = "def parse(text, digits=4):\n    return text\n"
+    candidates = so._candidates(source, [test], "parse", "m", 60)
+    assert (["1985"], {}) in candidates
+
+
+def test_a_module_its_package_imports_back_can_be_probed(tmp_path):
+    # isodate's __init__ imports from isodates, which imports isodate.isoerror:
+    # loaded on its own, the module met itself half-built and every probe of
+    # it failed, so no question about it ever offered an answer.
+    pkg = tmp_path / "src" / "iso"
+    pkg.mkdir(parents=True)
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='iso'\n")
+    (pkg / "__init__.py").write_text("from iso.dates import parse\n")
+    (pkg / "errors.py").write_text("class ParseError(ValueError):\n    pass\n")
+    (pkg / "dates.py").write_text("from iso.errors import ParseError\n\n"
+                                  "def parse(text):\n    if not text:\n"
+                                  "        raise ParseError(text)\n    return text[::-1]\n")
+    assert start_probe.run_calls(str(pkg / "dates.py"), str(tmp_path),
+                                 [("parse", ["ab"], {}), ("parse", [""], {})]) == \
+        [{"returns": "'ba'"}, {"raises": "ParseError"}]
+
+
+def test_a_class_built_by_the_tests_reaches_a_fault_in_its_methods(tmp_path):
+    # semantic_version's tests build Version('1.0.0'); every question about
+    # its parsing was text-only before classes could be called.
+    from qikly.mutation import count_sites, make_mutant
+    source = ("class Version:\n"
+              "    def __init__(self, text):\n"
+              "        self.parts = self._parse(text)\n\n"
+              "    def _parse(self, text):\n"
+              "        if not text[0].isdigit():\n"
+              "            raise ValueError(text)\n"
+              "        return tuple(int(p) for p in text.split('.'))\n\n"
+              "    def __repr__(self):\n"
+              "        return 'Version(%r)' % ('.'.join(map(str, self.parts)),)\n")
+    (tmp_path / "semver.py").write_text(source, encoding="utf-8")
+    tests = "from semver import Version\n\ndef test_v():\n    assert Version('1.2')\n"
+    mutant = next(m for m, d in (make_mutant(source, i, "validation")
+                                 for i in range(count_sites(source, "validation")))
+                  if d.startswith("guard disabled"))
+    q = {"path": str(tmp_path / "semver.py"), "line": 6, "function": "_parse",
+         "kind": "guard disabled", "question": "Your tests pass with this check "
+         "switched off. Which input, if any, should it catch?"}
+    prompt, options = so.menu(q, source, [tests], str(tmp_path), mutant)
+    assert prompt and prompt.startswith("What should Version(")
+    assert any(o["label"].startswith("raise ValueError") for o in options)
