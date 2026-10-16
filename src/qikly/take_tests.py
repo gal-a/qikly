@@ -332,10 +332,40 @@ def remembered_folder(cwd, task_id):
 _MISSING = re.compile(r"cannot import name|module '[\w.]+' has no attribute")
 
 
+_TAG = re.compile(r"Criteria:\s*\d")
+
+
+def _tagged_tests(paths):
+    """
+    The names of the tests the writer tagged with one of the answers. Only
+    those can disagree with an answer: an untagged test is the writer's own
+    reading of the code or the requirements, and on semantic_version two such
+    tests misused its API, the coding agent bent its copy to fit them, and
+    the user was told to apply that change to code that was right.
+    """
+    import ast
+    names = set()
+    for path in paths:
+        if not path.endswith(".py"):
+            continue
+        try:
+            with open(path, encoding="utf-8") as handle:
+                source = handle.read()
+            tree = ast.parse(source)
+        except (OSError, SyntaxError, ValueError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and \
+                    _TAG.search(ast.get_source_segment(source, node) or ""):
+                names.add(node.name)
+    return names
+
+
 def _run(cwd, paths):
     """
     The copied tests on the user's own code, each failure classified from
-    pytest's JUnit XML: (summary, disagree, missing, no_import, broken).
+    pytest's JUnit XML: (summary, disagree, missing, no_import, broken,
+    unanswered), unanswered being failures of tests no answer is behind.
     """
     from qikly.scaffold import importable  # noqa: F401  (keeps imports local)
 
@@ -352,11 +382,12 @@ def _run(cwd, paths):
     lines = [l for l in done.stdout.splitlines() if l.strip()]
     summary = next((l for l in reversed(lines)
                     if re.search(r"\b(passed|failed|error)", l)), "").strip("= ").strip()
-    disagree, missing, no_import, broken = [], [], [], []
+    disagree, missing, no_import, broken, unanswered = [], [], [], [], []
+    tagged = _tagged_tests(paths)
     try:
         tree = ET.parse(xml_path)
     except (ET.ParseError, OSError):
-        return summary, disagree, missing, no_import, broken
+        return summary, disagree, missing, no_import, broken, unanswered
     for case in tree.iter("testcase"):
         problem = case.find("failure")
         if problem is None:
@@ -379,10 +410,12 @@ def _run(cwd, paths):
             broken.append(label)
         elif problem.tag == "error" and not case.get("name"):
             broken.append(label)
-        else:
+        elif case.get("name", "").split("[")[0] in tagged:
             disagree.append(label)
+        else:
+            unanswered.append(label)
     shutil.rmtree(os.path.dirname(xml_path), ignore_errors=True)
-    return summary, disagree, missing, no_import, broken
+    return summary, disagree, missing, no_import, broken, unanswered
 
 
 def report(say, cwd, written, result, task_id):
@@ -403,8 +436,15 @@ def report(say, cwd, written, result, task_id):
     if isinstance(result, str):
         say(f"Run on your own code: {result}.")
         return
-    summary, disagree, missing, no_import, broken = result
+    summary, disagree, missing, no_import, broken, unanswered = result
     say(f"Run on your own code: {summary or 'no result'}.")
+    if unanswered:
+        say("These fail on your code but were not written from any of your "
+            "answers: they are the test writer's own reading of your code or "
+            "your requirements, which can be wrong. Check each one before "
+            "changing anything; if the test is wrong, delete it:")
+        for name in unanswered:
+            say(f"  {name}")
     if disagree:
         say("These fail because your code disagrees with your answers. qikly "
             "fixed its copy; apply the same fix to yours, from "

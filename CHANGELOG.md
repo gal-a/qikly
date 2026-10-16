@@ -129,6 +129,13 @@ packaging tools would read as `1.1`.
   that leaves out an argument with a default.
 
 ### Fixed
+- **A failing test no answer is behind is never called a disagreement.**
+  `--take-tests` told the user to apply qikly's change to code that was
+  right, when the failing tests were the test writer's own misreading of the
+  API. Such failures are now listed as tests to check before changing
+  anything, and the run report says the same.
+- **The sample-file prompt is a numbered menu**, with a way out and the file
+  already in place offered first. It had looped on a path that did not exist.
 - **Scoring no longer hangs on a fault that loops forever.** Each fault gets
   ten times the untouched suite's time, and at least a minute; one that runs
   past it is stopped and counted as caught, and the report says how many.

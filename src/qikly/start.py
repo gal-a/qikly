@@ -1883,11 +1883,14 @@ def report_result(console, paths, state, lines, converged):
                     f"What it printed last: " + (" | ".join(tail) or "nothing"))
         return
     if not converged:
+        # The third cause is the one cachetools hit: the test called the
+        # library with the wrong arguments, and eleven patches could not help.
         console.say(f"The run for {name} did not finish green: some tests "
                     f"written from your answers still fail. That can be a "
-                    f"disagreement qikly could not fix in its copy, or an "
-                    f"answer that contradicts another. The step-by-step report "
-                    f"says which.")
+                    f"disagreement qikly could not fix in its copy, an answer "
+                    f"that contradicts another, or a test written wrongly from "
+                    f"your answer, which no change to the code can fix. The "
+                    f"step-by-step report shows the failing test.")
     elif disagreed == "unknown":
         console.say(f"The run for {name} finished green, but qikly could not run "
                     f"your code as it is: its copy of {name} failed to import at "
@@ -1916,14 +1919,22 @@ def report_result(console, paths, state, lines, converged):
                          "which answer they were written from:"))
             for t in untagged:
                 console.say(f"  - {t}")
+            # Not a verdict on the code: on semantic_version both were the
+            # test writer misreading the API, and the copy was bent to fit.
+            console.say("  These are the test writer's own reading of your code or "
+                        "requirements, which can be wrong. Check each before "
+                        "changing anything.")
         patches = _newest(os.path.join(paths.cwd, "outputs", "logs", "patches",
                                        paths.task_id))
         # A run's patches sit in a folder per run; name the diff itself.
         if patches and os.path.isdir(patches):
             patches = _newest(patches) or patches
-        console.say(f"qikly fixed this in a copy, not in your file {name}.")
+        console.say(f"qikly fixed this in a copy, not in your file {name}."
+                    if disagreed else
+                    f"qikly changed its copy to make them pass, not your file "
+                    f"{name}; take that change only if the tests are right.")
         if patches:
-            console.say(f"  The fix: {paths.rel(patches)}")
+            console.say(f"  The change: {paths.rel(patches)}")
     else:
         # Agreement is claimed only for an answer a test checked: one whose
         # every test failed on an import, or that no test is tagged with, was

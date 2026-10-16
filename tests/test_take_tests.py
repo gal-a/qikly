@@ -13,7 +13,8 @@ CODE = ("def apply_discount(price, rate):\n    if rate < 0 or rate > 100:\n"
         "        raise ValueError\n    return price * (1 - rate / 100)\n")
 GEN = ("import pytest\nfrom outputs.agent_src.code.PRICING_VERIFY.pricing import apply_discount\n\n"
        "def test_ten():\n    assert apply_discount(100, 10) == 90\n\n"
-       "def test_hundred():\n    with pytest.raises(ValueError):\n        apply_discount(100, 100)\n\n"
+       "def test_hundred():\n    \"\"\"# Criteria: 1\"\"\"\n    with pytest.raises(ValueError):\n"
+       "        apply_discount(100, 100)\n\n"
        "def test_helper():\n    from outputs.agent_src.code.PRICING_VERIFY.pricing import _clamp\n"
        "    assert _clamp(5) == 5\n")
 
@@ -56,7 +57,7 @@ def test_the_copy_imports_the_users_module_and_runs_on_it(tmp_path):
     assert text.startswith(take_tests.MARKER)
     assert "from pricing import apply_discount" in text
     assert "outputs.agent_src" not in text.split("\n", 3)[3]
-    summary, disagree, missing, no_import, broken = result
+    summary, disagree, missing, no_import, broken, unanswered = result
     assert "1 passed" in summary and "2 failed" in summary
     assert [n.split("::")[-1] for n in disagree] == ["test_hundred"]
     assert [n.split("::")[-1] for n in missing] == ["test_helper"]
@@ -65,7 +66,7 @@ def test_the_copy_imports_the_users_module_and_runs_on_it(tmp_path):
 def test_the_from_package_import_is_rewritten_too(tmp_path):
     """`from outputs.agent_src.code.T import pricing` kept testing qikly's copy."""
     gen = ("import pytest\nfrom outputs.agent_src.code.PRICING_VERIFY import pricing\n\n"
-           "def test_hundred():\n    with pytest.raises(ValueError):\n"
+           "def test_hundred():\n    # Criteria: 1\n    with pytest.raises(ValueError):\n"
            "        pricing.apply_discount(100, 100)\n")
     _project(tmp_path, stage_files={"system/test_system.py": gen})
     written, result = _take(tmp_path)
@@ -128,7 +129,7 @@ def test_code_in_a_subfolder_is_importable_from_the_copies(tmp_path):
     _project(tmp_path, implementation="lib/pricing.py",
              own_test="def test_nothing():\n    pass\n")
     written, result = _take(tmp_path)
-    summary, disagree, missing, no_import, broken = result
+    summary, disagree, missing, no_import, broken, unanswered = result
     assert not no_import, result
     assert disagree, "the rate-100 test reaches the user's code"
 
@@ -139,7 +140,7 @@ def test_one_broken_file_does_not_stop_the_others(tmp_path):
     _project(tmp_path, stage_files=files)
     (tmp_path / "pytest.ini").write_text("[pytest]\naddopts = -x\n")
     written, result = _take(tmp_path)
-    summary, disagree, missing, no_import, broken = result
+    summary, disagree, missing, no_import, broken, unanswered = result
     assert broken and disagree, result
 
 
@@ -178,3 +179,21 @@ def test_a_task_without_generated_tests_says_so(tmp_path):
     shutil.rmtree(tmp_path / "outputs")
     written, reason = _take(tmp_path)
     assert written is None and "run it first" in reason
+
+
+def test_a_failing_test_no_answer_is_behind_is_never_called_a_disagreement(tmp_path):
+    # semantic_version: two tests written from the requirements misused its
+    # API, and the user was told to apply qikly's change to code that was right.
+    gen = ("from outputs.agent_src.code.PRICING_VERIFY.pricing import apply_discount\n\n"
+           "def test_guess():\n    \"\"\"# Criteria: none\"\"\"\n"
+           "    assert apply_discount(100, 10) == 91\n")
+    _project(tmp_path, stage_files={"integration/test_integration.py": gen})
+    said = []
+    written, result = take_tests.take(str(tmp_path), "PRICING_VERIFY", str(tmp_path / "tests"),
+                                      say=said.append)
+    summary, disagree, missing, no_import, broken, unanswered = result
+    assert not disagree and [n.split("::")[-1] for n in unanswered] == ["test_guess"]
+    take_tests.report(said.append, str(tmp_path), written, result, "PRICING_VERIFY")
+    text = "\n".join(said)
+    assert "not written from any of your answers" in text
+    assert "apply the same fix" not in text
