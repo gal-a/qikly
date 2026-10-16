@@ -68,7 +68,7 @@ things that do work, and let the user choose:
   for them to compare with its answer, not proof the code is wrong.
 
 - **`qikly --score my_module.py --score-tests their_tests.py`** if any
-  suite already exists. Free, no model call, nothing of theirs modified, and it
+  suite already exists (before 0.6.0 the flag is `--score-code`). Free, no model call, nothing of theirs modified, and it
   answers "is the suite we have worth anything" with named faults it missed.
   This is usually the right first move on somebody else's project.
 - **`qikly --scaffold my_module.py`**, then fill in `requirements` and
@@ -142,8 +142,8 @@ pip install qikly
 qikly --version          # version, package directory and interpreter
 ```
 
-**This Skill needs qikly 0.5.4 or later**, which is where `--score`
-arrives, alongside `--score-suite` and the reachability warning in `--validate`
+**This Skill needs qikly 0.5.4 or later**, which is where `--score-code`
+arrives (called `--score` from 0.6.0, and `--score-code` still works), alongside `--score-suite` and the reachability warning in `--validate`
 from 0.5.3. Against an older install an
 agent following this page will recommend a flag that does not exist, so check
 `qikly --version` before trusting the command table below. The Skill's own

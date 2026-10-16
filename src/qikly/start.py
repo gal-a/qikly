@@ -303,11 +303,6 @@ def _imports(source, stem, own=None):
     return False
 
 
-def _count_tests(paths):
-    return sum(len(re.findall(r"^\s*(?:async\s+)?def test_", _read(p), re.M))
-               for p in paths)
-
-
 def shown(path, base):
     """A path relative to `base` when it is inside it, else in full."""
     try:
@@ -1888,17 +1883,27 @@ def _answers_command(code, answers_file, cwd):
 
 def answers_file_for(code, cwd):
     """
-    The answers file --questions wrote for `code`: one path for a module, or
-    for a folder whose modules have exactly one; otherwise the list found.
+    The answers files --questions wrote about `code`: found by the module:
+    line each file carries, so a module scored as part of a folder is found
+    from its own path too. One path when there is exactly one with answers in
+    it, else the list of those that hold answers.
     """
-    code = _one_module(os.path.abspath(code))
-    modules = [code] if os.path.isfile(code) else modules_in(code)
-    if not modules:
-        return []
-    renamed = load_session(cwd, code).get("names") or {}
-    bases = task_bases(modules, code)
-    files = [Paths(cwd, m, renamed.get(shown(m, cwd), bases[m])).open for m in modules]
-    files = [f for f in files if os.path.isfile(f)]
+    import glob
+    target = os.path.normcase(_one_module(os.path.abspath(code)))
+    folder = target if os.path.isdir(target) else None
+    files = []
+    for f in sorted(glob.glob(os.path.join(cwd, "inputs_private", "questions",
+                                           "*_open_questions.txt"))):
+        module = _field(f, "module")
+        if not module:
+            continue
+        where = os.path.normcase(os.path.abspath(os.path.join(cwd, module)))
+        if where == target or (folder and where.startswith(folder + os.sep)):
+            files.append(f)
+    # For a folder, only the files someone has answered; one module's file is
+    # found answered or not, so --answers can say what is missing from it.
+    if folder:
+        files = [f for f in files if _has_answers(f)]
     return files[0] if len(files) == 1 else files
 
 
@@ -1951,32 +1956,24 @@ def write_questions(arg, cwd, console, given_tests=None):
     for module, qs, base in modules:
         paths = Paths(cwd, module, base)
         again = _answers_command(code, paths.open, cwd)
-        if _has_answers(paths.open):
-            # Never over what a person wrote: rerunning --start to see the
-            # command again must not cost them their answers.
-            console.say("")
-            console.say(f"{shown(paths.open, cwd)} already holds your answers, so it "
-                        f"is left as it is. Edit it, then run  {again}")
-            console.say("  To start it over, delete the file and run this command again.")
-            written.append((paths.open, again))
-            continue
         source = _read(module)
-        sharp, others, same = [], 0, {}
-        for q in qs:
-            prompt, options = so.menu(q, source, test_sources, root, q.get("mutant"))
-            if not prompt:
-                others += 1
-                continue
-            # The same call with the same two outcomes is one question, however
-            # many planted faults led to it: pricing asked what
-            # apply_discount(100, -11) should do three times.
-            mark = (prompt, tuple(sorted(json.dumps(o.get("pins"), sort_keys=True)
-                                         for o in options if o["kind"] == so.BEHAVIOUR)))
-            if mark in same:
-                same[mark].append(q)
-                continue
-            same[mark] = [q]
-            sharp.append((q, prompt, options, same[mark]))
+        sharp, others = sharp_questions(qs, source, test_sources, root)
+        # A file already answered is refreshed, never lost: every answer
+        # whose question is still asked is carried over by its id, with the
+        # requirements, rules and rows, and the old file is kept beside it.
+        carried, dropped, old = {}, [], None
+        if _has_answers(paths.open):
+            given, req, old_rows, _, old_ids = parse_answers(paths.open)
+            old = {"requirements": req or "", "rules": parse_rules(paths.open),
+                   "rows": old_rows}
+            current = {e["id"] for e in sharp}
+            for n, text in given.items():
+                fid = (old_ids.get(n) or "").split(" ")[0]
+                if fid in current:
+                    carried[fid] = text
+                else:
+                    dropped.append(n)
+            shutil.copy2(paths.open, paths.open + ".bak")
         name = os.path.basename(module)
         lines = [f"# Your answers for {name}, from qikly --questions.",
                  "#",
@@ -1985,12 +1982,14 @@ def write_questions(arg, cwd, console, given_tests=None):
                  "# That checks your answers, offers the run (it needs an API key),",
                  "# shows where your code disagrees with you, and offers to copy the",
                  "# new tests into your own tests. Change anything here and run it again.",
+                 "# Keep the id lines: they tie each answer to its question.",
                  "",
                  f"module: {shown(module, cwd)}",
+                 f"scored: {score_questions_pasteable(code, cwd)}",
                  "",
                  f"# 1. What {name} should do, in one sentence. The coding agent is",
                  "#    told this, so give its purpose, not its rules or boundary values.",
-                 "requirements: ",
+                 "requirements: " + (old["requirements"] if old else ""),
                  ""]
         if sharp:
             lines += [f"# 2. Questions your tests leave open, {len(sharp)} of them. qikly ran",
@@ -1998,21 +1997,22 @@ def write_questions(arg, cwd, console, given_tests=None):
                       "#    after the Q, or leave it blank to skip it. An option that asks",
                       "#    for a value takes the number, a colon and the value:  Q1: 2: 100.0",
                       ""]
-            for n, (q, prompt, options, group_) in enumerate(sharp, 1):
+            for n, entry in enumerate(sharp, 1):
+                q, group_ = entry["group"][0], entry["group"]
                 lines.append(f"# Q{n}. {where(q)}")
                 # The code itself: with only "line 143" to go on, an answer
                 # about slugify's separator check was written about the
                 # max_length check two lines above it.
                 lines += ["#" + line for line in _context(source, q.get("line"))]
-                lines.append(f"# {prompt}")
-                for i, o in enumerate(options, 1):
+                lines.append(f"# {entry['prompt']}")
+                for i, o in enumerate(entry["options"], 1):
                     if o["kind"] != so.OWN:
                         lines.append(f"#   {i}. {o['label']}")
                 if len(group_) > 1:
                     lines.append(f"#   (This answer also covers {len(group_) - 1} more "
                                  f"place{'s' if len(group_) > 2 else ''} your tests "
                                  f"leave open on the same call.)")
-                lines += ["# id " + " ".join(_key(x) for x in group_), f"Q{n}: ", ""]
+                lines += [f"# id {entry['id']}", f"Q{n}: {carried.get(entry['id'], '')}", ""]
         else:
             lines += ["# 2. Questions: none with answers qikly could work out by running",
                       "#    your code. Write what you know as rules, below.", ""]
@@ -2025,13 +2025,16 @@ def write_questions(arg, cwd, console, given_tests=None):
                       f"#    the code; the score report lists "
                       f"{'them' if others != 1 else 'it'}: {shown(report, cwd)}"
                       if report else "#    the score report lists them."]
-        lines += ["rule: ", ""]
+        lines += ["rule: " + r for r in (old["rules"] if old else [])] or ["rule: "]
+        lines.append("")
         from qikly.scaffold import starter_columns
         columns = starter_columns(source)
         if columns:
             built = build_rows({"answers": {}, "extra": []}, columns, source, test_sources)
             # A value with a line break cannot sit on one line.
             built = [r for r in built if not any("\n" in v or "\r" in v for v in r)]
+            if old and old["rows"]:
+                built = [list(r) for r in old["rows"]]
             lines += ["# 4. Example inputs the run tries the code on, one row per line,",
                       "#    the values in this order:  " + ", ".join(columns),
                       "#    qikly filled in the rows it could build from your tests"
@@ -2048,12 +2051,24 @@ def write_questions(arg, cwd, console, given_tests=None):
             handle.write("\n".join(lines))
         written.append((paths.open, again))
         console.say("")
-        console.say(f"{name}: {len(sharp)} question{'' if len(sharp) == 1 else 's'} "
-                    f"with answers to choose from"
+        console.say(f"{shown(module, cwd)}: {len(sharp)} question"
+                    f"{'' if len(sharp) == 1 else 's'} with answers to choose from"
                     + (f"; {others} more need{'s' if others == 1 else ''} someone who "
                        f"knows the code, listed in the score report" if others else "")
                     + ".")
+        if old:
+            console.say(f"  The file already held your answers: refreshed, with "
+                        f"{len(carried)} answer{'' if len(carried) == 1 else 's'} carried "
+                        f"over"
+                        + (f" and {len(dropped)} about questions no longer asked left "
+                           f"out" if dropped else "")
+                        + f". The previous file is kept as {shown(paths.open + '.bak', cwd)}.")
     console.say("")
+    if not written:
+        # A folder where nothing was missed has no file to point to.
+        console.say("No questions to answer. To add rules of your own for one "
+                    "module, run  qikly --questions <that module>.py")
+        return 0
     console.say("Next, step 2: answer in the file, then run the command under it.")
     for path, command in written:
         console.say(f"  {shown(path, cwd)}")
@@ -2188,96 +2203,130 @@ def _csv_line(values):
     return out.getvalue()
 
 
+def sharp_questions(questions, source, test_sources, root):
+    """
+    (entries, others): the questions the file shows, and how many it leaves
+    out for having no choice to offer. Each entry is one question as the file
+    shows it, with the planted faults that led to the same call and choices
+    grouped under it, and an id made from that call and those choices, not
+    from a line number. An id tied to the line lost every answer when a line
+    was added above it, and one tied to the scoring scope lost them all for a
+    module in a subfolder. The writer and the reader both build this list, so
+    a file's numbers and ids always mean the same questions.
+    """
+    entries, by_mark, others = [], {}, 0
+    for q in questions:
+        prompt, options = so.menu(q, source, test_sources, root, q.get("mutant"))
+        if not prompt:
+            others += 1
+            continue
+        mark = (re.sub(r"\bline \d+", "line", prompt),
+                sorted(json.dumps(o.get("pins"), sort_keys=True)
+                       for o in options if o["kind"] == so.BEHAVIOUR))
+        text = json.dumps(mark)
+        if text in by_mark:
+            by_mark[text]["group"].append(q)
+            continue
+        entry = {"id": hashlib.sha1(text.encode("utf-8")).hexdigest()[:12],
+                 "prompt": prompt, "options": options, "group": [q]}
+        by_mark[text] = entry
+        entries.append(entry)
+    return entries, others
+
+
+def _interpret(console, n, text, options):
+    """The record fields for answer `text` to file question Q`n`."""
+    if not text:
+        return {"status": so.SKIP, "deferred": True}
+    if text.lower() in ("skip", "either", "ask"):
+        return {"status": {"skip": so.SKIP, "either": so.EITHER, "ask": so.ASK}[text.lower()]}
+    if re.match(r"^\d+\s*[.):]?\s*(?::\s*(.+))?$", text) and \
+            int(re.match(r"^\d+", text).group(0)) <= 9:
+        # An option number, alone or as "1: 0.0" for an option that asks for
+        # a value. Numbers above 9 are answers, not options.
+        k = int(re.match(r"^\d+", text).group(0))
+        value = re.match(r"^\d+\s*[.)]?\s*:\s*(.+)$", text)
+        value = value.group(1).strip() if value else None
+        if not 1 <= k <= len(options) or options[k - 1]["kind"] == so.OWN:
+            console.say(f"Q{n}: there is no option {k}; it is left open.")
+            return {"status": so.SKIP}
+        o = options[k - 1]
+        if o["kind"] == so.BEHAVIOUR and o["pins"].get("returns", "") is None \
+                and value is None:
+            console.say(f"Q{n}: option {k} needs a value; write it as {k}: <value>. "
+                        f"It is left open.")
+            return {"status": so.SKIP}
+        if o["kind"] == so.BEHAVIOUR:
+            return {"status": "answered", "criterion": so.criterion(o, value),
+                    "function": o["function"], "args": o["args"],
+                    "kwargs": o.get("kwargs") or {}}
+        return {"status": o["kind"]}
+    if len(text.split()) < 3:
+        console.say(f"Q{n}: \"{text}\" is too short to be a criterion; write the "
+                    f"input and what should happen to it. It is left open.")
+        return {"status": so.SKIP}
+    return {"status": "answered", "criterion": text}
+
+
 def _from_answers(console, paths, questions, test_sources, root, answers_path):
+    """
+    The task, built from the answers file alone, every time. Built on top of
+    what an earlier run saved, a blanked answer stayed in the task and a
+    changed one did not change.
+    """
     from qikly.scaffold import starter_columns
 
     given, requirements, rows, _, ids = parse_answers(answers_path)
     source = _read(paths.module)
-    state = load_state(paths) or {"answers": {}, "extra": []}
-    # The file is the whole record of the person's answers: its rules replace
-    # any from before, so a rule deleted from the file is gone from the task.
-    state["extra"] = parse_rules(answers_path)
+    state = {"answers": {}, "extra": parse_rules(answers_path)}
     if requirements:
         state["requirements"] = requirements
-    if not state.get("requirements"):
+    else:
         console.say(f"{shown(answers_path, paths.cwd)} has no requirements: line, "
                     f"so the coding agent would not be told what the module "
                     f"does. Add one, such as  requirements: applies a discount.")
-    # Matched by the question's id where the file carries one, so a file
-    # answered against an earlier score cannot put an answer on another
-    # question; by number only for a file without ids.
-    by_id, covered_by = {}, {}
-    for n, text in given.items():
-        if n in ids:
-            first, *rest = ids[n].split()
-            by_id[first] = text
-            for other in rest:
-                covered_by[other] = first
-    # Ids on a line with no answer still group: a blank stays blank for all.
-    for n, marks in ids.items():
-        first, *rest = marks.split()
-        for other in rest:
-            covered_by.setdefault(other, first)
-    for n, q in enumerate(questions, 1):
-        key = _key(q)
-        rec = {"question": q["question"], "where": where(q), "number": n, "key": key}
-        if key in covered_by:
-            # Answered by the question it was written under: the same call and
-            # the same choices, so one criterion is enough, and it is not
-            # written into the task a second time.
-            first = state["answers"].get(covered_by[key]) or {}
-            if first.get("status") == "answered":
-                rec.update(status="covered", by=covered_by[key])
-            else:
-                rec.update(status=first.get("status", so.SKIP),
-                           deferred=bool(first.get("deferred", True)))
-            state["answers"][key] = rec
-            continue
-        text = by_id.get(key) if ids else given.get(n)
-        if not text:
-            if key in state["answers"]:
-                state["answers"][key]["number"] = n
+    entries, _ = sharp_questions(questions, source, test_sources, root)
+    by_id = {e["id"]: e for e in entries}
+    numbers = sorted(set(given) | set(ids))
+    unmatched = []
+    for n in numbers:
+        if ids:
+            entry = by_id.get((ids.get(n) or "").split(" ")[0])
+            if entry is None:
+                if given.get(n):
+                    unmatched.append(n)
                 continue
-            # Put off, not skipped: the file says a blank one is asked again,
-            # and a terminal run then treated it as decided.
-            rec["status"], rec["deferred"] = so.SKIP, True
-        elif text.lower() in ("skip", "either", "ask"):
-            rec["status"] = {"skip": so.SKIP, "either": so.EITHER, "ask": so.ASK}[text.lower()]
-        elif re.match(r"^\d+\s*[.):]?\s*(?::\s*(.+))?$", text) and \
-                int(re.match(r"^\d+", text).group(0)) <= 9:
-            # An option number, alone or as "1: 0.0" for an option that asks
-            # for a value. Numbers above 9 are answers, not options.
-            k = int(re.match(r"^\d+", text).group(0))
-            value = re.match(r"^\d+\s*[.)]?\s*:\s*(.+)$", text)
-            value = value.group(1).strip() if value else None
-            _, options = so.menu(q, source, test_sources, root, q.get("mutant"))
-            if not 1 <= k <= len(options):
-                console.say(f"Q{n}: there is no option {k}; it is left open.")
-                rec["status"] = so.SKIP
-            else:
-                o = options[k - 1]
-                if o["kind"] == so.BEHAVIOUR and o["pins"].get("returns", "") is None \
-                        and value is None:
-                    console.say(f"Q{n}: option {k} needs a value; write it as "
-                                f"{k}: <value>. It is left open.")
-                    rec["status"] = so.SKIP
-                elif o["kind"] == so.BEHAVIOUR:
-                    rec.update(status="answered", criterion=so.criterion(o, value),
-                               function=o["function"], args=o["args"],
-                               kwargs=o.get("kwargs") or {})
-                elif o["kind"] == so.OWN:
-                    console.say(f"Q{n}: write your own answer in words instead "
-                                f"of {k}. It is left open.")
-                    rec["status"] = so.SKIP
-                else:
-                    rec["status"] = o["kind"]
-        elif len(text.split()) < 3:
-            console.say(f"Q{n}: \"{text}\" is too short to be a criterion; write "
-                        f"the input and what should happen to it. It is left open.")
-            rec["status"] = so.SKIP
         else:
-            rec.update(status="answered", criterion=text)
-        state["answers"][key] = rec
+            # A file whose id lines were deleted: by position, in the same
+            # order the file was written in.
+            if not 1 <= n <= len(entries):
+                continue
+            entry = entries[n - 1]
+        fields = _interpret(console, n, given.get(n), entry["options"])
+        first, rest = entry["group"][0], entry["group"][1:]
+        state["answers"][_key(first)] = dict(
+            fields, question=first["question"], where=where(first), number=n,
+            key=_key(first))
+        for q in rest:
+            # The same call and the same choices: one criterion is enough,
+            # and it is not written into the task twice.
+            same = {"status": "covered", "by": _key(first)} \
+                if fields["status"] == "answered" else dict(fields)
+            state["answers"][_key(q)] = dict(same, question=q["question"],
+                                             where=where(q), key=_key(q))
+    for q in questions:
+        # Every question the file does not answer stays open in the task.
+        state["answers"].setdefault(_key(q), {
+            "question": q["question"], "where": where(q), "key": _key(q),
+            "status": so.SKIP, "deferred": True})
+    if unmatched:
+        console.say(f"{', '.join('Q%d' % n for n in unmatched)} in "
+                    f"{shown(answers_path, paths.cwd)} "
+                    f"{'is' if len(unmatched) == 1 else 'are'} about questions your "
+                    f"code no longer raises: it or its tests changed since the file "
+                    f"was written, so {'it is' if len(unmatched) == 1 else 'they are'} "
+                    f"left out. To refresh the file and keep the answers that still "
+                    f"apply, run  qikly --questions {_scope_of(answers_path, paths)}")
     columns = starter_columns(source)
     if columns == []:
         state["rows"], state["columns"], state["rows_typed"] = [["none"]], ["input"], False
@@ -2285,16 +2334,15 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
         # The file's rows, plus a row for each answer's own call: the file is
         # filled in from the tests before anything is answered, so an answer
         # such as apply_discount(7, 0.5) had no row of its own.
-        given = [r for r in rows if len(r) == len(columns)]
+        given_rows = [r for r in rows if len(r) == len(columns)]
         answered = build_rows(state, columns, source, [])
-        state["rows"] = given + [r for r in answered if r not in given]
+        state["rows"] = given_rows + [r for r in answered if r not in given_rows]
         state["columns"] = columns
         state["rows_typed"] = True
-    elif columns and not state.get("rows_typed"):
-        # Rebuilt each time, so an answer added since adds its row.
+    elif columns:
         state["rows"] = build_rows(state, columns, source, test_sources)
         state["columns"] = columns
-    elif columns is None and not state.get("sample"):
+    elif columns is None and not os.path.exists(paths.data):
         console.say(f"{os.path.basename(paths.module)} reads files, so it needs a "
                     f"real sample file: copy a small real one to "
                     f"{paths.rel(paths.data)}.")
@@ -2307,3 +2355,17 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
     console.say(f"saved to {paths.rel(paths.task)}"
                 + (f" and {paths.rel(data)}" if os.path.exists(data) else ""))
     return state, data
+
+
+def _field(path, name):
+    """The value of a `name:` line in an answers file, or None."""
+    for line in _read(path).splitlines():
+        found = re.match(r"^\s*%s\s*:\s*(.*)$" % re.escape(name), line, re.I)
+        if found and found.group(1).strip():
+            return found.group(1).strip()
+    return None
+
+
+def _scope_of(answers_path, paths):
+    """What --questions was given when it wrote the file: its scored: line."""
+    return _field(answers_path, "scored") or shown(paths.module, paths.cwd)

@@ -139,7 +139,9 @@ The same three steps as [the home page](https://test.qikly.com/?ref=quick-start)
    option's number after its `Q`. The file also has a line for what the module
    does in a sentence, `rule:` lines for rules of your own, and example input
    rows built from your tests. Answer at your own pace and change anything
-   before you run it: the file is yours and is never written over.
+   before you run it. If your code changes, run `--questions` again: it
+   refreshes the file and carries your answers over, keeping the old one as
+   `.bak`.
 
 3. **Get a fresh test suite written from your answers.** Run the command at
    the top of the file:

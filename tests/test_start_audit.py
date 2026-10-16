@@ -264,7 +264,8 @@ def test_an_option_that_asks_for_a_value_can_take_one_from_a_file(tmp_path, monk
               "pins": {"returns": None, "like": "99.0"}, "label": "x"}
     monkeypatch.setattr(so, "menu", lambda *a, **k: ("p", [option]))
     answers = tmp_path / "a.txt"
-    answers.write_text(f"requirements: applies a discount\n# id {start._key(q)}\nQ1: 1: 100.0\n")
+    entry = start.sharp_questions([q], PRICING, [TESTS], str(tmp_path))[0][0]
+    answers.write_text(f"requirements: applies a discount\n# id {entry['id']}\nQ1: 1: 100.0\n")
     state, _ = start._from_answers(Script([], interactive=False).console, paths, [q],
                                    [TESTS], str(tmp_path), str(answers))
     assert state["answers"][start._key(q)]["criterion"] == \
@@ -991,7 +992,7 @@ def test_building_a_menu_never_writes_a_new_file_beside_the_users_data(tmp_path)
     assert list((tmp_path / "data").iterdir()) == []
 
 
-def test_a_blank_answer_in_the_file_is_asked_again_in_a_terminal(tmp_path, monkeypatch):
+def test_a_blank_answer_in_the_file_stays_open(tmp_path, monkeypatch):
     _project(tmp_path)
     monkeypatch.chdir(tmp_path)
     assert start.main("pricing.py", str(tmp_path),

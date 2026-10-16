@@ -96,7 +96,9 @@ a whole folder. It:
    module. `qikly --take-tests <TASK>` does the same later.
 
 Change anything in the file and run the same `--answers` command again; the
-file is yours and is never written over. Your own files are never edited, and
+task is rebuilt from it each time. If your code changes, `--questions` again
+refreshes the file and carries your answers over, keeping the old one as
+`.bak`. Your own files are never edited, and
 the command ends with a full audit: every file it read, saved and wrote, and
 where. Without a terminal, as in CI or under a coding agent, `--answers` checks
 the task and prints the two commands that run it, `qikly --tasks <TASK>` and
@@ -104,7 +106,7 @@ the task and prints the two commands that run it, `qikly --tasks <TASK>` and
 
 ### The same path, command by command
 
-`--questions` runs these, and they remain for scripts and CI:
+`--questions` and `--answers` run these, and they remain for scripts and CI:
 
 | Step | Command | Costs |
 |---|---|---|

@@ -2139,7 +2139,12 @@ def _fill_criteria_from(text, doc, root):
 
 
 def _do_answers(path, tests=None):
-    """`qikly --answers PATH`: the answers file for PATH, or PATH itself."""
+    """
+    `qikly --answers PATH`: PATH is the code, which finds the file --questions
+    wrote for it, or the file itself. Scored in the scope the file was written
+    from, its scored: line: scored as one module instead, a module of a
+    folder matched none of its questions.
+    """
     from qikly import start
     if not path:
         print("Name the code, such as  qikly --answers pricing.py", file=sys.stderr)
@@ -2149,25 +2154,27 @@ def _do_answers(path, tests=None):
         print(f"There is no file or folder at {where}.", file=sys.stderr)
         return 2
     if os.path.isfile(where) and not where.endswith(".py"):
-        # The file itself: its module: line says which code it is about.
-        module = start.parse_answers(where)[3]
-        if not module:
-            print(f"{path} has no module: line, so qikly cannot tell which code "
-                  f"it answers for.", file=sys.stderr)
-            return 2
-        return start.main(module, INVOKED_FROM, answers=where, tests=tests)
-    found = start.answers_file_for(where, INVOKED_FROM)
-    if isinstance(found, list):
-        if not found:
-            print(f"There are no answers for {path} yet. Write the questions first:  "
-                  f"qikly --questions {path}", file=sys.stderr)
-        else:
-            print(f"{path} has answers for several modules; name one file:", file=sys.stderr)
-            for f in found:
-                print(f"  qikly --answers {start.score_questions_pasteable(f, INVOKED_FROM)}",
+        found = where
+    else:
+        found = start.answers_file_for(where, INVOKED_FROM)
+        if isinstance(found, list):
+            if not found:
+                print(f"There are no answers for {path} yet. Write the questions "
+                      f"first:  qikly --questions {path}", file=sys.stderr)
+            else:
+                print(f"{path} has answers for several modules; name one file:",
                       file=sys.stderr)
+                for f in found:
+                    print(f"  qikly --answers "
+                          f"{start.score_questions_pasteable(f, INVOKED_FROM)}",
+                          file=sys.stderr)
+            return 2
+    scope = start._field(found, "scored") or start._field(found, "module")
+    if not scope:
+        print(f"{path} has no module: line, so qikly cannot tell which code it "
+              f"answers for.", file=sys.stderr)
         return 2
-    return start.main(path, INVOKED_FROM, answers=found, tests=tests)
+    return start.main(scope, INVOKED_FROM, answers=found, tests=tests)
 
 
 def _do_start(path, answers=None, tests=None):
@@ -2596,6 +2603,11 @@ def main():
             ("--tasks", bool(getattr(args, "tasks", None))),
             ("--task-id", args.task_id is not None),
             ("--fresh", bool(args.fresh)),
+            ("--validate", bool(getattr(args, "validate", False))),
+            ("--explain", getattr(args, "explain", None) is not None),
+            ("--run", bool(getattr(args, "run", None))),
+            ("--runs", bool(getattr(args, "runs", False))),
+            ("--status", bool(getattr(args, "status", None))),
             ("--from-doc", args.from_doc is not None),
             ("--scaffold", bool(args.scaffold)),
             ("--score", bool(args.score_code)),
@@ -2611,8 +2623,11 @@ def main():
             return 2
         if args.start is None:
             return _do_answers(args.answers, args.score_tests)
+        if args.answers == "":
+            # --questions PATH --answers, with no value: the answers for PATH.
+            return _do_answers(args.start, args.score_tests)
         # The older form, --start PATH --answers FILE, still works.
-        return _do_start(args.start, args.answers or None, args.score_tests)
+        return _do_start(args.start, args.answers, args.score_tests)
 
     # These run before anything else and exit: they exist to make a project
     # runnable, so they must work when nothing is configured yet and must not

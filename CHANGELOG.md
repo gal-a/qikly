@@ -15,7 +15,7 @@ packaging tools would read as `1.1`.
   `--questions` does: the `test_*.py` and `*_test.py` files that import the code,
   searched from the project root, and it says which it used.
   `--score-tests` still names them, and is still needed with nothing to break.
-- **`--questions` no longer starts a background run.** It was an old alias of
+- **`--start` no longer starts a background run.** It was an old alias of
   `--run TASK`, and is now the guided first run above. A task id passed to it
   is told to use `qikly --run TASK`.
 - **`--score` and `--score-suite` lead with what was missed:** "5 of 12
@@ -62,9 +62,12 @@ packaging tools would read as `1.1`.
     your own, and example input rows built from your tests, or where to copy
     a sample file for code that reads files.
   - "Either is fine" and "save it for later" are options, and a blank answer
-    stays open. The file is yours: change anything and run `--answers` again;
-    qikly never writes over it, and rerunning `--questions` leaves a file you have
-    answered alone.
+    stays open. The file is yours: change anything and run `--answers` again,
+    and the task is rebuilt from the file each time. Rerunning `--questions`
+    after the code changed refreshes the file, carrying over every answer whose
+    question is still asked and keeping the old file as `.bak`. Each question's
+    id comes from its call and its choices, not its line, so an edit elsewhere
+    in the code does not lose an answer.
   - Without a terminal, as under a coding agent, `--answers` checks the task
     and prints `qikly --tasks <TASK>` and `qikly --take-tests <TASK>`.
   - A module inside a package is seeded as its whole top-level package and
@@ -87,7 +90,7 @@ packaging tools would read as `1.1`.
   import your module, and files that could not be collected. A file it did
   not write is never overwritten, a rerun removes its own stale copies, the
   folder is remembered, and `outputs/conftest.py` keeps a plain `pytest` from
-  running qikly's own copies as well. `--questions` offers it after a green run.
+  running qikly's own copies as well. `--answers` offers it after a green run.
 - **The Skill offers `--questions` first**, and says to relay the questions in its
   file to the user word for word, or to let them fill it in themselves.
 - **`--score` asks a question about every fault your tests missed, and
@@ -125,7 +128,7 @@ packaging tools would read as `1.1`.
   ten times the untouched suite's time, and at least a minute; one that runs
   past it is stopped and counted as caught, and the report says how many.
   cachetools' scoring had stopped for good on one.
-- **`--questions` never says your code agrees with an answer no test checked.**
+- **`--answers` never says your code agrees with an answer no test checked.**
   An answer whose tests all failed on an import, or that no test is tagged
   with, is listed as not checked instead.
 - **A function defined under an `if` or `try` is not "missing".** Such a test
