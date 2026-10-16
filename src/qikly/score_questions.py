@@ -247,6 +247,10 @@ def task_for(path):
     from qikly.scaffold import VERIFY_SUFFIX
 
     stem = os.path.splitext(os.path.basename(path))[0]
+    if stem == "__init__":
+        # A package's own code is named for the package: INFLECTION_VERIFY,
+        # not __INIT___VERIFY.
+        stem = os.path.basename(os.path.dirname(os.path.abspath(path))) or stem
     return "".join(c if c.isalnum() else "_" for c in stem).upper() + VERIFY_SUFFIX
 
 

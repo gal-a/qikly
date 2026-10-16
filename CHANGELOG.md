@@ -117,6 +117,19 @@ packaging tools would read as `1.1`.
   answer, never its own, and how the answers become a task.
 
 ### Fixed
+- **Real libraries, found by running the three steps on python-slugify,
+  inflection, tabulate, validators and humanize:**
+  - a package's `__init__.py` is scored and asked about when it holds code;
+    tabulate and inflection keep the whole library there, and it was skipped;
+  - tests are found when they import the package by name (`import humanize`)
+    or a module's functions from it (`from validators import card_number`),
+    and a single module gets its own test files before the whole suite;
+  - an input passed through a variable (`txt = "..."; slugify(txt)`) counts
+    for the concrete options, as a literal does;
+  - the suite is timed once, the scoring time is said, and above five minutes
+    `--start` offers a smaller sample of faults, or takes one without a terminal;
+  - when a suite fails on the untouched code, `--score-code` shows what pytest
+    said, such as a module generated at build time.
 - **A run's log reads plainly.** Lines no longer carry the task id twice
   (`[TASK] [TASK] ...`), and three research-flavoured lines say what they mean:
   a seeded run "uses your own implementation ... so its results are not

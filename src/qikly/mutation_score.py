@@ -179,6 +179,18 @@ def _nearby_suite(code, tests):
             f"{pick if ' ' not in pick else repr(pick)}")
 
 
+def has_code(path):
+    """Whether a file defines a function or a class at top level."""
+    import ast
+    try:
+        with open(path, encoding="utf-8-sig", errors="replace") as handle:
+            tree = ast.parse(handle.read())
+    except (OSError, SyntaxError, ValueError):
+        return False
+    return any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+               for n in tree.body)
+
+
 def from_paths(code, tests):
     """
     An implementation and a suite that already exist, anywhere.
@@ -241,7 +253,12 @@ def from_paths(code, tests):
                 # A suite inside the code directory is not code. Its files
                 # were planted with faults too, and a broken test reads as a
                 # fault caught, which inflated the score.
-                if (name.endswith(".py") and not name.startswith("__")
+                # `__init__.py` counts when it holds code: tabulate and
+                # inflection keep the whole library there, and skipping it
+                # scored only a stray cli.py, or nothing at all.
+                if (name.endswith(".py")
+                        and (not name.startswith("__")
+                             or name == "__init__.py" and has_code(path))
                         and not _inside(path, tests)):
                     sources.append(path)
         sources.sort()
@@ -1180,6 +1197,29 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
                   f"would fail for the reason the original does. Check that "
                   f"--score-tests points at tests that run and pass. Report "
                   f"at {path}")
+            # What pytest itself said, so the cause is on screen: on a real
+            # library it was a module generated at build time, which no
+            # amount of checking --score-tests would have found.
+            try:
+                from qikly.start import _pytest_tail
+                # With the same source roots scoring adds, so the error shown
+                # is the one scoring met, not a different import failure.
+                env = dict(os.environ)
+                extra = [os.path.join(target.root, *parent.split("/"))
+                         for _, parent in _import_roots(target) if parent]
+                if extra:
+                    env["PYTHONPATH"] = os.pathsep.join(
+                        extra + [env.get("PYTHONPATH", "")]).rstrip(os.pathsep)
+                for suite in target.suites:
+                    where = os.path.join(target.root, suite)
+                    tail = _pytest_tail(where, target.root, lines=4, env=env)
+                    if tail:
+                        print(f"[{task_id}] what pytest said:")
+                        for line in tail:
+                            print(f"[{task_id}]     {line}")
+                        break
+            except Exception:
+                pass
         else:
             print(f"[{task_id}] the suite does not pass your current code, so a "
                   f"score would mean nothing. Report at {path}")

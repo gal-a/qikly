@@ -67,6 +67,40 @@ def _names_for(tree, function, module):
     return matching
 
 
+def _value(node, known):
+    """A literal, or a name bound to one earlier in the same test."""
+    if isinstance(node, ast.Name) and node.id in known:
+        return known[node.id]
+    return ast.literal_eval(node)
+
+
+def _literals_around(tree, call):
+    """
+    Names bound to a literal, once, in the test function holding `call`. Real
+    suites pass inputs through variables, `txt = "..."` then `slugify(txt)`,
+    and reading only literal arguments found no call at all in four real
+    libraries. A name bound more than once is left out: which value reached
+    the call would be a guess.
+    """
+    for func in ast.walk(tree):
+        if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if not any(n is call for n in ast.walk(func)):
+            continue
+        seen, out = {}, {}
+        for node in ast.walk(func):
+            if isinstance(node, ast.Assign) and len(node.targets) == 1 and \
+                    isinstance(node.targets[0], ast.Name):
+                name = node.targets[0].id
+                seen[name] = seen.get(name, 0) + 1
+                try:
+                    out[name] = ast.literal_eval(node.value)
+                except (ValueError, TypeError, SyntaxError):
+                    out.pop(name, None)
+        return {k: v for k, v in out.items() if seen.get(k) == 1}
+    return {}
+
+
 def literal_calls(test_sources, function, module=None):
     """
     The calls of `function` in the tests whose arguments are all literals, as
@@ -93,9 +127,10 @@ def literal_calls(test_sources, function, module=None):
                 ok = False
             if not ok:
                 continue
+            known = _literals_around(tree, node)
             try:
-                args = [ast.literal_eval(a) for a in node.args]
-                kwargs = {k.arg: ast.literal_eval(k.value)
+                args = [_value(a, known) for a in node.args]
+                kwargs = {k.arg: _value(k.value, known)
                           for k in node.keywords if k.arg}
             except (ValueError, TypeError, SyntaxError):
                 continue

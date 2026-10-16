@@ -40,7 +40,9 @@ for entry in (os.path.dirname(path), root, spec_in.get("base")):
         sys.path.insert(0, entry)
 
 def load(source, name):
-    spec = importlib.util.spec_from_file_location(name, path)
+    package = [os.path.dirname(path)] if os.path.basename(path) == "__init__.py" else None
+    spec = importlib.util.spec_from_file_location(
+        name, path, submodule_search_locations=package)
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
     with contextlib.redirect_stdout(io.StringIO()):
@@ -91,8 +93,14 @@ def _package_walk(path, root):
 
 
 def dotted_name(path, root):
-    """`shop.pricing` for root/shop/pricing.py when shop is a package, else `pricing`."""
-    return ".".join(_package_walk(path, root)[0])
+    """
+    `shop.pricing` for root/shop/pricing.py when shop is a package, else
+    `pricing`; `shop` for shop/__init__.py, which is how it is imported.
+    """
+    parts = _package_walk(path, root)[0]
+    if len(parts) > 1 and parts[-1] == "__init__":
+        parts = parts[:-1]
+    return ".".join(parts)
 
 
 def import_base(path, root):

@@ -596,3 +596,58 @@ def test_score_code_says_how_to_name_tests_when_none_import_it(tmp_path, monkeyp
     monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
     assert cli._do_score_suite(None, None, None, code="pricing.py", tests=None) == 2
     assert "--score-tests" in capsys.readouterr().err
+
+
+# ------------------------------------------- real libraries, 2026-10-16 --
+
+def test_a_package_whose_code_is_its_init_is_scored_and_named(tmp_path):
+    """tabulate and inflection keep the whole library in __init__.py."""
+    pkg = tmp_path / "inflection"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("def pluralize(word):\n    return word + 's'\n")
+    (tmp_path / "test_inflection.py").write_text(
+        "import inflection\n\ndef test_p():\n    assert inflection.pluralize('a') == 'as'\n")
+    import qikly.mutation_score as ms
+    from qikly import score_questions
+    assert str(pkg / "__init__.py") in start.modules_in(str(pkg))
+    assert "inflection" in start.import_names(str(pkg))
+    assert start.auto_tests(str(pkg), str(tmp_path)).endswith("test_inflection.py")
+    target = ms.from_paths(str(pkg), str(tmp_path / "test_inflection.py"))
+    assert any(p.endswith("__init__.py") for p, _ in target.files)
+    assert score_questions.task_for(str(pkg / "__init__.py")) == "INFLECTION_VERIFY"
+    assert start_probe.dotted_name(str(pkg / "__init__.py"), str(tmp_path)) == "inflection"
+
+
+def test_a_module_gets_its_own_tests_before_the_whole_package(tmp_path):
+    """validators' tests all import validators; card.py's are test_card.py."""
+    pkg = tmp_path / "src" / "validators"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("from .card import card_number\n")
+    (pkg / "card.py").write_text("def card_number(v):\n    return v.isdigit()\n")
+    (pkg / "email.py").write_text("def email(v):\n    return '@' in v\n")
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_card.py").write_text("from validators import card_number\n")
+    (tests / "test_email.py").write_text("from validators import email\n")
+    (tmp_path / "pyproject.toml").write_text("")
+    picked = start.importing_tests(str(pkg / "card.py"), str(tmp_path))
+    assert [os.path.basename(p) for p in picked] == ["test_card.py"]
+    whole = start.importing_tests(str(pkg), str(tmp_path))
+    assert len(whole) == 2
+
+
+def test_an_input_passed_through_a_variable_is_found():
+    tests = "def test_a():\n    txt = 'Hello World'\n    assert slugify(txt) == 'hello-world'\n"
+    assert so.literal_calls([tests], "slugify") == [(["Hello World"], {})]
+    twice = "def test_b():\n    t = 'a'\n    t = 'b'\n    slugify(t)\n"
+    assert so.literal_calls([twice], "slugify") == []
+
+
+def test_a_slow_suite_is_sampled_without_a_terminal(tmp_path, monkeypatch):
+    import time as real_time
+    clock = iter([0.0, 20.0])
+    monkeypatch.setattr(real_time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(start.subprocess, "run", lambda *a, **k: None)
+    s = Script([], interactive=False)
+    assert start._fit_to_time(s.console, "tests", str(tmp_path), 150) == 15
+    assert "about 50 minutes" in s.text

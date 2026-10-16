@@ -320,13 +320,45 @@ def _is_test(name):
 
 
 def modules_in(folder):
-    """The modules under a folder, tests and tooling left out, sorted."""
+    """
+    The modules under a folder, tests and tooling left out, sorted. An
+    `__init__.py` that holds code counts, because tabulate and inflection keep
+    their whole library there; `__main__.py` does not, since importing it
+    runs a program.
+    """
+    from qikly.mutation_score import has_code
+
     out = []
     for here, dirs, names in os.walk(folder):
         dirs[:] = sorted(d for d in dirs if d not in _SKIP_DIRS
                          and not d.startswith("."))
-        out += [os.path.join(here, n) for n in sorted(names) if _is_module(n)]
+        for n in sorted(names):
+            path = os.path.join(here, n)
+            if _is_module(n) or (n == "__init__.py" and has_code(path)):
+                out.append(path)
     return out
+
+
+def import_names(code):
+    """
+    The names a test may import this code by: each module's own name, the
+    package name for an `__init__.py`, and the name of every package the
+    code sits in. humanize's tests say `import humanize`, never the module
+    file names, and matching only those found no tests at all.
+    """
+    paths = [code] if os.path.isfile(code) else modules_in(code)
+    names = set()
+    for p in paths:
+        stem = os.path.splitext(os.path.basename(p))[0]
+        folder = os.path.dirname(os.path.abspath(p))
+        if stem != "__init__":
+            names.add(stem)
+        while os.path.isfile(os.path.join(folder, "__init__.py")):
+            names.add(os.path.basename(folder))
+            folder = os.path.dirname(folder)
+    if os.path.isdir(code) and os.path.isfile(os.path.join(code, "__init__.py")):
+        names.add(os.path.basename(os.path.abspath(code)))
+    return sorted(n for n in names if n.isidentifier())
 
 
 def _test_files(root):
@@ -432,12 +464,83 @@ def _typed_path(console, cwd, what, want_code=False):
                         f"path again.")
 
 
+def _specific(code):
+    """
+    (module names, public names) that mark a test as this code's own: the
+    module imported by name, or one of its public functions or classes
+    imported from its package, as in validators' `from validators import
+    card_number`, which never names the module `card`.
+    """
+    import ast
+    paths = [code] if os.path.isfile(code) else modules_in(code)
+    modules, public = set(), set()
+    for p in paths:
+        stem = os.path.splitext(os.path.basename(p))[0]
+        if stem != "__init__":
+            modules.add(stem)
+        else:
+            modules.add(os.path.basename(os.path.dirname(os.path.abspath(p))))
+        try:
+            tree = ast.parse(_read(p))
+        except SyntaxError:
+            continue
+        public |= {n.name for n in tree.body
+                   if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                   and not n.name.startswith("_")}
+    return modules, public
+
+
+def _imports_specifically(source, modules, public, packages):
+    import ast
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(set(a.name.split(".")) & modules for a in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            parts = node.module.split(".")
+            if set(parts) & modules and parts[0] not in packages - modules:
+                return True
+            names = {a.name for a in node.names}
+            if parts[-1] in packages and names & (modules | public):
+                return True
+            if parts[-1] in modules:
+                return True
+    return False
+
+
+def importing_tests(code, root):
+    """
+    The test files that import this code, most specific first: those that
+    import the module itself or one of its public names, and only if there
+    are none, those that import its package at all. Matching every test that
+    imported validators sent card.py's score through the whole suite,
+    failing optional-dependency tests included.
+    """
+    files = _test_files(root)
+    modules, public = _specific(code)
+    packages = set(import_names(code)) - modules if os.path.isfile(code) else set()
+    if os.path.isdir(code):
+        packages = set()
+    narrow = [f for f in files
+              if _imports_specifically(_read(f), modules, public,
+                                       set(import_names(code)) | packages)]
+    names = import_names(code)
+    broad = [f for f in files if any(_imports(_read(f), s) for s in names)]
+    if os.path.isdir(code):
+        # A whole package is tested by everything that imports it, including
+        # `import humanize` followed by `humanize.naturalsize(...)`.
+        return sorted(set(narrow) | set(broad))
+    return narrow or broad
+
+
 def auto_tests(code, cwd=None):
     """The tests to use without asking: the files that import the code."""
     root = project_root(code, cwd)
-    stems = ([os.path.splitext(os.path.basename(code))[0]] if os.path.isfile(code)
-             else [os.path.splitext(os.path.basename(m))[0] for m in modules_in(code)])
-    found = [f for f in _test_files(root) if any(_imports(_read(f), s) for s in stems)]
+    found = importing_tests(code, root)
     if not found:
         return None
     if len(found) == 1:
@@ -457,11 +560,9 @@ def auto_tests(code, cwd=None):
 def pick_tests(console, code, cwd):
     """The second question: which tests to score it against."""
     root = project_root(code, cwd)
-    stems = ([os.path.splitext(os.path.basename(code))[0]] if os.path.isfile(code)
-             else [os.path.splitext(os.path.basename(m))[0]
-                   for m in modules_in(code)])
+    stems = import_names(code)
     files = _test_files(root)
-    importing = [f for f in files if any(_imports(_read(f), s) for s in stems)]
+    importing = importing_tests(code, root)
     options, targets = [], []
     for f in importing[:5]:
         options.append(f"{shown(f, cwd)}  imports "
@@ -680,6 +781,7 @@ def score(console, code, tests, cwd, many):
         console.say("There is nothing in that code qikly knows how to change, "
                     "so there is nothing to score.")
         return None, None
+    planted = _fit_to_time(console, tests, cwd, planted)
     console.say(f"Scoring: planting {planted} fault{'' if planted == 1 else 's'}"
                 f", one at a time, in a copy of your code"
                 + (f" (a sample of the {sites} it could plant)" if sites > cap else "")
@@ -710,17 +812,72 @@ def score(console, code, tests, cwd, many):
     return result, path
 
 
+QUICK_ENOUGH = 300   # seconds of scoring before the user is asked first
+
+
+def _fit_to_time(console, tests, cwd, planted):
+    """
+    How many faults to plant, given how long the suite takes. Every fault
+    runs the whole suite once, and tabulate's folder ran for over an hour
+    with nothing on screen. So the suite is timed once, the estimate is
+    said, and above five minutes a smaller sample is offered, or chosen
+    when there is nobody to ask.
+    """
+    import time
+    started = time.monotonic()
+    try:
+        subprocess.run([sys.executable, "-m", "pytest", "-q", "-x", "--color=no",
+                        "-p", "no:cacheprovider", tests], cwd=cwd,
+                       capture_output=True, text=True, timeout=900)
+    except (subprocess.TimeoutExpired, OSError):
+        return planted
+    each = max(time.monotonic() - started, 0.3)
+    total = each * planted
+
+    def minutes(seconds):
+        return f"{seconds / 60:.0f} minute{'' if round(seconds / 60) == 1 else 's'}" \
+            if seconds >= 90 else f"{seconds:.0f} seconds"
+
+    if total <= QUICK_ENOUGH:
+        return planted
+    sample = max(12, min(planted, int(QUICK_ENOUGH / each)))
+    console.say(f"Your tests take about {each:.0f} seconds to run, and each "
+                f"planted fault runs them once, so all {planted} would take "
+                f"about {minutes(total)}.")
+    if not console.interactive:
+        console.say(f"Planting a sample of {sample} instead, about "
+                    f"{minutes(each * sample)}. More questions come from more "
+                    f"faults; in a terminal you can choose.")
+        return sample
+    picked = choose(console, [
+        f"plant a sample of {sample}, about {minutes(each * sample)}",
+        f"plant all {planted}, about {minutes(total)}",
+        "type how many to plant",
+    ])
+    if picked == 1:
+        return sample
+    if picked == 2:
+        return planted
+    while True:
+        raw = free_text(console, f"Type a number from 1 to {planted}", "30",
+                        value=True)
+        if raw.isdigit() and 1 <= int(raw) <= planted:
+            return int(raw)
+        console.say(f"Please type a number from 1 to {planted}.")
+
+
 def score_questions_pasteable(path, cwd=None):
     """A path to print in a command: relative, forward slashes, quoted if spaced."""
     from qikly import score_questions
     return score_questions._pasteable(shown(path, cwd or os.getcwd()))
 
 
-def _pytest_tail(tests, cwd, lines=12):
+def _pytest_tail(tests, cwd, lines=12, env=None):
     try:
         done = subprocess.run([sys.executable, "-m", "pytest", "-x", "-q",
-                               "-p", "no:cacheprovider", tests],
-                              cwd=cwd, capture_output=True, text=True, timeout=300)
+                               "--color=no", "-p", "no:cacheprovider", tests],
+                              cwd=cwd, capture_output=True, text=True, timeout=300,
+                              env=env)
     except (subprocess.TimeoutExpired, OSError):
         return ["(pytest could not be run)"]
     out = [l for l in (done.stdout + done.stderr).splitlines() if l.strip()]
@@ -1110,7 +1267,10 @@ def _as_package_seed(text, paths):
 
     root = project_root(paths.module, paths.cwd)
     dotted = start_probe.dotted_name(paths.module, root)
-    if "." not in dotted:
+    is_init = os.path.basename(paths.module) == "__init__.py"
+    # A package's `__init__.py` is always seeded as its package: copied as a
+    # lone file it would be a module called __init__ that nothing imports.
+    if "." not in dotted and not is_init:
         return text
     # A package named like a standard-library module, `code` or `json`, is
     # refused by the run as a seed, but only after the paid test generation;
