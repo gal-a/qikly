@@ -234,7 +234,7 @@ def build(missed):
         seen.add(key)
         out.append({"file": label, "path": path, "line": line,
                     "function": function, "code": code, "question": question,
-                    "edge": edge, "number": number})
+                    "edge": edge, "number": number, "change": item.get("change")})
     asked_edges = {(q["path"], q["line"], q["edge"]) for q in out if q["edge"]}
     out = [q for q in out
            if not (q["number"] and (q["path"], q["line"], q["number"]) in asked_edges)]
@@ -295,8 +295,11 @@ def save(questions, path, label, scored=()):
     data = {"label": label,
             "written": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "scored": sorted({os.path.abspath(f) for f in scored}),
+            # edge, number and change too: `--scaffold` runs the code
+            # beside each one to say what it does there now.
             "questions": [{k: q.get(k) for k in
-                           ("file", "path", "line", "function", "code", "question")}
+                           ("file", "path", "line", "function", "code", "question",
+                            "edge", "number", "change")}
                           for q in questions]}
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(data, handle, indent=1)
@@ -385,8 +388,47 @@ _UNPRINTABLE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f\ud800-\
 
 
 def drop_question_lines(text):
-    """`text` without any line qikly wrote for a question. Idempotent."""
-    return _MARKED.sub("", text or "")
+    """
+    `text` without any line qikly wrote for a question, and without any
+    criterion still left as a TODO: a question someone skipped is not a
+    criterion, and sent as one it asked test generation to test "TODO: your
+    answer to the question above". Idempotent.
+    """
+    return drop_todo_criteria(_MARKED.sub("", text or ""))
+
+
+_TODO_ITEM = re.compile(r"^\s*TODO\b")
+
+
+def drop_todo_criteria(text):
+    """
+    `text` with every acceptance_criteria item that starts with TODO removed,
+    found by YAML itself so a multi-line item goes whole. A file YAML cannot
+    read is returned as it is, for the run to report.
+    """
+    import yaml
+
+    try:
+        node = yaml.compose(text)
+    except yaml.YAMLError:
+        return text
+    if not isinstance(node, yaml.MappingNode):
+        return text
+    items = next((v for k, v in node.value
+                  if isinstance(k, yaml.ScalarNode) and k.value == "acceptance_criteria"),
+                 None)
+    if not isinstance(items, yaml.SequenceNode):
+        return text
+    lines = text.split("\n")
+    drop = set()
+    for item in items.value:
+        if isinstance(item, yaml.ScalarNode) and _TODO_ITEM.match(item.value or ""):
+            # The item's lines, from its dash to its last character.
+            end = item.end_mark.line - (1 if item.end_mark.column == 0 else 0)
+            drop.update(range(item.start_mark.line, end + 1))
+    if not drop:
+        return text
+    return "\n".join(l for n, l in enumerate(lines) if n not in drop)
 
 
 def _printable(text):
@@ -416,11 +458,10 @@ def yaml_block(questions, written=None):
     lines = ["acceptance_criteria:"]
     lines += _comment(
         f"{count} question{'' if count == 1 else 's'} from qikly --score"
-        f"{when}, about behaviour your tests do not check. Replace each TODO "
-        f"with your answer, naming a value someone could check, and delete any "
-        f"you skip. Answer from what the code is meant to do, not from what "
-        f"the line shown does now. Lines starting {MARK} are removed from "
-        f"everything either agent receives, wherever they are in this file.")
+        f"{when}: what your tests do not check. Write your answer in place of "
+        f"each TODO, naming a value someone could check, from what the code is "
+        f"meant to do. A TODO you leave is skipped. Lines starting {MARK} are "
+        f"notes for you: neither agent reads them.")
     lines.append("")
     for q in questions:
         where = q.get("file") or "your code"
@@ -433,10 +474,39 @@ def yaml_block(questions, written=None):
             # The code on a line of its own, never wrapped, so it reads as
             # code. Still a comment: nothing taken from it can be a criterion.
             lines.append("  %s     " % MARK + _printable(q["code"]))
-        lines += _comment(q["question"])
-        lines.append(_ANSWER)
+        prompt = q.get("hint_prompt")
+        if prompt:
+            # What qikly saw by running the code beside the value in
+            # question, so the answer can be a value, not a guess at one.
+            # The call on a line of its own, never wrapped mid-call.
+            lead, found, ask = prompt.rpartition("What should ")
+            if lead.strip():
+                lines += _comment(lead.strip())
+            if found:
+                lines.append("  %s " % MARK + _printable(found + ask))
+            else:
+                lines += _comment(prompt)
+            lines += _comment("Found by running your code:")
+            for label in q.get("hint_options") or []:
+                label = label.split("; you will type")[0]
+                lines += _comment("  - " + label)
+            if q.get("covers"):
+                lines += _comment(f"(This also answers {q['covers']} more "
+                                  f"place{'s' if q['covers'] > 1 else ''} your "
+                                  f"tests leave open on the same call.)")
+            call = re.search(r"What should (.+) do\?", prompt)
+            lines.append(f'  - "TODO: what {_yaml_safe(call.group(1))} should do"'
+                         if call else _ANSWER)
+        else:
+            lines += _comment(q["question"])
+            lines.append(_ANSWER)
         lines.append("")
     return "\n".join(lines).rstrip("\n") + "\n"
+
+
+def _yaml_safe(text):
+    """Text for inside a double-quoted YAML string on one line."""
+    return _printable(text).replace("\\", "\\\\").replace('"', '\\"')
 
 
 # ------------------------------------------------------- in the report ----
@@ -497,15 +567,12 @@ def advice(questions, invoked_from=None):
     paths = sorted({q["path"] for q in questions if q.get("path")})
     if not paths:
         return []
-    # `--start` first, because it is step 2 on the home page and asks these
-    # one at a time; `--scaffold` stays as the way to answer them by hand.
     if len(paths) > 1:
         folder = os.path.commonpath([os.path.dirname(p) for p in paths])
-        return ["Next: `qikly --questions %s` writes these to one file per "
-                "module, to answer at your own pace. They are about %d files: "
-                "%s. By hand instead: `qikly --scaffold FILE` writes one file's "
-                "questions into a task file." % (
-                    shown(folder), len(paths), ", ".join(shown(p) for p in paths))]
+        return ["Next: `qikly --scaffold %s` writes a task file for each of the "
+                "%d modules these are about, with its questions in it to answer: "
+                "%s." % (shown(folder), len(paths),
+                         ", ".join(shown(p) for p in paths))]
     module, task = paths[0], task_for(paths[0])
     if not _scaffoldable(module):
         return ["`qikly --scaffold` needs a public top-level function to call, "
@@ -515,10 +582,9 @@ def advice(questions, invoked_from=None):
                 "%s, each above your answer." % (os.path.basename(module), MARK)]
     existing = os.path.join(here, "inputs_private", "config", "tasks", f"{task}.yaml")
     if os.path.isfile(existing):
-        return ["Next: `qikly --questions %s` writes these to a file to answer "
-                "at your own pace. %s already exists, so `--scaffold` would not "
-                "rewrite it." % (shown(module), task)]
-    return ["Next: `qikly --questions %s` writes these to a file to answer at "
-            "your own pace. By hand instead: `qikly --scaffold %s` writes them into "
-            "the task file, each above a TODO, and `qikly --validate --tasks %s` "
-            "says how many are still unanswered." % (shown(module), shown(module), task)]
+        return ["Its task file already exists, so `--scaffold` will not rewrite "
+                "it: %s. Add any new questions to its acceptance_criteria, or "
+                "move it aside and run `qikly --scaffold %s` again." % (
+                    shown(existing), shown(module))]
+    return ["Next: `qikly --scaffold %s` writes the task file, with these "
+            "questions in it to answer." % shown(module)]

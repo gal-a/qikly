@@ -837,21 +837,25 @@ footer {
       code, a coding agent that never sees the criteria, and a repair. About
       thirty seconds, well under a cent with a Gemini, OpenAI or Anthropic key.
       <a class="small-link" href="#demo">Watch one run</a></p>
-    <!-- 2026-10-16: real excerpts from qikly --questions on pricing.py with a
-         two-test suite, branch build of 0.6.0, gemini-3.5-flash-lite: Q3 of
-         the 6 in the questions file it wrote, and the finding the
-         --answers run ended with, with the diff it made to its copy. The run
-         took 5 model calls, about $0.002. Lines are trimmed, not reworded.
-         Step 1's excerpt is qikly --score on the same module and suite,
-         2026-10-17, which plants every fault it can, as --questions does. -->
+    <!-- 2026-10-17: real excerpts on pricing.py with a two-test suite, branch
+         build of 0.6.0, gemini-3.5-flash-lite. Step 1 is qikly --score;
+         step 2 is the third question in the task file qikly --scaffold
+         wrote, answered; step 3 is what qikly --take-tests printed after
+         qikly --tasks pricing.py (5 model calls, about $0.0017), and the
+         change the run made to its own copy. Lines are trimmed, not
+         reworded. -->
+    <p class="audit-note"><b>Run these from your project's root folder.</b>
+      Each takes one module or a whole folder, and every step takes the same
+      path.</p>
     <ol class="steps">
       <li class="row">
         <div class="step">
-          <span class="n">Step 1 (optional)</span>
-          <b>If you have a test suite, score it</b>
+          <span class="n">Step 1</span>
+          <b>Score the tests you have</b>
           <code class="cmd"><span>qikly</span> <span>--score</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--score</span> <span>your_project_folder</span></code>
-          <p>Plants faults in a copy of your code, one at a time, and names the
-            ones your tests did not notice. Nothing of yours is changed.
+          <p>Plants faults in a copy of your code, one at a time, and turns
+            each one your tests did not notice into a question about
+            behaviour nothing checks. Nothing of yours is changed.
             <a class="small-link" href="#your-tests">Where your tests can be</a></p>
           <span class="cost free">free, no key</span>
         </div>
@@ -864,25 +868,26 @@ footer {
       <li class="row">
         <div class="step">
           <span class="n">Step 2</span>
-          <b>Answer what your tests never check</b>
-          <code class="cmd"><span>qikly</span> <span>--questions</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--questions</span> <span>your_project_folder</span></code>
-          <p>Scores your tests first, so you can start here, then writes one
-            file of questions to answer at your own pace. Each comes with the
-            choices qikly found by running your code, and you can add rules of
-            your own. Change anything, any time, before you run it.
-            <a class="small-link" href="#your-tests">Where your tests can be</a></p>
+          <b>Answer the questions in the task file</b>
+          <code class="cmd"><span>qikly</span> <span>--scaffold</span> <span>your_module.py</span></code>
+          <p>Writes the task file, <code>inputs_private/config/tasks/YOUR_MODULE_VERIFY.yaml</code>,
+            with everything qikly can read from your code filled in. What is
+            left is step 1's questions, each with what your code does beside
+            the value in question. Write your answer in place of each TODO,
+            naming a value; a TODO you leave is skipped. This file is the
+            source of truth: change it any time.
+            <code>qikly --validate your_module.py</code> checks it, free.</p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
-          <figcaption>Q3 of 6 in the file it wrote, answered</figcaption>
-<pre><span class="code-line">#  &gt;    2     if rate &lt; 0 or rate &gt; 100:</span>
-# Your tests never try rate at exactly 100.
-# What should apply_discount(100, 100) do?
-#   1. raise ValueError, as rate 101 does now
-#   2. return a value, as rate 99 does now
-#   3. either is fine, I do not mind
-#   4. save it (no decision now, maybe later)
-Q3: <span class="you-ins">1</span></pre>
+          <figcaption>The third question in the file it wrote, answered</figcaption>
+<pre><span class="code-line">#?     if rate &lt; 0 or rate &gt; 100:</span>
+#? Your tests never try rate at exactly 100.
+#? What should apply_discount(100, 100) do?
+#? Found by running your code:
+#? - return a value, as rate 99 does now
+#? - raise ValueError, as rate 101 does now
+- "<span class="you-ins">apply_discount(100, 100) raises ValueError</span>"</pre>
           <p class="legend">qikly runs your code beside the value in question,
             never at it: <span class="you-ins">the answer</span> is yours</p>
         </figure>
@@ -891,23 +896,24 @@ Q3: <span class="you-ins">1</span></pre>
         <div class="step">
           <span class="n">Step 3</span>
           <b>Get a fresh test suite written from your answers</b>
-          <code class="cmd"><span>qikly</span> <span>--answers</span> <span>your_module.py</span></code>
-          <p>The exact command is at the top of the file. It checks your
-            answers and offers the full run, which needs an API key (Google
-            Gemini, Anthropic or OpenAI). A test agent writes tests from your
-            answers before any code is shown to it, and a separate coding
-            agent, which never sees your answers, repairs a copy of your code
-            until they pass. Your files are never edited. The first thing it
-            tells you is where your code and your answers disagree, and then it
-            offers to copy the new tests into your own tests folder, importing
-            your code.</p>
+          <code class="cmd"><span>qikly</span> <span>--tasks</span> <span>your_module.py</span></code>
+          <p>Set a key first, such as <code>GEMINI_API_KEY</code>, or one for
+            Anthropic or OpenAI. A test agent writes tests from your answers
+            before any code is shown to it, and a separate coding agent,
+            which never sees them, repairs a copy of your code until they
+            pass. Your files are never edited. Then
+            <code>qikly --take-tests your_module.py</code> copies the new tests
+            into your own tests folder, importing your code, and runs them on
+            it: a test that fails there is where your code and your answers
+            disagree.</p>
           <span class="cost key">needs an <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-step3-key">API key</a></span>
         </div>
         <figure class="eg">
-          <figcaption>How the run ended, and the fix it made in its copy</figcaption>
-<pre>Your code disagrees with 1 of your 6 answers:
-  - <span class="alert">apply_discount(100, 100) raises ValueError</span>
-qikly changed its copy to make them pass, not your file pricing.py.
+          <figcaption>The new tests on your own code, and the fix the run made in its copy</figcaption>
+<pre>Run on your own code: <span class="alert">3 failed</span>, 11 passed.
+These fail on your code and were written
+from your criteria:
+  <span class="alert">test_apply_discount_excessive_rate_raises</span>
 
 <span class="d-del">-    if rate &lt; 0 or rate &gt; 100:</span>
 <span class="d-ins">+    if rate &lt; 0 or rate &gt;= 100:</span></pre>
@@ -919,10 +925,8 @@ qikly changed its copy to make them pass, not your file pricing.py.
     <p class="audit-note" id="your-tests"><b>Where your tests can be.</b>
       Anywhere in your project, such as a <code>tests/</code> folder or beside
       your code, in files named <code>test_*.py</code> that import your module.
-      Steps 1 and 2 find them; to name them instead, add
+      Step 1 finds them; to name them instead, add
       <code>--score-tests test_folder/</code>.</p>
-    <p class="audit-note">It ends by providing a full audit, listing every file
-      it read, saved and wrote, and where.</p>
 
     <p class="eyebrow also">Other ways in</p>
     <ul class="also-list">
@@ -930,7 +934,7 @@ qikly changed its copy to make them pass, not your file pricing.py.
     </ul>
     <p class="eyebrow also">Read more</p>
     <ul class="also-list">
-      <li><a href="https://github.com/gal-a/qikly#start-here" data-goatcounter-click="start-readme">Every other way in</a><span>the separate commands behind --questions and --answers, for scripts and CI</span></li>
+      <li><a href="https://github.com/gal-a/qikly#start-here" data-goatcounter-click="start-readme">Every other way in</a><span>the demo, a finished example, and a task written from nothing</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-provider-keys">API key setup</a><span>for the run: Gemini, OpenAI or Anthropic, and what a wrong key looks like</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="start-quick-start">Quick start</a><span>the same path, command by command</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">Design 1: the case</a><span>why an agent that writes its own tests grades its own homework</span></li>

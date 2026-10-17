@@ -1,15 +1,12 @@
 """
-`qikly --start`, the findings of two reviews before 0.6.0: a Fable audit of
-the code, and a fresh first-time user who had only the landing page. Each test
-reproduces the reported case.
+Findings from reviews before 0.6.0, a Fable audit of the code and a fresh
+first-time user with only the landing page, for the parts that `--score` and
+`--scaffold` kept: finding tests, scoring, rows from tests, and running the
+code beside a question. Each test reproduces the reported case.
 """
 import os
-import re
-import subprocess
-import sys
 
 import pytest
-import yaml
 
 from qikly import cli, start, start_probe
 from qikly import start_options as so
@@ -49,24 +46,6 @@ def _project(tmp_path, source=PRICING, tests=TESTS, name="pricing.py"):
 # ------------------------------------------------------ the first-time user --
 
 
-def test_the_score_is_reused(tmp_path, monkeypatch):
-    _project(tmp_path)
-    calls = []
-    real = start.score
-
-    def counting(*a, **k):
-        calls.append(1)
-        return real(*a, **k)
-
-    monkeypatch.setattr(start, "score", counting)
-    code = str(tmp_path / "pricing.py")
-    tests = str(tmp_path / "tests")
-    first, _ = start._scored(Script([]).console, code, tests, str(tmp_path), {})
-    again = start.load_session(str(tmp_path), code)
-    second, _ = start._scored(Script([]).console, code, tests, str(tmp_path), again)
-    assert len(calls) == 1 and second["total"] == first["total"]
-
-
 def test_a_boundary_on_a_named_constant_with_a_defaulted_argument_is_concrete(tmp_path):
     source = ('THRESHOLD = 50.0\n\n\n'
               'def cost(total, weight, express=False):\n'
@@ -83,11 +62,6 @@ def test_a_boundary_on_a_named_constant_with_a_defaulted_argument_is_concrete(tm
     assert any("total 49.99 returns 5.0 now" in o["label"]
                and "total 50.01 returns 0.0" in o["label"] for o in options)
     assert sum(o["kind"] == so.BEHAVIOUR for o in options) == 1
-
-
-def test_a_line_outside_any_function_is_labelled_as_such():
-    assert start.where({"function": None, "path": "/x/shipping.py", "line": 6}) == \
-        "shipping.py, top level, line 6"
 
 
 def test_a_call_shaped_criterion_is_not_flagged_against_the_interface(tmp_path):
@@ -108,31 +82,6 @@ def test_a_call_shaped_criterion_is_not_flagged_against_the_interface(tmp_path):
 
 
 # ------------------------------------------------------------- the audit --
-
-def test_two_modules_with_one_file_name_get_two_tasks(tmp_path):
-    for sub in ("a", "b"):
-        (tmp_path / "lib" / sub).mkdir(parents=True)
-        (tmp_path / "lib" / sub / "util.py").write_text("def f(x):\n    return x\n")
-    modules = [str(tmp_path / "lib" / s / "util.py") for s in ("a", "b")]
-    names = start.task_bases(modules, str(tmp_path / "lib"))
-    assert sorted(names.values()) == ["A_UTIL", "B_UTIL"]
-
-
-def test_answers_for_one_module_never_land_on_another(tmp_path):
-    path = tmp_path / "answers.txt"
-    path.write_text("module: shop/labels.py\nrequirements: labels\nQ1: x y z\n")
-    assert start.parse_answers(str(path))[3] == "shop/labels.py"
-
-
-def test_a_backslash_in_the_requirements_survives(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    state = {"requirements": r"reads C:\data\prices, matching \d+", "extra": [],
-             "answers": {"a": {"status": "answered", "question": "q",
-                               "criterion": "apply_discount(1, 2) returns 0.98",
-                               "where": "w"}}}
-    task = yaml.safe_load(start.task_text(paths, state))
-    assert task["requirements"] == [r"reads C:\data\prices, matching \d+"]
 
 
 def test_the_probe_runs_in_an_empty_folder_not_the_project(tmp_path):
@@ -181,109 +130,10 @@ def test_a_comparison_without_a_recorded_edge_is_never_run_at_the_edge(
     assert prompt is None and options[-1]["label"] == "type my own answer"
 
 
-def test_a_crashed_validate_is_an_error_not_ready(tmp_path, monkeypatch):
-    class Done(object):
-        returncode, stdout, stderr = 1, "", "Traceback ...\nRuntimeError: cannot be stripped"
-    monkeypatch.setattr(start.subprocess, "run", lambda *a, **k: Done())
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    errors, _ = start.validate(Script([]).console, paths)
-    assert errors and "cannot be stripped" in errors[0]
-
-
-def test_a_rename_writes_a_task_that_names_itself(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    paths.name("PRICING_V2")
-    state = {"requirements": "applies a discount", "extra": [],
-             "answers": {"a": {"status": "answered", "question": "q", "where": "w",
-                               "criterion": "apply_discount(1, 2) returns 0.98"}}}
-    task = yaml.safe_load(start.task_text(paths, state))
-    assert task["task_id"] == "PRICING_V2_VERIFY"
-    assert task["inputs"] == ["inputs_private/data/PRICING_V2/input_01.csv"]
-    assert paths.task.endswith("PRICING_V2_VERIFY.yaml")
-
-
-def test_failing_parametrized_and_class_tests_are_matched(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    folder = tmp_path / "outputs" / "tests" / paths.task_id / "integration"
-    folder.mkdir(parents=True)
-    (folder / "test_integration.py").write_text(
-        'import pytest\n\n@pytest.mark.parametrize("r", [100])\n'
-        'def test_a(r) -> None:\n    """x\n    # Criteria: 1\n    """\n\n'
-        'class TestB:\n    def test_b(self):\n        """y\n        # Criteria: 2\n        """\n')
-    state = {"extra": [], "answers": {
-        "a": {"status": "answered", "criterion": "c1"},
-        "b": {"status": "answered", "criterion": "c2"}}}
-    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/2 passed | FAILED: "
-             f"test_a[100], TestB::test_b"]
-    disagreed, _, _, _, _ = start.disagreements(paths, state, lines)
-    assert disagreed == ["c1", "c2"]
-
-
-def test_stage_two_counts_only_when_stage_one_changed_nothing(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    folder = tmp_path / "outputs" / "tests" / paths.task_id / "system"
-    folder.mkdir(parents=True)
-    (folder / "test_system.py").write_text(
-        'def test_s():\n    """z\n    # Criteria: 1\n    """\n')
-    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
-    patched = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 1/2 passed | FAILED: test_x",
-               f"[{paths.task_id}] [stage 2/3] [iteration 1] 0/1 passed | FAILED: test_s"]
-    assert start.disagreements(paths, state, patched)[0] == []
-    clean = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 2/2 passed",
-             patched[1]]
-    assert start.disagreements(paths, state, clean)[0] == ["c1"]
-
-
-def test_a_module_with_no_public_functions_is_skipped_before_any_question(tmp_path):
-    (tmp_path / "hidden.py").write_text("def _limit():\n    return 1\n")
-    paths = start.Paths(str(tmp_path), str(tmp_path / "hidden.py"))
-    assert start._cannot_task(paths)
-    assert not os.path.exists(paths.task)
-
-
-def test_an_existing_task_this_command_did_not_write_is_left_alone(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    os.makedirs(os.path.dirname(paths.task))
-    open(paths.task, "w").write("task_id: x\n")
-    s = Script([])
-    assert start._existing_task(s.console, paths) is False
-    assert "left alone" in s.text and not any(str(x).startswith("Type a number") for x in s.seen)
-
-
-def test_an_option_that_asks_for_a_value_can_take_one_from_a_file(tmp_path, monkeypatch):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    q = {"file": "pricing.py", "path": paths.module, "line": 2, "question": "q?",
-         "function": "apply_discount"}
-    option = {"kind": so.BEHAVIOUR, "call": "apply_discount(100, 0)",
-              "args": [100, 0], "kwargs": {}, "function": "apply_discount",
-              "pins": {"returns": None, "like": "99.0"}, "label": "x"}
-    monkeypatch.setattr(so, "menu", lambda *a, **k: ("p", [option]))
-    answers = tmp_path / "a.txt"
-    entry = start.sharp_questions([q], PRICING, [TESTS], str(tmp_path))[0][0]
-    answers.write_text(f"requirements: applies a discount\n# id {entry['ids'][0]}\nQ1: 1: 100.0\n")
-    state, _ = start._from_answers(Script([], interactive=False).console, paths, [q],
-                                   [TESTS], str(tmp_path), str(answers))
-    assert state["answers"][start._key(q)]["criterion"] == \
-        "apply_discount(100, 0) returns 100.0"
-
-
 @pytest.mark.parametrize("bad", ["\x7f", "\x85", "\u2028", "\u2029", "\x00"])
 def test_characters_yaml_rejects_are_removed(bad):
     s = Script([f"a{bad}b"])
     assert s.console.ask("x") == "ab"
-
-
-def test_start_refuses_flags_it_would_ignore(monkeypatch, capsys):
-    monkeypatch.setattr(sys, "argv", ["qikly", "--start", "pricing.py",
-                                      "--task-id", "X", "--fresh"])
-    assert cli.main() == 2
-    err = capsys.readouterr().err
-    assert "--task-id" in err and "--fresh" in err
 
 
 # ------------------------------------------------- the eight-project matrix --
@@ -310,38 +160,6 @@ def test_a_src_layout_package_can_be_probed(tmp_path):
                                  [("grade", [150], {})]) == [{"returns": "100"}]
 
 
-def test_a_module_in_a_package_seeds_the_whole_package(tmp_path):
-    """A one-file seed lost `from .util import clamp`, so no test ran on the code."""
-    (tmp_path / "pyproject.toml").write_text("[project]\nname='acme'\n")
-    pkg = tmp_path / "src" / "acme"
-    pkg.mkdir(parents=True)
-    (pkg / "__init__.py").write_text("")
-    (pkg / "util.py").write_text("def clamp(v, lo, hi):\n    return max(lo, min(hi, v))\n")
-    (pkg / "scoring.py").write_text("from .util import clamp\n\ndef grade(p):\n"
-                                    "    return clamp(p, 0, 100)\n")
-    paths = start.Paths(str(tmp_path), str(pkg / "scoring.py"))
-    state = {"requirements": "grades", "extra": [], "answers": {"a": {
-        "status": "answered", "criterion": "grade(150) returns 100", "question": "q",
-        "where": "w"}}}
-    task = yaml.safe_load(start.task_text(paths, state))
-    assert task["interface"]["module"] == "acme.scoring"
-    assert task["seed"]["implementation"] == "src/acme"
-
-
-def test_a_first_iteration_that_ran_nothing_is_not_agreement(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
-    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] no test ran: the module "
-             f"could not be imported",
-             f"[{paths.task_id}] [stage 1/3] [iteration 2] 1/1 passed"]
-    assert start.disagreements(paths, state, lines)[0] == "unknown"
-    s = Script([])
-    start.report_result(s.console, paths, state, lines, True)
-    assert "cannot say where your code and your answers disagree" in s.text
-    assert "agrees" not in s.text
-
-
 def test_a_boundary_between_two_categories_offers_both(tmp_path):
     source = 'def grade(p):\n    if p >= 90:\n        return "A"\n    return "B"\n'
     (tmp_path / "g.py").write_text(source)
@@ -355,128 +173,7 @@ def test_a_boundary_between_two_categories_offers_both(tmp_path):
     assert so.criterion(chosen) == "grade(90) returns 'A'"
 
 
-def test_only_the_tasks_the_run_names_are_reported_as_failed():
-    lines = ["...", "Task(s) failed: COUPONS_VERIFY"]
-    assert start._failed_tasks(lines, ["CART_VERIFY", "COUPONS_VERIFY"], False) == \
-        {"COUPONS_VERIFY"}
-    assert start._failed_tasks(["boom"], ["A", "B"], False) == {"A", "B"}
-    assert start._failed_tasks(lines, ["A"], True) == set()
-
-
-def test_an_answer_is_listed_only_against_tests_that_make_its_call():
-    """A free-shipping answer was listed against two express-delivery tests."""
-    express = "def t():\n    cost = shipping_cost(50.0, 2, express=True)\n    assert cost\n"
-    exact = "def t():\n    assert shipping_cost(50.0, 2) == 0.0\n"
-    call = ("shipping_cost", [50.0, 2], {})
-    assert not start._makes_call(express, call)
-    assert start._makes_call(exact, call)
-
-
-def test_a_default_passed_explicitly_is_the_same_call():
-    source = "def shipping_cost(order_total, weight_kg, express=False):\n    return 0.0\n"
-    body = "def t():\n    assert shipping_cost(50.0, weight_kg=2, express=False) == 0.0\n"
-    assert start._makes_call(body, ("shipping_cost", [50.0, 2], {}), source)
-
-
-def test_a_tag_without_a_hash_still_links_the_test(tmp_path):
-    """'Criteria: 2' in a docstring was linked to nothing, and a real
-    disagreement was reported as agreement."""
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    folder = tmp_path / "outputs" / "tests" / paths.task_id / "integration"
-    folder.mkdir(parents=True)
-    (folder / "test_integration.py").write_text(
-        'def test_upper():\n    """rate 100 raises.\n\n    Criteria: 2\n    """\n'
-        '    try:\n        apply_discount(100, 100)\n        assert False\n'
-        '    except ValueError:\n        pass\n    # Criteria: 2\n')
-    state = {"extra": [], "answers": {
-        "a": {"status": "answered", "criterion": "apply_discount(100, 0) returns 100.0"},
-        "b": {"status": "answered", "criterion": "apply_discount(100, 100) raises ValueError"}}}
-    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_upper"]
-    assert start.disagreements(paths, state, lines)[0] == \
-        ["apply_discount(100, 100) raises ValueError"]
-
-
-def test_a_failure_with_no_tag_is_still_reported(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
-    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_odd"]
-    s = Script([])
-    start.report_result(s.console, paths, state, lines, True)
-    assert "test_odd" in s.text and "agrees" not in s.text
-
-
-def test_start_takes_its_tests_from_score_tests(monkeypatch, tmp_path):
-    seen = {}
-    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
-    monkeypatch.setattr(start, "main",
-                        lambda path, cwd, answers=None, tests=None: seen.update(tests=tests) or 0)
-    monkeypatch.setattr(sys, "argv", ["qikly", "--start", "pricing.py",
-                                      "--score-tests", "tests/"])
-    assert cli.main() == 0 and seen["tests"] == "tests/"
-
-
 # ---------------------------------------------- second audit, 2026-10-15 --
-
-def _tagged_project(tmp_path, body):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    folder = tmp_path / "outputs" / "tests" / paths.task_id / "integration"
-    folder.mkdir(parents=True)
-    (folder / "test_integration.py").write_text(body)
-    return paths
-
-
-def test_a_failure_tagged_beyond_the_answers_is_still_reported(tmp_path):
-    paths = _tagged_project(tmp_path, 'def test_x():\n    """# Criteria: 3"""\n')
-    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
-    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_x"]
-    _, _, _, untagged, _ = start.disagreements(paths, state, lines)
-    assert untagged == ["test_x"]
-
-
-def test_a_failing_stage_without_names_is_never_agreement(tmp_path):
-    paths = _tagged_project(tmp_path, 'def test_x():\n    pass\n')
-    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
-    for tail in ("1/2 passed | FAILED: ", "0 passed, 1 failed"):
-        lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] {tail}"]
-        s = Script([])
-        start.report_result(s.console, paths, state, lines, True)
-        assert "agrees" not in s.text and "did not name" in s.text, tail
-
-
-def test_a_tag_above_the_next_test_belongs_to_that_test(tmp_path):
-    body = ('def test_a():\n    assert True\n\n# Criteria: 1\ndef test_b():\n'
-            '    """b"""\n    assert True\n')
-    paths = _tagged_project(tmp_path, body)
-    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
-    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 1/2 passed | FAILED: test_a"]
-    disagreed, _, _, untagged, _ = start.disagreements(paths, state, lines)
-    assert disagreed == [] and untagged == ["test_a"]
-
-
-def test_same_named_methods_in_two_classes_stay_apart(tmp_path):
-    body = ('class TestHigh:\n    def test_edge(self):\n        """# Criteria: 1"""\n\n'
-            'class TestLow:\n    def test_edge(self):\n        """# Criteria: 2"""\n')
-    paths = _tagged_project(tmp_path, body)
-    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "high"},
-                                      "b": {"status": "answered", "criterion": "low"}}}
-    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 1/2 passed | FAILED: TestHigh::test_edge"]
-    assert start.disagreements(paths, state, lines)[0] == ["high"]
-
-
-def test_a_package_named_like_the_standard_library_stays_a_file_seed(tmp_path):
-    pkg = tmp_path / "code"
-    pkg.mkdir()
-    (pkg / "__init__.py").write_text("")
-    (pkg / "pricing.py").write_text(PRICING)
-    paths = start.Paths(str(tmp_path), str(pkg / "pricing.py"))
-    state = {"requirements": "r", "extra": [], "answers": {"a": {
-        "status": "answered", "criterion": "apply_discount(1, 2) returns 0.98",
-        "question": "q", "where": "w"}}}
-    task = yaml.safe_load(start.task_text(paths, state))
-    assert task["seed"]["implementation"].endswith("pricing.py")
 
 
 def test_decimal_neighbours_are_typed_not_pinned(tmp_path, monkeypatch):
@@ -489,12 +186,6 @@ def test_decimal_neighbours_are_typed_not_pinned(tmp_path, monkeypatch):
     _, options = so.menu(q, source, ["fee(50)\n"], str(tmp_path))
     behaviours = [o for o in options if o["kind"] == so.BEHAVIOUR]
     assert len(behaviours) == 1 and behaviours[0]["pins"]["returns"] is None
-
-
-def test_take_tests_and_start_together_are_refused(monkeypatch, capsys):
-    monkeypatch.setattr(sys, "argv", ["qikly", "--start", "p.py", "--take-tests", "X"])
-    assert cli.main() == 2
-    assert "separate step" in capsys.readouterr().err
 
 
 def test_score_code_finds_the_tests_when_none_are_named(tmp_path, monkeypatch, capsys):
@@ -603,55 +294,6 @@ def test_parametrize_rows_give_the_call_its_arguments():
     assert (["a b"], {}) in calls
 
 
-def test_the_same_question_on_many_lines_is_asked_once():
-    # inflection's table of 37 regexes all missing an anchor asked one
-    # question 37 times; public functions now come before private helpers.
-    q = "Your tests pass when this pattern matches only part of a value?"
-    questions = [{"path": "m.py", "function": None, "line": n, "question": q}
-                 for n in (22, 23, 24)]
-    questions.insert(0, {"path": "m.py", "function": "_helper", "line": 5,
-                         "question": "Private?"})
-    questions.append({"path": "m.py", "function": "titleize", "line": 90,
-                      "question": "Public?"})
-    grouped = start.group(questions)
-    assert [g["question"] for g in grouped] == ["Public?", q, "Private?"]
-    assert grouped[1]["also"] == [23, 24]
-    assert start.where(grouped[1]) == "m.py, top level, line 22 (and 2 more lines like it: 23, 24)"
-
-
-def test_a_test_importing_a_name_the_module_lacks_is_not_a_disagreement(tmp_path):
-    # validators' card.py met the answer, but the test imported ValidationError
-    # from card.py, which does not have it, and the report said "disagrees".
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    folder = tmp_path / "outputs" / "tests" / paths.task_id / "system"
-    folder.mkdir(parents=True)
-    (folder / "test_system.py").write_text(
-        'def test_s():\n    """z\n    # Criteria: 1\n    """\n'
-        '    from pricing import apply_discount, NoSuchError\n'
-        '    assert apply_discount(1, 2)\n')
-    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
-    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_s"]
-    disagreed, _, _, untagged, unchecked = start.disagreements(paths, state, lines)
-    assert disagreed == [] and untagged == []
-    assert unchecked == {"test_s": ["NoSuchError"]}
-
-
-def test_a_folder_of_one_module_is_that_module(tmp_path):
-    # inflection's code is its __init__.py.
-    pkg = tmp_path / "pkg"
-    pkg.mkdir()
-    (pkg / "__init__.py").write_text("def f(x):\n    return x + 1\n", encoding="utf-8")
-    assert start._one_module(str(pkg)) == str(pkg / "__init__.py")
-
-
-def test_a_call_through_a_variable_is_the_answers_call():
-    body = ('def test_p():\n    word = "mousetrap"\n'
-            '    assert pluralize(word) == "mousetraps"\n')
-    assert start._makes_call(body, ("pluralize", ["mousetrap"], {}))
-    assert not start._makes_call(body, ("pluralize", ["cowboy"], {}))
-
-
 def test_a_row_with_an_object_in_it_still_gives_its_plain_values():
     # isodate's rows hold date(...) beside the strings; reading the whole
     # table as one literal threw out every row.
@@ -675,54 +317,6 @@ def test_a_row_with_an_object_in_it_still_gives_its_plain_values():
 
 # ------------------------------------------ the third audit, 2026-10-16 --
 
-def _system_test(tmp_path, paths, body):
-    folder = tmp_path / "outputs" / "tests" / paths.task_id / "system"
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / "test_system.py").write_text(body, encoding="utf-8")
-
-
-def test_a_name_defined_under_an_if_is_not_missing(tmp_path):
-    # Counting only top-level statements took this apply_discount as missing
-    # and hid the one failure that was a real disagreement.
-    source = ("import sys\nif sys.version_info >= (3,):\n"
-              "    def apply_discount(price, rate):\n        return 90\n")
-    _project(tmp_path, source=source)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    _system_test(tmp_path, paths,
-                 'def test_s():\n    """z\n    # Criteria: 1\n    """\n'
-                 '    from pricing import apply_discount\n'
-                 '    assert apply_discount(100, 5) == 95\n')
-    state = {"extra": [], "answers": {"a": {"status": "answered", "criterion": "c1"}}}
-    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_s"]
-    disagreed, _, _, _, unchecked = start.disagreements(paths, state, lines)
-    assert disagreed == ["c1"] and unchecked == {}
-
-
-def test_a_module_getattr_means_nothing_is_called_missing(tmp_path):
-    source = "def __getattr__(name):\n    return 1\n"
-    _project(tmp_path, source=source)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    assert start._missing_imports("from pricing import anything\n", paths, source) == []
-
-
-def test_agreement_is_never_claimed_for_an_answer_no_test_checked(tmp_path):
-    _project(tmp_path)
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    _system_test(tmp_path, paths,
-                 'def test_s():\n    """z\n    # Criteria: 1\n    """\n'
-                 '    from pricing import apply_discount, NoSuchError\n'
-                 '    assert apply_discount(1, 2)\n')
-    state = {"extra": [], "answers": {
-        "a": {"status": "answered", "criterion": "apply_discount(1, 2) returns 0.98"},
-        "b": {"status": "answered", "criterion": "apply_discount(5, 0) returns 5"}}}
-    lines = [f"[{paths.task_id}] [stage 1/3] [iteration 1] 0/1 passed | FAILED: test_s",
-             f"[{paths.task_id}] [stage 1/3] [iteration 2] 1/1 passed"]
-    s = Script([])
-    start.report_result(s.console, paths, state, lines, True)
-    assert "agrees with all" not in s.text and "agrees with your answer" not in s.text
-    assert "No test that ran on your code checked any of your answers" in s.text
-    assert "Not checked by any test" in s.text and "imports NoSuchError" in s.text
-
 
 def test_two_different_guards_in_one_function_stay_two_questions(tmp_path):
     source = ("def apply_discount(price, rate):\n"
@@ -735,22 +329,6 @@ def test_two_different_guards_in_one_function_stay_two_questions(tmp_path):
     questions = [{"path": path, "function": "apply_discount", "line": n, "question": q}
                  for n in (2, 4)]
     assert len(start.group(questions)) == 2
-
-
-def test_rows_in_an_answers_file_keep_the_answers_own_calls(tmp_path, monkeypatch):
-    _project(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    assert start.main("pricing.py", str(tmp_path),
-                      console=Script([], interactive=False).console) == start.NEEDS_ANSWERS
-    answers = tmp_path / "inputs_private" / "questions" / "PRICING_open_questions.txt"
-    text = answers.read_text(encoding="utf-8")
-    text = re.sub(r"^requirements:.*$", "requirements: applies a discount", text, flags=re.M)
-    text = re.sub(r"^Q1:.*$", "Q1: apply_discount(7, 50) returns 3.5 exactly", text, flags=re.M)
-    answers.write_text(text, encoding="utf-8")
-    start.main("pricing.py", str(tmp_path), console=Script([], interactive=False).console,
-               answers=str(answers))
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    assert ["7", "50"] in start.load_state(paths)["rows"]
 
 
 def test_a_value_bound_more_than_one_way_is_not_used():
@@ -792,14 +370,6 @@ def test_a_sample_is_never_bigger_than_the_whole(monkeypatch):
     s = Script([], interactive=False)
     assert start._fit_to_time(s.console, "tests", ".", 10) == 10
     assert "sample of" not in s.text and "all 10 are planted" in s.text
-
-
-def test_main_py_is_not_a_module_to_test(tmp_path):
-    pkg = tmp_path / "pkg"
-    pkg.mkdir()
-    (pkg / "__init__.py").write_text("def f(x):\n    return x\n", encoding="utf-8")
-    (pkg / "__main__.py").write_text("print('hi')\n", encoding="utf-8")
-    assert start._one_module(str(pkg)) == str(pkg / "__init__.py")
 
 
 def test_a_fault_that_hangs_is_stopped_and_counted_caught(tmp_path, monkeypatch):
@@ -992,22 +562,6 @@ def test_building_a_menu_never_writes_a_new_file_beside_the_users_data(tmp_path)
     assert list((tmp_path / "data").iterdir()) == []
 
 
-def test_a_blank_answer_in_the_file_stays_open(tmp_path, monkeypatch):
-    _project(tmp_path)
-    monkeypatch.chdir(tmp_path)
-    assert start.main("pricing.py", str(tmp_path),
-                      console=Script([], interactive=False).console) == start.NEEDS_ANSWERS
-    answers = tmp_path / "inputs_private" / "questions" / "PRICING_open_questions.txt"
-    text = re.sub(r"^requirements:.*$", "requirements: applies a discount",
-                  answers.read_text(encoding="utf-8"), flags=re.M)
-    answers.write_text(text, encoding="utf-8")
-    start.main("pricing.py", str(tmp_path), console=Script([], interactive=False).console,
-               answers=str(answers))
-    paths = start.Paths(str(tmp_path), str(tmp_path / "pricing.py"))
-    state = start.load_state(paths)
-    assert state["answers"] and all(r.get("deferred") for r in state["answers"].values())
-
-
 # -------------------------------------------- the fifth audit, 2026-10-16 --
 
 def test_a_menu_never_writes_through_a_helper_or_the_lines_own_function(tmp_path):
@@ -1083,12 +637,5 @@ def test_tags_are_read_per_file_and_only_for_answers(tmp_path):
     tagged = take_tests._tagged_tests([str(a), str(b)], 2)
     assert ("test_one", "test_sum") in tagged and ("test_one", "test_tail") in tagged
     assert ("test_two", "test_sum") not in tagged and ("test_one", "test_far") not in tagged
-
-
-def test_a_class_test_is_read_inside_its_own_class():
-    test_file = ("class TestA:\n    def test_x(self):\n        assert parse('1')\n\n"
-                 "class TestB:\n    def test_x(self):\n        assert parse('2')\n")
-    assert start._makes_call("", ("parse", ["2"], {}), None, test_file, "TestB::test_x")
-    assert not start._makes_call("", ("parse", ["1"], {}), None, test_file, "TestB::test_x")
 
 

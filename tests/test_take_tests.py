@@ -196,5 +196,5 @@ def test_a_failing_test_no_answer_is_behind_is_never_called_a_disagreement(tmp_p
     assert not disagree and [n.split("::")[-1] for n in unanswered] == ["test_guess"]
     take_tests.report(said.append, str(tmp_path), written, result, "PRICING_VERIFY")
     text = "\n".join(said)
-    assert "not written from any of your answers" in text
+    assert "not written from any of your criteria" in text
     assert "apply the same fix" not in text

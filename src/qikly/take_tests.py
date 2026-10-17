@@ -17,7 +17,7 @@ use, refuses any copy that would still reach `outputs/`, writes a
 lives, and runs the copies on your untouched code.
 
 Each failure there is classified from pytest's own JUnit XML: a disagreement
-between your code and your answers; a call to something your code lacks,
+between your code and your criteria; a call to something your code lacks,
 usually a helper qikly's coding agent added to its copy; a copy that could
 not import your module; or a test that could not be collected. Only the first
 is said to be a disagreement.
@@ -235,7 +235,7 @@ def take(cwd, task_id, test_dir, say=print):
     source_root = os.path.join(cwd, "outputs", "tests", task_id)
     if not os.path.isdir(source_root):
         return None, (f"{task_id} has no generated tests yet: run it first, "
-                      f"with  qikly --answers <module>  or  qikly --tasks {task_id}")
+                      f"with  qikly --tasks {task_id}")
     home = os.path.join(test_dir, FOLDER)
     dest_root = os.path.join(home, task_id.lower())
     written, skipped, refused, extras = [], [], [], []
@@ -448,7 +448,7 @@ def report(say, cwd, written, result, task_id):
     say(f"Run on your own code: {summary or 'no result'}.")
     if unanswered:
         say("These fail on your code but were not written from any of your "
-            "answers: they are the test writer's own reading of your code or "
+            "criteria: they are the test writer's own reading of your code or "
             "your requirements, which can be wrong. Check each one before "
             "changing anything; if the test is wrong, delete it:")
         for name in unanswered:
@@ -457,9 +457,9 @@ def report(say, cwd, written, result, task_id):
         # Never "apply the same fix": on python-dotenv the test asserted more
         # than the answer said, and the copy's change to pass it altered a
         # documented default. Which side is wrong is for a person to judge.
-        say("These fail on your code and were written from your answers. Either "
-            "your code disagrees with the answer, or the test asserts more than "
-            "the answer said. Compare each with its answer before changing "
+        say("These fail on your code and were written from your criteria. Either "
+            "your code disagrees with the criterion, or the test asserts more than "
+            "the criterion said. Compare each with its criterion before changing "
             "anything. qikly's change to its own copy, which makes them pass, is "
             "in " + os.path.join("outputs", "logs", "patches", task_id) + os.sep
             + "; read it before taking any of it:")

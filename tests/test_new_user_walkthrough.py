@@ -10,8 +10,11 @@ from qikly import cli
 import qikly.mutation_score as ms
 
 
-def test_scaffold_on_a_folder_says_it_takes_one_file(tmp_path, monkeypatch, capsys):
-    """`--score-code` takes a folder, so `--scaffold` on it is the next try."""
+def test_scaffold_on_an_unscored_folder_says_to_score_it(tmp_path, monkeypatch, capsys):
+    """
+    `--scaffold` on a folder writes a task per module its score asked about;
+    with no score yet it says so, and names a module to scaffold instead.
+    """
     shop = tmp_path / "shop"
     shop.mkdir()
     (shop / "__init__.py").write_text("", encoding="utf-8")

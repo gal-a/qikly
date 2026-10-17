@@ -7,17 +7,51 @@ packaging tools would read as `1.1`.
 ## Unreleased
 
 ### Changed
-- **New names for the three steps:** `qikly --score` scores your tests
-  (`--score-code` still works), `qikly --questions` writes the questions file
-  (`--start` still works), and `qikly --answers my_module.py` reads it, finding
-  the file itself, then runs and reports.
-- **`--score` finds your tests when you do not name them**, the way
-  `--questions` does: the `test_*.py` and `*_test.py` files that import the code,
-  searched from the project root, and it says which it used.
-  `--score-tests` still names them, and is still needed with nothing to break.
-- **`--start` no longer starts a background run.** It was an old alias of
-  `--run TASK`, and is now the guided first run above. A task id passed to it
-  is told to use `qikly --run TASK`.
+- **Three steps, each taking the same module or folder:** `qikly --score
+  my_module.py` scores your tests (`--score-code` still works), `qikly
+  --scaffold my_module.py` writes the task file with the score's questions in
+  it to answer, and `qikly --tasks my_module.py` runs it. `--validate`,
+  `--explain` and `--take-tests` take the same path, so nobody has to learn
+  that `my_module.py`'s task is called `MY_MODULE_VERIFY`; task ids still
+  work as before.
+- **`--scaffold` leaves only the questions to answer**, for code you already
+  have. Everything it can read from the code is filled in: the task name,
+  the description, the interface without a TODO per function, the
+  entrypoint, and `requirements`, which starts as the module's docstring or
+  a line to keep what the code does, for you to replace in your own words.
+  The comments above each section are two or three lines. A module inside a
+  package is seeded as its whole top-level package and named by its dotted
+  path (`acme.scoring`), so a relative import such as `from .util import
+  clamp` works in qikly's copy.
+- **Each question in the task file says what your code does beside the value
+  in question**, found by running it in a separate process in an empty
+  folder, such as "raise ValueError, as rate 101 does now" and "return a
+  value, as rate 99 does now (it returns 1.0)", and its TODO names the call:
+  `TODO: what apply_discount(100, 100) should do`. A boundary is only ever
+  run on either side of the value in question, never at it, and the values
+  come in an order fixed by the values, not with "as your code does now"
+  first. Questions about the same call with the same values are asked once.
+  Those lines start with `#?`, so neither agent reads them.
+- **A criterion left as TODO is skipped**, not sent to test generation as
+  written. `--validate` says how many of the criteria are answered and that
+  a run skips the rest, and stops a file with none answered before a paid
+  run.
+- **`--scaffold` fills the data file with the values your tests already call
+  the code with**, so it is never only a header, and says to add any your
+  answers name.
+- **`--scaffold` takes a folder**: one task file per module that the
+  folder's last `--score` asked about. With no score yet, it says to score
+  the folder first and names a module to scaffold instead.
+- **A run of a task about your own code ends with the step after it**,
+  `qikly --take-tests my_module.py`, which runs the new tests on your code.
+- **`--score` plants every fault it can**, up to 60 in one module or 150 in a
+  folder, and a sample only when the suite is slow, where it used to plant a
+  sample of 12. The demo module is now scored 10 of 13 missed where it was 9
+  of 12.
+- **`--score` finds your tests when you do not name them**: the `test_*.py`
+  and `*_test.py` files that import the code, searched from the project
+  root, and it says which it used. `--score-tests` still names them, and is
+  still needed with nothing to break.
 - **`--score` and `--score-suite` lead with what was missed:** "5 of 12
   planted faults missed (42%), 7 caught" rather than "7 of 12 caught". The
   misses are the finding, and a caught count read as a pass mark. Scripts
@@ -26,108 +60,45 @@ packaging tools would read as `1.1`.
   missed, and numbers the misses, the questions and the catches. The note
   that a score is a floor rather than a verdict moved to the end, after the
   lists it qualifies.
-- **`--scaffold`'s next steps name each file in full**: the task file it wrote,
-  the sample data to add and where the TODO lines are. Checking the task is
-  now a step of its own.
-- **`--scaffold` starts the data file for code that is called with values.**
-  It writes the column names, one per argument (`price,rate,code`), and no
-  rows, which have to be real. For code that is given a file, it says to copy
-  in a real one, header line included.
+- **`--scaffold`'s next steps name each file in full** and put the free check
+  before the paid run.
 - **A run that passes says where the new tests are**, that they add to the
   ones you have, and that `qikly --score-suite --tasks <TASK>` shows how many
   planted faults they catch.
-- **`--score` on a folder says its faults were shared**: the 12 are
-  spread at random over every file, so a larger folder gets fewer per file.
 
 ### Added
-- **`qikly --questions my_module.py`: the whole path, through one file of
-  answers.** It scores the tests you already have and writes, per module, one
-  file to answer at your own pace in your editor:
-  `inputs_private/questions/<NAME>_open_questions.txt`. Then
-  `qikly --answers my_module.py`, the command at the top
-  of the file, saves your answers as acceptance criteria, checks the task,
-  and in a terminal offers the run, says where your code and your answers
-  disagree, and offers to copy the new tests home. It takes one module or a
-  whole folder, one task and one file per module.
-  - The file holds only questions qikly can offer a choice for, such as
-    "raise ValueError, as rate 101 does now", worked out by running your code
-    in a separate process in an empty folder. A boundary is only ever run on
-    either side of the value in question, never at it; other changes show an
-    input where the code and the changed code differ, with the current
-    result labelled, through the public functions and classes your tests
-    call when the line itself has none. The order of the two is shuffled per
-    question in an order fixed by its choices, and the same call with the
-    same choices is asked once.
-  - The file is a short header, then the questions, each with the code it
-    is about. After them comes an optional part that can be left as it is:
-    a `requirements:` line for what the module does (left blank, the coding
-    agent is told to keep what the code does now, or reads its docstring),
-    `rule:` lines for rules of your own, and example input rows built from
-    your tests. For code that reads files, the header says where to copy a
-    sample file.
-  - `--score` plants every fault it can, up to 60 in one module or 150 in a
-    folder, and a sample only when the suite is slow, counted as
-    `--questions` counts. With a fixed sample of 12, step 1 said 9 of 12
-    missed and step 2 said 10 of 13 on the same code. A saved score is reused
-    only when qikly's own scoring code is unchanged too.
-  - "Either is fine" and "save it for later" are options, and a blank answer
-    stays open. The file is yours: change anything and run `--answers` again,
-    and the task is rebuilt from the file each time. Rerunning `--questions`
-    leaves the file alone when nothing changed; otherwise it refreshes it,
-    keeps each answer on its question where it can still find it, writes any
-    it cannot at the end of the file as a comment, which comes back to its
-    question when that is asked again, and keeps a dated copy of the file as
-    it was. Each question's id comes from its function, its question
-    and the shape of its line, not its line number or what the code printed,
-    so an edit elsewhere in the code does not lose an answer; an option number
-    whose choices have since changed is left open rather than read as another
-    choice.
-  - Without a terminal, as under a coding agent, `--answers` checks the task
-    and prints `qikly --tasks <TASK>` and `qikly --take-tests <TASK>`.
-  - A module inside a package is seeded as its whole top-level package and
-    named by its dotted path (`acme.scoring`), so a relative import such as
-    `from .util import clamp` works in qikly's copy and the first tests run
-    on your code as it is. Test calls are found through import aliases,
-    parametrize rows and variables, and `src/` layouts are tried correctly.
-  - If nothing ran on your code as it is, the result says it cannot tell
-    where your code and your answers disagree, rather than that they agree;
-    agreement is claimed only for answers a test checked.
-  - A one-question-at-a-time terminal flow was built and shelved before
-    release: it was easy to get lost in, and a mistake felt final.
-- **`qikly --take-tests <TASK>`: tests you can take home.** The tests a run
-  wrote import qikly's copy of your code; this copies each stage's files into
-  `qikly_generated/<task>/<stage>/` beside your tests, keeping their names,
-  rewrites every import of qikly's copy to yours, writes a `conftest.py` that
-  makes your code importable from wherever it lives, and runs them on your
-  code. Failures are classified from pytest's own XML: disagreements with
-  your answers, calls to a helper only qikly's copy has, copies that could not
-  import your module, and files that could not be collected. A file it did
-  not write is never overwritten, a rerun removes its own stale copies, the
-  folder is remembered, and `outputs/conftest.py` keeps a plain `pytest` from
-  running qikly's own copies as well. `--answers` offers it after a green run.
-- **The Skill offers `--questions` first**, and says to relay the questions in its
-  file to the user word for word, or to let them fill it in themselves.
+- **`qikly --take-tests my_module.py`: tests you can take home.** The tests a
+  run wrote import qikly's copy of your code; this copies each stage's files
+  into `qikly_generated/<task>/<stage>/` beside your tests, keeping their
+  names, rewrites every import of qikly's copy to yours, writes a
+  `conftest.py` that makes your code importable from wherever it lives, and
+  runs them on your code. Failures are classified from pytest's own XML: tests
+  written from your criteria, to compare with each criterion; tests no
+  criterion is behind, the test writer's own reading, to check; calls to a
+  helper only qikly's copy has; copies that could not import your module; and
+  files that could not be collected. It never says to apply qikly's change. A
+  file it did not write is never overwritten, a rerun removes its own stale
+  copies, the folder is remembered, and `outputs/conftest.py` keeps a plain
+  `pytest` from running qikly's own copies as well.
 - **`--score` asks a question about every fault your tests missed, and
   `--scaffold` puts the questions where the answers belong.** The report ends
   with a plain question for each miss, naming the file, line and function,
   and the comparison itself when it is the only one of its kind on the line,
   such as "your tests pass whether this is `rate > 100` or `rate >= 100`...
   what should happen at exactly `100`?". Misses that ask the same thing share
-  one question. `qikly --scaffold` on the same module then writes the newest
-  questions about that file into `acceptance_criteria`, each as a comment
-  above a `TODO` for your answer. Question lines start with `#?` and are
-  removed from everything either agent receives, wherever they end up in the
-  file, because they quote the code; the answers are withheld from the coding
-  agent like any criterion. `--validate` says how many answers are still
-  `TODO`. A question whose line has since changed is dropped, and a newer
-  score that asks nothing replaces an older one that did. Where the next command
-  cannot be exact, for questions over several files, a module made only of
-  classes, or a task that already exists, the report says what to do
-  instead. Nothing guesses an answer and no model is called; the answers are
-  yours, because tests read off the code can only agree with it. Asked only
-  about a suite qikly did not write, and only when something was missed.
-- **Skill 0.3.7** tells an assistant that those questions are the user's to
-  answer, never its own, and how the answers become a task.
+  one question. Question lines start with `#?` and are removed from
+  everything either agent receives, wherever they end up in the file,
+  because they quote the code; the answers are withheld from the coding
+  agent like any criterion. A question whose line has since changed is
+  dropped, and a newer score that asks nothing replaces an older one that
+  did. Nothing guesses an answer and no model is called; the answers are
+  yours, because tests read off the code can only agree with it.
+- **Skill 0.3.7** walks an assistant through the three steps, and says the
+  questions are the user's to answer, word for word, never its own.
+- Two guided flows were built and shelved before release: one question at a
+  time in the terminal, and a separate file of numbered answers. On real
+  libraries only 1 question in 63 had choices to pick from, so the task file,
+  answered in sentences, stays the one place answers live.
 
 ### Fixed
 - **A failing test no answer is behind is never called a disagreement.**
@@ -142,9 +113,6 @@ packaging tools would read as `1.1`.
   ten times the untouched suite's time, and at least a minute; one that runs
   past it is stopped and counted as caught, and the report says how many.
   cachetools' scoring had stopped for good on one.
-- **`--answers` never says your code agrees with an answer no test checked.**
-  An answer whose tests all failed on an import, or that no test is tagged
-  with, is listed as not checked instead.
 - **A function defined under an `if` or `try` is not "missing".** Such a test
   was set aside as an import failure, which hid a real disagreement.
 - **Two different checks in one function are two questions.** Grouping now
@@ -157,8 +125,6 @@ packaging tools would read as `1.1`.
   out, and so is `indirect` parametrize. Rows in a table that also holds
   objects, such as `date(...)`, are read value by value, and a function
   imported through its package (`from isodate import parse_date`) is found.
-- **An answers file keeps a row for each answer's own call**, and a value
-  with leading spaces survives the round trip.
 - **`--score` on a folder with its tests inside** says to score one
   module, instead of refusing a `--score-tests` you never typed; tests on
   another drive no longer crash it, and the path it prints can be pasted.
@@ -171,24 +137,17 @@ packaging tools would read as `1.1`.
   a `$` too for `fullmatch`. Those faults could never be caught, and counted
   as misses: validators' card module was scored 6 of 41 missed and is 1 of 36.
   Scores on code without such patterns do not change.
-- **`--questions` asks one question where the same gap repeats.** A table of 37
+- **`--score` asks one question where the same gap repeats.** A table of 37
   rules missing the same anchor asked the same thing 37 times; it is now one
   question naming the other lines. Questions about public functions come
   first, private helpers last.
-- **Concrete options from parametrized tests**, including rows kept in a
-  module-level table, annotated or not. Real suites pass inputs that way, and
-  `--questions` offered no concrete call for them.
+- **Values beside each question from parametrized tests**, including rows
+  kept in a module-level table, annotated or not. Real suites pass inputs
+  that way, and no concrete call was found for them.
 - **A test that imports a name your module lacks is no longer a
-  disagreement.** It failed before checking anything, and the report said
-  your code disagreed with an answer it met. It is now listed apart.
-- **An answer's call made through a variable counts as made**, so the list of
-  answers and their tests no longer marks it "none makes this exact call".
-- **The questions file shows the code each question is about**, and asks for
-  the example inputs with `row:` lines, filled in where your tests provide
-  them. Without them a run stopped on "input file
-  not found".
-- **A folder holding one module is that module.**
-  The two had scored different things, so a file of answers did not match.
+  disagreement.** It failed before checking anything, and `--take-tests`
+  said your code disagreed with a criterion it met. It is now listed apart.
+- **A folder holding one module is scored as that module.**
 - **Real libraries, found by running the three steps on python-slugify,
   inflection, tabulate, validators and humanize:**
   - a package's `__init__.py` is scored and asked about when it holds code;
@@ -197,9 +156,9 @@ packaging tools would read as `1.1`.
     or a module's functions from it (`from validators import card_number`),
     and a single module gets its own test files before the whole suite;
   - an input passed through a variable (`txt = "..."; slugify(txt)`) counts
-    for the concrete options, as a literal does;
+    for the values beside a question, as a literal does;
   - the suite is timed once, the scoring time is said, and above five minutes
-    `--questions` offers a smaller sample of faults, or takes one without a terminal;
+    `--score` offers a smaller sample of faults, or takes one without a terminal;
   - when a suite fails on the untouched code, `--score` shows what pytest
     said, such as a module generated at build time.
 - **A run's log reads plainly.** Lines no longer carry the task id twice
@@ -222,8 +181,6 @@ packaging tools would read as `1.1`.
   happened.** Those tests import qikly's copy of the code, so the file is
   never run, and the message blamed an installed package. It now names
   `qikly --score-suite --tasks <TASK>`.
-- **`--scaffold` on a folder says it takes one file** and lists the files,
-  instead of "no such file".
 - **`--score` no longer prints a request for feedback.** It came straight
   after the result, in project jargon, and read as part of it. The request is
   now a short, optional last section of the report, below the misses it asks

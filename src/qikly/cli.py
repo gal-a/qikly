@@ -855,7 +855,9 @@ def _parse_args():
     )
     parser.add_argument(
         "--tasks", default=None,
-        help="Comma-separated task_ids to run (default: every task found in config/tasks/, bundled or private)"
+        help="Step 3: run the task for a module or folder --scaffold wrote, such "
+             "as --tasks pricing.py, or comma-separated task ids (default: every "
+             "task found in config/tasks/, bundled or private). Needs an API key."
     )
     parser.add_argument(
         "--generate-criteria", action="store_true",
@@ -929,7 +931,7 @@ def _parse_args():
         "--score-tests", metavar="PATH", default=None,
         help="The suite to run against those planted faults: a test file or a "
              "directory of them, absolute or relative the same way. Goes with "
-             "--score, --questions or --answers, and names the tests instead of letting "
+             "--score, and names the tests instead of letting "
              "them be found."
     )
     parser.add_argument(
@@ -954,14 +956,14 @@ def _parse_args():
     )
     parser.add_argument(
         "--scaffold", metavar="FILE", default=None,
-        help="STARTING POINT 3 of 4, for code you already have. Read a Python file "
-             "and write the task YAML for it: module path, the real "
-             "signatures of its public functions, and a guessed entrypoint. Leaves "
-             "requirements and acceptance_criteria for you, because criteria derived "
-             "from an implementation can only describe what it already does. If "
-             "--score was run on the same file from this directory, its "
-             "questions are written into acceptance_criteria for you to answer "
-             "(not with --fresh or --from-doc)."
+        help="Step 2, for code you already have: a Python file, or a folder "
+             "for one task file per module. Writes the task file with "
+             "everything it can read from the code filled in, rows for the "
+             "data file from your tests, and the questions your --score run "
+             "raised under acceptance_criteria, each with what your code does "
+             "beside the value in question, for you to answer. Then run "
+             "qikly --tasks with the same path. (Not the questions with "
+             "--fresh or --from-doc.)"
     )
     parser.add_argument(
         "--fresh", action="store_true",
@@ -1034,6 +1036,7 @@ def _parse_args():
     )
     parser.add_argument(
         "--explain", metavar="TASK", default=None,
+        # A task id, or the module or folder --scaffold was given.
         help="Print what test generation sees and what the coding agent sees for "
              "one task, and the difference between them, then stop. No model call "
              "and no API key: it builds the same prompts a run builds and shows "
@@ -1046,7 +1049,9 @@ def _parse_args():
              "qikly_explain_<TASK>.html where you ran the command."
     )
     parser.add_argument(
-        "--validate", action="store_true",
+        # Takes the module or folder --scaffold was given, or nothing and
+        # --tasks: `qikly --validate pricing.py` is what step 2 says to run.
+        "--validate", nargs="?", const=True, default=False, metavar="PATH",
         help="Check every task file offline and stop: valid YAML, required sections, "
              "acceptance_criteria a list rather than one long string, fixture paths "
              "that resolve, and criteria that name values instead of adjectives. "
@@ -1116,11 +1121,10 @@ def _parse_args():
     )
     parser.add_argument(
         # `--run` is the spelling that matches the MCP tool this shares its
-        # machinery with, `qikly_run`. `--start` was its original alias until
-        # 0.6.0, which gave that name to the guided first run; a task id
-        # passed to `--start` is told so. Note the neighbour: `--runs`,
-        # plural, lists past runs and starts nothing.
-        "--run", metavar="TASK", dest="run",
+        # machinery with, `qikly_run`. `--start` was the original and still
+        # works, so nothing that already scripts it breaks. Note the neighbour:
+        # `--runs`, plural, lists past runs and starts nothing.
+        "--run", "--start", metavar="TASK", dest="run",
         help="Start a run in the background and print its run id, without waiting. "
              "A run takes minutes to hours, so this is for when the terminal is not "
              "where you want to spend them: start it, close the window, ask later "
@@ -1129,28 +1133,12 @@ def _parse_args():
              "(`--runs`, plural, is a different flag that lists past runs.)"
     )
     parser.add_argument(
-        "--questions", "--start", dest="start", nargs="?", const="", default=None,
-        metavar="PATH",
-        help="Step 2. Scores the tests you already have and writes one file of "
-             "questions about what they never check, to answer in your editor. "
-             "PATH is a module or a folder of modules. Then run "
-             "qikly --answers PATH. Nothing of yours is changed. (--start is "
-             "the older name.)"
-    )
-    parser.add_argument(
         "--take-tests", metavar="TASK", default=None,
-        help="Copy the tests a run wrote for TASK into tests/qikly_generated/, "
-             "rewritten to import your own module rather than qikly's copy of "
-             "it, and run them on your code. A test that fails there is one to "
-             "compare with its answer. Free."
-    )
-    parser.add_argument(
-        "--answers", nargs="?", const="", metavar="PATH", default=None,
-        help="Step 3. Reads your answers from the file --questions wrote for "
-             "PATH (or give the file itself), checks the task, and in a "
-             "terminal offers the run, which needs an API key, shows where your "
-             "code disagrees with you, and offers to copy the new tests into "
-             "yours."
+        help="After step 3: copy the tests a run wrote into "
+             "tests/qikly_generated/, rewritten to import your own module "
+             "rather than qikly's copy of it, and run them on your code. TASK "
+             "is the module or folder you ran, or a task id. A test that fails "
+             "there is one to compare with your criteria. Free."
     )
     parser.add_argument(
         "--status", metavar="RUN_ID",
@@ -1692,9 +1680,9 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
 
     if code or tests:
         if code and not tests:
-            # Found the way --start finds them, so step 1 and step 2 on the
-            # home page read the same: the test files that import the code,
-            # searched from the project root.
+            # The test files that import the code, searched from the project
+            # root: found the way --scaffold finds them for the data rows, so
+            # both steps talk about the same tests.
             from qikly.start import auto_tests, score_questions_pasteable as shown_path
             where = code if os.path.isabs(code) else os.path.join(INVOKED_FROM, code)
             found = auto_tests(os.path.abspath(where), INVOKED_FROM) \
@@ -1736,8 +1724,8 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
             print(str(exc), file=sys.stderr)
             return 1
         if not mutants:
-            # Every fault it can plant, up to a cap, counted as --questions
-            # counts them, so steps 1 and 2 report the same score.
+            # Every fault it can plant, up to a cap, and a sample only when
+            # the suite is slow: a fixed 12 left faults unplanted on small code.
             from qikly import start
             sites, mutants = start.how_many(start.Console(), target, tests,
                                             INVOKED_FROM, os.path.isdir(code))
@@ -2153,85 +2141,76 @@ def _fill_criteria_from(text, doc, root):
     return fd.merge(text, criteria)
 
 
-def _do_answers(path, tests=None):
+def _task_ids_for(value):
     """
-    `qikly --answers PATH`: PATH is the code, which finds the file --questions
-    wrote for it, or the file itself. Scored in the scope the file was written
-    from, its scored: line: scored as one module instead, a module of a
-    folder matched none of its questions.
+    The task ids for a --tasks, --validate, --explain or --take-tests value:
+    task ids as given, or the module or folder --scaffold was run on, which
+    names each task the way --scaffold does. None, said why, when a path has
+    no task file yet.
     """
-    from qikly import start
-    if not path:
-        print("Name the code, such as  qikly --answers pricing.py", file=sys.stderr)
-        return 2
-    where = path if os.path.isabs(path) else os.path.join(INVOKED_FROM, path)
-    if not os.path.exists(where):
-        print(f"There is no file or folder at {where}.", file=sys.stderr)
-        return 2
-    if os.path.isfile(where) and not where.lower().endswith(".py"):
-        found = where
-    else:
-        found = start.answers_file_for(where, INVOKED_FROM)
-        if isinstance(found, list):
-            unanswered = start.answers_file_for(where, INVOKED_FROM, answered_only=False) \
-                if not found and os.path.isdir(where) else []
-            if not found and unanswered:
-                # Written but not answered yet: say where, not "write them".
-                print(f"None of the questions files for {path} has an answer yet. "
-                      f"Answer one, then run  qikly --answers <that file>:",
-                      file=sys.stderr)
-                for f in (unanswered if isinstance(unanswered, list) else [unanswered]):
-                    print(f"  {start.score_questions_pasteable(f, INVOKED_FROM)}",
-                          file=sys.stderr)
-            elif not found:
-                print(f"There are no answers for {path} yet. Write the questions "
-                      f"first:  qikly --questions {path}", file=sys.stderr)
-            else:
-                print(f"{path} has answers for several modules; name one file:",
-                      file=sys.stderr)
-                for f in found:
-                    print(f"  qikly --answers "
-                          f"{start.score_questions_pasteable(f, INVOKED_FROM)}",
-                          file=sys.stderr)
-            return 2
-    scope = start._field(found, "scored") or start._field(found, "module")
-    if scope and not os.path.exists(os.path.join(INVOKED_FROM, scope)):
-        print(f"{start.score_questions_pasteable(found, INVOKED_FROM)} was written "
-              f"for {scope} (its scored: line), which is not there any more. Run  "
-              f"qikly --questions <where the code is now>  to write it again.",
-              file=sys.stderr)
-        return 2
-    if not scope:
-        print(f"{path} has no module: line, so qikly cannot tell which code it "
-              f"answers for.", file=sys.stderr)
-        return 2
-    return start.main(scope, INVOKED_FROM, answers=found, tests=tests)
+    from qikly import score_questions, start
+
+    tasks_dir = os.path.join(INVOKED_FROM, "inputs_private", "config", "tasks")
+    out = []
+    for part in [t.strip() for t in value.split(",") if t.strip()]:
+        where = part if os.path.isabs(part) else os.path.join(INVOKED_FROM, part)
+        is_path = (part.lower().endswith(".py") or "/" in part or "\\" in part
+                   or (os.path.exists(where)
+                       and not re.match(r"^[A-Z][A-Z0-9_]*$", part)))
+        if not is_path:
+            out.append(part)
+            continue
+        if not os.path.exists(where):
+            print(f"There is no file or folder at {where}.", file=sys.stderr)
+            return None
+        modules = start.modules_in(where) if os.path.isdir(where) else [where]
+        found = [score_questions.task_for(m) for m in modules]
+        found = [t for t in dict.fromkeys(found)
+                 if os.path.isfile(os.path.join(tasks_dir, t + ".yaml"))]
+        if not found:
+            print(f"There is no task file for {part} yet. Write it first:  "
+                  f"qikly --scaffold {part}", file=sys.stderr)
+            return None
+        out += found
+    return ",".join(dict.fromkeys(out))
 
 
-def _do_start(path, answers=None, tests=None):
-    """`qikly --questions [PATH]`: see start.py."""
-    import re
+def _say_take_tests(task_ids):
+    """
+    After a run of a task about code the person already has, the one step
+    left: their own code under the tests the run wrote. A run only ever tested
+    qikly's copy, so until then nothing has been said about theirs.
+    """
+    import yaml
 
-    # Until 0.6.0 `--start TASK` started a background run, so a script may
-    # still pass a task id. Doing something different with it silently would
-    # be worse than refusing.
-    if (path and re.match(r"^[A-Z][A-Z0-9_]*$", path)
-            and not os.path.exists(os.path.join(INVOKED_FROM, path))):
-        print(f"--questions (once --start) takes a module or folder. To start a "
-              f"background run of the task {path}, use:  qikly --run {path}")
-        return 2
-    if answers and not os.path.isabs(answers):
-        answers = os.path.join(INVOKED_FROM, answers)
-    if answers and not os.path.isfile(answers):
-        print(f"There is no answers file at {answers}.")
-        return 2
-    from qikly import start
-    return start.main(path or None, INVOKED_FROM, answers=answers, tests=tests)
+    from qikly.agent_api.agent_interface import task_config_path
+
+    seeded = []
+    for task_id in task_ids:
+        try:
+            with open(task_config_path(task_id), encoding="utf-8") as handle:
+                seed = (yaml.safe_load(handle) or {}).get("seed") or {}
+        except Exception:
+            continue
+        if isinstance(seed, dict) and seed.get("implementation"):
+            seeded.append((task_id, seed["implementation"]))
+    if not seeded:
+        return
+    # The module's own path where the seed is one file; a package seed is a
+    # folder of many tasks' code, so its task id says which.
+    target = ",".join(impl if str(impl).endswith(".py") else task_id
+                      for task_id, impl in seeded)
+    print()
+    print(f"Next: qikly --take-tests {target}")
+    print("  copies the tests this run wrote into tests/qikly_generated/ and runs")
+    print("  them on your own code, which this run never changed. A test that")
+    print("  fails there is where your code and your criteria disagree.")
 
 
 def _do_scaffold(source, task_id, doc=None, fresh=False):
     """
-    Write the task file for an existing Python module.
+    Write the task file for existing Python code: one file, or a folder for
+    one task file per module.
 
     Scaffolding from code means one of two jobs, and the command line cannot
     tell which: you want that code tested, or you want a fresh implementation
@@ -2242,60 +2221,96 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
     It used to write both and ask you to delete one, which made the first thing
     a new user did a choice between two files they had not read yet.
     """
-    import re
-
-    import yaml
-
-    from qikly.scaffold import build_task
-
     root = INVOKED_FROM
     source = os.path.normpath(
         source if os.path.isabs(source) else os.path.join(root, source))
     if os.path.isdir(source):
-        # `--score-code` takes a folder, so `--scaffold` on the same folder is
-        # the natural next command, and "no such file" read like a typo.
-        # Modules only, subfolders included: tests, conftest and setup files
-        # are not code anyone specifies, and conftest.py sorted first as the
-        # suggested example.
-        skip_dirs = {"tests", "test", "venv", ".venv", "outputs",
-                     "inputs_private", "node_modules", "__pycache__"}
-        files = []
-        for folder, dirs, names in os.walk(source):
-            dirs[:] = sorted(d for d in dirs
-                             if d not in skip_dirs and not d.startswith("."))
-            for f in sorted(names):
-                if (f.endswith(".py") and f not in ("__init__.py",
-                        "conftest.py", "setup.py") and not f.startswith("test_")
-                        and not f.endswith("_test.py")):
-                    files.append(shown(os.path.join(folder, f)))
-        print(f"{shown(source)} is a folder. A task covers one module, so "
-              f"--scaffold takes one file at a time.")
-        if files:
-            first = files[0]
-            if " " in first:
-                first = f'"{first}"'
-            print("Run it on the one you want to specify first, for example:")
-            print(f"    qikly --scaffold {first}")
-            shown_files = files[:10]
-            print("The files: " + ", ".join(shown_files)
-                  + (f", and {len(files) - 10} more" if len(files) > 10 else ""))
-        return 2
+        if fresh or doc or task_id:
+            print("--fresh, --from-doc and --task-id take one file, not a folder.")
+            return 2
+        return _scaffold_folder(source)
     if not os.path.isfile(source):
         print(f"no such file: {source}")
         return 2
+    return _scaffold_one(source, task_id, doc, fresh)
 
+
+def _scaffold_folder(folder):
+    """
+    One task file per module that the folder's last --score asked about, the
+    way --score on a folder scores every module in it. Modules it asked
+    nothing about are left out: a task with no questions in it would only be
+    a file of TODOs.
+    """
+    from qikly import score_questions, start
+
+    root = INVOKED_FROM
+    reports = os.path.join(root, "qikly-suite-score")
+    asked = []
+    for module in start.modules_in(folder):
+        found, _ = score_questions.latest_for(module, reports)
+        if found:
+            asked.append(module)
+    if not asked:
+        from qikly.score_questions import _pasteable
+        modules = [shown(m) for m in start.modules_in(folder)]
+        print(f"{shown(folder)} is a folder. --scaffold writes a task file for each "
+              f"module in it that its --score asked about, and none has been "
+              f"asked about yet. Score it first:  qikly --score {_pasteable(shown(folder))}")
+        if modules:
+            print("Or scaffold one module, for example:")
+            print(f"    qikly --scaffold {_pasteable(modules[0])}")
+            print("The modules: " + ", ".join(modules[:10])
+                  + (f", and {len(modules) - 10} more" if len(modules) > 10 else ""))
+        return 2
+    print(f"Writing a task file for each of the {len(asked)} module"
+          f"{'' if len(asked) == 1 else 's'} in {shown(folder)} your --score "
+          f"asked about:")
+    written, problems = 0, 0
+    for module in asked:
+        code = _scaffold_one(module, None, None, False, brief=True)
+        written += code == 0
+        problems += code != 0
+    print()
+    if not written:
+        return 2
+    from qikly.score_questions import _pasteable
+    path = _pasteable(shown(folder))
+    print("  Next:")
+    print("    1. answer the questions in each task file (lines starting #? are")
+    print("       notes for you; a TODO you leave is skipped)")
+    print(f"    2. check them, free:  qikly --validate {path}")
+    print(f"    3. run them (needs an API key):  qikly --tasks {path}")
+    return 0
+
+
+def _scaffold_one(source, task_id, doc, fresh, brief=False):
+    """The task file for one module. `brief`: one line, for a folder's list."""
+    import yaml
+
+    from qikly import start
+    from qikly.scaffold import build_task, starter_columns
+
+    root = INVOKED_FROM
     dest_dir = os.path.join(root, "inputs_private", "config", "tasks")
-    os.makedirs(dest_dir, exist_ok=True)
+    name = os.path.basename(source)
 
-    if fresh:
-        seed_mode, headline = None, "writes a fresh implementation"
-    else:
-        seed_mode, headline = "existing", "tests the code you already have"
+    def refuse(reason):
+        print(f"  {shown(source)}: not written, {reason}" if brief else reason)
+        return 2
+
+    inside = start.run_from_inside(source, root)
+    if inside:
+        return refuse(f"{shown(source)} is {inside}")
+    seed_mode = None if fresh else "existing"
     text, problem = build_task(source, root, task_id=task_id, seed=seed_mode)
     if problem:
-        print(problem)
-        return 2
-    # The questions a `--score-code` run raised about this file go into the
+        return refuse(problem)
+    if not fresh:
+        # A module that imports its siblings needs its whole package seeded,
+        # or qikly's copy fails on the import before any test runs.
+        text = start.package_seed(text, source, root)
+    # The questions a `--score` run raised about this file go into the
     # criteria section, where the answers belong. Not with --fresh, whose job
     # is a new implementation, and not with --from-doc, whose criteria come
     # from the document.
@@ -2306,39 +2321,95 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
 
         found, asked_on = score_questions.latest_for(
             source, os.path.join(root, "qikly-suite-score"))
+        if found:
+            found = start.hinted(found, source, root)
         text, used = with_questions(text, found, asked_on)
         asked = len(found) if used else 0
     if doc:
         text, doc_problem = _fill_criteria_from(text, doc, root)
         if doc_problem:
-            print(doc_problem)
-            return 2
+            return refuse(doc_problem)
     # build_task names the task, including the _VERIFY suffix, so this and the
     # MCP tool always agree on it.
     tid = re.search(r'task_id:\s*"([^"]+)"', text).group(1)
     dest = os.path.join(dest_dir, f"{tid}.yaml")
     if os.path.exists(dest):
-        print(f"{shown(dest)} already exists. Move it aside first, or pass "
-              f"--task-id to write a different name.")
-        return 2
+        return refuse(f"its task file already exists: {os.path.abspath(dest)}. "
+                      f"Edit that one, or move it aside to write it again"
+                      + ("." if brief else ", or pass --task-id to write a "
+                         "different name."))
+    os.makedirs(dest_dir, exist_ok=True)
     with open(dest, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(text)
 
-    print(f"Read {shown(source)} and wrote a task that {headline}:")
+    # The data file. Never only a header: the rows are the values the tests
+    # already call the code with, so they are real, and a person adds more.
+    from qikly.validate import _input_exists
+
+    inputs = (yaml.safe_load(text) or {}).get("inputs") or []
+    columns = starter_columns(start._read(source))
+    data_note, data_step = None, None
+    for p in [p for p in inputs if not os.path.isfile(os.path.join(root, p))]:
+        data = os.path.abspath(os.path.join(root, p))
+        if _input_exists(p):
+            # Not in this project, but a bundled example's data has the same
+            # name. A file written here would replace that fixture for the
+            # bundled task too, so nothing is written.
+            data_step = (f"{p} is also a bundled example's data, so give this "
+                         f"task its own name: move the task file aside and run  "
+                         f"qikly --scaffold {shown(source)} --task-id MY_NAME")
+        elif columns and p.lower().endswith(".csv"):
+            rows = start.rows_from_tests(source, root, columns) if not fresh else []
+            os.makedirs(os.path.dirname(data), exist_ok=True)
+            import csv
+            with open(data, "w", encoding="utf-8", newline="") as handle:
+                writer = csv.writer(handle, lineterminator="\n")
+                writer.writerow(columns)
+                writer.writerows(rows)
+            if rows:
+                data_note = (f"The data file has {len(rows)} row"
+                             f"{'' if len(rows) == 1 else 's'} of values from your "
+                             f"tests; add any your answers name:")
+            else:
+                data_step = ("add a few example rows to the data file. Its first "
+                             "line already names the columns, one per named "
+                             "argument, so add rows of values below it, separated "
+                             "by commas, including the values your criteria name:")
+            data_note = (data_note + "\n      " + shown(data)) if data_note else None
+            data_step = (data_step + "\n       " + data) if data_step else None
+        elif columns is None:
+            data_step = ("copy in a small real file of the kind your code reads, "
+                         "exactly as it arrives, header line included if it has "
+                         "one:\n       " + data)
+        else:
+            data_step = "add a small real sample of the data your code works on:\n       " + data
+
+    if brief:
+        print(f"  {shown(source)}: {shown(dest)}, {asked} question"
+              f"{'' if asked == 1 else 's'}"
+              + (f"; {data_step.splitlines()[0]}" if data_step else ""))
+        return 0
+
+    from qikly.score_questions import _pasteable
+    path = _pasteable(shown(source))
+    target = tid if fresh or task_id else path
+    print(f"Wrote the task file for {name}:")
     # In full: it is the file every step below sends you to, and a relative
     # path is only right while you stay in this directory.
     print(f"    {os.path.abspath(dest)}")
     print()
     if fresh:
-        print("  To test the code you already have instead, run it again without --fresh.")
+        print("  It writes a fresh implementation of the same interface. To test")
+        print("  the code you already have instead, run it again without --fresh.")
     else:
-        print("  To write a fresh implementation of the same interface instead, add --fresh.")
+        print("  It tests the code you already have. To write a fresh")
+        print("  implementation of the same interface instead, add --fresh.")
     print()
     if doc:
         print(f"  Acceptance criteria came from {shown(doc)}.")
         print()
-        print("  One section is still yours:")
-        print("    requirements         the decisions: what the code must do, in your words")
+        print("  requirements is still yours: it says only to keep what the code")
+        print("  does now, so say what the code must do, in your words.")
         print()
         print("  It is not filled from the document on purpose. The coding agent")
         print("  reads requirements, and a feature page usually restates its own")
@@ -2350,83 +2421,29 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
         print("  criteria and says so if the two say the same thing.")
     elif asked:
         print(f"  Its acceptance_criteria hold the {asked} question"
-              f"{'' if asked == 1 else 's'} your --score run of {asked_on}")
-        print("  raised, each above a TODO. Replace each TODO with your answer,")
-        print("  and delete any question you skip. Answer from what the code is")
-        print("  meant to do, not from what it does now: that is what is in question.")
-        print()
-        print("  requirements, the decisions in your own words, are yours too.")
-        print(f"  `qikly --validate --tasks {tid}` says how many are still unanswered.")
-        print()
+              f"{'' if asked == 1 else 's'} your --score run of {asked_on} raised.")
+        print("  Write your answer in place of each TODO, naming a value someone")
+        print("  could check. A TODO you leave is skipped. Lines starting #? are")
+        print("  notes for you: neither agent reads them.")
+    elif not fresh:
+        print("  No --score of it was found here, so there are no questions in it")
+        print("  yet: write criteria of your own under acceptance_criteria, or")
+        print(f"  move this file aside, run  qikly --score {path}  and scaffold again.")
     else:
         print("  It needs two sections from you, and neither can be derived from")
         print("  the code:")
         print("    requirements         the decisions: what the code must do, in your words")
         print("    acceptance_criteria  the consequences: what must hold, with boundary values")
+    if data_note:
         print()
-        print("  Criteria read out of an implementation can only describe what it")
-        print("  already does, and a bar that agrees with the code by construction is")
-        print("  exactly what this tool exists to avoid. So those two are yours.")
-        print()
-        print("  Already written them somewhere? Point at it:")
-        print("    qikly --scaffold %s --from-doc feature.md" % shown(source))
-
-    # The old ending was "Then: qikly --tasks X", which failed at once: scaffold
-    # names an input file but never creates one. Say what is missing, and put
-    # the free check before the paid run.
-    inputs = (yaml.safe_load(text) or {}).get("inputs") or []
-    nl_indent = "\n       "
-    missing = [p for p in inputs if not os.path.isfile(os.path.join(root, p))]
-    # Each step names its file in full, because each sends you to a different
-    # one and "the TODO lines" did not say where they were.
-    from qikly.scaffold import starter_columns
-
-    with open(source, "r", encoding="utf-8-sig", errors="replace") as handle:
-        columns = starter_columns(handle.read())
-    from qikly.validate import _input_exists
-
-    # Named only when there are questions to answer; "your answers" meant
-    # nothing after a plain scaffold or one filled from a document.
-    values = ("the values your answers name" if asked
-              else "any values your acceptance criteria name")
+        print("  " + data_note)
     steps = []
-    for p in missing:
-        data = os.path.abspath(os.path.join(root, p))
-        if _input_exists(p):
-            # Not in this project, but a bundled example's data has the same
-            # name. A file written here would replace that fixture for the
-            # bundled task too, so nothing is written.
-            steps.append(
-                f"{p} is also a bundled example's data, so give this task"
-                + nl_indent + "its own name: move the task file aside and run"
-                + nl_indent + f"qikly --scaffold {shown(source)} --task-id MY_NAME")
-        elif columns and p.lower().endswith(".csv"):
-            # The header only. The rows have to be real values the code is
-            # called with, so they are never made up here.
-            os.makedirs(os.path.dirname(data), exist_ok=True)
-            with open(data, "w", encoding="utf-8", newline="\n") as handle:
-                handle.write(",".join(columns) + "\n")
-            steps.append(
-                "add a few example rows to the data file. Its first line"
-                + nl_indent + "already names the columns, one per named argument, so add"
-                + nl_indent + "rows of values below it, separated by commas, including"
-                + nl_indent + values + ":"
-                + nl_indent + data)
-        elif columns is None:
-            steps.append(
-                "copy in a small real file of the kind your code reads, exactly"
-                + nl_indent + "as it arrives, header line included if it has one:"
-                + nl_indent + data)
-        else:
-            steps.append(
-                "add a small real sample of the data your code works on:"
-                + nl_indent + data)
-    steps.append("replace the TODO lines in the task file:" + nl_indent
-                 + os.path.abspath(dest))
-    # Scoped to this task: unscoped, --validate also checks every bundled
-    # example, and the one line about this task gets lost among them.
-    steps.append(f"check it, free and with no model calls:  qikly --validate --tasks {tid}")
-    steps.append(f"run it:  qikly --tasks {tid}")
+    if data_step:
+        steps.append(data_step)
+    steps.append("answer the questions in the task file above" if asked
+                 else "fill in the task file above")
+    steps.append(f"check it, free:  qikly --validate {target}")
+    steps.append(f"run it (needs an API key):  qikly --tasks {target}")
     print()
     print("  Next:")
     for number, step in enumerate(steps, 1):
@@ -2619,36 +2636,24 @@ def main():
         except Exception:
             pass
 
-    if args.take_tests:
-        if args.start is not None or args.answers is not None:
-            print("--take-tests is a separate step: run it on its own.", file=sys.stderr)
+    # The steps take the path the person gave --score and --scaffold, so no
+    # one has to learn that pricing.py's task is called PRICING_VERIFY.
+    if isinstance(args.validate, str):
+        if args.tasks:
+            print("--validate takes a path or --tasks, not both.", file=sys.stderr)
             return 2
+        args.tasks, args.validate = args.validate, True
+    for name in ("tasks", "take_tests", "explain"):
+        value = getattr(args, name)
+        if value:
+            resolved = _task_ids_for(value)
+            if resolved is None:
+                return 2
+            setattr(args, name, resolved)
+
+    if args.take_tests:
         from qikly import take_tests
         return take_tests.main(args.take_tests, INVOKED_FROM)
-
-    if args.start is not None or args.answers is not None:
-        # --questions returns before the misattached-flag guard below, so it does
-        # its own: `--start pricing.py --task-id X --fresh` ran as PRICING and
-        # silently dropped both.
-        # An allowlist, not a list of refused flags: --demo, --json, --force
-        # and others slipped through a list and were dropped without a word.
-        allowed = {"start", "answers", "score_tests", "help", "_parser"}
-        ignored = [action.option_strings[0] for action in args._parser._actions
-                   if action.option_strings and action.dest not in allowed
-                   and getattr(args, action.dest, action.default) != action.default]
-        if ignored:
-            print(f"--questions and --answers take a path and, optionally, "
-                  f"--score-tests; they would "
-                  f"ignore {', '.join(ignored)}. Run without "
-                  f"{'that' if len(ignored) == 1 else 'those'}.", file=sys.stderr)
-            return 2
-        if args.start is None:
-            return _do_answers(args.answers, args.score_tests)
-        if args.answers == "":
-            # --questions PATH --answers, with no value: the answers for PATH.
-            return _do_answers(args.start, args.score_tests)
-        # The older form, --start PATH --answers FILE, still works.
-        return _do_start(args.start, args.answers, args.score_tests)
 
     # These run before anything else and exit: they exist to make a project
     # runnable, so they must work when nothing is configured yet and must not
@@ -2928,6 +2933,7 @@ def main():
         sys.exit(130)
 
     failed = [p.name for p in processes if p.exitcode != 0]
+    _say_take_tests(task_ids)
     if failed:
         print(f"Task(s) failed: {', '.join(failed)}")
         sys.exit(1)

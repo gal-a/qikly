@@ -63,7 +63,7 @@ def test_the_next_steps_name_the_missing_input_and_validate_before_running(
     cli._do_scaffold("billing.py", None)
     out = capsys.readouterr().out.replace("\\", "/")
     assert "inputs_private/data/BILLING/input_01.csv" in out
-    assert out.index("qikly --validate") < out.index("qikly --tasks BILLING_VERIFY")
+    assert out.index("qikly --validate") < out.index("qikly --tasks billing.py")
     assert "Then: qikly --tasks" not in out
 
 
@@ -155,6 +155,8 @@ def test_the_todo_warning_ignores_a_requirement_about_todo_comments(tmp_path):
 
 
 def test_the_validate_step_is_scoped_to_the_new_task(tmp_path, monkeypatch, capsys):
+    """Scoped by the module's own path, which names only its task."""
     _module(tmp_path, monkeypatch)
     cli._do_scaffold("billing.py", None)
-    assert "qikly --validate --tasks BILLING_VERIFY" in capsys.readouterr().out
+    assert "qikly --validate billing.py" in capsys.readouterr().out
+    assert cli._task_ids_for("billing.py") == "BILLING_VERIFY"

@@ -56,10 +56,9 @@ dependency chain and pip installs qikly itself last, so there is a window where
 its dependencies are present and qikly is not, which looks exactly like a
 broken install.
 
-A key is needed only for a run: `--demo`, the run `--answers` offers,
-and `--tasks`, `--run` and `--repeat`. `--version`, `--score`, `--questions`,
-`--answers` until its run, `--take-tests`, `--explain`, `--validate`, `--init`,
-`--example` and `--scaffold` make no model call and cost nothing.
+A key is needed only for a run: `--demo`, `--tasks`, `--run` and
+`--repeat`. `--version`, `--score`, `--scaffold`, `--validate`, `--explain`,
+`--take-tests`, `--init` and `--example` make no model call and cost nothing.
 
 Gemini is the default and its key is `GEMINI_API_KEY`. For OpenAI or
 Anthropic, which need an extra install, see [the provider table in
@@ -112,59 +111,71 @@ code.
 
 ## Your own module, start to first run
 
-The same three steps as [the home page](https://test.qikly.com/?ref=quick-start):
+The same three steps as [the home page](https://test.qikly.com/?ref=quick-start).
+Run them from your project's root folder. Each takes one module or a whole
+folder, and every step takes the same path:
 
-1. **If you have a test suite, score it.** Optional, free, no key:
+1. **Score the tests you have.** Free, no key:
 
    ```bash
    qikly --score my_metrics.py
    qikly --score my_project       # or a whole folder
    ```
 
-   It plants faults in a copy of your code, one at a time, and names the ones
-   your tests did not notice. It finds your tests itself, the `test_*.py`
-   and `*_test.py` files that import your code, searched from the project
-   root; to name them instead, add `--score-tests tests/`. Step 2 finds them
-   the same way.
+   It plants faults in a copy of your code, one at a time, and turns each
+   one your tests did not notice into a question about behaviour nothing
+   checks. It finds your tests itself, the `test_*.py` and `*_test.py` files
+   that import your code, searched from the project root; to name them
+   instead, add `--score-tests tests/`.
 
-2. **Answer what your tests never check.** Free, no key:
-
-   ```bash
-   qikly --questions my_metrics.py        # or: qikly --questions my_project
-   ```
-
-   It scores your tests first, so you can start here directly, then writes
-   one file of questions per module, under `inputs_private/questions/`. Each
-   question comes with the choices qikly found by running your code; write the
-   option's number after its `Q`. The file also has a line for what the module
-   does in a sentence, `rule:` lines for rules of your own, and example input
-   rows built from your tests. Answer at your own pace and change anything
-   before you run it. If your code changes, run `--questions` again: it
-   refreshes the file, keeps your answers on their questions wherever it can
-   find them and any it cannot at the end as comments, and keeps a dated copy
-   of the old file.
-
-3. **Get a fresh test suite written from your answers.** Run the command at
-   the top of the file:
+2. **Answer the questions in the task file.** Free, no key:
 
    ```bash
-   qikly --answers my_metrics.py
+   qikly --scaffold my_metrics.py     # or: qikly --scaffold my_project
    ```
 
-   It checks your answers and offers the run, which needs a key. A test agent
-   writes tests from your answers before any code is shown to it, and a
-   separate coding agent, which never sees them, repairs a copy of your code
-   until they pass. Your files are never edited. It tells you first where your
-   code and your answers disagree. After a green run it offers to copy the new
-   tests into `qikly_generated/` beside the tests it scored, importing your
-   own module (`qikly --take-tests <TASK>` does the same later), and it ends
-   with a full audit of every file it read, saved and wrote. Without a
-   terminal it prints the two commands that run it instead.
+   It writes `inputs_private/config/tasks/MY_METRICS_VERIFY.yaml`, with
+   everything qikly can read from your code filled in, and a data file of the
+   values your tests already call it with. On a folder it writes one task
+   file for each module step 1 asked about. What is left is step 1's
+   questions, under `acceptance_criteria`, each with what your code does
+   beside the value in question, found by running it. Write your answer in
+   place of each TODO, as a sentence that names a value someone could check,
+   such as `apply_discount(100, 100) raises ValueError`. A TODO you leave is
+   skipped. Lines starting `#?` are notes for you, and neither agent reads
+   them. Then check it, free:
+
+   ```bash
+   qikly --validate my_metrics.py
+   ```
+
+   This file is the one source of truth for the run: change it any time and
+   run step 3 again.
+
+3. **Get a fresh test suite written from your answers.** Needs a key:
+
+   ```bash
+   qikly --tasks my_metrics.py
+   ```
+
+   A test agent writes tests from your criteria before any code is shown to
+   it, and a separate coding agent, which never sees them, repairs a copy of
+   your code until they pass. Your files are never edited. It ends by
+   pointing at the last command:
+
+   ```bash
+   qikly --take-tests my_metrics.py
+   ```
+
+   which copies the new tests into `qikly_generated/` beside your tests,
+   rewritten to import your own module, and runs them on your code. A test
+   that fails there is where your code and your criteria disagree; the
+   report says which failures to compare with a criterion and which are the
+   test writer's own reading, to check.
 
 ## Command by command
 
-The separate commands behind `--questions` and `--answers`, for scripts and CI, or when you would
-rather write the task file yourself.
+For writing a task file yourself, from nothing or from a finished example.
 
 Rather see it work before you point it at your own code?
 
@@ -241,8 +252,8 @@ only task in your project.
    task files point at that one folder, named for the module rather than the
    task, so scaffolding both ways does not split your data in two. For code
    called with values, scaffold starts that file with one column per
-   argument and no rows: add a few rows of real example values. For code that
-   reads a file, copy a real sample there. Until it exists, `qikly --validate`
+   argument and the rows your tests already call it with: add any values your
+   criteria name. For code that reads a file, copy a real sample there. Until it exists, `qikly --validate`
    reports `input file not found`, and while it holds only its header line,
    it warns. What a good sample
    looks like: [`input_01.csv`](https://github.com/gal-a/qikly/blob/main/src/qikly/inputs_public/examples/data/MY_METRICS/input_01.csv) and
@@ -252,9 +263,8 @@ only task in your project.
    decisions and `acceptance_criteria` the consequences; the rule for telling
    them apart is under [Getting the two halves right](#getting-the-two-halves-right).
    Already written them in a page or a ticket? This takes the criteria from it:
-   `qikly --scaffold my_metrics.py --from-doc feature.md`. Replace the
-   remaining `TODO` lines too, and check the entrypoint scaffold marks as
-   guessed.
+   `qikly --scaffold my_metrics.py --from-doc feature.md`. Check the
+   `system_entrypoint` too: scaffold picks it from the function names.
 
 4. **Check it, for free.**
 

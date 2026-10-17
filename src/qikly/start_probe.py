@@ -1,11 +1,11 @@
 """
 Run a few calls against a module, in a separate process, and say what each did.
 
-`qikly --start` offers each question's answers as concrete behaviours, "raise
+`qikly --scaffold` writes what the code does beside each question, "raise
 ValueError, as rate 101 does now", which means calling the user's functions.
 That happens here, in a child process with a timeout, so a function that hangs,
-exits or prints cannot take the guided flow down with it, and nothing it
-imports stays loaded in the process that is asking the questions.
+exits or prints cannot take the command down with it, and nothing it imports
+stays loaded in the process that is writing the task file.
 
 Four rules, each from an audit finding before 0.6.0:
 

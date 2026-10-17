@@ -1175,8 +1175,7 @@ def write(result, gaps, out_dir=OUT_DIR, invoked_from=None, advice=None):
         score_questions.save(questions, asked, result["task"], scored)
         if questions:
             result.update(questions=questions, questions_path=asked,
-                          # `qikly --start` passes its own: the report must
-                          # not send its user off to --scaffold mid-flow.
+                          # A caller can pass its own next step.
                           questions_advice=advice if advice is not None
                           else score_questions.advice(questions, invoked_from))
     with open(path, "w", encoding="utf-8", newline="\n") as handle:

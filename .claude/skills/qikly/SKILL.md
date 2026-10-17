@@ -50,32 +50,29 @@ disagree with a bug because the bug is what they were written from.
 So do not open by writing tests. Say that in one sentence, then offer the
 things that do work, and let the user choose:
 
-- **`qikly --questions my_module.py`** (qikly 0.6.0 or later) is the whole path,
-  and the best first offer when a suite already exists. It scores their tests
-  and writes the questions, each with options worked out by running their
-  code, to `inputs_private/questions/<NAME>_open_questions.txt`, and exits
-  with code 3. Put each question and its options to the user **word for
-  word**, and write what they choose after its `Q` number, never an answer of
-  your own or one read off the code. The optional part at the end takes a
-  `requirements:` line, a sentence from them on what the module does, and
-  `rule:` lines, rules of their own, in their words. Or suggest they fill the file in
-  themselves, in their editor: the answers have to be theirs.
-  Then `qikly --answers my_module.py` checks the task. In
-  their own terminal it offers the run, says where the code and the answers
-  disagree, and offers to copy the new tests home. Run by you, without a
-  terminal, it prints `qikly --tasks <TASK>` and `qikly --take-tests <TASK>`,
-  which do the run and the copy; any copied test that fails on their code is
-  for them to compare with its answer, not proof the code is wrong.
+The path is three commands, each taking the same module or folder:
 
-- **`qikly --score my_module.py --score-tests their_tests.py`** if any
-  suite already exists (before 0.6.0 the flag is `--score-code`). Free, no model call, nothing of theirs modified, and it
-  answers "is the suite we have worth anything" with named faults it missed.
-  This is usually the right first move on somebody else's project.
-- **`qikly --scaffold my_module.py`**, then fill in `requirements` and
-  `acceptance_criteria` together, if what they actually want is tests that
-  could fail. The scaffold reads their real signatures; the two halves are the
-  part only they can write, and the whole value is in that being a separate act
-  from writing the code.
+- **`qikly --score my_module.py`**, the best first move when any suite
+  exists (before 0.6.0 the flag is `--score-code`). Free, no model call,
+  nothing of theirs modified. It finds the tests that import the module, or
+  take `--score-tests their_tests.py`, and answers "is the suite we have
+  worth anything" with named faults it missed, each as a question.
+- **`qikly --scaffold my_module.py`** then writes the task file,
+  `inputs_private/config/tasks/<NAME>_VERIFY.yaml`, with the interface, a
+  data file of the values their tests already use, and those questions under
+  `acceptance_criteria`, each above a TODO. Under each question, lines
+  starting `#?` say what the code does beside the value in question, found by
+  running it. Put each question and those values to the user **word for
+  word**, and write what they answer in place of its TODO, as a sentence
+  naming a value, never an answer of your own or one read off the code. A
+  TODO left in place is skipped. `requirements` starts as a neutral line, to
+  keep what the code does; replace it only with their words. Or suggest they
+  answer in their editor: the answers have to be theirs.
+  `qikly --validate my_module.py` checks it, free.
+- **`qikly --tasks my_module.py`** runs it, which needs their key. It ends by
+  pointing at `qikly --take-tests my_module.py`, which copies the new tests
+  home and runs them on their code; a copied test that fails there is for
+  them to compare with its criterion, not proof the code is wrong.
 
 ## Ask economically, or you will lose them
 

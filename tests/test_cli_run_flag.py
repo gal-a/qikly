@@ -21,17 +21,14 @@ def _parse(argv, monkeypatch):
     return cli._parse_args()
 
 
-def test_start_is_no_longer_run_and_an_old_script_is_told_so(monkeypatch, capsys):
+def test_start_is_still_run(monkeypatch):
     """
-    `--start` was `--run`'s old spelling until 0.6.0 gave it to the guided
-    first run. A script still passing a task id must not have it silently
-    treated as a module path: it is told which flag it wants.
+    `--start` is `--run`'s original spelling, and 0.5.9 shipped it that way.
+    A 0.6.0 build gave the name to a guided first run, since shelved; the
+    alias is back, so a script that passes a task id to it still works.
     """
     assert _parse(["--run", "CALC_TAX"], monkeypatch).run == "CALC_TAX"
-    parsed = _parse(["--start", "CALC_TAX"], monkeypatch)
-    assert not parsed.run and parsed.start == "CALC_TAX"
-    assert cli._do_start("CALC_TAX") == 2
-    assert "qikly --run CALC_TAX" in capsys.readouterr().out
+    assert _parse(["--start", "CALC_TAX"], monkeypatch).run == "CALC_TAX"
 
 
 def test_runs_plural_is_a_different_flag_and_starts_nothing(monkeypatch):

@@ -1,5 +1,6 @@
 """
-The answers `qikly --start` offers for one question, as concrete behaviours.
+What the code does beside one question's value, as concrete behaviours:
+the lines `qikly --scaffold` writes under each question in the task file.
 
 The rule this module exists to keep: **the answer is the person's, never read
 off the code.** So:
@@ -12,16 +13,15 @@ off the code.** So:
   planted change disagree**, and both results are offered, the current one
   labelled as such. The user sees the code line anyway; the label is honest
   about which is which, and the prompt asks what it *should* do.
-- **The order of the two behaviours is shuffled**, seeded by the question, so
-  "option 1" never comes to mean "what my code does".
+- **The order of the two behaviours carries no signal**: `--scaffold` lists
+  them in an order fixed by the values, so the first never comes to mean
+  "what my code does".
 - **Where the line's own function has no test call**, the public functions
   and classes the tests call are tried, and only a call that ran the line
   counts. A check switched off and an error never raised get the same search.
 - **Where nothing works**, a comparison whose edge is not known, or no call
-  that reaches the line, the menu offers only "skip this question for now"
-  and "type my own answer".
-
-Every option set ends with free text, the user's rule for every menu.
+  that reaches the line, nothing is offered and the question is asked as the
+  score report asked it.
 """
 import ast
 import hashlib

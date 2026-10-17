@@ -42,85 +42,58 @@ key away from the student: the coding agent never sees the acceptance criteria.*
 
 ## Start here
 
+Run these from your project's root folder. Each takes one module or a whole
+folder, and the same path in every step:
+
 ```bash
 pip install --upgrade qikly
-qikly --score my_module.py     # optional: score the suite you have
-qikly --questions my_module.py          # or a folder: qikly --questions my_project
+qikly --score my_module.py       # 1. what your tests miss         free, no key
+qikly --scaffold my_module.py    # 2. the task file, to answer in  free, no key
+qikly --tasks my_module.py       # 3. the run                      needs an API key
 ```
 
-**Have a test suite? Score it first.** `--score` plants faults in a copy
-of your code, one at a time, and names the ones your tests did not notice.
-Free, no key, nothing of yours changed. It takes a module or a whole folder.
-Both commands find your tests themselves: the `test_*.py` and `*_test.py`
-files that import your code, searched from the project root. To name them
-instead, add `--score-tests tests/`.
+1. **`--score` scores the tests you have.** It plants faults in a copy of your
+   code, one at a time, and names the ones your tests did not notice, each as
+   a question about behaviour nothing checks. It finds your tests itself: the
+   `test_*.py` and `*_test.py` files that import your code, searched from the
+   project root. To name them instead, add `--score-tests tests/`. No model is
+   called and nothing of yours is changed.
+2. **`--scaffold` writes the task file**, `inputs_private/config/tasks/MY_MODULE_VERIFY.yaml`,
+   with everything it can read from your code filled in, and a data file of
+   the values your tests already call it with. What is left is what only you
+   know: the questions from step 1, under `acceptance_criteria`, each with
+   what your code does beside the value in question, found by running it:
 
-**Then, or instead, start on your own code, not on ours.** `--questions` needs no task file, no
-specification and, until its last step, no API key. Point it at one module or
-a whole folder. It:
-
-1. **Scores the tests you already have**, by planting faults in a copy of your
-   code one at a time and seeing which ones your tests do not notice. Free, and
-   no model is called. It finds the tests that import your code, or name them
-   with `--score-tests tests/`.
-2. **Writes one file of questions about what they never check**, to answer at
-   your own pace in your editor. Only questions qikly can offer a choice for
-   go in, worked out by running your code beside the value in question, never
-   at it; the same call is asked once:
-
-   ```
-   #  >    2     if rate < 0 or rate > 100:
-   # Your tests never try rate at exactly 100.
-   # What should apply_discount(100, 100) do?
-   #   1. raise ValueError, as rate 101 does now
-   #   2. return a value, as rate 99 does now
-   #   3. either is fine, I do not mind
-   #   4. save it (no decision now, maybe later)
-   Q3: 1
+   ```yaml
+   #?     if rate < 0 or rate > 100:
+   #? Your tests never try rate at exactly 100.
+   #? What should apply_discount(100, 100) do?
+   #? Found by running your code:
+   #? - return a value, as rate 99 does now (it returns 1.0)
+   #? - raise ValueError, as rate 101 does now
+   - "apply_discount(100, 100) raises ValueError"
    ```
 
-   The file also has a line for what the module does, `rule:` lines for rules
-   of your own, and example input rows built from your tests.
-3. **`qikly --answers my_module.py`**, the command at the
-   top of the file, saves your answers as acceptance criteria, checks them,
-   and in a terminal offers the run, which needs an API key. A test agent
-   writes tests from your answers before any code is shown to it; a separate
-   coding agent, which never sees your answers, repairs a copy of your code
-   until they pass. It tells you first where your code and your answers
-   disagree.
-4. **After a green run, it offers to copy the new tests into your own tests
-   folder**, under `qikly_generated/` beside the tests it scored, rewritten to
-   import your module rather than qikly's copy of it, and runs them on your
-   code. It names failures that are worth comparing with your answers, and
-   those that only call a helper qikly's copy has or could not import your
-   module. `qikly --take-tests <TASK>` does the same later.
+   You write your answer in place of each TODO, as a sentence that names a
+   value. A TODO you leave is skipped. On a folder it writes one task file for
+   each module step 1 asked about. Lines starting `#?` are notes for you,
+   and neither agent reads them. This file is the one source of truth: change
+   it and run step 3 again. `qikly --validate my_module.py` checks it, free.
+3. **`--tasks` runs it**, which needs an API key (Google Gemini, Anthropic or
+   OpenAI). A test agent writes tests from your criteria before any code is
+   shown to it, and a separate coding agent, which never sees them, repairs a
+   copy of your code until they pass. Your files are never edited. It ends by
+   pointing at **`qikly --take-tests my_module.py`**, which copies the new
+   tests into your own tests folder, under `qikly_generated/`, rewritten to
+   import your module rather than qikly's copy, and runs them on your code. A
+   test that fails there is where your code and your criteria disagree; the
+   report says which failures to compare with a criterion and which to check
+   as the test writer's own reading.
 
-Change anything in the file and run the same `--answers` command again; the
-task is rebuilt from it each time. If your code changes, `--questions` again
-refreshes the file: your answers stay on their questions wherever it can find
-them, any it cannot are kept at the end as comments, and a dated copy of the
-old file is kept beside it. Your own files are never edited, and
-the command ends with a full audit: every file it read, saved and wrote, and
-where. Without a terminal, as in CI or under a coding agent, `--answers` checks
-the task and prints the two commands that run it, `qikly --tasks <TASK>` and
-`qikly --take-tests <TASK>`.
-
-### The same path, command by command
-
-`--questions` and `--answers` run these, and they remain for scripts and CI:
-
-| Step | Command | Costs |
-|---|---|---|
-| Score your tests, and turn each miss into a question | `qikly --score my_module.py --score-tests tests/` | free, no key |
-| Write the task file with those questions in it, to answer by hand | `qikly --scaffold my_module.py` | free, no key |
-| Check the task file | `qikly --validate --tasks MY_MODULE_VERIFY` | free, no key |
-| Run it | `qikly --tasks MY_MODULE_VERIFY` | needs an API key |
-| See how many planted faults the new integration and system tests catch | `qikly --score-suite --tasks MY_MODULE_VERIFY` | free, no key |
-| Copy the new tests into your own tests, importing your module | `qikly --take-tests MY_MODULE_VERIFY` | free, no key |
-
-A task id is the module's name in capitals plus `_VERIFY`, which marks a task
-that tests code you already have. `qikly --scaffold my_module.py --fresh`
-writes `MY_MODULE.yaml` instead, a task in which qikly writes a new
+The task is named after the module, `MY_MODULE_VERIFY`, where `_VERIFY` marks
+a task that tests code you already have. You never need to type it: every
+step takes the path you gave `--score`. `qikly --scaffold my_module.py
+--fresh` writes `MY_MODULE.yaml` instead, a task in which qikly writes a new
 implementation of the same interface.
 
 ### Other ways in
@@ -144,9 +117,8 @@ implementation of the same interface.
   there, so anything the code never did is invisible to it. No model is called,
   nothing of yours is modified, and no code leaves your machine.
 - It plants every fault it can, up to 60 in one module or 150 in a folder,
-  and a sample when your tests are slow; `--questions` counts the same way,
-  so both report the same score. `--score-mutants 48` sets the number, and
-  `--score-seed 1` draws a different sample.
+  and a sample when your tests are slow. `--score-mutants 48` sets the
+  number, and `--score-seed 1` draws a different sample.
 - `--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
   delete. It is for watching, not for building in. `--example` and `--scaffold`
   create a real project in the directory you are standing in, and those are the

@@ -198,21 +198,28 @@ def check_task(path):
         warnings.append(Note(line, group=("unreachable", line.split("criterion: ")[-1])))
 
     leftover = [field for field in ("task_name", "description", "interface",
-                                    "requirements", "acceptance_criteria")
+                                    "requirements")
                 if task.get(field) is not None and _TODO.search(str(task.get(field)))]
     if leftover:
-        # Counted for the criteria, because --scaffold writes one TODO per
-        # question --score-code raised, and "still has TODO placeholders"
-        # does not tell anyone how many answers are left.
-        open_answers = sum(
-            1 for c in (task.get("acceptance_criteria") or [])
-            if isinstance(c, str) and _TODO.search(c))
-        counted = (f" ({open_answers} of the acceptance criteria still "
-                   f"unanswered)" if open_answers else "")
         warnings.append(
-            f"{name}: still has TODO placeholders in {', '.join(leftover)}"
-            f"{counted}. A run sends them to the agents as written, so "
-            f"replace them first")
+            f"{name}: still has TODO placeholders in {', '.join(leftover)}. "
+            f"A run sends them to the agents as written, so replace them first")
+    # A criterion left as TODO is a question someone skipped: a run leaves
+    # it out, so it is counted, not refused. With none answered there is
+    # nothing to test against, which is worth stopping for before a paid run.
+    all_criteria = [c for c in (task.get("acceptance_criteria") or [])
+                    if isinstance(c, str)]
+    skipped = sum(1 for c in all_criteria if _TODO.search(c))
+    if skipped and skipped == len(all_criteria):
+        errors.append(
+            f"{name}: none of its {skipped} acceptance criteria is answered "
+            f"yet, so a run would have nothing to test against. Write an "
+            f"answer in place of at least one TODO")
+    elif skipped:
+        warnings.append(Note(
+            f"{name}: {len(all_criteria) - skipped} of its "
+            f"{len(all_criteria)} acceptance criteria are answered; a run skips "
+            f"the {skipped} still left as TODO", group=("skipped-todo", name)))
 
     for relative in (task.get("inputs") or []):
         if not _input_exists(relative):
@@ -304,8 +311,8 @@ def _restated_outside_requirements(raw, task, threshold=0.6):
     requirement_text = {str(r).strip() for r in (task.get("requirements") or [])}
     handed_over = without_acceptance_criteria(raw)
     # The interface's own signatures are facts about the code, written by
-    # --scaffold. A criterion phrased as a call, as `qikly --start` writes
-    # them ("delivery_days('DE') returns 10"), shares every word of one, and
+    # --scaffold. A criterion phrased as a call, as an answer to a question
+    # in the task file is ("delivery_days('DE') returns 10"), shares every word of one, and
     # the warning then told a first-time user they had leaked the answers.
     interface = task.get("interface") or {}
     declared = list(interface.get("integration_functions") or []) + \

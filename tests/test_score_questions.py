@@ -283,7 +283,6 @@ def test_one_file_is_told_the_exact_command(tmp_path):
     questions = _questions(tmp_path)
     (line,) = sq.advice(questions, str(tmp_path))
     assert "`qikly --scaffold pricing.py`" in line
-    assert "--tasks PRICING_VERIFY" in line
 
 
 def test_several_files_are_not_given_a_command_that_guesses(tmp_path):
@@ -291,7 +290,8 @@ def test_several_files_are_not_given_a_command_that_guesses(tmp_path):
         (tmp_path / name).write_text(MODULE, encoding="utf-8")
     qs = [{"path": str(tmp_path / n)} for n in ("a.py", "b.py")]
     (line,) = sq.advice(qs, str(tmp_path))
-    assert "2 files" in line
+    # The folder, which --scaffold takes, and the modules it is about.
+    assert "`qikly --scaffold .`" in line and "2 modules" in line
 
 
 def test_a_module_of_classes_is_sent_to_init(tmp_path):
@@ -310,7 +310,8 @@ def test_a_second_round_does_not_scaffold_again(tmp_path):
     (tasks / "PRICING_VERIFY.yaml").write_text("task_id: PRICING_VERIFY\n",
                                                encoding="utf-8")
     (line,) = sq.advice(questions, str(tmp_path))
-    assert "already exists" in line and "--scaffold pricing.py" not in line
+    assert "already exists" in line and "Next: `qikly --scaffold" not in line
+    assert "move it aside" in line
 
 
 def test_a_path_with_a_space_is_quoted_and_uses_forward_slashes(tmp_path):
@@ -375,8 +376,8 @@ def test_score_then_scaffold_puts_the_questions_where_criteria_live(scored):
     assert criteria and all(c.startswith("TODO:") for c in criteria)
     assert "rate > 100" in text.split("acceptance_criteria:")[1]
 
-    checked = _run(["--validate", "--tasks", "PRICING_VERIFY"], str(project))
-    assert "acceptance_criteria" in checked.stdout + checked.stderr
+    checked = _run(["--validate", "pricing.py"], str(project))
+    assert "none of its" in checked.stdout + checked.stderr
 
 
 def test_fresh_scaffold_does_not_take_the_questions(scored):
@@ -487,5 +488,12 @@ def test_validate_says_how_many_answers_are_left(tmp_path):
     _run(["--score-code", "pricing.py", "--score-tests", "test_pricing.py",
           "--score-seed", "1"], str(project))
     _run(["--scaffold", "pricing.py"], str(project))
+    task = project / "inputs_private" / "config" / "tasks" / "PRICING_VERIFY.yaml"
+    text = task.read_text(encoding="utf-8")
+    first = text.index('  - "TODO:')
+    end = text.index("\n", first)
+    task.write_text(text[:first] + '  - "apply_discount(100, 0) returns 100.0"'
+                    + text[end:], encoding="utf-8")
     checked = _run(["--validate", "--tasks", "PRICING_VERIFY"], str(project))
-    assert "of the acceptance criteria still unanswered" in checked.stdout + checked.stderr
+    out = checked.stdout + checked.stderr
+    assert "acceptance criteria are answered; a run skips the" in out, out

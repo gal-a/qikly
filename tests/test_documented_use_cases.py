@@ -64,7 +64,9 @@ def test_scaffold_writes_the_interface_and_refuses_to_write_the_criteria(tmp_pat
     assert written["interface"]["module"]
     assert written["interface"]["integration_functions"]
     assert "TODO" in written["acceptance_criteria"][0]
-    assert "TODO" in written["requirements"][0]
+    # Requirements start as a neutral line, to keep what the code does, for
+    # the person to replace: never a rule read out of the code.
+    assert "keep that" in written["requirements"][0]
 
 
 # --------------------------------------------- row: requirements only (1) --

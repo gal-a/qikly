@@ -308,8 +308,11 @@ def _warn_if_no_acceptance_criteria(task_id):
     first round starts from a freshly-generated list, not a hand-written
     one -- see docs/TASK_FILE_REFERENCE.md#auto-generating-acceptance-criteria).
     """
-    with open(task_config_path(task_id), "r") as f:
-        task_config = yaml.safe_load(f) or {}
+    # As test generation will read it: criteria left as TODO are skipped,
+    # so a file of nothing but TODOs has none.
+    from qikly.score_questions import drop_question_lines
+    with open(task_config_path(task_id), "r", encoding="utf-8") as f:
+        task_config = yaml.safe_load(drop_question_lines(f.read())) or {}
     if not task_config.get("acceptance_criteria"):
         print(
             f"[{task_id}] WARNING: no acceptance_criteria defined. Test generation "

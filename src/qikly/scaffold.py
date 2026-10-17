@@ -71,6 +71,69 @@ acceptance_criteria:
 {seed_block}'''
 
 
+# The task that tests code you already have: everything qikly can read from
+# the code is filled in, so what is left is what only its owner knows. A first
+# user, given the template above, met six TODOs before the first question.
+VERIFY_TEMPLATE = '''# The task file for {source_rel}. Answer the questions under
+# acceptance_criteria, then run:  qikly --tasks {command}
+task_id: "{task_id}"
+
+task_name: "{task_id}: tests for {name}"
+
+description: "{description}"
+
+inputs:
+{inputs}
+
+outputs:
+  - "outputs/data/{task_id}/output.json"
+
+# Read from {source_rel}.
+interface:
+  module: "{module}"
+  integration_functions:
+{functions}
+  system_entrypoint: "{entrypoint}"
+
+# What the code is for, in your words. The coding agent reads this, so give
+# its purpose, not the values the questions below ask about.
+requirements:
+  - {requirement}
+
+# What must be true, each naming a value someone could check, such as
+# "a humidity of 100 is accepted and 101 is rejected". The coding agent never sees
+# this section, so keep those values out of every other line of this file.
+acceptance_criteria:
+  - "TODO: one checkable statement, with its boundary value, e.g. a humidity of
+    100 is accepted and 101 is rejected"
+
+# The code under test. qikly tests a copy of it and never changes this file.
+seed:
+  implementation: "{source_rel}"
+'''
+
+
+def default_requirement(source, name):
+    """
+    The requirements line a task for existing code starts with: the module's
+    own docstring, or to keep what the code does. The coding agent repairs a
+    copy of that code, so the code is the description; a person can say more.
+    """
+    try:
+        doc = ast.get_docstring(ast.parse(source)) or ""
+    except SyntaxError:
+        doc = ""
+    first = doc.strip().split("\n\n")[0].replace("\n", " ").strip()
+    if first:
+        return f"{name}: {first}"
+    return (f"{name} does what its code does now; keep that, and change only "
+            f"what the tests show is wrong.")
+
+
+def _quoted(text):
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
 # A scaffold writes one of two task files, because one command cannot know which
 # of two jobs you meant. The default, SEED_EXISTING, tests the code you already
 # have; `--fresh` picks SEED_NONE and a new implementation instead.
@@ -340,6 +403,16 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
     in_lines = "\n".join(f'  - "{p}"' for p in inputs)
 
     source_rel = _source_rel(source_path, project_root)
+    if seed == "existing":
+        name = os.path.basename(source_path)
+        command = source_rel if " " not in source_rel else f'"{source_rel}"'
+        requirement = default_requirement(source, name)
+        return VERIFY_TEMPLATE.format(
+            source_rel=source_rel, command=command, task_id=task_id, name=name,
+            description=f"Tests for the existing {name}, from its owner's answers.",
+            inputs=in_lines, module=module_path(source_path, task_id),
+            functions="\n".join(f'    - "{_signature(f)}"' for f in functions),
+            entrypoint=_signature(entry), requirement=_quoted(requirement)), None
     seed_block = {
         None: SEED_NONE,
         "none": SEED_NONE,

@@ -134,8 +134,8 @@ def test_the_merge_runs_against_what_scaffold_actually_writes(tmp_path):
     parsed = yaml.safe_load(merged)          # the step that used to raise
     assert parsed["acceptance_criteria"] == [
         "A humidity of 100 is accepted and 101 is rejected"]
-    assert parsed["requirements"] and "TODO" in parsed["requirements"][0], (
-        "requirements must still be the reader's to write")
+    assert parsed["requirements"] and "keep that" in parsed["requirements"][0], (
+        "requirements must not be filled from the document")
     assert parsed["interface"]["module"], "the interface was dropped"
 
 
