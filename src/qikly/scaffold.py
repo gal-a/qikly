@@ -389,6 +389,10 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
                       f"no interface to describe. Tests need something to call.")
 
     stem = os.path.splitext(os.path.basename(source_path))[0]
+    if stem == "__init__":
+        # A package's own code is named for the package, as
+        # score_questions.task_for names it: MYPKG_VERIFY, not __INIT___VERIFY.
+        stem = os.path.basename(os.path.dirname(os.path.abspath(source_path))) or stem
     base = task_id or "".join(c if c.isalnum() else "_" for c in stem).upper()
     # Named here, not by each caller, so `--scaffold` and the MCP tool cannot
     # disagree about what the task that tests existing code is called. Both

@@ -139,7 +139,8 @@ folder, and every step takes the same path:
    values your tests already call it with. On a folder it writes one task
    file for each module step 1 asked about. What is left is step 1's
    questions, under `acceptance_criteria`, each with what your code does
-   beside the value in question, found by running it. Write your answer in
+   there now, found by running it (for a boundary, only on either side of
+   it, never at it). Write your answer in
    place of each TODO, as a sentence that names a value someone could check,
    such as `apply_discount(100, 100) raises ValueError`. A TODO you leave is
    skipped. Lines starting `#?` are notes for you, and neither agent reads
@@ -169,9 +170,9 @@ folder, and every step takes the same path:
 
    which copies the new tests into `qikly_generated/` beside your tests,
    rewritten to import your own module, and runs them on your code. A test
-   that fails there is where your code and your criteria disagree; the
-   report says which failures to compare with a criterion and which are the
-   test writer's own reading, to check.
+   that fails there is one to compare with its criterion: either your code
+   or the test is wrong. The report says which failures were written from a
+   criterion and which are the test writer's own reading, to check.
 
 ## Command by command
 

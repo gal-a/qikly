@@ -961,7 +961,7 @@ def _parse_args():
              "everything it can read from the code filled in, rows for the "
              "data file from your tests, and the questions your --score run "
              "raised under acceptance_criteria, each with what your code does "
-             "beside the value in question, for you to answer. Then run "
+             "there now, found by running it, for you to answer. Then run "
              "qikly --tasks with the same path. (Not the questions with "
              "--fresh or --from-doc.)"
     )
@@ -1727,8 +1727,12 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
             # Every fault it can plant, up to a cap, and a sample only when
             # the suite is slow: a fixed 12 left faults unplanted on small code.
             from qikly import start
-            sites, mutants = start.how_many(start.Console(), target, tests,
-                                            INVOKED_FROM, os.path.isdir(code))
+            try:
+                sites, mutants = start.how_many(start.Console(), target, tests,
+                                                INVOKED_FROM, os.path.isdir(code))
+            except (start.Stop, EOFError, KeyboardInterrupt):
+                print("Stopped before anything was planted.")
+                return 130
             if not mutants:
                 print("There is nothing in that code qikly knows how to change, "
                       "so there is nothing to score.")
@@ -2141,16 +2145,54 @@ def _fill_criteria_from(text, doc, root):
     return fd.merge(text, criteria)
 
 
-def _task_ids_for(value):
+_HEADER = re.compile(r"^# The task file for (.+)\. Answer the questions under$")
+
+
+def _module_of(task_file, as_written=False):
+    """
+    The module a --scaffold task file names on its first line, or None: as
+    a path to compare, or `as_written`, as the file gives it, for printing.
+    """
+    try:
+        with open(task_file, encoding="utf-8-sig") as handle:
+            found = _HEADER.match(handle.readline().rstrip("\r\n"))
+    except OSError:
+        return None
+    if not found:
+        return None
+    if as_written:
+        return found.group(1)
+    return os.path.normcase(os.path.abspath(os.path.join(INVOKED_FROM, found.group(1))))
+
+
+def _tasks_by_module():
+    """{module path: [task ids]} for every task file that names its module."""
+    tasks_dir = os.path.join(INVOKED_FROM, "inputs_private", "config", "tasks")
+    out = {}
+    try:
+        names = sorted(os.listdir(tasks_dir))
+    except OSError:
+        return out
+    for name in names:
+        if name.endswith(".yaml"):
+            module = _module_of(os.path.join(tasks_dir, name))
+            if module:
+                out.setdefault(module, []).append(name[:-len(".yaml")])
+    return out
+
+
+def _task_ids_for(value, quiet=False):
     """
     The task ids for a --tasks, --validate, --explain or --take-tests value:
-    task ids as given, or the module or folder --scaffold was run on, which
-    names each task the way --scaffold does. None, said why, when a path has
-    no task file yet.
+    task ids as given, or the module or folder --scaffold was run on. A task
+    file names its module on its first line, so a module scaffolded under
+    another name, with --task-id or beside a module of the same name, is
+    still found. None, said why, when a path has no task file yet.
     """
     from qikly import score_questions, start
 
     tasks_dir = os.path.join(INVOKED_FROM, "inputs_private", "config", "tasks")
+    by_module = _tasks_by_module()
     out = []
     for part in [t.strip() for t in value.split(",") if t.strip()]:
         where = part if os.path.isabs(part) else os.path.join(INVOKED_FROM, part)
@@ -2161,18 +2203,48 @@ def _task_ids_for(value):
             out.append(part)
             continue
         if not os.path.exists(where):
-            print(f"There is no file or folder at {where}.", file=sys.stderr)
+            if not quiet:
+                print(f"There is no file or folder at {where}.", file=sys.stderr)
             return None
         modules = start.modules_in(where) if os.path.isdir(where) else [where]
-        found = [score_questions.task_for(m) for m in modules]
-        found = [t for t in dict.fromkeys(found)
-                 if os.path.isfile(os.path.join(tasks_dir, t + ".yaml"))]
+        found = []
+        for m in modules:
+            named = by_module.get(os.path.normcase(os.path.abspath(m)))
+            if named:
+                found += named
+            else:
+                # A task file written before its first line named the module.
+                old = score_questions.task_for(m)
+                path = os.path.join(tasks_dir, old + ".yaml")
+                if os.path.isfile(path) and _module_of(path) is None:
+                    found.append(old)
         if not found:
-            print(f"There is no task file for {part} yet. Write it first:  "
-                  f"qikly --scaffold {part}", file=sys.stderr)
+            if not quiet:
+                from qikly.score_questions import _pasteable
+                print(f"There is no task file for {part} yet. Write it first:  "
+                      f"qikly --scaffold {_pasteable(part)}", file=sys.stderr)
             return None
         out += found
     return ",".join(dict.fromkeys(out))
+
+
+def _all_todo(task_ids):
+    """The tasks among these whose acceptance criteria are all placeholders."""
+    import yaml
+
+    from qikly.agent_api.agent_interface import task_config_path
+    from qikly.score_questions import is_todo
+
+    out = []
+    for task_id in task_ids:
+        try:
+            with open(task_config_path(task_id), encoding="utf-8") as handle:
+                criteria = (yaml.safe_load(handle) or {}).get("acceptance_criteria")
+        except Exception:
+            continue
+        if isinstance(criteria, list) and criteria and all(is_todo(c) for c in criteria):
+            out.append(task_id)
+    return out
 
 
 def _say_take_tests(task_ids):
@@ -2181,30 +2253,26 @@ def _say_take_tests(task_ids):
     left: their own code under the tests the run wrote. A run only ever tested
     qikly's copy, so until then nothing has been said about theirs.
     """
-    import yaml
-
     from qikly.agent_api.agent_interface import task_config_path
+    from qikly.score_questions import _pasteable
 
-    seeded = []
+    targets = []
     for task_id in task_ids:
-        try:
-            with open(task_config_path(task_id), encoding="utf-8") as handle:
-                seed = (yaml.safe_load(handle) or {}).get("seed") or {}
-        except Exception:
+        module = _module_of(task_config_path(task_id), as_written=True)
+        if module is None:
             continue
-        if isinstance(seed, dict) and seed.get("implementation"):
-            seeded.append((task_id, seed["implementation"]))
-    if not seeded:
+        # The module's path where it names this task alone; otherwise the
+        # task id, which is never ambiguous.
+        path = _pasteable(module)
+        targets.append(path if _task_ids_for(path, quiet=True) == task_id else task_id)
+    if not targets:
         return
-    # The module's own path where the seed is one file; a package seed is a
-    # folder of many tasks' code, so its task id says which.
-    target = ",".join(impl if str(impl).endswith(".py") else task_id
-                      for task_id, impl in seeded)
     print()
-    print(f"Next: qikly --take-tests {target}")
+    print(f"Next: qikly --take-tests {','.join(targets)}")
     print("  copies the tests this run wrote into tests/qikly_generated/ and runs")
     print("  them on your own code, which this run never changed. A test that")
-    print("  fails there is where your code and your criteria disagree.")
+    print("  fails there is one to compare with its criterion: it says which")
+    print("  side looks wrong, and the choice is yours.")
 
 
 def _do_scaffold(source, task_id, doc=None, fresh=False):
@@ -2266,11 +2334,9 @@ def _scaffold_folder(folder):
     print(f"Writing a task file for each of the {len(asked)} module"
           f"{'' if len(asked) == 1 else 's'} in {shown(folder)} your --score "
           f"asked about:")
-    written, problems = 0, 0
+    written = 0
     for module in asked:
-        code = _scaffold_one(module, None, None, False, brief=True)
-        written += code == 0
-        problems += code != 0
+        written += _scaffold_one(module, None, None, False, brief=True) == 0
     print()
     if not written:
         return 2
@@ -2314,14 +2380,18 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
     # criteria section, where the answers belong. Not with --fresh, whose job
     # is a new implementation, and not with --from-doc, whose criteria come
     # from the document.
-    asked, asked_on = 0, None
+    asked, asked_on, found = 0, None, []
+    from qikly.scaffold import with_questions
     if not fresh and not doc:
         from qikly import score_questions
-        from qikly.scaffold import with_questions
 
         found, asked_on = score_questions.latest_for(
             source, os.path.join(root, "qikly-suite-score"))
         if found:
+            if not brief:
+                print(f"Running {name} beside each of the {len(found)} question"
+                      f"{'' if len(found) == 1 else 's'} its score raised, in a "
+                      f"separate process; nothing of yours is changed.")
             found = start.hinted(found, source, root)
         text, used = with_questions(text, found, asked_on)
         asked = len(found) if used else 0
@@ -2333,6 +2403,29 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
     # MCP tool always agree on it.
     tid = re.search(r'task_id:\s*"([^"]+)"', text).group(1)
     dest = os.path.join(dest_dir, f"{tid}.yaml")
+    mine = os.path.normcase(os.path.abspath(source))
+    if (os.path.exists(dest) and not fresh and not task_id
+            and _module_of(dest) not in (None, mine)):
+        # Another module of the same name, in another folder, has this name:
+        # take the parent folder's name too, then a number, and never write
+        # into its task file or its data.
+        from qikly.scaffold import VERIFY_SUFFIX
+        base = tid[:-len(VERIFY_SUFFIX)]
+        parent = re.sub(r"\W", "_", os.path.basename(os.path.dirname(mine))).upper()
+        for n in range(1, 100):
+            candidate = f"{parent}_{base}" + (f"_{n}" if n > 1 else "")
+            path = os.path.join(dest_dir, f"{candidate}{VERIFY_SUFFIX}.yaml")
+            if not os.path.exists(path) or _module_of(path) == mine:
+                break
+        text, problem = build_task(source, root, task_id=candidate, seed=seed_mode)
+        if problem:
+            return refuse(problem)
+        text = start.package_seed(text, source, root)
+        if not doc:
+            text, used = with_questions(text, found, asked_on)
+            asked = len(found) if used else 0
+        tid = candidate + VERIFY_SUFFIX
+        dest = os.path.join(dest_dir, f"{tid}.yaml")
     if os.path.exists(dest):
         return refuse(f"its task file already exists: {os.path.abspath(dest)}. "
                       f"Edit that one, or move it aside to write it again"
@@ -2355,9 +2448,10 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
             # Not in this project, but a bundled example's data has the same
             # name. A file written here would replace that fixture for the
             # bundled task too, so nothing is written.
+            from qikly.score_questions import _pasteable
             data_step = (f"{p} is also a bundled example's data, so give this "
                          f"task its own name: move the task file aside and run  "
-                         f"qikly --scaffold {shown(source)} --task-id MY_NAME")
+                         f"qikly --scaffold {_pasteable(shown(source))} --task-id MY_NAME")
         elif columns and p.lower().endswith(".csv"):
             rows = start.rows_from_tests(source, root, columns) if not fresh else []
             os.makedirs(os.path.dirname(data), exist_ok=True)
@@ -2386,8 +2480,9 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
 
     if brief:
         print(f"  {shown(source)}: {shown(dest)}, {asked} question"
-              f"{'' if asked == 1 else 's'}"
-              + (f"; {data_step.splitlines()[0]}" if data_step else ""))
+              f"{'' if asked == 1 else 's'}")
+        if data_step:
+            print("    then " + data_step.replace("\n       ", "\n      "))
         return 0
 
     from qikly.score_questions import _pasteable
@@ -2789,6 +2884,10 @@ def main():
               file=sys.stderr)
         return 2
     if args.explain:
+        if "," in args.explain:
+            print(f"--explain shows one task at a time. Name one module, or one "
+                  f"of: {args.explain.replace(',', ', ')}", file=sys.stderr)
+            return 2
         return _do_explain(args.explain, args.json, args.html)
     if args.validate:
         return _do_validate(args.tasks, args.json)
@@ -2810,6 +2909,15 @@ def main():
     if not task_ids:
         print("No tasks found in config/tasks/, bundled or private (and none given via --tasks).")
         sys.exit(1)
+
+    # A task whose criteria are all still TODO would run with none, since a
+    # run skips them, and spend money testing nothing anyone decided.
+    unanswered = _all_todo(task_ids)
+    if unanswered:
+        print(f"Nothing is answered yet in {', '.join(unanswered)}: every "
+              f"acceptance criterion is still a TODO, which a run skips. Write "
+              f"an answer in place of at least one, then run it again.")
+        sys.exit(2)
 
     # Fail fast on a misconfigured/unsupported LLM_PROVIDER or a missing
     # required env var, before spawning any per-task process -- otherwise

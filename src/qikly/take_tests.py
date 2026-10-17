@@ -287,8 +287,11 @@ def take(cwd, task_id, test_dir, say=print):
         say(f"  not copied, because it still refers to qikly's copy: {path}")
     keep_outputs_out_of_pytest(cwd)
     _remember(cwd, task_id, test_dir)
-    return written + extras, _run(cwd, written,
-                                  len(task.get("acceptance_criteria") or []))
+    # Counted as test generation saw them, TODOs left out: a test tagged
+    # with a number past that was not written from any criterion.
+    from qikly.score_questions import is_todo
+    answered = [c for c in (task.get("acceptance_criteria") or []) if not is_todo(c)]
+    return written + extras, _run(cwd, written, len(answered))
 
 
 def _remove_stale(dest_root, keep):

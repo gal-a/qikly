@@ -352,7 +352,8 @@ def generate_and_write_acceptance_criteria_if_missing(task_id, seed=None):
     path = task_config_path(task_id)
     with open(path, "r", encoding="utf-8") as f:
         text = f.read()
-    task_config = yaml.safe_load(text) or {}
+    from qikly.score_questions import drop_question_lines
+    task_config = yaml.safe_load(drop_question_lines(text)) or {}
     if task_config.get("acceptance_criteria"):
         return False
 

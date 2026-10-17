@@ -210,10 +210,12 @@ def qikly_scaffold(file_path):
     """
     Turn a Python file into a task that tests that code, returned as text.
 
-    It writes `TODO` for requirements and acceptance criteria and will not fill
-    them in, because criteria derived from an implementation can only describe
-    what that implementation already does, which is the circularity this whole
+    It writes `TODO` for the acceptance criteria and will not fill them in,
+    because criteria derived from an implementation can only describe what
+    that implementation already does, which is the circularity this whole
     project exists to break. That refusal is the feature, not a gap.
+    `requirements` starts as the module's docstring, or a line to keep what
+    the code does, for the person to replace in their own words.
     """
     if not file_path or not isinstance(file_path, str):
         return _error("file_path is required")
@@ -247,6 +249,11 @@ def qikly_scaffold(file_path):
         # The same task `qikly --scaffold` writes by default: one that tests the
         # code in the file, which is why someone points a tool at a file.
         yaml_text, problem = scaffold.build_task(file_path, root, seed="existing")
+        if not problem:
+            # As `qikly --scaffold` does: a module that imports its siblings
+            # is seeded as its whole package, or qikly's copy cannot import.
+            from qikly import start
+            yaml_text = start.package_seed(yaml_text, file_path, root)
     except Exception as exc:                       # noqa: BLE001
         return _error("could not scaffold that file: %s" % exc)
     if problem:
@@ -258,9 +265,10 @@ def qikly_scaffold(file_path):
     task_id = named.group(1) if named else "<task_id>"
     return _redact({"ok": True, "task_yaml": yaml_text,
                     "note": "This task tests the code in that file. Save it as "
-                            "inputs_private/config/tasks/%s.yaml. requirements and "
-                            "acceptance_criteria are left as TODO on purpose: criteria "
-                            "taken from code can only restate it" % task_id})
+                            "inputs_private/config/tasks/%s.yaml. acceptance_criteria "
+                            "is left as TODO on purpose, since criteria taken from code "
+                            "can only restate it, and requirements is a starting line "
+                            "for the person to replace in their own words" % task_id})
 
 
 _FORBIDDEN_KEYS = ("acceptance_criteria", "criteria", "criterion")

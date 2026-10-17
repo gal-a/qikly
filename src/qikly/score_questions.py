@@ -397,7 +397,15 @@ def drop_question_lines(text):
     return drop_todo_criteria(_MARKED.sub("", text or ""))
 
 
-_TODO_ITEM = re.compile(r"^\s*TODO\b")
+# A placeholder starts with TODO and a colon, a space or nothing: "TODO:
+# your answer", "TODO what f(1) does". Not "TODO-list", and not a criterion
+# that only mentions a TODO later on. `--validate` counts with the same rule.
+_TODO_ITEM = re.compile(r"^\s*TODO(?::|\s|$)")
+
+
+def is_todo(criterion):
+    """Whether a criterion is still a placeholder, which a run skips."""
+    return isinstance(criterion, str) and bool(_TODO_ITEM.match(criterion))
 
 
 def drop_todo_criteria(text):
@@ -417,15 +425,26 @@ def drop_todo_criteria(text):
     items = next((v for k, v in node.value
                   if isinstance(k, yaml.ScalarNode) and k.value == "acceptance_criteria"),
                  None)
-    if not isinstance(items, yaml.SequenceNode):
+    # A flow list, `[a, b]`, sits on one line with its key; removing lines
+    # would take the real criteria with it, so it is left as written.
+    if not isinstance(items, yaml.SequenceNode) or items.flow_style:
         return text
     lines = text.split("\n")
     drop = set()
     for item in items.value:
         if isinstance(item, yaml.ScalarNode) and _TODO_ITEM.match(item.value or ""):
-            # The item's lines, from its dash to its last character.
+            # The item's lines, from its dash, which may sit on the line
+            # above a value, to its last character.
+            start = item.start_mark.line
+            while start > 0 and not lines[start].lstrip().startswith("-"):
+                start -= 1
+            between = "\n".join(lines[start:item.start_mark.line + 1])
+            if re.search(r"-\s*&", between):
+                # Anchored, so perhaps referenced elsewhere: removing it would
+                # break the file, so it stays.
+                continue
             end = item.end_mark.line - (1 if item.end_mark.column == 0 else 0)
-            drop.update(range(item.start_mark.line, end + 1))
+            drop.update(range(start, end + 1))
     if not drop:
         return text
     return "\n".join(l for n, l in enumerate(lines) if n not in drop)

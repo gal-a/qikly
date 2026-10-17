@@ -174,3 +174,122 @@ def test_score_points_at_scaffold(tmp_path):
     advice = score_questions.advice(questions, str(tmp_path))
     assert advice == ["Next: `qikly --scaffold pricing.py` writes the task file, "
                       "with these questions in it to answer."]
+
+
+# ------------------------------------------- the Fable audit of bdb698a --
+
+def test_a_boundary_is_never_probed_in_a_function_that_writes_files(tmp_path):
+    from qikly import start_options as so
+    marker = tmp_path / "marker.txt"
+    source = ("def record(n, log=%r):\n"
+              "    with open(log, 'a') as handle:\n"
+              "        handle.write('called with %%s' %% n)\n"
+              "    if n > 10:\n"
+              "        raise ValueError(n)\n"
+              "    return n\n") % str(marker)
+    (tmp_path / "iomod.py").write_text(source, encoding="utf-8")
+    question = {"function": "record", "edge": "10", "line": 4,
+                "path": str(tmp_path / "iomod.py")}
+    tests = ["from iomod import record\n\ndef test_r():\n    assert record(3) == 3\n"]
+    assert so.boundary_options(question, source, tests, str(tmp_path)) is None
+    assert not marker.exists()
+
+
+def test_a_package_init_is_named_for_its_package(tmp_path, monkeypatch):
+    pkg = tmp_path / "mypkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("def top(x):\n    return x\n", encoding="utf-8")
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    assert cli._do_scaffold(os.path.join("mypkg", "__init__.py"), None) == 0
+    tasks = tmp_path / "inputs_private" / "config" / "tasks"
+    assert os.listdir(tasks) == ["MYPKG_VERIFY.yaml"]
+    assert cli._task_ids_for(os.path.join("mypkg", "__init__.py")) == "MYPKG_VERIFY"
+
+
+def test_two_modules_of_one_name_never_share_a_task(tmp_path, monkeypatch):
+    for folder in ("a", "b"):
+        (tmp_path / folder).mkdir()
+        (tmp_path / folder / "util.py").write_text("def f(x):\n    return x\n",
+                                                   encoding="utf-8")
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    assert cli._do_scaffold(os.path.join("a", "util.py"), None) == 0
+    assert cli._do_scaffold(os.path.join("b", "util.py"), None) == 0
+    tasks = tmp_path / "inputs_private" / "config" / "tasks"
+    assert sorted(os.listdir(tasks)) == ["B_UTIL_VERIFY.yaml", "UTIL_VERIFY.yaml"]
+    assert cli._task_ids_for(os.path.join("a", "util.py")) == "UTIL_VERIFY"
+    assert cli._task_ids_for(os.path.join("b", "util.py")) == "B_UTIL_VERIFY"
+    # The same module again is refused, not renamed.
+    assert cli._do_scaffold(os.path.join("b", "util.py"), None) == 2
+
+
+def test_a_task_id_task_is_found_by_its_path_and_named_after_a_run(
+        scored, capsys, monkeypatch):
+    assert cli._do_scaffold("pricing.py", "SHOP") == 0
+    assert cli._task_ids_for("pricing.py") == "SHOP_VERIFY"
+    from qikly.agent_api import agent_interface
+    tasks = scored / "inputs_private" / "config" / "tasks"
+    monkeypatch.setattr(agent_interface, "task_config_path",
+                        lambda task_id: str(tasks / f"{task_id}.yaml"))
+    cli._do_scaffold("pricing.py", None)
+    capsys.readouterr()
+    # Two tasks name pricing.py now, so the path would run both: the id.
+    cli._say_take_tests(["SHOP_VERIFY"])
+    assert "Next: qikly --take-tests SHOP_VERIFY" in capsys.readouterr().out
+
+
+def test_validate_and_the_run_agree_on_what_a_todo_is(scored):
+    from qikly.agent_api.agent_interface import read_acceptance_criteria
+    from qikly.validate import check_task
+    cli._do_scaffold("pricing.py", None)
+    path = scored / TASK
+    text = path.read_text(encoding="utf-8")
+    text = text.replace('"TODO: what apply_discount(100, 0) should do"',
+                        '"TODO apply_discount(100, 0) returns 5"')
+    text = text.replace('"TODO: what label(\'VIP\') should do"',
+                        '"label(\'VIP\') returns \'gold\' (TODO: confirm with sales)"')
+    path.write_text(text, encoding="utf-8")
+    sent = read_acceptance_criteria("PRICING_VERIFY")
+    assert sent == ["label('VIP') returns 'gold' (TODO: confirm with sales)"]
+    errors, warnings = check_task(str(path))
+    assert not errors and any("1 of its 6" in w for w in warnings), (errors, warnings)
+
+
+@pytest.mark.parametrize("text, kept", [
+    ('acceptance_criteria: ["TODO: a", "f(1) returns 2"]\n', ["TODO: a", "f(1) returns 2"]),
+    ('acceptance_criteria:\n  -\n    "TODO: a"\n  - "f(1) returns 2"\n', ["f(1) returns 2"]),
+    ('acceptance_criteria:\n  - "TODO-list f(2) returns 3"\n', ["TODO-list f(2) returns 3"]),
+    ('acceptance_criteria:\n  - &x "TODO: a"\n  - "f(1) returns 2"\nother: *x\n',
+     ["TODO: a", "f(1) returns 2"]),
+    ('acceptance_criteria:\n  - |\n    TODO: a\n  - "f(1) returns 2"\n', ["f(1) returns 2"]),
+])
+def test_a_todo_goes_whole_and_nothing_else_does(text, kept):
+    assert (yaml.safe_load(score_questions.drop_todo_criteria(text))
+            ["acceptance_criteria"]) == kept
+
+
+def test_copied_tests_are_numbered_as_test_generation_saw_the_criteria(
+        scored, monkeypatch):
+    from qikly import take_tests
+    cli._do_scaffold("pricing.py", None)
+    path = scored / TASK
+    path.write_text(path.read_text(encoding="utf-8").replace(
+        '"TODO: what label(\'VIP\') should do"', '"label(\'VIP\') returns \'gold\'"'),
+        encoding="utf-8")
+    seen = {}
+    monkeypatch.setattr(take_tests, "_run",
+                        lambda cwd, written, count=0: seen.setdefault("count", count))
+    (scored / "outputs" / "tests" / "PRICING_VERIFY" / "integration").mkdir(parents=True)
+    (scored / "outputs" / "tests" / "PRICING_VERIFY" / "integration" /
+     "test_integration.py").write_text(
+        "from outputs.agent_src.code.PRICING_VERIFY.pricing import label\n\n"
+        "def test_vip():\n    assert label('VIP') == 'gold'\n", encoding="utf-8")
+    take_tests.take(str(scored), "PRICING_VERIFY", str(scored / "tests"), say=lambda *a: None)
+    assert seen["count"] == 1
+
+
+def test_a_run_with_nothing_answered_is_not_started(scored, monkeypatch):
+    cli._do_scaffold("pricing.py", None)
+    from qikly.agent_api import agent_interface
+    monkeypatch.setattr(agent_interface, "task_config_path",
+                        lambda task_id: str(scored / TASK))
+    assert cli._all_todo(["PRICING_VERIFY"]) == ["PRICING_VERIFY"]

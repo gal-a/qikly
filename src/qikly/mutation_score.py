@@ -1274,7 +1274,7 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
     print(f"[{task_id}] {headline(caught, total)}." if total
           else f"[{task_id}] no faults planted.")
     site_files = result.get("site_files") or 0
-    if total and site_files > 1:
+    if total and site_files > 1 and result.get("sites", 0) > total:
         # The cap is per run, not per file, and a folder looked as if each
         # file had been given the same scrutiny as a single module. Counted
         # over files that had something to plant, and "plant more" only when

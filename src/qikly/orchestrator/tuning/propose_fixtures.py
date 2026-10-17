@@ -50,8 +50,10 @@ MAX_PROPOSALS = 8
 
 
 def _criteria(task_id):
+    from qikly.score_questions import drop_question_lines
     with open(task_config_path(task_id), encoding="utf-8") as handle:
-        return (yaml.safe_load(handle) or {}).get("acceptance_criteria") or []
+        text = drop_question_lines(handle.read())
+    return (yaml.safe_load(text) or {}).get("acceptance_criteria") or []
 
 
 ACCEPTED_FILE = ".accepted_proposals"

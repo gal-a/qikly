@@ -62,7 +62,8 @@ qikly --tasks my_module.py       # 3. the run                      needs an API 
    with everything it can read from your code filled in, and a data file of
    the values your tests already call it with. What is left is what only you
    know: the questions from step 1, under `acceptance_criteria`, each with
-   what your code does beside the value in question, found by running it:
+   what your code does there now, found by running it, and for a boundary
+   only on either side of it, never at it:
 
    ```yaml
    #?     if rate < 0 or rate > 100:
@@ -86,13 +87,14 @@ qikly --tasks my_module.py       # 3. the run                      needs an API 
    pointing at **`qikly --take-tests my_module.py`**, which copies the new
    tests into your own tests folder, under `qikly_generated/`, rewritten to
    import your module rather than qikly's copy, and runs them on your code. A
-   test that fails there is where your code and your criteria disagree; the
-   report says which failures to compare with a criterion and which to check
-   as the test writer's own reading.
+   test that fails there is one to compare with its criterion: either your
+   code or the test is wrong, and the report says which failures were written
+   from a criterion and which are the test writer's own reading, to check.
 
 The task is named after the module, `MY_MODULE_VERIFY`, where `_VERIFY` marks
 a task that tests code you already have. You never need to type it: every
-step takes the path you gave `--score`. `qikly --scaffold my_module.py
+step takes the path you gave `--score`, and a task written with `--task-id`
+is found by its path too. `qikly --scaffold my_module.py
 --fresh` writes `MY_MODULE.yaml` instead, a task in which qikly writes a new
 implementation of the same interface.
 

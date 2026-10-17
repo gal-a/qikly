@@ -84,7 +84,10 @@ def test_a_single_file_score_says_nothing_about_sharing(tmp_path, monkeypatch, c
 
 def test_the_folder_note_counts_files_with_sites_and_offers_more_only_if_left(
         tmp_path, monkeypatch, capsys):
-    """Three files, one with sites: every site used, so nothing to add."""
+    """
+    The note is for a sample: with every site planted, as `--score` now
+    does unless the suite is slow, nothing was spread and nothing is left.
+    """
     target = ms.Target("lib", [("a.py", "a.py"), ("b.py", "b.py"),
                                ("c.py", "c.py")], ["tests"], str(tmp_path))
     result = {"task": "lib", "baseline": True, "caught": [], "missed": [],
@@ -96,8 +99,11 @@ def test_the_folder_note_counts_files_with_sites_and_offers_more_only_if_left(
     assert "spread at random" not in capsys.readouterr().out
     result.update(site_files=2)
     ms.run(target, invoked_from=str(tmp_path))
+    assert "spread at random" not in capsys.readouterr().out
+    result.update(site_files=2, sites=10)
+    ms.run(target, invoked_from=str(tmp_path))
     out = capsys.readouterr().out
-    assert "over 2 files" in out and "--score-mutants" not in out
+    assert "over 2 files" in out and "--score-mutants" in out
 
 
 def test_a_comment_naming_the_generated_path_is_not_an_import(tmp_path):

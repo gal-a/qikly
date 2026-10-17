@@ -171,8 +171,9 @@ def check(task_id, seed=None):
     from qikly.agent_api.call_llm import call_llm
 
     try:
+        from qikly.score_questions import drop_question_lines
         with open(task_config_path(task_id), encoding="utf-8") as handle:
-            cfg = yaml.safe_load(handle) or {}
+            cfg = yaml.safe_load(drop_question_lines(handle.read())) or {}
     except Exception:
         return []
 

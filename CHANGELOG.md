@@ -23,25 +23,32 @@ packaging tools would read as `1.1`.
   package is seeded as its whole top-level package and named by its dotted
   path (`acme.scoring`), so a relative import such as `from .util import
   clamp` works in qikly's copy.
-- **Each question in the task file says what your code does beside the value
-  in question**, found by running it in a separate process in an empty
-  folder, such as "raise ValueError, as rate 101 does now" and "return a
-  value, as rate 99 does now (it returns 1.0)", and its TODO names the call:
-  `TODO: what apply_discount(100, 100) should do`. A boundary is only ever
-  run on either side of the value in question, never at it, and the values
-  come in an order fixed by the values, not with "as your code does now"
-  first. Questions about the same call with the same values are asked once.
-  Those lines start with `#?`, so neither agent reads them.
-- **A criterion left as TODO is skipped**, not sent to test generation as
-  written. `--validate` says how many of the criteria are answered and that
-  a run skips the rest, and stops a file with none answered before a paid
-  run.
+- **Each question in the task file says what your code does there now**,
+  found by running it in a separate process in an empty folder, and its TODO
+  names the call: `TODO: what apply_discount(100, 100) should do`. A
+  boundary is only ever run on either side of the value in question, never
+  at it: "raise ValueError, as rate 101 does now" and "return a value, as
+  rate 99 does now (it returns 1.0)". Other questions show what the code
+  returns now and what the changed code would, labelled. The values come in
+  an order fixed by the values, not with "as your code does now" first, and
+  a function that reads or writes files is never run. Questions about the
+  same call with the same values are asked once. Those lines start with
+  `#?`, so neither agent reads them.
+- **A criterion left as TODO is skipped**, not sent to test generation or
+  any other model call as written: one that starts with `TODO`, followed by
+  a colon, a space or nothing. `--validate` counts with the same rule, says
+  how many are answered and that a run skips the rest, and `--validate` and
+  `--tasks` both stop a file with none answered before a paid run.
 - **`--scaffold` fills the data file with the values your tests already call
   the code with**, so it is never only a header, and says to add any your
   answers name.
 - **`--scaffold` takes a folder**: one task file per module that the
   folder's last `--score` asked about. With no score yet, it says to score
-  the folder first and names a module to scaffold instead.
+  the folder first and names a module to scaffold instead. A package's
+  `__init__.py` is named for the package, and a second module of the same
+  name in another folder gets its folder's name too (`SUB_UTIL_VERIFY`),
+  never another module's task file. Each task file names its module on its
+  first line, which is how a path finds it, `--task-id` tasks included.
 - **A run of a task about your own code ends with the step after it**,
   `qikly --take-tests my_module.py`, which runs the new tests on your code.
 - **`--score` plants every fault it can**, up to 60 in one module or 150 in a

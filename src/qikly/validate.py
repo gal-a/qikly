@@ -207,9 +207,10 @@ def check_task(path):
     # A criterion left as TODO is a question someone skipped: a run leaves
     # it out, so it is counted, not refused. With none answered there is
     # nothing to test against, which is worth stopping for before a paid run.
+    from qikly.score_questions import is_todo
     all_criteria = [c for c in (task.get("acceptance_criteria") or [])
                     if isinstance(c, str)]
-    skipped = sum(1 for c in all_criteria if _TODO.search(c))
+    skipped = sum(1 for c in all_criteria if is_todo(c))
     if skipped and skipped == len(all_criteria):
         errors.append(
             f"{name}: none of its {skipped} acceptance criteria is answered "

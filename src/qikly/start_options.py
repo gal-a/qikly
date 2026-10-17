@@ -457,6 +457,10 @@ def boundary_options(question, source, test_sources, root):
     function, edge = question.get("function"), question.get("edge")
     if not (function and edge and source):
         return None
+    # As for differences: a function that reads or writes files or the
+    # system is never run, or --scaffold would write wherever it writes.
+    if _does_io(source, function):
+        return None
     variable = _boundary_variable(source, question.get("line"), edge)
     found = signature(source, function)
     near = _neighbours(edge, source)
