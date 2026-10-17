@@ -1906,6 +1906,10 @@ def answers_file_for(code, cwd, answered_only=True):
     # found answered or not, so --answers can say what is missing from it.
     if folder and answered_only:
         files = [f for f in files if _has_answers(f)]
+    elif len(files) > 1:
+        # One module scored both alone and in its folder has two files.
+        answered = [f for f in files if _has_answers(f)]
+        files = answered if len(answered) == 1 else files
     return files[0] if len(files) == 1 else files
 
 
@@ -1964,25 +1968,43 @@ def write_questions(arg, cwd, console, given_tests=None):
         # whose question is still asked is carried over by its id, with the
         # requirements, rules and rows, and the old file is kept beside it.
         carried, kept_back, old = {}, [], None
-        if _has_answers(paths.open):
+        if os.path.isfile(paths.open):
             _, req, old_rows, _, _ = parse_answers(paths.open)
             old_text = _read(paths.open)
             old = {"requirements": req or "", "rules": parse_rules(paths.open),
-                   "rows": old_rows,
-                   # Answers kept back by an earlier refresh stay kept back.
-                   "kept": [l for l in old_text.splitlines() if l.startswith("#   was Q")]}
-            for fe, entry in _match_entries(_file_entries(paths.open), sharp):
+                   "rows": old_rows, "kept": []}
+            file_entries = _file_entries(paths.open)
+            # Answers kept back by an earlier refresh: back on their question
+            # when it is asked again, still kept back when it is not.
+            for line in old_text.splitlines():
+                found = re.match(r"^#   was Q(\d+): (.*?)(?:   \((.*)\))?"
+                                 r"(?:   \[id ([0-9a-f ]+) choices ([0-9a-f]+)\])?$", line)
+                if not found:
+                    continue
+                if found.group(4):
+                    file_entries.append({"n": int(found.group(1)),
+                                         "ids": found.group(4).split(),
+                                         "choices": found.group(5),
+                                         "prompt": found.group(3),
+                                         "text": found.group(2).strip()})
+                else:
+                    old["kept"].append(line)
+            for fe, entry in _match_entries(file_entries, sharp):
                 if not fe["text"]:
                     continue
                 stale = entry is not None and _is_option_number(fe["text"]) and \
                     fe["choices"] and fe["choices"] != entry["choices"]
                 if entry is not None and not stale:
-                    carried[id(entry)] = fe["text"]
+                    carried.setdefault(id(entry), fe["text"])
                 else:
                     # Never dropped: an answer qikly cannot place is written
-                    # into the file as a comment, for the person to move.
-                    kept_back.append(f"#   was Q{fe['n']}: {fe['text']}"
-                                     + (f"   ({fe['prompt']})" if fe["prompt"] else ""))
+                    # into the file as a comment, with what it needs to come
+                    # back to its question once that is asked again.
+                    kept_back.append(
+                        f"#   was Q{fe['n']}: {fe['text']}"
+                        + (f"   ({fe['prompt']})" if fe["prompt"] else "")
+                        + (f"   [id {' '.join(fe['ids'])} choices {fe['choices']}]"
+                           if fe["ids"] and fe["choices"] else ""))
         name = os.path.basename(module)
         lines = [f"# Your answers for {name}, from qikly --questions.",
                  "#",
@@ -2048,14 +2070,21 @@ def write_questions(arg, cwd, console, given_tests=None):
             built = build_rows({"answers": {}, "extra": []}, columns, source, test_sources)
             # A value with a line break cannot sit on one line.
             built = [r for r in built if not any("\n" in v or "\r" in v for v in r)]
-            # The rows a person kept or edited, while they still fit the code.
-            if old and old["rows"] and all(len(r) == len(columns) for r in old["rows"]):
-                built = [list(r) for r in old["rows"]]
+            # The rows a person kept or edited, each one while it still fits
+            # the code; one that no longer fits is kept as a comment.
+            misfit = []
+            if old and old["rows"]:
+                fits = [list(r) for r in old["rows"] if len(r) == len(columns)]
+                misfit = [r for r in old["rows"] if len(r) != len(columns)]
+                if fits:
+                    built = fits
             lines += ["# 4. Example inputs the run tries the code on, one row per line,",
                       "#    the values in this order:  " + ", ".join(columns),
                       "#    qikly filled in the rows it could build from your tests"
                       + ("." if built else "; none could be built, so add at least one.")]
             lines += ["row: " + _csv_line(r) for r in built] or ["row: "]
+            lines += [f"#   a row that no longer fits {', '.join(columns)}: " + _csv_line(r)
+                      for r in misfit]
             lines.append("")
         elif columns is None:
             lines += [f"# 4. {name} works on files, so the run needs a real sample one.",
@@ -2082,15 +2111,14 @@ def write_questions(arg, cwd, console, given_tests=None):
                        f"knows the code, listed in the score report" if others else "")
                     + ".")
         if old and backup:
-            console.say(f"  The file already held your answers: refreshed, with "
+            console.say(f"  Refreshed the file you had, with "
                         f"{len(carried)} answer{'' if len(carried) == 1 else 's'} in place"
                         + (f" and {len(kept_back)} kept at the end of the file, for "
                            f"questions no longer asked or whose choices changed"
                            if kept_back else "")
                         + f". The file as it was is kept as {shown(backup, cwd)}.")
         elif old:
-            console.say("  The file already held your answers, and nothing has "
-                        "changed, so it is left as it is.")
+            console.say("  The file is already up to date, so it is left as it is.")
     console.say("")
     if not written:
         # A folder where nothing was missed has no file to point to.
@@ -2332,8 +2360,24 @@ def _match_entries(file_entries, entries):
             found = None
         if found is not None:
             claimed.add(id(found))
-        out.append((fe, found))
-    return out
+        out.append([fe, found])
+    # Then the same question with the same choices: fixing the code to agree
+    # with an answer changes the line, and with it every id on that line.
+    for pair in out:
+        fe, found = pair
+        if found is None and fe["prompt"] and fe["choices"]:
+            same = next((e for e in entries if id(e) not in claimed
+                         and e["choices"] == fe["choices"]
+                         and _plain_prompt(e["prompt"]) == _plain_prompt(fe["prompt"])),
+                        None)
+            if same is not None:
+                claimed.add(id(same))
+                pair[1] = same
+    return [tuple(pair) for pair in out]
+
+
+def _plain_prompt(prompt):
+    return re.sub(r"\s+", " ", re.sub(r"\bline \d+", "line", prompt or "")).strip()
 
 
 def _is_option_number(text):
@@ -2401,11 +2445,14 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
                     f"so the coding agent would not be told what the module "
                     f"does. Add one, such as  requirements: applies a discount.")
     entries, _ = sharp_questions(questions, source, test_sources, root)
-    unmatched, changed = [], []
+    present = {_member_id(q) for q in questions}
+    unmatched, changed, unworked = [], [], []
     for fe, entry in _match_entries(_file_entries(answers_path), entries):
         n, text = fe["n"], fe["text"]
         if entry is None:
-            if text:
+            if text and any(i in present for i in fe["ids"]):
+                unworked.append(n)
+            elif text:
                 unmatched.append(n)
             continue
         if text and _is_option_number(text) and fe["choices"] and \
@@ -2431,11 +2478,18 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
         state["answers"].setdefault(_key(q), {
             "question": q["question"], "where": where(q), "key": _key(q),
             "status": so.SKIP})
-    scope = _scope_of(answers_path, paths)
+    scope = score_questions_pasteable(os.path.join(paths.cwd, _scope_of(answers_path, paths)),
+                                      paths.cwd)
+    if unworked:
+        console.say(f"{', '.join('Q%d' % n for n in unworked)}: qikly could not work "
+                    f"out the choices this time, usually because your code took "
+                    f"too long to run, so {'it is' if len(unworked) == 1 else 'they are'} "
+                    f"left open for now. The answer is still in the file; run the "
+                    f"same command again.")
     if unmatched:
         console.say(f"{', '.join('Q%d' % n for n in unmatched)} in "
                     f"{shown(answers_path, paths.cwd)} "
-                    f"{'is' if len(unmatched) == 1 else 'are'} about questions your "
+                    f"{'is about a question' if len(unmatched) == 1 else 'are about questions'} your "
                     f"code no longer raises, so {'it is' if len(unmatched) == 1 else 'they are'} "
                     f"left out. To refresh the file, keeping every answer, run  "
                     f"qikly --questions {scope}")

@@ -7,7 +7,7 @@
 <!-- mcp-name: io.github.gal-a/qikly -->
 
 [![Agent Skill](https://img.shields.io/badge/Agent_Skill-qikly%20--install--skill-7e22ce)](https://github.com/gal-a/qikly/blob/main/docs/skill.md)
-[![1,700+ tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=1%2C800%2B%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
+[![2,100+ tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=2%2C100%2B%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
 [![pypi](https://img.shields.io/pypi/v/qikly?color=blue)](https://pypi.org/project/qikly/)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/gal-a/qikly/blob/main/LICENSE)
@@ -97,9 +97,9 @@ a whole folder. It:
 
 Change anything in the file and run the same `--answers` command again; the
 task is rebuilt from it each time. If your code changes, `--questions` again
-refreshes the file: your answers stay on their questions, any it can no longer
-place are kept at the end as comments, and a dated copy of the old file is
-kept beside it. Your own files are never edited, and
+refreshes the file: your answers stay on their questions wherever it can find
+them, any it cannot are kept at the end as comments, and a dated copy of the
+old file is kept beside it. Your own files are never edited, and
 the command ends with a full audit: every file it read, saved and wrote, and
 where. Without a terminal, as in CI or under a coding agent, `--answers` checks
 the task and prints the two commands that run it, `qikly --tasks <TASK>` and

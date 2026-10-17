@@ -393,13 +393,13 @@ def test_questions_again_refreshes_the_file_and_keeps_the_answers(tmp_path, monk
     f = _write_and_answer(tmp_path, monkeypatch, {1: "raise"})
     s = Script([], interactive=False)
     start.main("pricing.py", str(tmp_path), console=s.console)
-    assert "nothing has changed, so it is left as it is" in s.text
+    assert "already up to date, so it is left as it is" in s.text
     answered = f.read_text(encoding="utf-8")
     # A change to the code: refreshed, with the answer still on its question.
     (tmp_path / "pricing.py").write_text('"""Pricing."""\n' + PRICING, encoding="utf-8")
     s = Script([], interactive=False)
     start.main("pricing.py", str(tmp_path), console=s.console)
-    assert "refreshed, with 1 answer in place" in s.text
+    assert "with 1 answer in place" in s.text
     assert re.search(r"^Q1: \d+$", f.read_text(encoding="utf-8"), re.M)
     assert "applies a discount" in f.read_text(encoding="utf-8")
     backups = list(f.parent.glob(f.name + ".*.bak"))
@@ -495,6 +495,31 @@ def test_a_refresh_never_drops_an_answer_it_cannot_place(tmp_path, monkeypatch):
     text = f.read_text(encoding="utf-8")
     # An answer whose question is gone: its id belongs to nothing now.
     text = re.sub(r"^# id [0-9a-f ]+$", "# id 000000000000", text, count=1, flags=re.M)
+    text = re.sub(r"^# choices [0-9a-f]+$", "# choices 00000000", text, count=1, flags=re.M)
     f.write_text(text, encoding="utf-8")
     start.main("pricing.py", str(tmp_path), console=Script([], interactive=False).console)
     assert re.search(r"^#   was Q1: \d+", f.read_text(encoding="utf-8"), re.M)
+
+
+def test_fixing_the_code_to_agree_with_an_answer_keeps_every_answer(tmp_path, monkeypatch):
+    # The edit changes the question's own line, and with it its ids; the
+    # question and its choices are the same, so the answer stays.
+    f = _write_and_answer(tmp_path, monkeypatch, {1: "raise", 3: "raise"})
+    _answer(tmp_path, f)
+    before = _criteria(tmp_path)
+    (tmp_path / "pricing.py").write_text(PRICING.replace("rate > 100", "rate >= 100"),
+                                         encoding="utf-8")
+    s = _answer(tmp_path, f)
+    assert _criteria(tmp_path) == before and len(before) == 2, s.text[-800:]
+
+
+def test_a_row_that_no_longer_fits_is_kept_as_a_comment(tmp_path, monkeypatch):
+    f = _write_and_answer(tmp_path, monkeypatch, {1: "raise"})
+    text = f.read_text(encoding="utf-8")
+    text = re.sub(r"^row: .*$", "row: 80,15\nrow: 250,5,regular", text, count=1, flags=re.M)
+    f.write_text(text, encoding="utf-8")
+    (tmp_path / "pricing.py").write_text('"""Pricing."""\n' + PRICING, encoding="utf-8")
+    start.main("pricing.py", str(tmp_path), console=Script([], interactive=False).console)
+    refreshed = f.read_text(encoding="utf-8")
+    assert "row: 250,5,regular" in refreshed
+    assert "a row that no longer fits" in refreshed and "80,15" in refreshed

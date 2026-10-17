@@ -108,22 +108,28 @@ def is_ours(code):
         ours[code] = os.path.normcase(os.path.abspath(code.co_filename)) == target
     return ours[code]
 
-def show(value):
+def show(value, depth=0):
     """
     A repr that is the same on every run. A set prints in hash order, which
     changes with each process, so the same outcome read as two different ones.
+    Plain lists, tuples and dicts are followed all the way down, to a depth
+    that stops a structure holding itself; other types keep their own repr.
     """
+    if depth > 20:
+        return repr(value)
     if isinstance(value, (set, frozenset)):
-        body = ", ".join(sorted(show(v) for v in value))
+        body = ", ".join(sorted(show(v, depth + 1) for v in value))
         if isinstance(value, frozenset):
             return "frozenset({%s})" % body if body else "frozenset()"
         return "{%s}" % body if body else "set()"
-    if isinstance(value, dict):
-        return "{%s}" % ", ".join("%s: %s" % (show(k), show(v)) for k, v in value.items())
-    if isinstance(value, (list, tuple)) and any(isinstance(v, (set, frozenset, dict)) for v in value):
-        inner = ", ".join(show(v) for v in value)
-        return "[%s]" % inner if isinstance(value, list) else \
-            "(%s%s)" % (inner, "," if len(value) == 1 else "")
+    if type(value) is dict:
+        return "{%s}" % ", ".join("%s: %s" % (show(k, depth + 1), show(v, depth + 1))
+                                  for k, v in value.items())
+    if type(value) is list:
+        return "[%s]" % ", ".join(show(v, depth + 1) for v in value)
+    if type(value) is tuple:
+        inner = ", ".join(show(v, depth + 1) for v in value)
+        return "(%s%s)" % (inner, "," if len(value) == 1 else "")
     return repr(value)
 
 def outcomes(module, calls, trace=False):
@@ -228,6 +234,23 @@ def sendable(value):
     return type(back) is type(value) and back == value
 
 
+def _child(payload, seed):
+    """The child's reply, run with a fixed hash seed, or None."""
+    env = dict(os.environ, PYTHONHASHSEED=seed)
+    try:
+        with tempfile.TemporaryDirectory() as empty:
+            done = subprocess.run([sys.executable, "-c", _CHILD],
+                                  input=payload, capture_output=True, text=True,
+                                  timeout=TIMEOUT, cwd=empty, env=env,
+                                  encoding="utf-8", errors="replace")
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    try:
+        return json.loads(done.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return None
+
+
 def run_calls(path, root, calls, mutant=None, line=None, span=None):
     """
     The outcome of each call, or None when the module could not be run at
@@ -249,23 +272,21 @@ def run_calls(path, root, calls, mutant=None, line=None, span=None):
         "calls": [[f, [repr(a) for a in args],
                    {k: repr(v) for k, v in kwargs.items()}]
                   for f, args, kwargs in calls]})
-    try:
-        with tempfile.TemporaryDirectory() as empty:
-            done = subprocess.run([sys.executable, "-c", _CHILD],
-                                  input=payload, capture_output=True, text=True,
-                                  timeout=TIMEOUT, cwd=empty,
-                                  encoding="utf-8", errors="replace")
-    except (subprocess.TimeoutExpired, OSError):
+    reply = _child(payload, seed="0")
+    if reply is None:
         return None
-    try:
-        reply = json.loads(done.stdout.strip().splitlines()[-1])
-    except (ValueError, IndexError):
-        return None
+    # The calls once more, in a process with another hash seed: an outcome
+    # that hangs on hash order, `",".join(a_set)`, printed the same twice in
+    # one process and differently the next run, and made an answer unmatchable.
+    other = _child(json.dumps(dict(json.loads(payload), mutant=None, line=None,
+                                   span=None)), seed="1")
     now, again = reply.get("now"), reply.get("again")
+    elsewhere = (other or {}).get("now")
     if not (isinstance(now, list) and isinstance(again, list)
-            and len(now) == len(again) == len(calls)):
+            and isinstance(elsewhere, list)
+            and len(now) == len(again) == len(elsewhere) == len(calls)):
         return None
-    stable = [a == b for a, b in zip(now, again)]
+    stable = [a == b == c for a, b, c in zip(now, again, elsewhere)]
     if mutant is None:
         return now if all(stable) else None
     changed = reply.get("changed")

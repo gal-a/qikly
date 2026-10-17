@@ -56,7 +56,8 @@ packaging tools would read as `1.1`.
     input where the code and the changed code differ, with the current
     result labelled, through the public functions and classes your tests
     call when the line itself has none. The order of the two is shuffled per
-    question, and the same call with the same choices is asked once.
+    question in an order fixed by its choices, and the same call with the
+    same choices is asked once.
   - Each question shows the code it is about. The file also has a
     `requirements:` line for what the module does, `rule:` lines for rules of
     your own, and example input rows built from your tests, or where to copy
@@ -64,10 +65,11 @@ packaging tools would read as `1.1`.
   - "Either is fine" and "save it for later" are options, and a blank answer
     stays open. The file is yours: change anything and run `--answers` again,
     and the task is rebuilt from the file each time. Rerunning `--questions`
-    leaves an answered file alone when nothing changed; otherwise it refreshes
-    the file, keeps each answer on its question, writes any it can no longer
-    place at the end of the file as a comment, and keeps a dated copy of the
-    file as it was. Each question's id comes from its function, its question
+    leaves the file alone when nothing changed; otherwise it refreshes it,
+    keeps each answer on its question where it can still find it, writes any
+    it cannot at the end of the file as a comment, which comes back to its
+    question when that is asked again, and keeps a dated copy of the file as
+    it was. Each question's id comes from its function, its question
     and the shape of its line, not its line number or what the code printed,
     so an edit elsewhere in the code does not lose an answer; an option number
     whose choices have since changed is left open rather than read as another
