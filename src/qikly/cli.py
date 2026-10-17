@@ -1735,8 +1735,20 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return 1
+        if not mutants:
+            # Every fault it can plant, up to a cap, counted as --questions
+            # counts them, so steps 1 and 2 report the same score.
+            from qikly import start
+            sites, mutants = start.how_many(start.Console(), target, tests,
+                                            INVOKED_FROM, os.path.isdir(code))
+            if not mutants:
+                print("There is nothing in that code qikly knows how to change, "
+                      "so there is nothing to score.")
+                return 0
+            if seed is None:
+                seed = 0
         try:
-            run(target, mutants=mutants or DEFAULT_MUTANTS, seed=seed,
+            run(target, mutants=mutants, seed=seed,
                 invoked_from=INVOKED_FROM)
         except Exception as exc:
             print(f"[{target.label}] could not be scored: "

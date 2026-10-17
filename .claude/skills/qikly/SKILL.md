@@ -56,9 +56,9 @@ things that do work, and let the user choose:
   code, to `inputs_private/questions/<NAME>_open_questions.txt`, and exits
   with code 3. Put each question and its options to the user **word for
   word**, and write what they choose after its `Q` number, never an answer of
-  your own or one read off the code. The file also needs a `requirements:`
-  line, a sentence from them on what the module does, and can take `rule:`
-  lines, rules of their own, in their words. Or suggest they fill the file in
+  your own or one read off the code. The optional part at the end takes a
+  `requirements:` line, a sentence from them on what the module does, and
+  `rule:` lines, rules of their own, in their words. Or suggest they fill the file in
   themselves, in their editor: the answers have to be theirs.
   Then `qikly --answers my_module.py` checks the task. In
   their own terminal it offers the run, says where the code and the answers

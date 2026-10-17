@@ -549,19 +549,14 @@ def score(console, code, tests, cwd, many):
     except ValueError as exc:
         console.say(str(exc))
         return None, None
-    sites = 0
-    for path, _ in target.files:
-        sites += len(ms.sites(_read(path)))
-    cap = SCORE_CAP_MANY if many else SCORE_CAP_ONE
-    planted = min(sites, cap)
+    sites, planted = how_many(console, target, tests, cwd, many)
     if not planted:
         console.say("There is nothing in that code qikly knows how to change, "
                     "so there is nothing to score.")
         return None, None
-    planted = _fit_to_time(console, tests, cwd, planted)
     console.say(f"Scoring: planting {planted} fault{'' if planted == 1 else 's'}"
                 f", one at a time, in a copy of your code"
-                + (f" (a sample of the {sites} it could plant)" if sites > cap else "")
+                + (f" (a sample of the {sites} it could plant)" if sites > planted else "")
                 + ". Each one runs your tests once, so this takes a little "
                   "while. No model is called.")
     try:
@@ -590,6 +585,21 @@ def score(console, code, tests, cwd, many):
 
 
 QUICK_ENOUGH = 300   # seconds of scoring before the user is asked first
+
+
+def how_many(console, target, tests, cwd, many):
+    """
+    (faults it could plant, faults to plant): every one up to the cap, fewer
+    when the suite is slow. `--score` and `--questions` both count this way;
+    with a fixed 12 for `--score`, step 1 said 9 of 12 missed and step 2 said
+    10 of 13 on the same code a minute later.
+    """
+    from qikly import mutation_score as ms
+    sites = sum(len(ms.sites(_read(path))) for path, _ in target.files)
+    planted = min(sites, SCORE_CAP_MANY if many else SCORE_CAP_ONE)
+    if planted:
+        planted = _fit_to_time(console, tests, cwd, planted)
+    return sites, planted
 
 
 def _fit_to_time(console, tests, cwd, planted):
@@ -2014,68 +2024,72 @@ def write_questions(arg, cwd, console, given_tests=None):
                         + (f"   [id {' '.join(fe['ids'])} choices {fe['choices']}]"
                            if fe["ids"] and fe["choices"] else ""))
         name = os.path.basename(module)
-        lines = [f"# Your answers for {name}, from qikly --questions.",
-                 "#",
-                 "# Fill in this file, save it, then run:",
-                 f"#   {again}",
-                 "# That checks your answers, offers the run (it needs an API key),",
-                 "# shows where your code disagrees with you, and offers to copy the",
-                 "# new tests into your own tests. Change anything here and run it again.",
-                 "# Keep the id lines: they tie each answer to its question.",
-                 "# " + "-" * 70,
-                 "",
-                 f"module: {shown(module, cwd)}",
-                 f"scored: {shown(code, cwd)}",
-                 "",
-                 f"# What {name} should do, in one sentence. The coding agent is",
-                 "# told this, so give its purpose, not its rules or boundary values.",
-                 "requirements: " + (old["requirements"] if old else ""),
-                 ""]
-        if sharp:
-            lines += [f"# {len(sharp)} question{'' if len(sharp) == 1 else 's'} your tests "
-                      f"leave open. qikly ran your code to find each choice.",
-                      "# Answer with the option's number after the Q, or leave it blank to",
-                      "# skip it. An option that asks for a value takes the number, a colon",
-                      "# and the value, for example:  Q1: 2: 100.0",
-                      ""]
-            for n, entry in enumerate(sharp, 1):
-                q, group_ = entry["group"][0], entry["group"]
-                lines.append(f"# Q{n}. {where(q)}")
-                # The code itself: with only "line 143" to go on, an answer
-                # about slugify's separator check was written about the
-                # max_length check two lines above it.
-                lines += ["#" + line for line in _context(source, q.get("line"))]
-                lines.append(f"# {entry['prompt']}")
-                for i, o in enumerate(entry["options"], 1):
-                    if o["kind"] != so.OWN:
-                        lines.append(f"#   {i}. {o['label']}")
-                if len(group_) > 1:
-                    lines.append(f"#   (This answer also covers {len(group_) - 1} more "
-                                 f"place{'s' if len(group_) > 2 else ''} your tests "
-                                 f"leave open on the same call.)")
-                lines += ["# id " + " ".join(entry["ids"]), f"# choices {entry['choices']}",
-                          f"Q{n}: {carried.get(id(entry), '')}", ""]
-        else:
-            lines += ["# No questions with answers qikly could work out by running your",
-                      "# code. Write what you know as rules, below.", ""]
-        lines += ["# Rules of your own, optional, one per line, each naming a value:",
-                  "#   rule: apply_discount(100, 0) returns 100.0",
-                  "#   rule: label(' VIP ') returns 'gold'"]
-        if others:
-            lines += [f"# {others} more place{'s' if others != 1 else ''} your tests "
-                      f"leave open need{'' if others != 1 else 's'} someone who knows",
-                      f"# the code; the score report lists "
-                      f"{'them' if others != 1 else 'it'}: {shown(report, cwd)}"
-                      if report else "# the score report lists them."]
-        lines += ["rule: " + r for r in (old["rules"] if old else [])] or ["rule: "]
-        lines.append("")
-        kept = (old["kept"] if old else []) + kept_back
-        if kept:
-            lines += ["# Earlier answers whose question is no longer asked, or whose",
-                      "# choices changed, kept so nothing is lost. Move any that still",
-                      "# apply to its question above, or write it as a rule."] + kept + [""]
+        rule_line = "-" * 70
         from qikly.scaffold import starter_columns
         columns = starter_columns(source)
+        # The header says everything there is to do; after the line come the
+        # questions alone, and an optional part at the end that can be left
+        # as it is. A first reader took the numbered parts and the empty
+        # requirements: line for things that had to be filled in first.
+        lines = [f"# qikly questions for {name}",
+                 "#"]
+        if sharp:
+            lines += ["# Answer a question by typing an option's number after its Q,",
+                      "# such as  Q1: 2 . Leave it blank to skip it. An option that",
+                      "# asks for a value takes the number, a colon and the value,",
+                      "# for example:  Q1: 1: 100.0"]
+        else:
+            lines += ["# No questions this time: qikly could not work out choices for",
+                      "# any of them by running your code. Write what you know as",
+                      "# rules, at the end of this file."]
+        if others:
+            lines.append(f"# {others} more question{'s' if others != 1 else ''} need"
+                         f"{'' if others != 1 else 's'} someone who knows the code; "
+                         f"the score report lists {'them' if others != 1 else 'it'}.")
+        if columns is None:
+            lines += ["#",
+                      f"# {name} reads files, so before you run it, copy a small real",
+                      "# file of the kind it reads to",
+                      f"#   {shown(paths.data, cwd)}"]
+        lines += ["#",
+                  "# Then save this file and run:",
+                  f"#   {again}",
+                  "# It checks your answers, then offers the run, which needs an API",
+                  "# key. Change anything here and run it again, any time.",
+                  "# Keep the id and choices lines as they are.",
+                  "",
+                  f"module: {shown(module, cwd)}",
+                  f"scored: {shown(code, cwd)}",
+                  "# " + rule_line,
+                  ""]
+        for n, entry in enumerate(sharp, 1):
+            q, group_ = entry["group"][0], entry["group"]
+            lines.append(f"# Q{n}. {where(q)}")
+            # The code itself: with only "line 143" to go on, an answer
+            # about slugify's separator check was written about the
+            # max_length check two lines above it.
+            lines += ["#" + line for line in _context(source, q.get("line"))]
+            lines.append(f"# {entry['prompt']}")
+            for i, o in enumerate(entry["options"], 1):
+                if o["kind"] != so.OWN:
+                    lines.append(f"#   {i}. {o['label']}")
+            if len(group_) > 1:
+                lines.append(f"#   (This answer also covers {len(group_) - 1} more "
+                             f"place{'s' if len(group_) > 2 else ''} your tests "
+                             f"leave open on the same call.)")
+            lines += ["# id " + " ".join(entry["ids"]), f"# choices {entry['choices']}",
+                      f"Q{n}: {carried.get(id(entry), '')}", ""]
+        lines += ["# " + rule_line,
+                  "# Optional: everything below can be left as it is.",
+                  "#",
+                  f"# What {name} does, in one sentence, for the coding agent.",
+                  "# Left blank, the agent is told to keep what it does now.",
+                  "requirements: " + (old["requirements"] if old else ""),
+                  "",
+                  "# Rules of your own, one per line, each naming a value, such as",
+                  "#   rule: apply_discount(100, 0) returns 100.0"]
+        lines += ["rule: " + r for r in (old["rules"] if old else [])] or ["rule: "]
+        lines.append("")
         if columns:
             built = build_rows({"answers": {}, "extra": []}, columns, source, test_sources)
             # A value with a line break cannot sit on one line.
@@ -2090,17 +2104,17 @@ def write_questions(arg, cwd, console, given_tests=None):
                     built = fits
             lines += ["# Example inputs the run tries the code on, one row per line,",
                       "# the values in this order:  " + ", ".join(columns),
-                      "# qikly filled in the rows it could build from your tests"
-                      + ("." if built else "; none could be built, so add at least one.")]
+                      "# qikly filled these in from your tests" if built else
+                      "# none could be built from your tests, so add at least one"]
             lines += ["row: " + _csv_line(r) for r in built] or ["row: "]
             lines += [f"#   a row that no longer fits {', '.join(columns)}: " + _csv_line(r)
                       for r in misfit]
             lines.append("")
-        elif columns is None:
-            lines += [f"# {name} works on files, so the run needs a real sample one.",
-                      "# Copy a small real file of the kind it reads to",
-                      f"#   {shown(paths.data, cwd)}",
-                      "# before you run the command above.", ""]
+        kept = (old["kept"] if old else []) + kept_back
+        if kept:
+            lines += ["# Earlier answers whose question is no longer asked, or whose",
+                      "# choices changed, kept so nothing is lost. Move any that still",
+                      "# apply to its question above, or write it as a rule."] + kept + [""]
         os.makedirs(os.path.dirname(paths.open), exist_ok=True)
         text = "\n".join(lines)
         backup = None
@@ -2135,7 +2149,8 @@ def write_questions(arg, cwd, console, given_tests=None):
         console.say("No questions to answer. To add rules of your own for one "
                     "module, run  qikly --questions <that module>.py")
         return 0
-    console.say("Next, step 2: answer in the file, then run the command under it.")
+    console.say("Next: answer the questions in the file, save it, then run the "
+                "command under it.")
     for path, command in written:
         console.say(f"  {shown(path, cwd)}")
         console.say(f"    then:  {command}")
@@ -2437,6 +2452,25 @@ def _interpret(console, n, text, options):
     return {"status": "answered", "criterion": text}
 
 
+def _default_requirements(module, source):
+    """
+    What the coding agent is told when the requirements: line is blank: the
+    module's own docstring, or to keep what the code does now. It repairs a
+    copy of that code, so the code is the description.
+    """
+    import ast
+    try:
+        doc = ast.get_docstring(ast.parse(source)) or ""
+    except SyntaxError:
+        doc = ""
+    first = doc.strip().split("\n\n")[0].replace("\n", " ").strip()
+    name = os.path.basename(module)
+    if first:
+        return f"{name}: {first}"
+    return (f"{name} does what its code does now; keep that, and change only "
+            f"what the tests show is wrong.")
+
+
 def _from_answers(console, paths, questions, test_sources, root, answers_path):
     """
     The task, built from the answers file alone, every time. Built on top of
@@ -2448,12 +2482,7 @@ def _from_answers(console, paths, questions, test_sources, root, answers_path):
     _, requirements, rows, _, _ = parse_answers(answers_path)
     source = _read(paths.module)
     state = {"answers": {}, "extra": parse_rules(answers_path)}
-    if requirements:
-        state["requirements"] = requirements
-    else:
-        console.say(f"{shown(answers_path, paths.cwd)} has no requirements: line, "
-                    f"so the coding agent would not be told what the module "
-                    f"does. Add one, such as  requirements: applies a discount.")
+    state["requirements"] = requirements or _default_requirements(paths.module, source)
     entries, _ = sharp_questions(questions, source, test_sources, root)
     present = {_member_id(q) for q in questions}
     unmatched, changed, unworked = [], [], []

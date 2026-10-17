@@ -143,10 +143,10 @@ implementation of the same interface.
   the code was right to begin with, because it works by breaking code that is
   there, so anything the code never did is invisible to it. No model is called,
   nothing of yours is modified, and no code leaves your machine.
-- The 12 faults are a random sample, drawn afresh on every run and shared
-  across every file when you point it at a folder. `--score-mutants 48`
-  plants more. To compare a score before and after changing your tests, pass
-  the same seed both times, such as `--score-seed 1`.
+- It plants every fault it can, up to 60 in one module or 150 in a folder,
+  and a sample when your tests are slow; `--questions` counts the same way,
+  so both report the same score. `--score-mutants 48` sets the number, and
+  `--score-seed 1` draws a different sample.
 - `--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
   delete. It is for watching, not for building in. `--example` and `--scaffold`
   create a real project in the directory you are standing in, and those are the

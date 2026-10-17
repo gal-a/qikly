@@ -58,10 +58,18 @@ packaging tools would read as `1.1`.
     call when the line itself has none. The order of the two is shuffled per
     question in an order fixed by its choices, and the same call with the
     same choices is asked once.
-  - Each question shows the code it is about. The file also has a
-    `requirements:` line for what the module does, `rule:` lines for rules of
-    your own, and example input rows built from your tests, or where to copy
-    a sample file for code that reads files.
+  - The file is a short header, then the questions, each with the code it
+    is about. After them comes an optional part that can be left as it is:
+    a `requirements:` line for what the module does (left blank, the coding
+    agent is told to keep what the code does now, or reads its docstring),
+    `rule:` lines for rules of your own, and example input rows built from
+    your tests. For code that reads files, the header says where to copy a
+    sample file.
+  - `--score` plants every fault it can, up to 60 in one module or 150 in a
+    folder, and a sample only when the suite is slow, counted as
+    `--questions` counts. With a fixed sample of 12, step 1 said 9 of 12
+    missed and step 2 said 10 of 13 on the same code. A saved score is reused
+    only when qikly's own scoring code is unchanged too.
   - "Either is fine" and "save it for later" are options, and a blank answer
     stays open. The file is yours: change anything and run `--answers` again,
     and the task is rebuilt from the file each time. Rerunning `--questions`

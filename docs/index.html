@@ -842,8 +842,8 @@ footer {
          the 6 in the questions file it wrote, and the finding the
          --answers run ended with, with the diff it made to its copy. The run
          took 5 model calls, about $0.002. Lines are trimmed, not reworded.
-         Step 1's excerpt is qikly --score on the same module and suite
-         with --score-seed 1, 2026-10-15. -->
+         Step 1's excerpt is qikly --score on the same module and suite,
+         2026-10-17, which plants every fault it can, as --questions does. -->
     <ol class="steps">
       <li class="row">
         <div class="step">
@@ -857,7 +857,7 @@ footer {
         </div>
         <figure class="eg">
           <figcaption>What it printed for pricing.py, whose two tests both pass</figcaption>
-<pre><span class="dim">[pricing.py]</span> <span class="alert">9 of 12 planted faults missed</span><span class="alert"> (75%)</span>, 3 caught.
+<pre><span class="dim">[pricing.py]</span> <span class="alert">10 of 13 planted faults missed</span><span class="alert"> (77%)</span>, 3 caught.
 <span class="dim">[pricing.py]</span> 8 questions your tests leave open, in the same report.</pre>
         </figure>
       </li>
