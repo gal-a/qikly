@@ -498,10 +498,18 @@ def save_session(cwd, code, session):
 
 
 def fingerprint(code, tests):
-    """A hash of every code and test file, so an unchanged pair is not re-scored."""
+    """
+    A hash of every code and test file, and of qikly's own scoring code, so an
+    unchanged pair is not re-scored. Without the scoring code, a score saved by
+    an older qikly was reused after an upgrade: 13 planted faults where a fresh
+    `--score` of the same files planted 12.
+    """
+    from qikly import mutation, mutation_score
     files = ([code] if os.path.isfile(code) else modules_in(code))
     files += ([tests] if os.path.isfile(tests) else _test_files(tests))
     digest = hashlib.sha256()
+    for module in (mutation, mutation_score):
+        digest.update(_read(module.__file__).encode("utf-8", "replace"))
     for path in sorted(set(files)):
         digest.update(path.encode("utf-8"))
         digest.update(_read(path).encode("utf-8", "replace"))
@@ -2014,19 +2022,21 @@ def write_questions(arg, cwd, console, given_tests=None):
                  "# shows where your code disagrees with you, and offers to copy the",
                  "# new tests into your own tests. Change anything here and run it again.",
                  "# Keep the id lines: they tie each answer to its question.",
+                 "# " + "-" * 70,
                  "",
                  f"module: {shown(module, cwd)}",
                  f"scored: {shown(code, cwd)}",
                  "",
-                 f"# 1. What {name} should do, in one sentence. The coding agent is",
-                 "#    told this, so give its purpose, not its rules or boundary values.",
+                 f"# What {name} should do, in one sentence. The coding agent is",
+                 "# told this, so give its purpose, not its rules or boundary values.",
                  "requirements: " + (old["requirements"] if old else ""),
                  ""]
         if sharp:
-            lines += [f"# 2. Questions your tests leave open, {len(sharp)} of them. qikly ran",
-                      "#    your code to find each choice. Answer with the option's number",
-                      "#    after the Q, or leave it blank to skip it. An option that asks",
-                      "#    for a value takes the number, a colon and the value:  Q1: 2: 100.0",
+            lines += [f"# {len(sharp)} question{'' if len(sharp) == 1 else 's'} your tests "
+                      f"leave open. qikly ran your code to find each choice.",
+                      "# Answer with the option's number after the Q, or leave it blank to",
+                      "# skip it. An option that asks for a value takes the number, a colon",
+                      "# and the value, for example:  Q1: 2: 100.0",
                       ""]
             for n, entry in enumerate(sharp, 1):
                 q, group_ = entry["group"][0], entry["group"]
@@ -2046,17 +2056,17 @@ def write_questions(arg, cwd, console, given_tests=None):
                 lines += ["# id " + " ".join(entry["ids"]), f"# choices {entry['choices']}",
                           f"Q{n}: {carried.get(id(entry), '')}", ""]
         else:
-            lines += ["# 2. Questions: none with answers qikly could work out by running",
-                      "#    your code. Write what you know as rules, below.", ""]
-        lines += ["# 3. Rules of your own, optional, one per line, each naming a value:",
-                  "#      rule: apply_discount(100, 0) returns 100.0",
-                  "#      rule: label(' VIP ') returns 'gold'"]
+            lines += ["# No questions with answers qikly could work out by running your",
+                      "# code. Write what you know as rules, below.", ""]
+        lines += ["# Rules of your own, optional, one per line, each naming a value:",
+                  "#   rule: apply_discount(100, 0) returns 100.0",
+                  "#   rule: label(' VIP ') returns 'gold'"]
         if others:
-            lines += [f"#    {others} more place{'s' if others != 1 else ''} your tests "
+            lines += [f"# {others} more place{'s' if others != 1 else ''} your tests "
                       f"leave open need{'' if others != 1 else 's'} someone who knows",
-                      f"#    the code; the score report lists "
+                      f"# the code; the score report lists "
                       f"{'them' if others != 1 else 'it'}: {shown(report, cwd)}"
-                      if report else "#    the score report lists them."]
+                      if report else "# the score report lists them."]
         lines += ["rule: " + r for r in (old["rules"] if old else [])] or ["rule: "]
         lines.append("")
         kept = (old["kept"] if old else []) + kept_back
@@ -2078,19 +2088,19 @@ def write_questions(arg, cwd, console, given_tests=None):
                 misfit = [r for r in old["rows"] if len(r) != len(columns)]
                 if fits:
                     built = fits
-            lines += ["# 4. Example inputs the run tries the code on, one row per line,",
-                      "#    the values in this order:  " + ", ".join(columns),
-                      "#    qikly filled in the rows it could build from your tests"
+            lines += ["# Example inputs the run tries the code on, one row per line,",
+                      "# the values in this order:  " + ", ".join(columns),
+                      "# qikly filled in the rows it could build from your tests"
                       + ("." if built else "; none could be built, so add at least one.")]
             lines += ["row: " + _csv_line(r) for r in built] or ["row: "]
             lines += [f"#   a row that no longer fits {', '.join(columns)}: " + _csv_line(r)
                       for r in misfit]
             lines.append("")
         elif columns is None:
-            lines += [f"# 4. {name} works on files, so the run needs a real sample one.",
-                      "#    Copy a small real file of the kind it reads to",
-                      f"#      {shown(paths.data, cwd)}",
-                      "#    before you run the command above.", ""]
+            lines += [f"# {name} works on files, so the run needs a real sample one.",
+                      "# Copy a small real file of the kind it reads to",
+                      f"#   {shown(paths.data, cwd)}",
+                      "# before you run the command above.", ""]
         os.makedirs(os.path.dirname(paths.open), exist_ok=True)
         text = "\n".join(lines)
         backup = None
