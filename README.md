@@ -77,8 +77,10 @@ qikly --tasks my_module.py       # 3. the run                      needs an API 
    - "apply_discount(100, 100) raises ValueError"
    ```
 
-   You write your answer in place of each TODO, as a sentence that names a
-   value. A TODO you leave is skipped. On a folder it writes one task file for
+   You replace each TODO line with your answer, keeping the quotes, as a
+   sentence that names a value. A TODO you leave is skipped. Replace the
+   `requirements` line too, marked `TODO: MODIFY THIS:`, with what the
+   module is for in your words. On a folder it writes one task file for
    each module step 1 asked about. Lines starting `#?` are notes for you,
    and neither agent reads them. This file is the one source of truth: change
    it and run step 3 again. `qikly --validate my_module.py` checks it, free.

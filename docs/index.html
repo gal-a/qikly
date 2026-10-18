@@ -360,6 +360,9 @@ h1 {
 .audit-note + .audit-note { margin-top: -16px; }
 .step .small-link { display: block; margin-top: 6px; font-size: .8rem; }
 .step p { margin: 0; font-size: .92rem; color: var(--ink-soft); flex: 1; }
+/* A long path, the task file's, wraps at its slashes instead of running
+   out of the column. */
+.step p code { overflow-wrap: anywhere; }
 .step .cost {
   align-self: flex-start;
   font-family: "IBM Plex Mono", monospace;
@@ -869,14 +872,15 @@ footer {
         <div class="step">
           <span class="n">Step 2</span>
           <b>Answer the questions in the task file</b>
-          <code class="cmd"><span>qikly</span> <span>--scaffold</span> <span>your_module.py</span></code>
-          <p>Writes the task file, <code>inputs_private/config/tasks/YOUR_MODULE_VERIFY.yaml</code>,
-            with everything qikly can read from your code filled in. What is
+          <code class="cmd"><span>qikly</span> <span>--scaffold</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--scaffold</span> <span>your_project_folder</span></code>
+          <p>Writes the task file, <code>inputs_private/config/tasks/<wbr>YOUR_MODULE_VERIFY.yaml</code>,
+            one per module for a folder, with everything qikly can read from
+            your code filled in. What is
             left is step 1's questions, each with what your code does there
             now, found by running it. Write your answer in place of each TODO,
             naming a value; a TODO you leave is skipped. This file is the
             source of truth: change it any time.
-            <code>qikly --validate your_module.py</code> checks it, free.</p>
+            <code>qikly --validate</code> with the same path checks it, free.</p>
           <span class="cost free">free, no key</span>
         </div>
         <figure class="eg">
@@ -896,13 +900,13 @@ footer {
         <div class="step">
           <span class="n">Step 3</span>
           <b>Get a fresh test suite written from your answers</b>
-          <code class="cmd"><span>qikly</span> <span>--tasks</span> <span>your_module.py</span></code>
+          <code class="cmd"><span>qikly</span> <span>--tasks</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--tasks</span> <span>your_project_folder</span></code>
           <p>Set a key first, such as <code>GEMINI_API_KEY</code>, or one for
             Anthropic or OpenAI. A test agent writes tests from your answers
             before any code is shown to it, and a separate coding agent,
             which never sees them, repairs a copy of your code until they
             pass. Your files are never edited. Then
-            <code>qikly --take-tests your_module.py</code> copies the new tests
+            <code>qikly --take-tests</code> with the same path copies the new tests
             into your own tests folder, importing your code, and runs them on
             it: a test that fails there is one to compare with your answer.</p>
           <span class="cost key">needs an <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-step3-key">API key</a></span>

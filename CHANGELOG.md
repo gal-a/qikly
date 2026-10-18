@@ -17,9 +17,11 @@ packaging tools would read as `1.1`.
 - **`--scaffold` leaves only the questions to answer**, for code you already
   have. Everything it can read from the code is filled in: the task name,
   the description, the interface without a TODO per function, the
-  entrypoint, and `requirements`, which starts as the module's docstring or
-  a line to keep what the code does, for you to replace in your own words.
-  The comments above each section are two or three lines. A module inside a
+  entrypoint. `requirements` starts as the module's docstring or a line to
+  keep what the code does, marked `TODO: MODIFY THIS:` for you to replace in
+  your own words, which `--validate` reminds you of. Each section sits under
+  a dividing line with a short note on what it is for and an example of the
+  answer it takes, and the seed, the file under test, comes first. A module inside a
   package is seeded as its whole top-level package and named by its dotted
   path (`acme.scoring`), so a relative import such as `from .util import
   clamp` works in qikly's copy.

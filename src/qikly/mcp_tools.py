@@ -215,7 +215,8 @@ def qikly_scaffold(file_path):
     that implementation already does, which is the circularity this whole
     project exists to break. That refusal is the feature, not a gap.
     `requirements` starts as the module's docstring, or a line to keep what
-    the code does, for the person to replace in their own words.
+    the code does, marked `TODO: MODIFY THIS:` for the person to replace in
+    their own words.
     """
     if not file_path or not isinstance(file_path, str):
         return _error("file_path is required")

@@ -77,39 +77,52 @@ acceptance_criteria:
 VERIFY_TEMPLATE = '''# The task file for {source_rel}. Answer the questions under
 # acceptance_criteria, then run:  qikly --tasks {command}
 task_id: "{task_id}"
-
 task_name: "{task_id}: tests for {name}"
-
 description: "{description}"
 
+# ----------------------------------------------------------------------------
+# Your code under test. qikly copies it, tests the copy and repairs the copy;
+# this file is never changed. Without this section a run would write new code
+# from the requirements instead of testing yours.
+seed:
+  implementation: "{source_rel}"
+
+# ----------------------------------------------------------------------------
+# The example data a run calls your code with, filled in from your tests, and
+# where a run writes its result.
 inputs:
 {inputs}
-
 outputs:
   - "outputs/data/{task_id}/output.json"
 
-# Read from {source_rel}.
+# ----------------------------------------------------------------------------
+# The functions the tests call, read from {source_rel}. `module` is where
+# qikly's copy of your code is imported from during a run. Nothing to change.
 interface:
   module: "{module}"
   integration_functions:
 {functions}
   system_entrypoint: "{entrypoint}"
 
+# ----------------------------------------------------------------------------
 # What the code is for, in your words. The coding agent reads this, so give
-# its purpose, not the values the questions below ask about.
+# its purpose, not the values the questions below ask about. Replace the
+# line, keeping the quotes, for example:
+#   - "reads sensor readings and writes one summary per station per day"
 requirements:
   - {requirement}
 
-# What must be true, each naming a value someone could check, such as
-# "a humidity of 100 is accepted and 101 is rejected". The coding agent never sees
-# this section, so keep those values out of every other line of this file.
+# ----------------------------------------------------------------------------
+# What must be true. The coding agent never sees this section; the test
+# agent writes the tests from it. Replace each TODO line with your answer,
+# keeping the quotes and naming a value someone could check, for example:
+#   - "TODO: what f(0) should do"    becomes    - "f(0) returns 1.0"
+# A TODO you leave is skipped. The question lines above each TODO are notes
+# for you, and neither agent reads them. Keep these values out of every
+# other line of this file, comments included: the coding agent reads the rest.
 acceptance_criteria:
   - "TODO: one checkable statement, with its boundary value, e.g. a humidity of
     100 is accepted and 101 is rejected"
-
-# The code under test. qikly tests a copy of it and never changes this file.
-seed:
-  implementation: "{source_rel}"
 '''
 
 
@@ -296,7 +309,9 @@ def with_questions(text, questions, written=None):
         handed_over = without_acceptance_criteria(out)
         if not isinstance(criteria, list) or len(criteria) != len(questions):
             return text, False
-        if score_questions.MARK in handed_over or any(
+        # A line that starts with the mark, wherever it is; the mark named
+        # inside a sentence, as the section's own comment does, is not one.
+        if score_questions._MARKED.search(handed_over) or any(
                 q["question"][:40] in handed_over for q in questions):
             return text, False
     except Exception:
@@ -410,7 +425,9 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
     if seed == "existing":
         name = os.path.basename(source_path)
         command = source_rel if " " not in source_rel else f'"{source_rel}"'
-        requirement = default_requirement(source, name)
+        # Marked, so nobody runs on it without reading it: the coding agent is
+        # told this, and the line qikly can write is only a starting point.
+        requirement = "TODO: MODIFY THIS: " + default_requirement(source, name)
         return VERIFY_TEMPLATE.format(
             source_rel=source_rel, command=command, task_id=task_id, name=name,
             description=f"Tests for the existing {name}, from its owner's answers.",

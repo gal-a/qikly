@@ -70,8 +70,10 @@ def test_only_the_questions_are_left_to_answer(scored):
     assert cli._do_scaffold("pricing.py", None) == 0
     text = _task(scored)
     task = yaml.safe_load(text)
-    for field in ("task_name", "description", "interface", "requirements"):
+    for field in ("task_name", "description", "interface"):
         assert "TODO" not in str(task[field]), field
+    # Marked, so it is read before a run; still never a rule from the code.
+    assert task["requirements"][0].startswith("TODO: MODIFY THIS: pricing.py ")
     criteria = task["acceptance_criteria"]
     assert criteria and all(c.startswith("TODO: what ") for c in criteria), criteria
     assert task["seed"]["implementation"] == "pricing.py"

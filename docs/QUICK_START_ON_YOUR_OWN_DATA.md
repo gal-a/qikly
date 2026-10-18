@@ -140,10 +140,12 @@ folder, and every step takes the same path:
    file for each module step 1 asked about. What is left is step 1's
    questions, under `acceptance_criteria`, each with what your code does
    there now, found by running it (for a boundary, only on either side of
-   it, never at it). Write your answer in
-   place of each TODO, as a sentence that names a value someone could check,
-   such as `apply_discount(100, 100) raises ValueError`. A TODO you leave is
-   skipped. Lines starting `#?` are notes for you, and neither agent reads
+   it, never at it). Replace each TODO line with your answer, keeping the
+   quotes, as a sentence that names a value someone could check: `- "TODO:
+   what apply_discount(100, 100) should do"` becomes `- "apply_discount(100,
+   100) raises ValueError"`. A TODO you leave is skipped. Replace the
+   `requirements` line too, marked `TODO: MODIFY THIS:`, with what the module
+   is for in your own words. Lines starting `#?` are notes for you, and neither agent reads
    them. Then check it, free:
 
    ```bash

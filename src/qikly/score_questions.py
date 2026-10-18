@@ -477,10 +477,8 @@ def yaml_block(questions, written=None):
     lines = ["acceptance_criteria:"]
     lines += _comment(
         f"{count} question{'' if count == 1 else 's'} from qikly --score"
-        f"{when}: what your tests do not check. Write your answer in place of "
-        f"each TODO, naming a value someone could check, from what the code is "
-        f"meant to do. A TODO you leave is skipped. Lines starting {MARK} are "
-        f"notes for you: neither agent reads them.")
+        f"{when}: what your tests do not check. Answer from what the code is "
+        f"meant to do, not from what it does now.")
     lines.append("")
     for q in questions:
         where = q.get("file") or "your code"

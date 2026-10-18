@@ -272,8 +272,11 @@ def check_task(path):
     # error, because the overlap measure is blunt and a false positive must
     # not stop a run, but it is worth saying loudly every time.
     from qikly.from_doc import restated
-    for req, crit, score in restated(task.get("requirements"),
-                                     task.get("acceptance_criteria")):
+    from qikly.score_questions import is_todo
+    # A TODO left in place is no criterion, and its "TODO: your answer to the
+    # question above" matched the template's own advice on replacing TODOs.
+    answered = [c for c in (task.get("acceptance_criteria") or []) if not is_todo(c)]
+    for req, crit, score in restated(task.get("requirements"), answered):
         warnings.append(Note(
             f"{name}: a requirement restates a criterion ({int(score * 100)}% "
             f"of its words). The coding agent reads requirements and never "
@@ -309,8 +312,9 @@ def _restated_outside_requirements(raw, task, threshold=0.6):
     from qikly.agent_api.agent_interface import without_acceptance_criteria
     from qikly.from_doc import common_vocabulary, overlap
 
+    from qikly.score_questions import is_todo
     criteria = [c for c in (task.get("acceptance_criteria") or [])
-                if isinstance(c, str)]
+                if isinstance(c, str) and not is_todo(c)]
     if not criteria:
         return []
 

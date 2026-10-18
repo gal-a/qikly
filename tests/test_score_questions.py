@@ -490,7 +490,7 @@ def test_validate_says_how_many_answers_are_left(tmp_path):
     _run(["--scaffold", "pricing.py"], str(project))
     task = project / "inputs_private" / "config" / "tasks" / "PRICING_VERIFY.yaml"
     text = task.read_text(encoding="utf-8")
-    first = text.index('  - "TODO:')
+    first = text.index('  - "TODO:', text.index("acceptance_criteria:"))
     end = text.index("\n", first)
     task.write_text(text[:first] + '  - "apply_discount(100, 0) returns 100.0"'
                     + text[end:], encoding="utf-8")

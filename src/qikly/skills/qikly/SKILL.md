@@ -66,8 +66,8 @@ The path is three commands, each taking the same module or folder:
   word**, and write what they answer in place of its TODO, as a sentence
   naming a value, never an answer of your own or one read off the code. A
   TODO left in place is skipped. `requirements` starts as the module's
-  docstring, or a line to keep what the code does; replace it only with
-  their words. Or suggest they
+  docstring, or a line to keep what the code does, marked `TODO: MODIFY
+  THIS:`; replace it only with their words. Or suggest they
   answer in their editor: the answers have to be theirs.
   `qikly --validate my_module.py` checks it, free.
 - **`qikly --tasks my_module.py`** runs it, which needs their key. It ends by
