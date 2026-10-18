@@ -808,14 +808,14 @@ footer {
       <figcaption>
         <p>This was run by two independent AI agents:</p>
         <ol>
-          <li><b>The Test Agent set the acceptance bar:</b> it was told, from
+          <li><b>The Test Agent builds the test suite:</b> it was told, from
             the spec's acceptance criteria, that the rate may not exceed
             100.</li>
-          <li><b>The Coding Agent never saw that acceptance bar and found that
-            bound from a failing test:</b> it added
+          <li><b>The Coding Agent never saw the acceptance criteria and
+            discovered that rate limit from a failing test:</b> it then added
             <code style="white-space:nowrap">or rate &gt; 100</code> by itself,
-            so the 9 of 9 is code eventually passing the bar after applying
-            fixes in an automated repair loop.</li>
+            so the 9 of 9 is code eventually passing the test suite after
+            applying fixes in an automated repair loop.</li>
         </ol>
       </figcaption>
     </figure>

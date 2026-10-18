@@ -19,9 +19,11 @@
 
 **The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
 
-*One logged run. Only the test agent was told a rate may not exceed 100. The
-coding agent figured that bound out from a failing test and added `or rate > 100`
-itself, so the 9 of 9 is code passing an acceptance bar it never saw.*
+*One logged run. The test agent builds the test suite: it was told, from the
+spec's acceptance criteria, that a rate may not exceed 100. The coding agent
+never saw the acceptance criteria and discovered that rate limit from a failing
+test: it then added `or rate > 100` by itself, so the 9 of 9 is code eventually
+passing the test suite after applying fixes in an automated repair loop.*
 
 A student who writes the exam paper, writes the answer key and then sits the
 exam will pass. That is what happens when one model is given the acceptance
