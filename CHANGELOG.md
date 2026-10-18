@@ -19,9 +19,10 @@ packaging tools would read as `1.1`.
   the description, the interface without a TODO per function, the
   entrypoint. `requirements` starts as the module's docstring or a line to
   keep what the code does, marked `TODO: MODIFY THIS:` for you to replace in
-  your own words, which `--validate` reminds you of. Each section sits under
-  a dividing line with a short note on what it is for and an example of the
-  answer it takes, and the seed, the file under test, comes first. A module inside a
+  your own words, which `--validate` reminds you of. Left in place, the line
+  goes to the agents without the mark. Each section sits under
+  a dividing line with a short note on what it is for, with an example of
+  the answer for `requirements` and `acceptance_criteria`, and the seed, the file under test, comes first. A module inside a
   package is seeded as its whole top-level package and named by its dotted
   path (`acme.scoring`), so a relative import such as `from .util import
   clamp` works in qikly's copy.

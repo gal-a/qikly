@@ -874,11 +874,12 @@ footer {
           <b>Answer the questions in the task file</b>
           <code class="cmd"><span>qikly</span> <span>--scaffold</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--scaffold</span> <span>your_project_folder</span></code>
           <p>Writes the task file, <code>inputs_private/config/tasks/<wbr>YOUR_MODULE_VERIFY.yaml</code>,
-            one per module for a folder, with everything qikly can read from
-            your code filled in. What is
-            left is step 1's questions, each with what your code does there
-            now, found by running it. Write your answer in place of each TODO,
-            naming a value; a TODO you leave is skipped. This file is the
+            one per module step 1 asked about for a folder, with everything
+            qikly can read from your code filled in. What is left is step 1's
+            questions, each with what your code does there now, found by
+            running it, and a line saying what the module is for. Replace each
+            TODO line with your answer, naming a value; a TODO you leave is
+            skipped. This file is the
             source of truth: change it any time.
             <code>qikly --validate</code> with the same path checks it, free.
             <a class="small-link" href="https://github.com/gal-a/qikly/tree/main/docs/examples" data-goatcounter-click="start-examples">A module and a folder, answered</a></p>

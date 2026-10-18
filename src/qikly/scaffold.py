@@ -116,7 +116,7 @@ requirements:
 # What must be true. The coding agent never sees this section; the test
 # agent writes the tests from it. Replace each TODO line with your answer,
 # keeping the quotes and naming a value someone could check, for example:
-#   - "TODO: what f(0) should do"    becomes    - "f(0) returns 1.0"
+#   - "TODO: what example_fn(0) should do"  becomes  - "example_fn(0) returns 1.5"
 # A TODO you leave is skipped. The question lines above each TODO are notes
 # for you, and neither agent reads them. Keep these values out of every
 # other line of this file, comments included: the coding agent reads the rest.
@@ -309,8 +309,8 @@ def with_questions(text, questions, written=None):
         handed_over = without_acceptance_criteria(out)
         if not isinstance(criteria, list) or len(criteria) != len(questions):
             return text, False
-        # A line that starts with the mark, wherever it is; the mark named
-        # inside a sentence, as the section's own comment does, is not one.
+        # A second guard: drop_question_lines has already removed every
+        # line that starts with the mark, so this fires only if that failed.
         if score_questions._MARKED.search(handed_over) or any(
                 q["question"][:40] in handed_over for q in questions):
             return text, False
@@ -427,7 +427,8 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
         command = source_rel if " " not in source_rel else f'"{source_rel}"'
         # Marked, so nobody runs on it without reading it: the coding agent is
         # told this, and the line qikly can write is only a starting point.
-        requirement = "TODO: MODIFY THIS: " + default_requirement(source, name)
+        from qikly.score_questions import REQUIREMENT_MARK
+        requirement = REQUIREMENT_MARK + default_requirement(source, name)
         return VERIFY_TEMPLATE.format(
             source_rel=source_rel, command=command, task_id=task_id, name=name,
             description=f"Tests for the existing {name}, from its owner's answers.",

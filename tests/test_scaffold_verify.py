@@ -350,3 +350,19 @@ def test_validate_numbers_criteria_as_test_generation_does(scored):
     finally:
         qikly.fixture_reach.describe = real
     assert seen["criteria"] == ["apply_discount(100, 100) raises ValueError"]
+
+
+# ------------------------------------------ the Fable audit of 0cdd358 --
+
+def test_the_requirements_mark_never_reaches_an_agent(scored):
+    """
+    Left in place, "TODO: MODIFY THIS:" read as an order to the coding agent
+    to modify the code; the line goes to the agents without it, so it still
+    says to keep what the code does.
+    """
+    from qikly.agent_api.agent_interface import _read_task
+    cli._do_scaffold("pricing.py", None)
+    assert "TODO: MODIFY THIS:" in (scored / TASK).read_text(encoding="utf-8")
+    sent = _read_task("PRICING_VERIFY")
+    assert "MODIFY THIS" not in sent
+    assert '- "pricing.py does what its code does now; keep that' in sent

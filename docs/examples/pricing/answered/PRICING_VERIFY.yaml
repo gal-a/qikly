@@ -41,12 +41,12 @@ requirements:
 # What must be true. The coding agent never sees this section; the test
 # agent writes the tests from it. Replace each TODO line with your answer,
 # keeping the quotes and naming a value someone could check, for example:
-#   - "TODO: what f(0) should do"    becomes    - "f(0) returns 1.0"
+#   - "TODO: what example_fn(0) should do"  becomes  - "example_fn(0) returns 1.5"
 # A TODO you leave is skipped. The question lines above each TODO are notes
 # for you, and neither agent reads them. Keep these values out of every
 # other line of this file, comments included: the coding agent reads the rest.
 acceptance_criteria:
-  #? 6 questions from qikly --score on 2026-10-18 12:10: what your tests do
+  #? 6 questions from qikly --score on 2026-10-18 14:03: what your tests do
   #? not check. Answer from what the code is meant to do, not from what it
   #? does now.
 

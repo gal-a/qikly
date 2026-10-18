@@ -2541,9 +2541,11 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
     elif asked:
         print(f"  Its acceptance_criteria hold the {asked} question"
               f"{'' if asked == 1 else 's'} your --score run of {asked_on} raised.")
-        print("  Write your answer in place of each TODO, naming a value someone")
-        print("  could check. A TODO you leave is skipped. Lines starting #? are")
-        print("  notes for you: neither agent reads them.")
+        print("  Replace each TODO line with your answer, keeping the quotes and")
+        print("  naming a value someone could check. A TODO you leave is skipped.")
+        print("  Lines starting #? are notes for you: neither agent reads them.")
+        print("  Replace the requirements line too, marked TODO: MODIFY THIS:,")
+        print("  with what the module is for in your own words.")
     elif not fresh:
         print("  No --score of it was found here, so there are no questions in it")
         print("  yet: write criteria of your own under acceptance_criteria, or")

@@ -394,13 +394,18 @@ def drop_question_lines(text):
     criterion, and sent as one it asked test generation to test "TODO: your
     answer to the question above". Idempotent.
     """
-    return drop_todo_criteria(_MARKED.sub("", text or ""))
+    return _REQUIREMENT_MARK.sub(r"\1", drop_todo_criteria(_MARKED.sub("", text or "")))
 
 
 # A placeholder starts with TODO and a colon, a space or nothing: "TODO:
 # your answer", "TODO what f(1) does". Not "TODO-list", and not a criterion
 # that only mentions a TODO later on. `--validate` counts with the same rule.
 _TODO_ITEM = re.compile(r"^\s*TODO(?::|\s|$)")
+# The mark --scaffold puts on the requirements line it writes, for the person
+# to replace it. Left in place, the line still goes to the agents, without the
+# mark, which read as an order to the coding agent to modify the code.
+REQUIREMENT_MARK = "TODO: MODIFY THIS: "
+_REQUIREMENT_MARK = re.compile(r"(?m)^([ \t]*-[ \t]*[\"']?)" + re.escape(REQUIREMENT_MARK))
 
 
 def is_todo(criterion):

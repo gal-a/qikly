@@ -95,7 +95,7 @@ qikly --tasks my_module.py       # 3. the run                      needs an API 
    code or the test is wrong, and the report says which failures were written
    from a criterion and which are the test writer's own reading, to check.
 
-**Try it on a worked example first:** [`docs/examples/`](docs/examples/)
+**Try it on a worked example first:** [`docs/examples/`](https://github.com/gal-a/qikly/tree/main/docs/examples)
 has a one-module project and a two-module folder, each with its task files
 as they look once answered, to compare yours against.
 
