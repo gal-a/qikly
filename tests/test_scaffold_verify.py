@@ -15,6 +15,7 @@ What these pin, in order of how much a failure would cost a first-time user:
   and for a folder.
 """
 import os
+import re
 
 import pytest
 import yaml
@@ -62,6 +63,13 @@ def scored(tmp_path, monkeypatch):
     return tmp_path
 
 
+def _answer(text, call, answer):
+    """`text` with the TODO under "What should <call> do?" replaced by `answer`."""
+    at = text.index(f"What should {call} do?")
+    todo = re.compile(r'^  - "TODO: [^"]*"$', re.M).search(text, at)
+    return text[:todo.start()] + "  - " + answer + text[todo.end():]
+
+
 def _task(root):
     return (root / TASK).read_text(encoding="utf-8")
 
@@ -75,7 +83,7 @@ def test_only_the_questions_are_left_to_answer(scored):
     # Marked, so it is read before a run; still never a rule from the code.
     assert task["requirements"][0].startswith("TODO: MODIFY THIS: pricing.py ")
     criteria = task["acceptance_criteria"]
-    assert criteria and all(c.startswith("TODO: what ") for c in criteria), criteria
+    assert criteria and all(c.startswith("TODO: pick 1 or 2") for c in criteria), criteria
     assert task["seed"]["implementation"] == "pricing.py"
     data = (scored / "inputs_private" / "data" / "PRICING" / "input_01.csv").read_text()
     assert data.splitlines()[0] == "price,rate,code"
@@ -86,18 +94,19 @@ def test_each_question_says_what_the_code_does_beside_the_value(scored):
     cli._do_scaffold("pricing.py", None)
     text = _task(scored)
     assert "#? What should apply_discount(100, 100) do?" in text
-    assert "raise ValueError, as rate 101 does now" in text
+    assert "raises ValueError   (as rate 101 does now)" in text
     assert "as rate 99 does now (it returns 1.0)" in text
     # Never at the value itself: that is the question.
     assert "as rate 100 does now" not in text
-    assert '- "TODO: what apply_discount(100, 100) should do"' in text
+    assert "#?   2 = apply_discount(100, 100) raises ValueError   (as rate 101 does now)" in text
+    assert '- "TODO: pick 1 or 2, or write your own"' in text
 
 
 def test_neither_agent_reads_the_notes(scored):
     from qikly.agent_api.agent_interface import _read_task
     cli._do_scaffold("pricing.py", None)
     sent = _read_task("PRICING_VERIFY")
-    assert "#?" not in sent and "Found by running your code" not in sent
+    assert "#?" not in sent and "found by running your code" not in sent
     assert "rate 101" not in sent
 
 
@@ -105,9 +114,7 @@ def test_a_question_left_as_todo_is_skipped(scored):
     from qikly.agent_api.agent_interface import read_acceptance_criteria
     cli._do_scaffold("pricing.py", None)
     path = scored / TASK
-    text = path.read_text(encoding="utf-8").replace(
-        '"TODO: what apply_discount(100, 100) should do"',
-        '"apply_discount(100, 100) raises ValueError"')
+    text = _answer(path.read_text(encoding="utf-8"), 'apply_discount(100, 100)', '"apply_discount(100, 100) raises ValueError"')
     path.write_text(text, encoding="utf-8")
     assert read_acceptance_criteria("PRICING_VERIFY") == [
         "apply_discount(100, 100) raises ValueError"]
@@ -119,8 +126,7 @@ def test_validate_stops_a_file_with_nothing_answered(scored):
     errors, warnings = check_task(str(scored / TASK))
     assert any("none of its" in e for e in errors), errors
     path = scored / TASK
-    path.write_text(path.read_text(encoding="utf-8").replace(
-        '"TODO: what label(\'VIP\') should do"', '"label(\'VIP\') returns \'gold\'"'),
+    path.write_text(_answer(path.read_text(encoding="utf-8"), "label('VIP')", '"label(\'VIP\') returns \'gold\'"'),
         encoding="utf-8")
     errors, warnings = check_task(str(path))
     assert not errors, errors
@@ -245,10 +251,8 @@ def test_validate_and_the_run_agree_on_what_a_todo_is(scored):
     cli._do_scaffold("pricing.py", None)
     path = scored / TASK
     text = path.read_text(encoding="utf-8")
-    text = text.replace('"TODO: what apply_discount(100, 0) should do"',
-                        '"TODO apply_discount(100, 0) returns 5"')
-    text = text.replace('"TODO: what label(\'VIP\') should do"',
-                        '"label(\'VIP\') returns \'gold\' (TODO: confirm with sales)"')
+    text = _answer(text, 'apply_discount(100, 0)', '"TODO apply_discount(100, 0) returns 5"')
+    text = _answer(text, "label('VIP')", '"label(\'VIP\') returns \'gold\' (TODO: confirm with sales)"')
     path.write_text(text, encoding="utf-8")
     sent = read_acceptance_criteria("PRICING_VERIFY")
     assert sent == ["label('VIP') returns 'gold' (TODO: confirm with sales)"]
@@ -274,8 +278,7 @@ def test_copied_tests_are_numbered_as_test_generation_saw_the_criteria(
     from qikly import take_tests
     cli._do_scaffold("pricing.py", None)
     path = scored / TASK
-    path.write_text(path.read_text(encoding="utf-8").replace(
-        '"TODO: what label(\'VIP\') should do"', '"label(\'VIP\') returns \'gold\'"'),
+    path.write_text(_answer(path.read_text(encoding="utf-8"), "label('VIP')", '"label(\'VIP\') returns \'gold\'"'),
         encoding="utf-8")
     seen = {}
     monkeypatch.setattr(take_tests, "_run",
@@ -336,9 +339,7 @@ def test_validate_numbers_criteria_as_test_generation_does(scored):
     seen = {}
     real = fixture_reach.describe
     path = scored / TASK
-    path.write_text(path.read_text(encoding="utf-8").replace(
-        '"TODO: what apply_discount(100, 100) should do"',
-        '"apply_discount(100, 100) raises ValueError"'), encoding="utf-8")
+    path.write_text(_answer(path.read_text(encoding="utf-8"), 'apply_discount(100, 100)', '"apply_discount(100, 100) raises ValueError"'), encoding="utf-8")
 
     def spy(task, name, read):
         seen["criteria"] = task.get("acceptance_criteria")
@@ -366,3 +367,72 @@ def test_the_requirements_mark_never_reaches_an_agent(scored):
     sent = _read_task("PRICING_VERIFY")
     assert "MODIFY THIS" not in sent
     assert '- "pricing.py does what its code does now; keep that' in sent
+
+
+# ----------------------------------------------- answering with a number --
+
+def test_a_number_a_value_and_keep_become_criteria_with_or_without_quotes(scored):
+    from qikly.agent_api.agent_interface import read_acceptance_criteria
+    cli._do_scaffold("pricing.py", None)
+    path = scored / TASK
+    text = path.read_text(encoding="utf-8")
+    for call, answer in (("apply_discount(100, 0)", "1: 100.0"),
+                         ("apply_discount(100, -11)", "keep"),
+                         ("apply_discount(100, 100)", '"2"'),
+                         ("apply_discount(100, 10.333)", "'keep'"),
+                         ("label(' vip ')", "1"),
+                         ("label('VIP')", "label('VIP') returns 'gold' always")):
+        text = _answer(text, call, answer)
+    path.write_text(text, encoding="utf-8")
+    assert read_acceptance_criteria("PRICING_VERIFY") == [
+        "apply_discount(100, 0) returns 100.0",
+        "apply_discount(100, -11) raises ValueError",
+        "apply_discount(100, 100) raises ValueError",
+        "apply_discount(100, 10.333) returns 89.67",
+        "label(' vip ') returns 'gold'",
+        "label('VIP') returns 'gold' always",
+    ]
+    # The file keeps what was typed.
+    assert "  - 1: 100.0\n" in path.read_text(encoding="utf-8")
+
+
+def test_validate_shows_each_short_answer_and_stops_on_one_it_cannot_read(
+        scored, capsys):
+    from qikly.validate import check_task
+    cli._do_scaffold("pricing.py", None)
+    path = scored / TASK
+    text = path.read_text(encoding="utf-8")
+    text = _answer(text, "apply_discount(100, 100)", "2")
+    text = _answer(text, "apply_discount(100, 0)", "3")
+    text = _answer(text, "label('VIP')", "2: gold")
+    text = _answer(text, "label(' vip ')", "1")
+    path.write_text(text, encoding="utf-8")
+    errors, _ = check_task(str(path))
+    assert any("answers '3'" in e for e in errors), errors
+    assert any("takes no value" in e for e in errors), errors
+    capsys.readouterr()
+    cli._say_expanded(["PRICING_VERIFY"])
+    out = capsys.readouterr().out
+    assert "2      ->  apply_discount(100, 100) raises ValueError" in out
+
+
+def test_keep_is_refused_where_no_option_is_what_the_code_does_now(scored):
+    from qikly.validate import check_task
+    cli._do_scaffold("pricing.py", None)
+    path = scored / TASK
+    # At a boundary qikly never runs the value itself, so there is no "now".
+    path.write_text(_answer(path.read_text(encoding="utf-8"),
+                            "apply_discount(100, 100)", "keep"), encoding="utf-8")
+    errors, _ = check_task(str(path))
+    assert any("answers 'keep'" in e for e in errors), errors
+
+
+def test_a_short_answer_never_reaches_the_coding_agent(scored):
+    from qikly.agent_api.agent_interface import without_acceptance_criteria
+    cli._do_scaffold("pricing.py", None)
+    path = scored / TASK
+    path.write_text(_answer(path.read_text(encoding="utf-8"),
+                            "apply_discount(100, 100)", "2"), encoding="utf-8")
+    from qikly.agent_api.agent_interface import _read_task
+    handed_over = without_acceptance_criteria(_read_task("PRICING_VERIFY"))
+    assert "raises ValueError" not in handed_over

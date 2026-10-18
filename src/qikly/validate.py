@@ -143,9 +143,14 @@ def check_task(path):
     errors, warnings = [], []
     name = os.path.basename(path)
 
+    from qikly.score_questions import expand_answers
+    unread = []
     try:
         with open(path, encoding="utf-8") as handle:
             raw = handle.read()
+        # Read as both agents read it: a short answer, `2` or `keep`, as the
+        # criterion it stands for, and one written without quotes as text.
+        raw, _, unread = expand_answers(raw)
         task = yaml.safe_load(raw)
     except OSError as exc:
         return [f"{name}: cannot be read: {exc}"], []
@@ -159,6 +164,7 @@ def check_task(path):
     for field in REQUIRED:
         if not task.get(field):
             errors.append(f"{name}: no {field}")
+    errors.extend(f"{name}: {problem}" for problem in unread)
 
     declared = task.get("task_id")
     stem = os.path.splitext(name)[0]

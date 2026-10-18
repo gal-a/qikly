@@ -1,0 +1,87 @@
+# The task file for shop/pricing.py. Answer the questions under
+# acceptance_criteria, then run:  qikly --tasks shop/pricing.py
+task_id: "PRICING_VERIFY"
+task_name: "PRICING_VERIFY: tests for pricing.py"
+description: "Tests for the existing pricing.py, from its owner's answers."
+
+# ----------------------------------------------------------------------------
+# Your code under test. qikly copies it, tests the copy and repairs the copy;
+# this file is never changed. Without this section a run would write new code
+# from the requirements instead of testing yours.
+seed:
+  implementation: "shop"
+
+# ----------------------------------------------------------------------------
+# The example data a run calls your code with, filled in from your tests, and
+# where a run writes its result.
+inputs:
+  - "inputs_private/data/PRICING/input_01.csv"
+outputs:
+  - "outputs/data/PRICING_VERIFY/output.json"
+
+# ----------------------------------------------------------------------------
+# The functions the tests call, read from shop/pricing.py. `module` is where
+# qikly's copy of your code is imported from during a run. Nothing to change.
+interface:
+  module: "shop.pricing"
+  integration_functions:
+    - "apply_discount(price, rate)"
+  system_entrypoint: "apply_discount(price, rate)"
+
+# ----------------------------------------------------------------------------
+# What the code is for, in your words. The coding agent reads this, so give
+# its purpose, not the values the questions below ask about. Replace the
+# line, keeping the quotes, for example:
+#   - "reads sensor readings and writes one summary per station per day"
+requirements:
+  - "TODO: MODIFY THIS: pricing.py does what its code does now; keep that, and change only what the tests show is wrong."
+
+# ----------------------------------------------------------------------------
+# What must be true. The coding agent never sees this section; the test
+# agent writes the tests from it. Answer each TODO line, with or without
+# the quotes:
+#   - 2              pick an option numbered above it
+#   - 1: 0.0         an option that asks for a value, and the value
+#   - keep           what your code does now is right
+#   - example_fn(0) returns 1.5      or write your own, naming a value
+# `qikly --validate` shows each short answer as the criterion it becomes.
+# A TODO you leave is skipped. The question lines above each TODO are notes
+# for you, and neither agent reads them. Keep these values out of every
+# other line of this file, comments included: the coding agent reads the rest.
+acceptance_criteria:
+  #? 4 questions from qikly --score on 2026-10-18 16:39: what your tests do
+  #? not check. Answer from what the code is meant to do, not from what it
+  #? does now.
+
+  #? pricing.py, apply_discount, line 5:
+  #?     if rate < 0 or rate > MAX_RATE:
+  #? Your tests never try rate at exactly 0.
+  #? What should apply_discount(100, 0) do?
+  #? Answer with a number, found by running your code:
+  #?   1 = apply_discount(100, 0) returns VALUE   (write it as 1: the value; as rate 1 does now (it returns 99.0))
+  #?   2 = apply_discount(100, 0) raises ValueError   (as rate -1 does now)
+  - "TODO: pick 1 or 2, or write your own"
+
+  #? pricing.py, apply_discount, line 5:
+  #?     if rate < 0 or rate > MAX_RATE:
+  #? Your tests pass whether this is `rate > MAX_RATE` or `rate >= MAX_RATE`,
+  #? so nothing checks the boundary itself. What should happen at exactly
+  #? `MAX_RATE`?
+  - "TODO: your answer to the question above"
+
+  #? pricing.py, apply_discount, line 5:
+  #?     if rate < 0 or rate > MAX_RATE:
+  #? What should apply_discount(100, -11) do?
+  #? Answer with a number, found by running your code:
+  #?   1 = apply_discount(100, -11) raises ValueError   (as your code does now)
+  #?   2 = apply_discount(100, -11) returns 111.0
+  #? (This also answers 2 more places your tests leave open on the same call.)
+  - "TODO: pick 1 or 2, keep, or write your own"
+
+  #? pricing.py, apply_discount, line 7:
+  #?     return round(price * (1 - rate / 100), 2)
+  #? What should apply_discount(100, 10.333) do?
+  #? Answer with a number, found by running your code:
+  #?   1 = apply_discount(100, 10.333) returns 89.667
+  #?   2 = apply_discount(100, 10.333) returns 89.67   (as your code does now)
+  - "TODO: pick 1 or 2, keep, or write your own"

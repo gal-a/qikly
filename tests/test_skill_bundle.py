@@ -259,7 +259,7 @@ SKILL_BODY_HASHES = {
     # missed, which --scaffold writes into the task file, and the rule that they are the user's to answer: an assistant
     # answering them from the code would be writing criteria off the
     # implementation, which is the failure the Skill opens by warning against.
-    "0.3.7": "a1c4ae91dd82df9929f85d865d70c709634c3bbe3b8ab546a49033d0fa4e915e",
+    "0.3.7": "744d3c7c624e728f48eb2ae2db031ec89b17a98b9c9ad9c0098a46390864048b",
 }
 
 

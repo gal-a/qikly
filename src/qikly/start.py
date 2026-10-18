@@ -688,6 +688,27 @@ def rows_from_tests(module, cwd, columns):
     return [r for r in rows if not any("\n" in v or "\r" in v for v in r)]
 
 
+def _numbered(option):
+    """
+    One option as the task file numbers it: the criterion it becomes, with
+    VALUE where the person writes the value, and a note on what the code does
+    beside the value in question, from the option's own label.
+    """
+    from qikly.score_questions import VALUE
+    pins, call = option.get("pins") or {}, option.get("call") or ""
+    if "raises" in pins:
+        criterion = f"{call} raises {pins['raises']}"
+    elif pins.get("returns") is None:
+        criterion = f"{call} returns {VALUE}"
+    else:
+        criterion = f"{call} returns {pins['returns']}"
+    label = option.get("label") or ""
+    note = ("as " + label.split(", as ", 1)[1]) if ", as " in label else ""
+    note = note.split("; you will type")[0]
+    return {"criterion": criterion, "note": note,
+            "now": label.endswith("as your code does now")}
+
+
 def hinted(questions, module, cwd):
     """
     The saved questions about `module`, merged where they ask about the same
@@ -724,9 +745,10 @@ def hinted(questions, module, cwd):
                 by_mark[mark]["covers"] = by_mark[mark].get("covers", 0) + 1
                 continue
             # In an order fixed by the values, not "as your code does now"
-            # first, which reads as the answer.
+            # first, which reads as the answer. Each with the criterion its
+            # number becomes, so a person can answer with the number.
             q.update(hint_prompt=prompt,
-                     hint_options=[o["label"] for o in sorted(
+                     hint_options=[_numbered(o) for o in sorted(
                          behaviours, key=lambda o: json.dumps(o.get("pins"), sort_keys=True))])
             by_mark[mark] = q
         out.append(q)

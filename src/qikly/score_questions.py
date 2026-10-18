@@ -387,6 +387,109 @@ _MARKED = re.compile(r"(?m)^[ \t]*#\?.*(?:\r?\n|$)")
 _UNPRINTABLE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f\ud800-\udfff\ufffe\uffff]")
 
 
+# Where an option's criterion needs the person's value: "1: 0.0".
+VALUE = "VALUE"
+_OPTION = re.compile(r"^[ \t]*#\?[ \t]+(\d+) = (.+?)(?:   \((.*)\))?[ \t]*$")
+_ITEM = re.compile(r"^([ \t]+)-([ \t]+)(.*?)[ \t]*$")
+
+
+def _scalar(raw):
+    """(value, quoted) of a one-line list item as written, or (None, None)."""
+    if not raw:
+        return None, None
+    if raw[0] == '"':
+        if len(raw) < 2 or not raw.endswith('"') or raw.endswith('\\"'):
+            return None, None
+        return raw[1:-1].replace('\\"', '"').replace("\\\\", "\\"), True
+    if raw[0] == "'":
+        if len(raw) < 2 or not raw.endswith("'"):
+            return None, None
+        return raw[1:-1].replace("''", "'"), True
+    if raw[0] in "|>[{&*!":
+        return None, None
+    return re.split(r"\s#", raw, 1)[0].strip(), False
+
+
+def _quote(text):
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def expand_answers(text):
+    """
+    (text, expanded, problems): the task file with each short answer under
+    acceptance_criteria written out as the criterion it stands for, as both
+    agents and --validate read it. A short answer is an option's number,
+    `2`; a number and a value, `1: 0.0`, for an option that asks for one;
+    or `keep`, for the option that is what the code does now. Quotes are
+    optional for a short answer. A sentence of the person's own is left as
+    written: with a colon and a space in it, YAML reads it as a mapping, so
+    such a sentence needs its quotes, as any YAML string does. `expanded` holds
+    (answer, criterion) pairs; an answer that names no option is turned
+    into a TODO, which a run skips, and said in `problems`.
+    """
+    lines = (text or "").split("\n")
+    start = next((i for i, l in enumerate(lines)
+                  if re.match(r"^acceptance_criteria[ \t]*:[ \t]*$", l)), None)
+    if start is None:
+        return text, [], []
+    expanded, problems = [], []
+    options, now, number = {}, None, 0
+    for i in range(start + 1, len(lines)):
+        line = lines[i]
+        if line and not line[0].isspace() and not line.startswith("#"):
+            break
+        found = _OPTION.match(line)
+        if found:
+            options[found.group(1)] = found.group(2)
+            if "your code does now" in (found.group(3) or ""):
+                now = found.group(1)
+            continue
+        item = _ITEM.match(line)
+        if not item or line.lstrip().startswith("#"):
+            continue
+        number += 1
+        value, quoted = _scalar(item.group(3))
+        prefix = item.group(1) + "-" + item.group(2)
+        mine, mine_now = options, now
+        options, now = {}, None
+        if value is None or is_todo(value):
+            continue
+        short = value.strip()
+        criterion, problem = None, None
+        # Only under a question qikly numbered: anywhere else a line such as
+        # `- 3: text` or `- id: 7` is the person's own YAML, a criterion
+        # written as a mapping, and is left exactly as it is.
+        pick = re.fullmatch(r"(\d+)(?:[ \t]*:[ \t]*(.+))?", short) if mine else None
+        if pick:
+            option = mine.get(pick.group(1))
+            if option is None:
+                problem = (f"criterion {number} answers {short!r}, but "
+                           + (f"its options are {', '.join(sorted(mine))}" if mine
+                              else "it has no numbered options") + "")
+            elif VALUE in option and not pick.group(2):
+                problem = (f"criterion {number}: option {pick.group(1)} needs your "
+                           f"value, written as  {pick.group(1)}: <the value>")
+            elif VALUE not in option and pick.group(2):
+                problem = (f"criterion {number}: option {pick.group(1)} takes no "
+                           f"value, so write just  {pick.group(1)}")
+            else:
+                criterion = option.replace(VALUE, (pick.group(2) or "").strip())
+        elif short.lower() == "keep" and (mine or not quoted):
+            if mine_now is None:
+                problem = (f"criterion {number} answers 'keep', but qikly did not "
+                           f"show what your code does at that call; write the "
+                           f"answer instead")
+            else:
+                criterion = mine[mine_now]
+        if problem:
+            problems.append(problem)
+            lines[i] = prefix + _quote(f"TODO: {short} could not be read: {problem}")
+        elif criterion:
+            expanded.append((short, criterion))
+            lines[i] = prefix + _quote(criterion)
+    return "\n".join(lines), expanded, problems
+
+
 def drop_question_lines(text):
     """
     `text` without any line qikly wrote for a question, and without any
@@ -394,7 +497,8 @@ def drop_question_lines(text):
     criterion, and sent as one it asked test generation to test "TODO: your
     answer to the question above". Idempotent.
     """
-    return _REQUIREMENT_MARK.sub(r"\1", drop_todo_criteria(_MARKED.sub("", text or "")))
+    text = expand_answers(text or "")[0]
+    return _REQUIREMENT_MARK.sub(r"\1", drop_todo_criteria(_MARKED.sub("", text)))
 
 
 # A placeholder starts with TODO and a colon, a space or nothing: "TODO:
@@ -508,17 +612,27 @@ def yaml_block(questions, written=None):
                 lines.append("  %s " % MARK + _printable(found + ask))
             else:
                 lines += _comment(prompt)
-            lines += _comment("Found by running your code:")
-            for label in q.get("hint_options") or []:
-                label = label.split("; you will type")[0]
-                lines += _comment("  - " + label)
+            lines += _comment("Answer with a number, found by running your code:")
+            options = q.get("hint_options") or []
+            now = None
+            for n, option in enumerate(options, 1):
+                if isinstance(option, str):
+                    option = {"criterion": option, "note": "", "now": False}
+                note = option.get("note") or ""
+                if VALUE in option["criterion"]:
+                    note = f"write it as  {n}: the value" + (f"; {note}" if note else "")
+                # On a line of its own, never wrapped: it is read back.
+                lines.append("  %s   %d = %s" % (MARK, n, _printable(option["criterion"]))
+                             + (f"   ({_printable(note)})" if note else ""))
+                if option.get("now"):
+                    now = n
             if q.get("covers"):
                 lines += _comment(f"(This also answers {q['covers']} more "
                                   f"place{'s' if q['covers'] > 1 else ''} your "
                                   f"tests leave open on the same call.)")
-            call = re.search(r"What should (.+) do\?", prompt)
-            lines.append(f'  - "TODO: what {_yaml_safe(call.group(1))} should do"'
-                         if call else _ANSWER)
+            numbers = " or ".join(str(n) for n in range(1, len(options) + 1))
+            lines.append(f'  - "TODO: pick {numbers}' + (", keep" if now else "")
+                         + ', or write your own"' if options else _ANSWER)
         else:
             lines += _comment(q["question"])
             lines.append(_ANSWER)

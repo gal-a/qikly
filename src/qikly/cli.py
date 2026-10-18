@@ -2127,7 +2127,29 @@ def _do_validate(tasks, as_json):
 
     text, errors = render(results)
     print(text)
+    _say_expanded(task_ids or [])
     return 1 if errors else 0
+
+
+def _say_expanded(task_ids):
+    """
+    Each short answer as the criterion it becomes, so a person sees exactly
+    what the test agent will be given before anything is spent.
+    """
+    from qikly.agent_api.agent_interface import task_config_path
+    from qikly.score_questions import expand_answers
+
+    for task_id in task_ids:
+        try:
+            with open(task_config_path(task_id), encoding="utf-8") as handle:
+                _, expanded, _ = expand_answers(handle.read())
+        except OSError:
+            continue
+        if expanded:
+            print(f"{task_id}: your short answers, as the test agent gets them:")
+            for answer, criterion in expanded:
+                print(f"  {answer:<6} ->  {criterion}")
+            print()
 
 
 def _fill_criteria_from(text, doc, root):

@@ -877,9 +877,9 @@ footer {
             one per module step 1 asked about for a folder, with everything
             qikly can read from your code filled in. What is left is step 1's
             questions, each with what your code does there now, found by
-            running it, and a line saying what the module is for. Replace each
-            TODO line with your answer, naming a value; a TODO you leave is
-            skipped. This file is the
+            running it, numbered, and a line saying what the module is for.
+            Answer each TODO with an option's number, or write your own; a
+            TODO you leave is skipped. This file is the
             source of truth: change it any time.
             <code>qikly --validate</code> with the same path checks it, free.
             <a class="small-link" href="https://github.com/gal-a/qikly/tree/main/docs/examples" data-goatcounter-click="start-examples">A module and a folder, answered</a></p>
@@ -890,10 +890,11 @@ footer {
 <pre><span class="code-line">#?     if rate &lt; 0 or rate &gt; 100:</span>
 #? Your tests never try rate at exactly 100.
 #? What should apply_discount(100, 100) do?
-#? Found by running your code:
-#? - return a value, as rate 99 does now
-#? - raise ValueError, as rate 101 does now
-- "<span class="you-ins">apply_discount(100, 100) raises ValueError</span>"</pre>
+#?   1 = apply_discount(100, 100) returns VALUE
+#?       (as rate 99 does now)
+#?   2 = apply_discount(100, 100) raises ValueError
+#?       (as rate 101 does now)
+- <span class="you-ins">2</span></pre>
           <p class="legend">qikly runs your code beside the value in question,
             never at it: <span class="you-ins">the answer</span> is yours</p>
         </figure>

@@ -114,9 +114,13 @@ requirements:
 
 # ----------------------------------------------------------------------------
 # What must be true. The coding agent never sees this section; the test
-# agent writes the tests from it. Replace each TODO line with your answer,
-# keeping the quotes and naming a value someone could check, for example:
-#   - "TODO: what example_fn(0) should do"  becomes  - "example_fn(0) returns 1.5"
+# agent writes the tests from it. Answer each TODO line, with or without
+# the quotes:
+#   - 2              pick an option numbered above it
+#   - 1: 0.0         an option that asks for a value, and the value
+#   - keep           what your code does now is right
+#   - example_fn(0) returns 1.5      or write your own, naming a value
+# `qikly --validate` shows each short answer as the criterion it becomes.
 # A TODO you leave is skipped. The question lines above each TODO are notes
 # for you, and neither agent reads them. Keep these values out of every
 # other line of this file, comments included: the coding agent reads the rest.

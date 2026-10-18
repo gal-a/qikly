@@ -71,14 +71,17 @@ qikly --tasks my_module.py       # 3. the run                      needs an API 
    #?     if rate < 0 or rate > 100:
    #? Your tests never try rate at exactly 100.
    #? What should apply_discount(100, 100) do?
-   #? Found by running your code:
-   #? - return a value, as rate 99 does now (it returns 1.0)
-   #? - raise ValueError, as rate 101 does now
-   - "apply_discount(100, 100) raises ValueError"
+   #? Answer with a number, found by running your code:
+   #?   1 = apply_discount(100, 100) returns VALUE   (write it as 1: the value; as rate 99 does now (it returns 1.0))
+   #?   2 = apply_discount(100, 100) raises ValueError   (as rate 101 does now)
+   - 2
    ```
 
-   You replace each TODO line with your answer, keeping the quotes, as a
-   sentence that names a value. A TODO you leave is skipped. Replace the
+   You replace each TODO line with an option's number, `1: <value>` for one
+   that asks for a value, `keep` where one option is what your code does
+   now, or a sentence of your own that names a value, with or without
+   quotes (a sentence with a colon in it needs them). `qikly --validate`
+   shows each short answer as the criterion it becomes. A TODO you leave is skipped. Replace the
    `requirements` line too, marked `TODO: MODIFY THIS:`, with what the
    module is for in your words. On a folder it writes one task file for
    each module step 1 asked about. Lines starting `#?` are notes for you,

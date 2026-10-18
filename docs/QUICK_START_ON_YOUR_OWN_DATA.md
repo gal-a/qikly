@@ -140,10 +140,14 @@ folder, and every step takes the same path:
    file for each module step 1 asked about. What is left is step 1's
    questions, under `acceptance_criteria`, each with what your code does
    there now, found by running it (for a boundary, only on either side of
-   it, never at it). Replace each TODO line with your answer, keeping the
-   quotes, as a sentence that names a value someone could check: `- "TODO:
-   what apply_discount(100, 100) should do"` becomes `- "apply_discount(100,
-   100) raises ValueError"`. A TODO you leave is skipped. Replace the
+   it, never at it), numbered. Replace each TODO line, with or without
+   quotes, by an option's number (`- 2`), a number and your value for an
+   option that asks for one (`- 1: 0.0`), `keep` where one option is what
+   your code does now, or a sentence of your own that names a value
+   (`- apply_discount(100, 100) raises ValueError`; quote one that has a
+   colon in it). `qikly --validate` shows
+   each short answer as the criterion it becomes. A TODO you leave is
+   skipped. Replace the
    `requirements` line too, marked `TODO: MODIFY THIS:`, with what the module
    is for in your own words. Lines starting `#?` are notes for you, and neither agent reads
    them. Then check it, free:

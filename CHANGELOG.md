@@ -39,6 +39,13 @@ packaging tools would read as `1.1`.
   your files. Questions about the
   same call with the same values are asked once. Those lines start with
   `#?`, so neither agent reads them.
+- **Answer a question with its number.** Each option qikly found is
+  numbered with the criterion it becomes, and a TODO line can be answered
+  `2`, `1: 0.0` for an option that asks for a value, `keep` for the option
+  that is what the code does now, or a sentence, with or without quotes.
+  Both agents and `--validate` read the answer as the full criterion, the
+  file keeps what you typed, and `--validate` prints each short answer as
+  the criterion it becomes and stops on a number that names no option.
 - **A criterion left as TODO is skipped**, not sent to test generation or
   any other model call as written: one that starts with `TODO`, followed by
   a colon, a space or nothing. A TODO inside a one-line list, `[...]`, or

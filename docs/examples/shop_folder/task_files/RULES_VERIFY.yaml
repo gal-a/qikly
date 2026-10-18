@@ -34,36 +34,40 @@ interface:
 # line, keeping the quotes, for example:
 #   - "reads sensor readings and writes one summary per station per day"
 requirements:
-  - "labels customer codes"
+  - "TODO: MODIFY THIS: rules.py does what its code does now; keep that, and change only what the tests show is wrong."
 
 # ----------------------------------------------------------------------------
 # What must be true. The coding agent never sees this section; the test
-# agent writes the tests from it. Replace each TODO line with your answer,
-# keeping the quotes and naming a value someone could check, for example:
-#   - "TODO: what example_fn(0) should do"  becomes  - "example_fn(0) returns 1.5"
+# agent writes the tests from it. Answer each TODO line, with or without
+# the quotes:
+#   - 2              pick an option numbered above it
+#   - 1: 0.0         an option that asks for a value, and the value
+#   - keep           what your code does now is right
+#   - example_fn(0) returns 1.5      or write your own, naming a value
+# `qikly --validate` shows each short answer as the criterion it becomes.
 # A TODO you leave is skipped. The question lines above each TODO are notes
 # for you, and neither agent reads them. Keep these values out of every
 # other line of this file, comments included: the coding agent reads the rest.
 acceptance_criteria:
-  #? 3 questions from qikly --score on 2026-10-18 14:03: what your tests do
+  #? 3 questions from qikly --score on 2026-10-18 16:39: what your tests do
   #? not check. Answer from what the code is meant to do, not from what it
   #? does now.
 
   #? rules.py, label, line 5:
   #?     if code.strip().lower() == 'vip':
   #? What should label(' vip ') do?
-  #? Found by running your code:
-  #? - return 'gold', as your code does now
-  #? - return 'standard'
-  - "label(' vip ') returns 'gold'"
+  #? Answer with a number, found by running your code:
+  #?   1 = label(' vip ') returns 'gold'   (as your code does now)
+  #?   2 = label(' vip ') returns 'standard'
+  - "TODO: pick 1 or 2, keep, or write your own"
 
   #? rules.py, label, line 5:
   #?     if code.strip().lower() == 'vip':
   #? What should label('VIP') do?
-  #? Found by running your code:
-  #? - return 'gold', as your code does now
-  #? - return 'standard'
-  - "label('VIP') returns 'gold'"
+  #? Answer with a number, found by running your code:
+  #?   1 = label('VIP') returns 'gold'   (as your code does now)
+  #?   2 = label('VIP') returns 'standard'
+  - "TODO: pick 1 or 2, keep, or write your own"
 
   #? rules.py, line 1:
   #?     MAX_RATE = 100

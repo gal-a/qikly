@@ -62,9 +62,10 @@ The path is three commands, each taking the same module or folder:
   data file of the values their tests already use, and those questions under
   `acceptance_criteria`, each above a TODO. Under each question, lines
   starting `#?` say what the code does there now, found by running it, and
-  for a boundary only on either side of it. Put each question and those values to the user **word for
-  word**, and write what they answer in place of its TODO, as a sentence
-  naming a value, never an answer of your own or one read off the code. A
+  for a boundary only on either side of it, numbered. Put each question and its numbered options to the
+  user **word for word**, and write what they answer in place of its TODO:
+  the option's number, `1: <value>`, `keep`, or their own sentence naming a
+  value, never an answer of your own or one read off the code. A
   TODO left in place is skipped. `requirements` starts as the module's
   docstring, or a line to keep what the code does, marked `TODO: MODIFY
   THIS:`; replace it only with their words. Or suggest they
