@@ -293,3 +293,58 @@ def test_a_run_with_nothing_answered_is_not_started(scored, monkeypatch):
     monkeypatch.setattr(agent_interface, "task_config_path",
                         lambda task_id: str(scored / TASK))
     assert cli._all_todo(["PRICING_VERIFY"]) == ["PRICING_VERIFY"]
+
+
+# --------------------------------------- the Fable re-audit of 67b6756 --
+
+def test_a_renamed_task_keeps_the_documents_criteria(tmp_path, monkeypatch):
+    for folder in ("a", "b"):
+        (tmp_path / folder).mkdir()
+        (tmp_path / folder / "util.py").write_text("def double(x):\n    return 2 * x\n",
+                                                   encoding="utf-8")
+    (tmp_path / "feature.md").write_text(
+        "## Acceptance criteria\n\n- double(2) returns 4\n- double(0) returns 0\n",
+        encoding="utf-8")
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    for folder in ("a", "b"):
+        assert cli._do_scaffold(os.path.join(folder, "util.py"), None, "feature.md") == 0
+    tasks = tmp_path / "inputs_private" / "config" / "tasks"
+    for name in ("UTIL_VERIFY.yaml", "B_UTIL_VERIFY.yaml"):
+        criteria = yaml.safe_load((tasks / name).read_text(encoding="utf-8"))[
+            "acceptance_criteria"]
+        assert "double(2) returns 4" in criteria, (name, criteria)
+
+
+def test_a_renamed_task_never_starts_with_a_digit(tmp_path, monkeypatch):
+    for folder in ("a", "2024"):
+        (tmp_path / folder).mkdir()
+        (tmp_path / folder / "util.py").write_text("def f(x):\n    return x\n",
+                                                   encoding="utf-8")
+    monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
+    cli._do_scaffold(os.path.join("a", "util.py"), None)
+    assert cli._do_scaffold(os.path.join("2024", "util.py"), None) == 0
+    tasks = tmp_path / "inputs_private" / "config" / "tasks"
+    assert "DIR_2024_UTIL_VERIFY.yaml" in os.listdir(tasks)
+
+
+def test_validate_numbers_criteria_as_test_generation_does(scored):
+    from qikly import fixture_reach
+    from qikly.validate import check_task
+    cli._do_scaffold("pricing.py", None)
+    seen = {}
+    real = fixture_reach.describe
+    path = scored / TASK
+    path.write_text(path.read_text(encoding="utf-8").replace(
+        '"TODO: what apply_discount(100, 100) should do"',
+        '"apply_discount(100, 100) raises ValueError"'), encoding="utf-8")
+
+    def spy(task, name, read):
+        seen["criteria"] = task.get("acceptance_criteria")
+        return real(task, name, read)
+    import qikly.fixture_reach
+    qikly.fixture_reach.describe = spy
+    try:
+        check_task(str(path))
+    finally:
+        qikly.fixture_reach.describe = real
+    assert seen["criteria"] == ["apply_discount(100, 100) raises ValueError"]

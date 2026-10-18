@@ -1280,8 +1280,7 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
         # over files that had something to plant, and "plant more" only when
         # the sample left sites out.
         more = (f" Plant more with --score-mutants, such as --score-mutants "
-                f"{min(result['sites'], total * 4)}."
-                if result.get("sites", 0) > total else "")
+                f"{min(result['sites'], total * 4)}.")
         print(f"[{task_id}] those {total} were spread at random over "
               f"{site_files} files, so a larger folder gets fewer per "
               f"file.{more}")

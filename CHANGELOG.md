@@ -31,12 +31,16 @@ packaging tools would read as `1.1`.
   rate 99 does now (it returns 1.0)". Other questions show what the code
   returns now and what the changed code would, labelled. The values come in
   an order fixed by the values, not with "as your code does now" first, and
-  a function that reads or writes files is never run. Questions about the
+  a function qikly sees reading or writing files is never run; the code runs
+  in an empty folder, so only an absolute path it builds itself could reach
+  your files. Questions about the
   same call with the same values are asked once. Those lines start with
   `#?`, so neither agent reads them.
 - **A criterion left as TODO is skipped**, not sent to test generation or
   any other model call as written: one that starts with `TODO`, followed by
-  a colon, a space or nothing. `--validate` counts with the same rule, says
+  a colon, a space or nothing. A TODO inside a one-line list, `[...]`, or
+  on an anchored item is left as written, since removing it would break the
+  file. `--validate` counts with the same rule, says
   how many are answered and that a run skips the rest, and `--validate` and
   `--tasks` both stop a file with none answered before a paid run.
 - **`--scaffold` fills the data file with the values your tests already call

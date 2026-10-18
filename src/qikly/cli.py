@@ -1731,7 +1731,7 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
                 sites, mutants = start.how_many(start.Console(), target, tests,
                                                 INVOKED_FROM, os.path.isdir(code))
             except (start.Stop, EOFError, KeyboardInterrupt):
-                print("Stopped before anything was planted.")
+                print("\nStopped before anything was planted.")
                 return 130
             if not mutants:
                 print("There is nothing in that code qikly knows how to change, "
@@ -2228,6 +2228,21 @@ def _task_ids_for(value, quiet=False):
     return ",".join(dict.fromkeys(out))
 
 
+def _seed_module(task_id):
+    """A task file's seed, where it is one module, for one written before
+    task files named their module on their first line."""
+    import yaml
+
+    from qikly.agent_api.agent_interface import task_config_path
+    try:
+        with open(task_config_path(task_id), encoding="utf-8") as handle:
+            seed = (yaml.safe_load(handle) or {}).get("seed") or {}
+    except Exception:
+        return None
+    implementation = seed.get("implementation") if isinstance(seed, dict) else None
+    return implementation if str(implementation or "").endswith(".py") else None
+
+
 def _all_todo(task_ids):
     """The tasks among these whose acceptance criteria are all placeholders."""
     import yaml
@@ -2260,11 +2275,13 @@ def _say_take_tests(task_ids):
     for task_id in task_ids:
         module = _module_of(task_config_path(task_id), as_written=True)
         if module is None:
-            continue
+            module = _seed_module(task_id)
+            if module is None:
+                continue
         # The module's path where it names this task alone; otherwise the
         # task id, which is never ambiguous.
-        path = _pasteable(module)
-        targets.append(path if _task_ids_for(path, quiet=True) == task_id else task_id)
+        targets.append(_pasteable(module)
+                       if _task_ids_for(module, quiet=True) == task_id else task_id)
     if not targets:
         return
     print()
@@ -2389,9 +2406,8 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
             source, os.path.join(root, "qikly-suite-score"))
         if found:
             if not brief:
-                print(f"Running {name} beside each of the {len(found)} question"
-                      f"{'' if len(found) == 1 else 's'} its score raised, in a "
-                      f"separate process; nothing of yours is changed.")
+                print(f"Running {name} beside the questions its score raised, "
+                      f"in a separate process; nothing of yours is changed.")
             found = start.hinted(found, source, root)
         text, used = with_questions(text, found, asked_on)
         asked = len(found) if used else 0
@@ -2412,6 +2428,10 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
         from qikly.scaffold import VERIFY_SUFFIX
         base = tid[:-len(VERIFY_SUFFIX)]
         parent = re.sub(r"\W", "_", os.path.basename(os.path.dirname(mine))).upper()
+        if not parent or parent[0].isdigit():
+            # `01_extract` is a usual folder name and no import can start
+            # with a digit: outputs.agent_src.code.2024_UTIL_VERIFY failed.
+            parent = "DIR_" + parent
         for n in range(1, 100):
             candidate = f"{parent}_{base}" + (f"_{n}" if n > 1 else "")
             path = os.path.join(dest_dir, f"{candidate}{VERIFY_SUFFIX}.yaml")
@@ -2424,6 +2444,10 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
         if not doc:
             text, used = with_questions(text, found, asked_on)
             asked = len(found) if used else 0
+        else:
+            text, doc_problem = _fill_criteria_from(text, doc, root)
+            if doc_problem:
+                return refuse(doc_problem)
         tid = candidate + VERIFY_SUFFIX
         dest = os.path.join(dest_dir, f"{tid}.yaml")
     if os.path.exists(dest):
@@ -2635,8 +2659,8 @@ def _append_criteria_to_task(task_id, criteria):
     # seeds a TODO line so the shape of the file is obvious, and treating that
     # as real criteria blocked the natural sequence: scaffold from your code,
     # then import the criteria from the ticket that described it.
-    placeholder = bool(existing) and all(
-        isinstance(c, str) and c.strip().upper().startswith("TODO") for c in existing)
+    from qikly.score_questions import is_todo
+    placeholder = bool(existing) and all(is_todo(c) for c in existing)
     if placeholder:
         # Drop the placeholder block so the new criteria are the file's only
         # bar, rather than being appended under a TODO nobody meant to keep.
@@ -2912,12 +2936,19 @@ def main():
 
     # A task whose criteria are all still TODO would run with none, since a
     # run skips them, and spend money testing nothing anyone decided.
-    unanswered = _all_todo(task_ids)
-    if unanswered:
+    unanswered = [] if args.generate_criteria else _all_todo(task_ids)
+    if unanswered and args.tasks:
         print(f"Nothing is answered yet in {', '.join(unanswered)}: every "
               f"acceptance criterion is still a TODO, which a run skips. Write "
-              f"an answer in place of at least one, then run it again.")
+              f"an answer in place of at least one, then run it again.",
+              file=sys.stderr)
         sys.exit(2)
+    if unanswered:
+        print(f"Leaving out {', '.join(unanswered)}: nothing is answered in it "
+              f"yet, since every acceptance criterion is still a TODO.")
+        task_ids = [t for t in task_ids if t not in unanswered]
+        if not task_ids:
+            sys.exit(2)
 
     # Fail fast on a misconfigured/unsupported LLM_PROVIDER or a missing
     # required env var, before spawning any per-task process -- otherwise

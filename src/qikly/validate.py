@@ -194,7 +194,12 @@ def check_task(path):
     # `--propose-fixtures` answers with a model call: that one proposes the
     # rows, this one only says which criteria are currently unmeasurable.
     from qikly.fixture_reach import describe as _unreachable
-    for line in _unreachable(task, name, _readable_input):
+    from qikly.score_questions import is_todo as _is_todo
+    # Numbered as test generation numbers them, with the TODOs a run skips
+    # left out, so "criterion 3" here is criterion 3 in --propose-fixtures.
+    reached = dict(task, acceptance_criteria=[
+        c for c in (task.get("acceptance_criteria") or []) if not _is_todo(c)])
+    for line in _unreachable(reached, name, _readable_input):
         warnings.append(Note(line, group=("unreachable", line.split("criterion: ")[-1])))
 
     leftover = [field for field in ("task_name", "description", "interface",
