@@ -153,7 +153,8 @@ folder, and every step takes the same path:
    ```
 
    This file is the one source of truth for the run: change it any time and
-   run step 3 again.
+   run step 3 again. [Worked examples](https://github.com/gal-a/qikly/tree/main/docs/examples), a module and a folder, show the
+   task files as they look once answered.
 
 3. **Get a fresh test suite written from your answers.** Needs a key:
 

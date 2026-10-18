@@ -1,0 +1,72 @@
+# The task file for shop/rules.py. Answer the questions under
+# acceptance_criteria, then run:  qikly --tasks shop/rules.py
+task_id: "RULES_VERIFY"
+task_name: "RULES_VERIFY: tests for rules.py"
+description: "Tests for the existing rules.py, from its owner's answers."
+
+# ----------------------------------------------------------------------------
+# Your code under test. qikly copies it, tests the copy and repairs the copy;
+# this file is never changed. Without this section a run would write new code
+# from the requirements instead of testing yours.
+seed:
+  implementation: "shop"
+
+# ----------------------------------------------------------------------------
+# The example data a run calls your code with, filled in from your tests, and
+# where a run writes its result.
+inputs:
+  - "inputs_private/data/RULES/input_01.csv"
+outputs:
+  - "outputs/data/RULES_VERIFY/output.json"
+
+# ----------------------------------------------------------------------------
+# The functions the tests call, read from shop/rules.py. `module` is where
+# qikly's copy of your code is imported from during a run. Nothing to change.
+interface:
+  module: "shop.rules"
+  integration_functions:
+    - "label(code)"
+  system_entrypoint: "label(code)"
+
+# ----------------------------------------------------------------------------
+# What the code is for, in your words. The coding agent reads this, so give
+# its purpose, not the values the questions below ask about. Replace the
+# line, keeping the quotes, for example:
+#   - "reads sensor readings and writes one summary per station per day"
+requirements:
+  - "labels customer codes"
+
+# ----------------------------------------------------------------------------
+# What must be true. The coding agent never sees this section; the test
+# agent writes the tests from it. Replace each TODO line with your answer,
+# keeping the quotes and naming a value someone could check, for example:
+#   - "TODO: what f(0) should do"    becomes    - "f(0) returns 1.0"
+# A TODO you leave is skipped. The question lines above each TODO are notes
+# for you, and neither agent reads them. Keep these values out of every
+# other line of this file, comments included: the coding agent reads the rest.
+acceptance_criteria:
+  #? 3 questions from qikly --score on 2026-10-18 12:30: what your tests do
+  #? not check. Answer from what the code is meant to do, not from what it
+  #? does now.
+
+  #? rules.py, label, line 5:
+  #?     if code.strip().lower() == 'vip':
+  #? What should label(' vip ') do?
+  #? Found by running your code:
+  #? - return 'gold', as your code does now
+  #? - return 'standard'
+  - "label(' vip ') returns 'gold'"
+
+  #? rules.py, label, line 5:
+  #?     if code.strip().lower() == 'vip':
+  #? What should label('VIP') do?
+  #? Found by running your code:
+  #? - return 'gold', as your code does now
+  #? - return 'standard'
+  - "label('VIP') returns 'gold'"
+
+  #? rules.py, line 1:
+  #?     MAX_RATE = 100
+  #? Your tests pass whether this number is 100 or 101. What should it be, and
+  #? which input would show the difference?
+  - "TODO: your answer to the question above"
