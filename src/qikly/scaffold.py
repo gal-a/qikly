@@ -88,8 +88,11 @@ seed:
   implementation: "{source_rel}"
 
 # ----------------------------------------------------------------------------
-# The example data a run calls your code with, filled in from your tests, and
-# where a run writes its result.
+# Example data for the tests: one column per argument, one row per call,
+# filled in from your tests. The test agent writes tests that use it, and
+# `qikly --validate` warns about a criterion no row can reach. Add rows, or
+# more files to the list (any format your code reads); every file listed
+# must exist. `outputs` is where a run writes its result.
 inputs:
 {inputs}
 outputs:

@@ -12,8 +12,11 @@ seed:
   implementation: "shop"
 
 # ----------------------------------------------------------------------------
-# The example data a run calls your code with, filled in from your tests, and
-# where a run writes its result.
+# Example data for the tests: one column per argument, one row per call,
+# filled in from your tests. The test agent writes tests that use it, and
+# `qikly --validate` warns about a criterion no row can reach. Add rows, or
+# more files to the list (any format your code reads); every file listed
+# must exist. `outputs` is where a run writes its result.
 inputs:
   - "inputs_private/data/PRICING/input_01.csv"
 outputs:
@@ -49,7 +52,7 @@ requirements:
 # for you, and neither agent reads them. Keep these values out of every
 # other line of this file, comments included: the coding agent reads the rest.
 acceptance_criteria:
-  #? 4 questions from qikly --score on 2026-10-18 16:39: what your tests do
+  #? 4 questions from qikly --score on 2026-10-19 18:02: what your tests do
   #? not check. Answer from what the code is meant to do, not from what it
   #? does now.
 

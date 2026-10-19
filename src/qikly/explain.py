@@ -101,6 +101,8 @@ def _restated_lines(task_id):
             raw = handle.read()
     except OSError:
         return []
+    from qikly.score_questions import expand_answers
+    raw = expand_answers(raw)[0]
     task = yaml.safe_load(raw) or {}
     return [{"line": line, "criterion": crit, "score": score}
             for line, crit, score in _restated_outside_requirements(raw, task)]
