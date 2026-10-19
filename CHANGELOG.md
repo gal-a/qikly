@@ -4,7 +4,9 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
-## Unreleased
+## 0.6.0
+
+> Three steps on one path: --score, --scaffold and --tasks, answered by number
 
 ### Changed
 - **Three steps, each taking the same module or folder:** `qikly --score
