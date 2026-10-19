@@ -433,11 +433,13 @@ def expand_answers(text):
     if start is None:
         return text, [], []
     expanded, problems = [], []
-    options, now, number = {}, None, 0
+    options, now, number, asked = {}, None, 0, False
     for i in range(start + 1, len(lines)):
         line = lines[i]
         if line and not line[0].isspace() and not line.startswith("#"):
             break
+        if re.match(r"^[ \t]*#\?", line):
+            asked = True
         found = _OPTION.match(line)
         if found:
             options[found.group(1)] = found.group(2)
@@ -451,7 +453,8 @@ def expand_answers(text):
         value, quoted = _scalar(item.group(3))
         prefix = item.group(1) + "-" + item.group(2)
         mine, mine_now = options, now
-        options, now = {}, None
+        options, now, asked_here = {}, None, asked
+        asked = False
         if value is None or is_todo(value):
             continue
         short = value.strip()
@@ -460,7 +463,11 @@ def expand_answers(text):
         # `- 3: text` or `- id: 7` is the person's own YAML, a criterion
         # written as a mapping, and is left exactly as it is.
         pick = re.fullmatch(r"(\d+)(?:[ \t]*:[ \t]*(.+))?", short) if mine else None
-        if pick:
+        if not mine and asked_here and re.fullmatch(r"-?\d+(?:\.\d+)?", short):
+            problem = (f"criterion {number} answers {short!r}, but that question "
+                       f"has no numbered options: write the answer as a sentence "
+                       f"that names a value, such as  MAX_RATE is 100")
+        elif pick:
             option = mine.get(pick.group(1))
             if option is None:
                 problem = (f"criterion {number} answers {short!r}, but "
@@ -476,9 +483,11 @@ def expand_answers(text):
                 criterion = option.replace(VALUE, (pick.group(2) or "").strip())
         elif short.lower() == "keep" and (mine or not quoted):
             if mine_now is None:
-                problem = (f"criterion {number} answers 'keep', but qikly did not "
-                           f"show what your code does at that call; write the "
-                           f"answer instead")
+                problem = (f"criterion {number} answers 'keep', which picks the "
+                           f"option marked (as your code does now), and this "
+                           f"question has none: "
+                           + (f"pick {' or '.join(sorted(mine))}, or write the answer"
+                              if mine else "write the answer as a sentence"))
             else:
                 criterion = mine[mine_now]
         if problem:

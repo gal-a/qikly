@@ -281,7 +281,14 @@ def check_task(path):
     from qikly.score_questions import is_todo
     # A TODO left in place is no criterion, and its "TODO: your answer to the
     # question above" matched the template's own advice on replacing TODOs.
-    answered = [c for c in (task.get("acceptance_criteria") or []) if not is_todo(c)]
+    # A bare number or a yes/no is none either: YAML reads `- 1` as 1.
+    answered = [c for c in (task.get("acceptance_criteria") or [])
+                if isinstance(c, (str, dict)) and not is_todo(c)]
+    for n, c in enumerate(task.get("acceptance_criteria") or [], 1):
+        if c is not None and not isinstance(c, (str, dict)):
+            errors.append(f"{name}: criterion {n} is {c!r}, not a sentence. Write "
+                          f"it as one that names a value, in quotes if it has a "
+                          f"colon in it")
     for req, crit, score in restated(task.get("requirements"), answered):
         warnings.append(Note(
             f"{name}: a requirement restates a criterion ({int(score * 100)}% "

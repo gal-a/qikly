@@ -436,3 +436,26 @@ def test_a_short_answer_never_reaches_the_coding_agent(scored):
     from qikly.agent_api.agent_interface import _read_task
     handed_over = without_acceptance_criteria(_read_task("PRICING_VERIFY"))
     assert "raises ValueError" not in handed_over
+
+
+def test_a_bare_number_where_there_are_no_options_is_said_not_crashed_on(tmp_path):
+    """
+    Found by a first user: `- 1` under the MAX_RATE question, which has no
+    numbered options, reached --validate as the integer 1 and crashed it.
+    """
+    from qikly.validate import check_task
+    path = tmp_path / "T_VERIFY.yaml"
+    path.write_text(
+        'task_id: "T_VERIFY"\nrequirements:\n  - "labels codes"\n'
+        'interface:\n  module: "m"\n'
+        'acceptance_criteria:\n'
+        '  #? rules.py, line 1:\n'
+        '  #?     MAX_RATE = 100\n'
+        '  #? What should it be?\n'
+        '  - 1\n'
+        '  - 7\n', encoding="utf-8")
+    errors, _ = check_task(str(path))
+    assert any("criterion 1 answers '1'" in e and "no numbered options" in e
+               for e in errors), errors
+    # Not under a question qikly wrote: still no crash, and said.
+    assert any("criterion 2 is 7, not a sentence" in e for e in errors), errors
