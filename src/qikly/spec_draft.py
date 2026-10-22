@@ -179,13 +179,16 @@ that names a concrete call and its expected result, such as
 "parse('') raises ValueError". Use the module's real function names and
 arguments, as the documentation shows them.
 
-For each answer, say where it comes from:
+Answer every question you can. A question about a private helper is about
+the public functions that use it: answer it as a call to one of those. For
+each answer, say where it comes from:
 - "docs" when a sentence of the documentation below decides it. Then give that
   sentence, copied exactly, as "quote".
 - "purpose" when nothing written decides it and you judged it from what the
-  module is for. Then set "check" to true: a person will read those first.
-If a question cannot be answered with a checkable criterion at all, give
-"criterion": null.
+  module is for, as a careful owner would. Then set "check" to true: a person
+  will read those first.
+Give "criterion": null only when no call to the module's public functions
+could express the question at all.
 
 Also write "requirements": one or two sentences for the programmer who will
 repair the code, who reads them and never reads your criteria. Say what the
@@ -194,9 +197,16 @@ documentation gives them: that a rate is a percentage, that prices are in a
 currency with cents. Never a boundary value, a matching rule or an
 expected result your criteria name: those must stay with the criteria.
 
-Reply with JSON only, in this shape:
-{{"requirements": "...",
- "answers": [{{"question": 1, "criterion": "...", "source": "docs", "quote": "...", "check": false}}]}}
+Reply with JSON only. Every answer that has a quote or a judgement must have
+its criterion written out as a call and its result. An example of the shape,
+for a different module:
+{{"requirements": "Converts temperatures; a temperature is in degrees Celsius.",
+ "answers": [
+  {{"question": 1, "criterion": "to_kelvin(0) returns 273.15", "source": "docs",
+   "quote": "Zero Celsius is 273.15 kelvin.", "check": false}},
+  {{"question": 2, "criterion": "to_kelvin(-300) raises ValueError", "source": "purpose",
+   "quote": "", "check": true}},
+  {{"question": 3, "criterion": null, "source": "purpose", "quote": "", "check": true}}]}}
 
 THE DOCUMENTATION
 
@@ -216,6 +226,25 @@ def _squash(text):
     return re.sub(r"\s+", " ", re.sub(r"[`*_]", "", text or "")).strip().lower()
 
 
+def quoted(quote, documentation):
+    """
+    Whether a quote is in the documentation: word for word, apart from case,
+    spacing and markup, where an ellipsis may stand for words left out, as
+    long as the pieces it joins appear in their order.
+    """
+    pieces = [p.strip(" .,;:") for p in re.split(r"\.\.\.|\u2026", _squash(quote))]
+    pieces = [p for p in pieces if p]
+    if not pieces:
+        return False
+    at = 0
+    for piece in pieces:
+        found = documentation.find(piece, at)
+        if found < 0:
+            return False
+        at = found + len(piece)
+    return True
+
+
 def draft(module, cwd, questions, seed=None, call=None):
     """
     {"requirements": str, "answers": {question number: {criterion, source,
@@ -231,6 +260,10 @@ def draft(module, cwd, questions, seed=None, call=None):
                           public_callers(source))
     if call is None:
         from qikly.agent_api.call_llm import call_llm as call
+    if seed is None:
+        # Seeded as a run is, so the same file drafts the same way twice.
+        # 42 is cli.HARDCODED_SEED, the seed every run uses by default.
+        seed = int(os.environ.get("AGENT_SEED") or 42)
     reply = call("spec_draft", prompt, seed=seed)
     found = re.search(r"\{.*\}", reply or "", re.S)
     if not found:
@@ -255,7 +288,7 @@ def draft(module, cwd, questions, seed=None, call=None):
             continue
         source_of = "docs" if item.get("source") == "docs" else "purpose"
         quote = item.get("quote") if isinstance(item.get("quote"), str) else ""
-        if source_of == "docs" and (not quote.strip() or _squash(quote) not in documentation):
+        if source_of == "docs" and not quoted(quote, documentation):
             # A quote that is not there is a claim with nothing behind it.
             continue
         answers[number] = {"criterion": " ".join(criterion.split()),

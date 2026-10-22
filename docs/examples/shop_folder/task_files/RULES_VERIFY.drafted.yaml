@@ -1,0 +1,82 @@
+# The task file for shop/rules.py. Answer the questions under
+# acceptance_criteria, then run:  qikly --tasks shop/rules.py
+task_id: "RULES_VERIFY"
+task_name: "RULES_VERIFY: tests for rules.py"
+description: "Tests for the existing rules.py, from its owner's answers."
+
+# ----------------------------------------------------------------------------
+# Your code under test. qikly copies it, tests the copy and repairs the copy;
+# this file is never changed. Without this section a run would write new code
+# from the requirements instead of testing yours.
+seed:
+  implementation: "shop"
+
+# ----------------------------------------------------------------------------
+# Example data for the tests: one column per argument, one row per call,
+# filled in from your tests. The test agent writes tests that use it, and
+# `qikly --validate` warns about a criterion no row can reach. Add rows, or
+# more files to the list (any format your code reads); every file listed
+# must exist. `outputs` is where a run writes its result.
+inputs:
+  - "inputs_private/data/RULES/input_01.csv"
+outputs:
+  - "outputs/data/RULES_VERIFY/output.json"
+
+# ----------------------------------------------------------------------------
+# The functions the tests call, read from shop/rules.py. `module` is where
+# qikly's copy of your code is imported from during a run. Nothing to change.
+interface:
+  module: "shop.rules"
+  integration_functions:
+    - "label(code)"
+  system_entrypoint: "label(code)"
+
+# ----------------------------------------------------------------------------
+# What the code is for, in your words. The coding agent reads this, so give
+# its purpose, not the values the questions below ask about. Replace the
+# line, keeping the quotes, for example:
+#   - "reads sensor readings and writes one summary per station per day"
+requirements:
+  #? Drafted by the spec agent from your README and docstrings. Change it if it misses the point.
+  - "Labels customer codes for the receipt; a rate is a percentage, and prices are in a currency with cents."
+
+# ----------------------------------------------------------------------------
+# What must be true. The coding agent never sees this section; the test
+# agent writes the tests from it. Answer each TODO line, with or without
+# the quotes:
+#   - 2              pick an option numbered above it
+#   - 1: 0.0         an option that asks for a value, and the value
+#   - keep           what your code does now is right
+#   - example_fn(0) returns 1.5      or write your own, naming a value
+# `qikly --validate` shows each short answer as the criterion it becomes.
+# A TODO you leave is skipped. The question lines above each TODO are notes
+# for you, and neither agent reads them. Keep these values out of every
+# other line of this file, comments included: the coding agent reads the rest.
+acceptance_criteria:
+  #? 3 questions from qikly --score on 2026-10-22 15:18: what your tests do
+  #? not check. Answer from what the code is meant to do, not from what it
+  #? does now.
+
+  #? rules.py, label, line 5:
+  #?     if code.strip().lower() == 'vip':
+  #? What should label(' vip ') do?
+  #? Answer with a number, found by running your code:
+  #?   1 = label(' vip ') returns 'gold'   (as your code does now)
+  #?   2 = label(' vip ') returns 'standard'
+  #? Drafted from your documentation: "The VIP code is labelled gold, whatever its letter case and with any spaces around it ignored; every other code is standard."
+  - "label(' vip ') returns 'gold'"
+
+  #? rules.py, label, line 5:
+  #?     if code.strip().lower() == 'vip':
+  #? What should label('VIP') do?
+  #? Answer with a number, found by running your code:
+  #?   1 = label('VIP') returns 'gold'   (as your code does now)
+  #?   2 = label('VIP') returns 'standard'
+  #? Drafted from your documentation: "The VIP code is labelled gold, whatever its letter case and with any spaces around it ignored; every other code is standard."
+  - "label('VIP') returns 'gold'"
+
+  #? rules.py, line 1:
+  #?     MAX_RATE = 100
+  #? Your tests pass whether this number is 100 or 101. What should it be, and
+  #? which input would show the difference?
+  - "TODO: your answer to the question above"

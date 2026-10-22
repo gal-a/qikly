@@ -5,7 +5,7 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.3.7
+  version: 0.3.8
   requires: qikly >= 0.6.0
 ---
 
@@ -60,17 +60,19 @@ The path is three commands, each taking the same module or folder:
 - **`qikly --scaffold my_module.py`** then writes the task file,
   `inputs_private/config/tasks/<NAME>_VERIFY.yaml`, with the interface, a
   data file of the values their tests already use, and those questions under
-  `acceptance_criteria`, each above a TODO. Under each question, lines
-  starting `#?` say what the code does there now, found by running it, and
-  for a boundary only on either side of it, numbered. Put each question and its numbered options to the
-  user **word for word**, and write what they answer in place of its TODO:
-  the option's number, `1: <value>`, `keep`, or their own sentence naming a
-  value, never an answer of your own or one read off the code. A
-  TODO left in place is skipped. `requirements` starts as the module's
-  docstring, or a line to keep what the code does, marked `TODO: MODIFY
-  THIS:`; replace it only with their words. Or suggest they
-  answer in their editor: the answers have to be theirs.
-  `qikly --validate my_module.py` checks it, free.
+  `acceptance_criteria`. With their key set, qikly's own spec agent drafts
+  the `requirements` line and an answer to each question from their README
+  and docstrings, never their code; each drafted answer carries its source,
+  a quote from their documentation or `CHECK` where it was judged. **Show
+  them the draft, the `CHECK` answers first, and change only what they tell
+  you to.** Never redraft an answer yourself: you have read their code, and
+  an answer read off the code agrees with it by construction. What the draft
+  leaves as a TODO is theirs: put the question and any numbered options
+  under it to them **word for word**, and write what they answer, the
+  option's number, `1: <value>`, `keep`, or their own sentence naming a
+  value. A TODO left in place is skipped. Without a key every answer is a
+  TODO and `requirements` is marked `TODO: MODIFY THIS:`; replace it only
+  with their words. `qikly --validate my_module.py` checks it, free.
 - **`qikly --tasks my_module.py`** runs it, which needs their key. It ends by
   pointing at `qikly --take-tests my_module.py`, which copies the new tests
   home and runs them on their code; a copied test that fails there is for

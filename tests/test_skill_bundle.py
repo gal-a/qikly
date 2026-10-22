@@ -260,6 +260,7 @@ SKILL_BODY_HASHES = {
     # answering them from the code would be writing criteria off the
     # implementation, which is the failure the Skill opens by warning against.
     "0.3.7": "744d3c7c624e728f48eb2ae2db031ec89b17a98b9c9ad9c0098a46390864048b",
+    "0.3.8": "4ae26bea08928ed30568db0af1c7da091979bad9867b4e26a9a294c3c6cbe453",
 }
 
 

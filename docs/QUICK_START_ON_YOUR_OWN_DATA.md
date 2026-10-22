@@ -128,7 +128,7 @@ folder, and every step takes the same path:
    that import your code, searched from the project root; to name them
    instead, add `--score-tests tests/`.
 
-2. **Answer the questions in the task file.** Free, no key:
+2. **Check the drafted spec.** A fraction of a cent with a key:
 
    ```bash
    qikly --scaffold my_metrics.py     # or: qikly --scaffold my_project
@@ -137,20 +137,24 @@ folder, and every step takes the same path:
    It writes `inputs_private/config/tasks/MY_METRICS_VERIFY.yaml`, with
    everything qikly can read from your code filled in, and a data file of the
    values your tests already call it with. On a folder it writes one task
-   file for each module step 1 asked about. What is left is step 1's
-   questions, under `acceptance_criteria`, each with what your code does
-   there now, found by running it (for a boundary, only on either side of
-   it, never at it), numbered. Replace each TODO line, with or without
-   quotes, by an option's number (`- 2`), a number and your value for an
-   option that asks for one (`- 1: 0.0`), `keep` where one option is what
-   your code does now, or a sentence of your own that names a value
-   (`- apply_discount(100, 100) raises ValueError`; quote one that has a
-   colon in it). `qikly --validate` shows
-   each short answer as the criterion it becomes. A TODO you leave is
-   skipped. Replace the
-   `requirements` line too, marked `TODO: MODIFY THIS:`, with what the module
-   is for in your own words. Lines starting `#?` are notes for you, and neither agent reads
-   them. Then check it, free:
+   file for each module step 1 asked about. With a key set, a spec agent then
+   drafts the rest: a `requirements` line on what the module is for, and an
+   answer to each of step 1's questions under `acceptance_criteria`. It reads
+   your README and docstrings and never your code, so a test written from its
+   draft can disagree with the code. Each answer says where it came from: a
+   quote from your documentation, checked word for word, or `CHECK` where it
+   was judged from the module's purpose. Run the draft as it is, or change
+   any answer.
+
+   What the documentation cannot decide is left as a TODO. Answer it, with
+   or without quotes, by an option's number where qikly lists them (`- 2`),
+   a number and your value (`- 1: 0.0`), `keep` for what your code does now,
+   or a sentence that names a value (`- apply_discount(100, 100) raises
+   ValueError`; quote one that has a colon in it), or leave it: a TODO is
+   skipped. Without a key every answer is yours, and the `requirements` line
+   is marked `TODO: MODIFY THIS:`. Lines starting `#?` are notes for you, and
+   neither agent reads them. Then check it, free; it also shows each short
+   answer as the criterion it becomes:
 
    ```bash
    qikly --validate my_metrics.py
@@ -158,7 +162,7 @@ folder, and every step takes the same path:
 
    This file is the one source of truth for the run: change it any time and
    run step 3 again. [Worked examples](https://github.com/gal-a/qikly/tree/main/docs/examples), a module and a folder, show the
-   task files as they look once answered.
+   task files as written, as drafted and as answered.
 
 3. **Get a fresh test suite written from your answers.** Needs a key:
 

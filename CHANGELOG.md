@@ -6,6 +6,24 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
+### Added
+- **A spec agent drafts the task file in step 2.** With a key set, `--scaffold`
+  has a third agent write the `requirements` line and an answer to each of
+  step 1's questions, ready to run. It reads the project's README, the
+  module's docstrings and its function signatures, and each question with
+  the code it quotes taken out; it never reads a function body, so it
+  writes what the code should do, not what it does, and a test written from
+  its draft can disagree with the code. Each answer says where it came from:
+  a quote from the documentation, checked word for word and dropped if it is
+  not there, or `CHECK` where it was judged from the module's purpose. What
+  the documentation cannot decide stays a TODO. Run the draft as it is or
+  change it. Without a key, or with `QIKLY_NO_DRAFT=1`, the file has TODOs
+  as before. The agent has its own role, `spec`, so the settings file can
+  point it at another model. `--take-tests` names the criterion behind each
+  failing test and who wrote it.
+- The worked examples gain READMEs, which are what the spec agent reads, and
+  a `.drafted.yaml` beside each task file.
+
 ### Fixed
 - **`--scaffold` on a large module no longer takes minutes.** Where faults can be
   planted was worked out again for every question: on tabulate's 3,000 lines

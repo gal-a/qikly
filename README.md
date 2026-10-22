@@ -52,7 +52,7 @@ folder, and the same path in every step:
 ```bash
 pip install --upgrade qikly
 qikly --score my_module.py       # 1. what your tests miss         free, no key
-qikly --scaffold my_module.py    # 2. the task file, to answer in  free, no key
+qikly --scaffold my_module.py    # 2. the drafted spec, to check   a fraction of a cent with a key
 qikly --tasks my_module.py       # 3. the run                      needs an API key
 ```
 
@@ -62,33 +62,36 @@ qikly --tasks my_module.py       # 3. the run                      needs an API 
    `test_*.py` and `*_test.py` files that import your code, searched from the
    project root. To name them instead, add `--score-tests tests/`. No model is
    called and nothing of yours is changed.
-2. **`--scaffold` writes the task file**, `inputs_private/config/tasks/MY_MODULE_VERIFY.yaml`,
+2. **`--scaffold` drafts the spec**, `inputs_private/config/tasks/MY_MODULE_VERIFY.yaml`,
    with everything it can read from your code filled in, and a data file of
-   the values your tests already call it with. What is left is what only you
-   know: the questions from step 1, under `acceptance_criteria`, each with
-   what your code does there now, found by running it, and for a boundary
-   only on either side of it, never at it:
+   the values your tests already call it with. With a key set (Google
+   Gemini, Anthropic or OpenAI), a spec agent then drafts the parts only an
+   owner could write: a line on what the module is for, and an answer to
+   each of step 1's questions as an acceptance criterion. **It reads your
+   README and docstrings, never your code**, so it says what the code should
+   do rather than what it does, and a test written from it can disagree
+   with the code:
 
    ```yaml
-   #?     if rate < 0 or rate > 100:
-   #? Your tests never try rate at exactly 100.
    #? What should apply_discount(100, 100) do?
-   #? Answer with a number, found by running your code:
-   #?   1 = apply_discount(100, 100) returns VALUE   (write it as 1: the value; as rate 99 does now (it returns 1.0))
-   #?   2 = apply_discount(100, 100) raises ValueError   (as rate 101 does now)
-   - 2
+   #? Drafted from your documentation: "...so a rate of 100 or more is rejected with ValueError..."
+   - "apply_discount(100, 100) raises ValueError"
    ```
 
-   You replace each TODO line with an option's number, `1: <value>` for one
-   that asks for a value, `keep` where one option is what your code does
-   now, or a sentence of your own that names a value, with or without
-   quotes (a sentence with a colon in it needs them). `qikly --validate`
-   shows each short answer as the criterion it becomes. A TODO you leave is skipped. Replace the
-   `requirements` line too, marked `TODO: MODIFY THIS:`, with what the
-   module is for in your words. On a folder it writes one task file for
-   each module step 1 asked about. Lines starting `#?` are notes for you,
+   Each answer says where it came from: a quote from your documentation,
+   checked word for word, or `CHECK` where the agent judged it from the
+   module's purpose because nothing written decides it. Run the draft as it
+   is, or change any answer you disagree with, with or without quotes. What
+   the documentation cannot decide is left as a TODO: answer it with an
+   option's number where qikly found values by running your code
+   (`1: <value>` for one that asks for a value, `keep` for what the code does
+   now), or a sentence that names a value. A TODO you leave is skipped.
+   Without a key, every answer is yours to write, and the `requirements`
+   line is marked `TODO: MODIFY THIS:`. On a folder it writes one task file
+   for each module step 1 asked about. Lines starting `#?` are notes for you,
    and neither agent reads them. This file is the one source of truth: change
-   it and run step 3 again. `qikly --validate my_module.py` checks it, free.
+   it and run step 3 again. `qikly --validate my_module.py` checks it, free,
+   and shows each short answer as the criterion it becomes.
 3. **`--tasks` runs it**, which needs an API key (Google Gemini, Anthropic or
    OpenAI). A test agent writes tests from your criteria before any code is
    shown to it, and a separate coding agent, which never sees them, repairs a
