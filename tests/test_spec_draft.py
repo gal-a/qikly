@@ -221,3 +221,17 @@ def test_a_suite_failing_on_its_own_is_said_to_be_the_setup_not_qikly():
     assert "your project's setup, not qikly" in text
     assert "-m pip install click" in text
     assert "python -m pytest tests" in text
+
+
+def test_with_no_readme_and_no_docstrings_nothing_is_drafted(scored, monkeypatch, capsys):
+    """With names alone, every drafted answer was a guess, label('VIP') raising."""
+    os.remove(scored / "README.md")
+    (scored / "pricing.py").write_text(PRICING.replace('    """Apply a percentage discount."""\n', ""),
+                                       encoding="utf-8")
+    # Scored again: the saved questions name lines the edit moved.
+    assert cli._do_score_suite(None, None, None, code="pricing.py", tests=None) == 0
+    seen = _drafting(monkeypatch, _answers)
+    capsys.readouterr()
+    cli._do_scaffold("pricing.py", None)
+    assert not seen, "a model was called with nothing to draft from"
+    assert "no README and no docstrings" in capsys.readouterr().out

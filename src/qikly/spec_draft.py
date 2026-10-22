@@ -100,6 +100,29 @@ def interface_text(source):
     return "\n".join(lines)
 
 
+# Fewer characters of README and docstrings than this, and there is nothing to
+# draft from: with function names alone, the agent guessed that label('VIP')
+# raises ValueError, every answer a guess.
+MIN_DOCS = 80
+
+
+def documentation(module, cwd):
+    """The README and the module's docstrings: what a draft may rest on."""
+    from qikly.start import _read
+    try:
+        tree = ast.parse(_read(module))
+    except SyntaxError:
+        tree = None
+    docs = []
+    if tree is not None:
+        for node in [tree] + list(ast.walk(tree)):
+            if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                doc = ast.get_docstring(node)
+                if doc:
+                    docs.append(doc)
+    return (readme_text(module, cwd) + "\n" + "\n".join(docs)).strip()
+
+
 _LITERAL = re.compile(r"""^(-?\d+(\.\d+)?|'[^']*'|"[^"]*"|True|False|None)$""")
 
 

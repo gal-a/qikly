@@ -2362,6 +2362,11 @@ def _draft_answers(text, source, root, questions, brief=False):
                   "a key, --scaffold drafts them from your README and docstrings.")
         return text, None
     name = os.path.basename(source)
+    if len(spec_draft.documentation(source, root)) < spec_draft.MIN_DOCS:
+        print(f"  {name} has no README and no docstrings, so there is nothing to draft "
+              f"its answers from and they are left for you. A README saying what the "
+              f"code is for, and its rules, is what the spec agent drafts from.")
+        return text, None
     if not brief:
         print(f"Drafting the answers with {provider}: the spec agent reads {name}'s "
               f"README and docstrings, never its code.")
