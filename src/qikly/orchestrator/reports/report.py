@@ -217,7 +217,7 @@ def _load_task_meta(task_id):
     path = resolve_input(f"config/tasks/{task_id}.yaml")
     try:
         import yaml
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         return {"task_name": data.get("task_name"), "description": data.get("description")}
     except Exception:

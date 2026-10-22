@@ -504,6 +504,12 @@ def _suite_verdict(workspace, target, env=None, plugin=None, timeout=None):
         try:
             result = subprocess.run(
                 [sys.executable, "-m", "pytest", where, "-q", "--tb=no",
+                 # Stop at the first failing test: one is enough for "fail", and
+                 # the verdict reads nothing else. packaging's selected suite is
+                 # 118 seconds of tests, and a fault that broke Version failed
+                 # thousands of them, each reported, before the run could end;
+                 # a sample estimated at 24 minutes ran past an hour.
+                 "-x",
                  # The project's own addopts already carry -q, and -qq suppresses
                  # the count line entirely, so every parsed count reads as zero,
                  # which looks exactly like a suite that ran and passed.

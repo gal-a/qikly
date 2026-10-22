@@ -39,6 +39,24 @@ CHECK = "CHECK"
 
 # ------------------------------------------------------- what it may read --
 
+def _read_readme(path):
+    """
+    A README's text, following it when it is a symbolic link git could not
+    make. tenacity's README.rst links to doc/source/index.rst, and a Windows
+    checkout without symlink support writes the link as a file holding only
+    that path: 20 characters, so the spec agent was told there was no README.
+    """
+    with open(path, encoding="utf-8-sig", errors="replace") as handle:
+        text = handle.read()
+    target = text.strip()
+    if target and "\n" not in target and len(target) < 260:
+        linked = os.path.normpath(os.path.join(os.path.dirname(path), target))
+        if os.path.isfile(linked):
+            with open(linked, encoding="utf-8-sig", errors="replace") as handle:
+                return handle.read()
+    return text
+
+
 def readme_text(module, cwd):
     """The README nearest the module and the project's own, as one text."""
     from qikly.start import project_root
@@ -52,8 +70,7 @@ def readme_text(module, cwd):
             if os.path.isfile(path) and os.path.normcase(path) not in seen:
                 seen.add(os.path.normcase(path))
                 try:
-                    with open(path, encoding="utf-8-sig", errors="replace") as handle:
-                        found.append(handle.read())
+                    found.append(_read_readme(path))
                 except OSError:
                     pass
                 break
@@ -292,6 +309,52 @@ def quoted(quote, documentation):
     return True
 
 
+def interface_names(source):
+    """
+    The module's public function, class and method names, the last part of
+    each, and whatever it exports in `__all__`: python-slugify defines
+    `smart_truncate` elsewhere and re-exports it from `slugify.py`.
+    """
+    from qikly.scaffold import read_interface
+    try:
+        names = {m.name.rpartition(".")[2] for m in read_interface(source)}
+        tree = ast.parse(source)
+    except SyntaxError:
+        return set()
+    for node in tree.body:
+        if (isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "__all__"
+                                                 for t in node.targets)
+                and isinstance(node.value, (ast.List, ast.Tuple))):
+            names |= {e.value for e in node.value.elts
+                      if isinstance(e, ast.Constant) and isinstance(e.value, str)}
+    return names
+
+
+_CALL = re.compile(r"\b([A-Za-z_][\w.]*)\s*\(")
+
+
+def other_function(quote, criterion, names):
+    """
+    Why a drafted answer needs a second look, or None: its quote shows a call
+    to one of the module's functions and the answer calls a different one.
+
+    On python-slugify the README's example was `slugify('one two three
+    four', max_length=12, word_boundary=True) == 'one-two-four'`, quoted word
+    for word, and the answer gave that result to `smart_truncate`, whose
+    separator is a space. The quote check passed it; only the names differ.
+    Only the module's own names count, so a `Decimal(...)` in a quote is not
+    taken for a call the answer had to make.
+    """
+    def calls(text):
+        return {c.rpartition(".")[2] for c in _CALL.findall(text or "")} & names
+
+    shown, used = calls(quote), calls(criterion)
+    if shown and used and not shown & used:
+        return (f"the quote's example calls {', '.join(sorted(shown))}(), and this "
+                f"answer calls {', '.join(sorted(used))}() instead")
+    return None
+
+
 def draft(module, cwd, questions, seed=None, call=None):
     """
     {"requirements": str, "answers": {question number: {criterion, source,
@@ -322,6 +385,7 @@ def draft(module, cwd, questions, seed=None, call=None):
     if not isinstance(data, dict):
         return None
     documentation = _squash(readme + "\n" + interface)
+    names = interface_names(source)
     answers, dropped = {}, 0
     for item in data.get("answers") or []:
         if not isinstance(item, dict):
@@ -339,9 +403,11 @@ def draft(module, cwd, questions, seed=None, call=None):
             # A quote that is not there is a claim with nothing behind it.
             dropped += 1
             continue
+        why = other_function(quote, criterion, names) if source_of == "docs" else None
         answers[number] = {"criterion": " ".join(criterion.split()),
                            "source": source_of, "quote": " ".join(quote.split()),
-                           "check": source_of == "purpose" or bool(item.get("check"))}
+                           "check": source_of == "purpose" or bool(item.get("check")) or bool(why),
+                           "why": why}
     requirements = data.get("requirements")
     return {"requirements": " ".join(requirements.split())
             if isinstance(requirements, str) else None,
@@ -391,5 +457,8 @@ def apply(text, drafted):
                 done += 1
                 check += answer["check"]
                 i += 1
+                if answer.get("why"):
+                    lines.insert(i, f"  #? {CHECK}: {_printable(answer['why'])}.")
+                    i += 1
         i += 1
     return "\n".join(lines), done, check

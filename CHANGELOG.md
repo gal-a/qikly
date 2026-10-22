@@ -25,6 +25,33 @@ packaging tools would read as `1.1`.
   a `.drafted.yaml` beside each task file.
 
 ### Fixed
+- **Generated tests are written as UTF-8 on Windows.** They were written in the
+  locale's encoding, cp1252, so a test holding a `€` became a file pytest could
+  not parse, and one holding a `μ` could not be written at all. On
+  price-parser every attempt of every run then reported "the module could not
+  be imported", and the coding agent spent its attempts on a file it may not
+  touch. Task files and the run's logs and reports are now read and written
+  as UTF-8 too, and each generated file is read back and compiled after it is
+  written.
+- **A refused test draft is retried with the reason.** A generated test file
+  that was not valid Python, or had no tests, was regenerated with a new seed
+  and nothing else; inflect's run ended after three such files. The retry is
+  now told what was wrong with its own draft, which says nothing of the code
+  under test.
+- **`--score` stops each faulted suite at its first failing test.** One
+  failure is enough to count a fault caught. packaging's suite runs for two
+  minutes, and a fault that broke its `Version` class failed thousands of
+  tests before the run ended: a sample estimated at 24 minutes ran past an
+  hour. No score changes, since the verdict reads only pass or fail.
+- **The spec agent follows a README that is a symbolic link.** A Windows
+  checkout without symlink support writes the link as a file holding only
+  its target's path, so tenacity's README read as "doc/source/index.rst" and
+  nothing was drafted.
+- **A drafted answer calling another function than its quote is marked
+  `CHECK`.** python-slugify's README example `slugify(...) == 'one-two-four'`
+  was quoted word for word and given to `smart_truncate`, whose separator is a
+  space; the quote check passed it. The task file now says which function the
+  quote's example calls, beside the answer.
 - **`--scaffold` accepts a module made only of classes.** iniconfig and
   bidict were refused for having "no public top level functions", after
   `--score` had raised questions about them. A public class is now part of

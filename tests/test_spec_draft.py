@@ -235,3 +235,65 @@ def test_with_no_readme_and_no_docstrings_nothing_is_drafted(scored, monkeypatch
     cli._do_scaffold("pricing.py", None)
     assert not seen, "a model was called with nothing to draft from"
     assert "no README and no docstrings" in capsys.readouterr().out
+
+
+# ------------------------------------------- found on the sweep, 2026-10-22 --
+
+SLUGIFY = "def slugify(text, max_length=0):\n    pass\n\n\ndef smart_truncate(text, max_length=0):\n    pass\n"
+
+
+def test_an_answer_calling_another_function_than_its_quote_is_marked_check():
+    """slugify: the README's slugify() example given to smart_truncate()."""
+    names = spec_draft.interface_names(SLUGIFY)
+    quote = "assert slugify('one two three four', max_length=12) == 'one-two-four'"
+    why = spec_draft.other_function(
+        quote, "smart_truncate('one two three four', max_length=12) returns 'one-two-four'", names)
+    assert why and "slugify()" in why and "smart_truncate()" in why
+    assert spec_draft.other_function(quote, "slugify('a b', max_length=1) returns 'a'", names) is None
+
+
+def test_a_call_to_something_outside_the_module_is_not_a_mismatch():
+    names = spec_draft.interface_names(SLUGIFY)
+    assert spec_draft.other_function("Decimal('1.0') is accepted",
+                                     "slugify('x') returns 'x'", names) is None
+
+
+def test_the_mismatch_is_written_beside_the_answer():
+    drafted = {"requirements": None, "dropped": 0, "answers": {1: {
+        "criterion": "label('VIP') returns 'gold'", "source": "docs",
+        "quote": "apply_discount(100, 100) raises", "check": True,
+        "why": "the quote's example calls apply_discount(), and this answer calls label() instead"}}}
+    task = "acceptance_criteria:\n  - \"TODO: your answer to the question above\"\n"
+    out, done, check = spec_draft.apply(task, drafted)
+    lines = out.splitlines()
+    assert done == 1 and check == 1
+    at = next(i for i, l in enumerate(lines) if "label('VIP')" in l)
+    assert lines[at - 1].startswith("  #? CHECK: the quote's example calls apply_discount()")
+
+
+def test_a_readme_that_is_a_symlink_git_could_not_make_is_followed(tmp_path):
+    """tenacity: README.rst holds only 'doc/source/index.rst' on Windows."""
+    (tmp_path / "doc" / "source").mkdir(parents=True)
+    (tmp_path / "doc" / "source" / "index.rst").write_text(
+        "Tenacity retries a call until it succeeds.\n", encoding="utf-8")
+    (tmp_path / "README.rst").write_text("doc/source/index.rst", encoding="utf-8")
+    (tmp_path / "pkg").mkdir()
+    module = tmp_path / "pkg" / "retry.py"
+    module.write_text("def retry():\n    pass\n", encoding="utf-8")
+    assert "retries a call" in spec_draft.readme_text(str(module), str(tmp_path))
+
+
+def test_a_short_readme_that_names_no_file_is_kept_as_written(tmp_path):
+    (tmp_path / "README.md").write_text("Small tools.", encoding="utf-8")
+    module = tmp_path / "tools.py"
+    module.write_text("def f():\n    pass\n", encoding="utf-8")
+    assert spec_draft.readme_text(str(module), str(tmp_path)) == "Small tools."
+
+
+def test_a_function_reexported_through_all_counts_as_the_modules():
+    """python-slugify's smart_truncate lives in _legacy.py and is exported here."""
+    source = ("from ._legacy import smart_truncate\n__all__ = ['slugify', 'smart_truncate']\n\n"
+              "def slugify(text):\n    pass\n")
+    names = spec_draft.interface_names(source)
+    assert {"slugify", "smart_truncate"} <= names
+    assert spec_draft.other_function("slugify('a b') == 'a-b'", "smart_truncate('a b') returns 'a-b'", names)

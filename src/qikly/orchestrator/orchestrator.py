@@ -283,7 +283,7 @@ def verify_task_id(task_id):
     path = task_config_path(task_id)
     if not os.path.exists(path):
         raise FileNotFoundError(f"task config not found at: {path}")
-    with open(path, "r") as f:
+    with open(path, "r", encoding="utf-8") as f:
         task_config = yaml.safe_load(f) or {}
     configured_id = task_config.get("task_id")
     if configured_id != task_id:
@@ -418,7 +418,7 @@ def log_transaction(entry):
     if not SAVE_TRANSACTIONS:
         return
     entry = {"ts": datetime.now().isoformat(), **entry}
-    with open(TRANSACTIONS_PATH, "a") as f:
+    with open(TRANSACTIONS_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
         f.flush()
 
@@ -493,7 +493,7 @@ def load_seed_spec(task_id):
     completes the set: all three inputs to the loop (criteria, code, tests)
     can come from outside it.
     """
-    with open(task_config_path(task_id), "r") as f:
+    with open(task_config_path(task_id), "r", encoding="utf-8") as f:
         task_config = yaml.safe_load(f) or {}
     seed = task_config.get("seed") or {}
     if not isinstance(seed, dict):
@@ -765,8 +765,17 @@ def generate_and_write_tests(stage, tests_dir, task_id, seed=None, guidance=None
         name = filename if len(batches) == 1 else \
             f"{filename[:-3]}_{index}.py"
         test_path = os.path.join(stage_dir, name)
-        with open(test_path, "w", newline="\n") as f:
+        # utf-8, never the locale's: on Windows that is cp1252, which wrote a
+        # test's `€` as the byte 0x80, a file pytest cannot parse, and could
+        # not write a `μ` at all. Either stopped every attempt of the run.
+        with open(test_path, "w", encoding="utf-8", newline="\n") as f:
             f.write(source)
+        # What pytest will read is the file, not the string that was
+        # validated. When the two differed, every attempt reported "the module
+        # could not be imported" and the coding agent spent ten of them on a
+        # file it may not touch. Read it back as pytest will.
+        with open(test_path, "rb") as f:
+            compile(f.read(), test_path, "exec")
         written.append(test_path)
         log_transaction({"stage": stage, "test_path": test_path,
                          "batch": index, "batches": len(batches),
@@ -774,6 +783,15 @@ def generate_and_write_tests(stage, tests_dir, task_id, seed=None, guidance=None
                          "action": "tests_generated"})
 
     return written[0]
+
+
+def _takes_guidance(generator):
+    import inspect
+    try:
+        params = inspect.signature(generator).parameters
+    except (TypeError, ValueError):
+        return False
+    return "guidance" in params or any(p.kind is p.VAR_KEYWORD for p in params.values())
 
 
 def _generate_one(stage, generator, task_id, seed, criteria, batch_index, guidance=None):
@@ -786,18 +804,29 @@ def _generate_one(stage, generator, task_id, seed, criteria, batch_index, guidan
     no second chance at all. Batches perturb it further so two batches of the
     same task do not come back as the same file.
     """
-    source = None
+    source, rejected = None, None
     for attempt in range(1, GENERATE_TESTS_MAX_ATTEMPTS + 1):
         attempt_seed = seed
         if seed is not None:
             attempt_seed = seed + attempt - 1 + 1000 * (batch_index - 1)
+        # A retry is told why the last draft was refused. A new seed alone
+        # left inflect's run with three invalid files and no run at all: the
+        # model never learned what was wrong. The reason is about its own
+        # file, a syntax error or an undefined name, so it carries nothing of
+        # the code under test.
+        told = guidance
+        if rejected:
+            told = ((guidance + "\n\n") if guidance else "") + (
+                f"Your previous draft of this file was rejected: {rejected}. "
+                f"Write the whole file again, as valid Python.")
         # Guidance is passed only when there is some, so a generator written
         # before it existed, or a test's stand-in, keeps working unchanged.
-        extra = {"guidance": guidance} if guidance else {}
+        extra = {"guidance": told} if told and _takes_guidance(generator) else {}
         source = generator(task_id, seed=attempt_seed, criteria=criteria, **extra)
         error = _validate_generated_tests(source, stage)
         if not error:
             return source
+        rejected = error
         if attempt < GENERATE_TESTS_MAX_ATTEMPTS:
             log_transaction({"stage": stage, "error": error, "source": source,
                              "attempt": attempt, "action": "tests_generation_invalid_retry"})

@@ -784,7 +784,7 @@ def agent_generate_system_tests(task_id, seed=None, criteria=None, guidance=None
     return _extract_python(raw)
 
 
-def agent_generate_unit_tests(task_id, seed=None, criteria=None):
+def agent_generate_unit_tests(task_id, seed=None, criteria=None, guidance=None):
     """
     Build the UNIT test prompt and call the LLM to generate that test file's
     source. Unlike the integration/system prompts, this one includes the
@@ -797,7 +797,7 @@ def agent_generate_unit_tests(task_id, seed=None, criteria=None):
     task = _task_with_criteria(task_id, criteria)
     codebase_text = load_codebase(agent_src_code_path(task_id))
 
-    prompt = build_unit_test_prompt(test_agent_md, task, codebase_text)
+    prompt = _with_guidance(build_unit_test_prompt(test_agent_md, task, codebase_text), guidance)
     raw = call_llm("test_unit", prompt, seed=seed)
     return _extract_python(raw)
 

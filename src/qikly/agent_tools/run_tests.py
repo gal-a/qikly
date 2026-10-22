@@ -96,7 +96,7 @@ def _write_summary_report(task_id, stage, iteration, counts, test_results, run_t
             f"{counts['total']} total"
         )
 
-    with open(report_path, "a", newline="\n") as f:
+    with open(report_path, "a", encoding="utf-8", newline="\n") as f:
         f.write(line + "\n")
     print(line)
 
