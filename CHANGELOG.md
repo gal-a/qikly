@@ -52,6 +52,15 @@ packaging tools would read as `1.1`.
   was quoted word for word and given to `smart_truncate`, whose separator is a
   space; the quote check passed it. The task file now says which function the
   quote's example calls, beside the answer.
+- **A drafted answer that changes its quoted example is marked `CHECK`.** When
+  the quote shows a call and the answer calls the same function with other
+  arguments, the expected result is the agent's, not the documentation's:
+  price-parser's docstring showed `parse_number("12,34")` and the answer asked
+  about `"12€34"`, and tabulate's README showed `"colon_grid"` and the answer
+  asked for `"plain"` and wrote its own table.
+- **A drafted criterion keeps its spaces.** Runs of spaces were squeezed to one,
+  as in prose, which rewrote any expected output aligned with spaces, such as
+  a tabulate table. A line break in a criterion is written as a visible `\n`.
 - **`--scaffold` accepts a module made only of classes.** iniconfig and
   bidict were refused for having "no public top level functions", after
   `--score` had raised questions about them. A public class is now part of

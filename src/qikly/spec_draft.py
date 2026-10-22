@@ -309,6 +309,22 @@ def quoted(quote, documentation):
     return True
 
 
+def criterion_text(text):
+    """
+    A drafted criterion as one line, its spaces kept exactly.
+
+    It used to be squeezed like prose, every run of spaces made one, which
+    rewrote an expected output: tabulate aligns its columns with runs of
+    spaces, so `'strings      numbers'` became a string no table prints. A line
+    break becomes a visible `\\n`, so the task file keeps one criterion to a
+    line and the text still says where the break was.
+    """
+    from qikly.score_questions import _UNPRINTABLE
+
+    text = str(text).strip().replace("\r\n", "\n").replace("\n", "\\n").replace("\t", "\\t")
+    return _UNPRINTABLE.sub("?", text)
+
+
 def interface_names(source):
     """
     The module's public function, class and method names, the last part of
@@ -345,14 +361,40 @@ def other_function(quote, criterion, names):
     Only the module's own names count, so a `Decimal(...)` in a quote is not
     taken for a call the answer had to make.
     """
-    def calls(text):
-        return {c.rpartition(".")[2] for c in _CALL.findall(text or "")} & names
-
-    shown, used = calls(quote), calls(criterion)
-    if shown and used and not shown & used:
+    shown, used = _calls(quote, names), _calls(criterion, names)
+    if shown and used and not set(shown) & set(used):
         return (f"the quote's example calls {', '.join(sorted(shown))}(), and this "
                 f"answer calls {', '.join(sorted(used))}() instead")
+    # The same function, other arguments: the expected result is then the
+    # agent's, not the documentation's. price-parser's docstring showed
+    # parse_number("12,34") and the answer asked about "12€34"; tabulate's
+    # README showed "colon_grid" and the answer asked for "plain" and wrote
+    # its own table.
+    for name in sorted(set(shown) & set(used)):
+        if not used[name] & shown[name]:
+            return (f"the quote's example calls {name}() with other arguments, so "
+                    f"the expected result here is the agent's, not your documentation's")
     return None
+
+
+def _calls(text, names):
+    """{function: {argument text, spaces removed}} for each call to one of `names`."""
+    text = text or ""
+    found = {}
+    for match in _CALL.finditer(text):
+        name = match.group(1).rpartition(".")[2]
+        if name not in names:
+            continue
+        depth, start = 0, match.end() - 1
+        for at in range(start, len(text)):
+            if text[at] in "([{":
+                depth += 1
+            elif text[at] in ")]}":
+                depth -= 1
+                if depth == 0:
+                    found.setdefault(name, set()).add(re.sub(r"\s+", "", text[start + 1:at]))
+                    break
+    return found
 
 
 def draft(module, cwd, questions, seed=None, call=None):
@@ -404,7 +446,7 @@ def draft(module, cwd, questions, seed=None, call=None):
             dropped += 1
             continue
         why = other_function(quote, criterion, names) if source_of == "docs" else None
-        answers[number] = {"criterion": " ".join(criterion.split()),
+        answers[number] = {"criterion": criterion_text(criterion),
                            "source": source_of, "quote": " ".join(quote.split()),
                            "check": source_of == "purpose" or bool(item.get("check")) or bool(why),
                            "why": why}
@@ -452,7 +494,7 @@ def apply(text, drafted):
                         if answer["source"] == "docs" else
                         f"  #? {CHECK}: drafted from the module's purpose; nothing "
                         f"written decides it.")
-                lines[i] = "  - " + _quote(_printable(answer["criterion"]))
+                lines[i] = "  - " + _quote(criterion_text(answer["criterion"]))
                 lines.insert(i, note)
                 done += 1
                 check += answer["check"]

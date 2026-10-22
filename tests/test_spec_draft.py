@@ -249,7 +249,39 @@ def test_an_answer_calling_another_function_than_its_quote_is_marked_check():
     why = spec_draft.other_function(
         quote, "smart_truncate('one two three four', max_length=12) returns 'one-two-four'", names)
     assert why and "slugify()" in why and "smart_truncate()" in why
-    assert spec_draft.other_function(quote, "slugify('a b', max_length=1) returns 'a'", names) is None
+    same = "slugify('one two three four', max_length=12) returns 'one-two-four'"
+    assert spec_draft.other_function(quote, same, names) is None
+
+
+def test_an_answer_changing_its_examples_arguments_is_marked_check():
+    """price-parser's "12,34" became "12€34"; tabulate's "colon_grid" became "plain"."""
+    names = {"parse_number", "tabulate"}
+    why = spec_draft.other_function('>>> parse_number("12,34")',
+                                    'parse_number("12€34") returns Decimal("12.34")', names)
+    assert why and "other arguments" in why
+    why = spec_draft.other_function(
+        'tabulate([["spam", 41.9999]], ["strings"], "colon_grid")',
+        'tabulate([["spam", 41.9999]], ["strings"], "plain") returns "..."', names)
+    assert why and "tabulate()" in why
+    assert spec_draft.other_function('parse_number( "12,34" )',
+                                     'parse_number("12,34") returns Decimal("12.34")', names) is None
+
+
+def test_a_rule_written_in_prose_is_not_an_example_to_match():
+    names = {"apply_discount"}
+    assert spec_draft.other_function("a rate of 100 or more is rejected with ValueError",
+                                     "apply_discount(100, 100) raises ValueError", names) is None
+
+
+def test_a_drafted_criterion_keeps_its_spaces():
+    """tabulate aligns columns with runs of spaces; squeezing them changed the output."""
+    text = spec_draft.criterion_text("tabulate(t) returns 'strings      numbers\nspam   1'\n")
+    assert text == "tabulate(t) returns 'strings      numbers\\nspam   1'"
+    drafted = {"requirements": None, "dropped": 0, "answers": {1: {
+        "criterion": text, "source": "docs", "quote": "q", "check": False, "why": None}}}
+    out, _, _ = spec_draft.apply('acceptance_criteria:\n  - "TODO: your answer"\n', drafted)
+    import yaml
+    assert yaml.safe_load(out)["acceptance_criteria"] == [text]
 
 
 def test_a_call_to_something_outside_the_module_is_not_a_mismatch():
