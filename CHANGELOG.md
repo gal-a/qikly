@@ -25,6 +25,18 @@ packaging tools would read as `1.1`.
   a `.drafted.yaml` beside each task file.
 
 ### Fixed
+- **`--scaffold` accepts a module made only of classes.** iniconfig and
+  bidict were refused for having "no public top level functions", after
+  `--score` had raised questions about them. A public class is now part of
+  the interface as its constructor, `Name(args)`, and its public methods,
+  `Name.method(args)`: `self` and `cls` dropped, as are `@overload` stubs,
+  other dunders and arguments starting with an underscore. A property is
+  listed as `Name.attr`, and a constructor inherited from a base class as
+  `Name(...)`. With only classes, the guessed entrypoint is the class named
+  as the module, else the one with the most methods. Questions about a
+  method now name its class, `IniConfig.parse` rather than `parse`, in the
+  task file and for the spec agent. A module of private helpers only is
+  still refused, and the reason now names the module that imports it.
 - **`--scaffold` on a large module no longer takes minutes.** Where faults can be
   planted was worked out again for every question: on tabulate's 3,000 lines
   the step took 15 minutes with nothing on screen. It is now worked out once

@@ -580,11 +580,12 @@ def build_rows(state, columns, source, test_sources):
     already call the code with, so the data file is never only a header.
     """
     state = state or {}
-    from qikly.scaffold import read_functions
+    from qikly.scaffold import read_interface
 
     rows, typical = [], {}
+    # A class is called by its own name, with its constructor's arguments.
     functions = {f.name: [a.arg for a in f.args.posonlyargs + f.args.args]
-                 for f in read_functions(source)}
+                 for f in read_interface(source)}
 
     def values_of(function, args, kwargs):
         values = dict(zip(functions[function], args))

@@ -267,12 +267,12 @@ def _pasteable(path):
 
 
 def _scaffoldable(path):
-    """Whether `--scaffold` will accept this file: it needs a public function."""
+    """Whether `--scaffold` will accept this file: it needs a public function or class."""
     try:
-        from qikly.scaffold import read_functions
+        from qikly.scaffold import read_interface
 
         with open(path, encoding="utf-8-sig", errors="replace") as handle:
-            return bool(read_functions(handle.read()))
+            return bool(read_interface(handle.read()))
     except Exception:
         return True
 
@@ -697,7 +697,7 @@ def advice(questions, invoked_from=None):
     What to run next, as lines, exact for where the questions are.
 
     Commands are given only when they will work as pasted: `--scaffold` takes
-    one module and refuses one with no public function, and will not rewrite a
+    one module and refuses one with no public function or class, and will not rewrite a
     task that already exists.
     """
     here = invoked_from or os.getcwd()
@@ -720,8 +720,8 @@ def advice(questions, invoked_from=None):
                          ", ".join(shown(p) for p in paths))]
     module, task = paths[0], task_for(paths[0])
     if not _scaffoldable(module):
-        return ["`qikly --scaffold` needs a public top-level function to call, "
-                "and %s has none, which is usual for a module made of classes. "
+        return ["`qikly --scaffold` needs a public top-level function or class to "
+                "call, and %s has neither, only private helpers. "
                 "Start a task with `qikly --init` instead and copy these "
                 "questions under its acceptance_criteria as comments starting "
                 "%s, each above your answer." % (os.path.basename(module), MARK)]

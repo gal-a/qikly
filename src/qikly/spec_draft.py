@@ -158,6 +158,30 @@ def public_callers(source):
     return {k: sorted(v) for k, v in reach.items()}
 
 
+def in_classes(questions, source):
+    """
+    `questions` with a method's name given with its class: step 1 records
+    `parse` or `__init__` alone, which says nothing about which part of a
+    module made of classes the question is about. Copies; the originals are
+    the saved questions.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return questions
+    spans = [(n.lineno, getattr(n, "end_lineno", n.lineno), n.name)
+             for n in tree.body if isinstance(n, ast.ClassDef)]
+    out = []
+    for q in questions:
+        line, name = q.get("line"), q.get("function")
+        owner = next((c for start, end, c in spans
+                      if isinstance(line, int) and start <= line <= end), None)
+        if owner and name and "." not in name and name != owner:
+            q = dict(q, function=owner if name == "__init__" else f"{owner}.{name}")
+        out.append(q)
+    return out
+
+
 def neutral_question(q, callers=None):
     """
     The question as the spec agent may see it: the call it is about where
@@ -279,8 +303,8 @@ def draft(module, cwd, questions, seed=None, call=None):
     source = _read(module)
     readme = readme_text(module, cwd)
     interface = interface_text(source)
-    prompt = build_prompt(os.path.basename(module), readme, interface, questions,
-                          public_callers(source))
+    prompt = build_prompt(os.path.basename(module), readme, interface,
+                          in_classes(questions, source), public_callers(source))
     if call is None:
         from qikly.agent_api.call_llm import call_llm as call
     if seed is None:

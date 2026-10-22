@@ -294,11 +294,19 @@ def test_several_files_are_not_given_a_command_that_guesses(tmp_path):
     assert "`qikly --scaffold .`" in line and "2 modules" in line
 
 
-def test_a_module_of_classes_is_sent_to_init(tmp_path):
-    """Audit finding: --scaffold refuses a module with no public function."""
+def test_a_module_of_classes_is_sent_to_scaffold(tmp_path):
+    """--scaffold takes a class as its constructor and methods now."""
     path = tmp_path / "box.py"
     path.write_text("class Box:\n    def put(self, v):\n        return v > 0\n",
                     encoding="utf-8")
+    (line,) = sq.advice([{"path": str(path)}], str(tmp_path))
+    assert "Next: `qikly --scaffold" in line
+
+
+def test_a_module_of_private_helpers_is_sent_to_init(tmp_path):
+    """Audit finding: --scaffold refuses a module with nothing public to call."""
+    path = tmp_path / "_box.py"
+    path.write_text("def _put(v):\n    return v > 0\n", encoding="utf-8")
     (line,) = sq.advice([{"path": str(path)}], str(tmp_path))
     assert "--init" in line
 

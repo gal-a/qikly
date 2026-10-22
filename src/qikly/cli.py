@@ -2505,6 +2505,9 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
                 print(f"  Stopped after {start.HINT_BUDGET} seconds: {late} of the "
                       f"{len(found)} questions are written without numbered options, "
                       f"to answer in your own words.")
+            # After the hints, which look a function up by its bare name.
+            from qikly import spec_draft
+            found = spec_draft.in_classes(found, start._read(source))
         text, used = with_questions(text, found, asked_on)
         asked = len(found) if used else 0
 

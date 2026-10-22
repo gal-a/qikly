@@ -191,7 +191,7 @@ seed:
 
 
 def _signature(fn):
-    """A readable signature line for one top level function."""
+    """A readable signature line for one top level function or class member."""
     args = []
     a = fn.args
     for i, arg in enumerate(a.args):
@@ -208,7 +208,9 @@ def _signature(fn):
         args.append(arg.arg)
     if a.kwarg:
         args.append("**" + a.kwarg.arg)
-    sig = f"{fn.name}({', '.join(args)})"
+    if getattr(fn, "inherited", False):
+        return f"{fn.name}(...)"
+    sig = fn.name if getattr(fn, "attribute", False) else f"{fn.name}({', '.join(args)})"
     if fn.returns is not None:
         try:
             sig += f" -> {ast.unparse(fn.returns)}"
@@ -233,7 +235,108 @@ def read_functions(source):
     return out
 
 
-def guess_entrypoint(functions):
+class Member:
+    """
+    One line of a class's interface, shaped as a function node is, so the
+    signature and the starter columns treat it as one: the constructor as
+    `Name`, taking `__init__`'s arguments, or a method as `Name.method`. `self`
+    or `cls` is already dropped, since a test never passes it.
+    """
+
+    def __init__(self, name, args, returns=None, attribute=False, owner=None,
+                 inherited=False):
+        self.name, self.args, self.returns = name, args, returns
+        self.attribute, self.owner, self.inherited = attribute, owner, inherited
+
+
+def _decorators(node):
+    names = set()
+    for d in node.decorator_list:
+        target = d.func if isinstance(d, ast.Call) else d
+        names.add(target.attr if isinstance(target, ast.Attribute)
+                  else getattr(target, "id", ""))
+    return names
+
+
+def _without_first(args, first=True):
+    """
+    `args` without its first positional argument, the instance or the class,
+    and without any whose name starts with an underscore: iniconfig's
+    constructor takes `_sections` and `_sources` for its own use, and a test
+    written against them tests a detail, not the interface.
+    """
+    positional = list(args.posonlyargs) + list(args.args)
+    defaults = [None] * (len(positional) - len(args.defaults)) + list(args.defaults)
+    pairs = list(zip(positional, defaults))
+    if first and pairs:
+        pairs.pop(0)
+    keep = [(a, d) for a, d in pairs if not a.arg.startswith("_")]
+    kw = [(a, d) for a, d in zip(args.kwonlyargs, args.kw_defaults) if not a.arg.startswith("_")]
+    # Defaults belong to the last arguments, so the kept ones still line up
+    # once the leading arguments without one are left off the list.
+    defaults = [d for _, d in keep]
+    while defaults and defaults[0] is None:
+        defaults.pop(0)
+    return ast.arguments(posonlyargs=[], args=[a for a, _ in keep], vararg=args.vararg,
+                         kwonlyargs=[a for a, _ in kw], kw_defaults=[d for _, d in kw],
+                         kwarg=args.kwarg, defaults=defaults)
+
+
+def class_members(node):
+    """
+    The constructor and public methods of one class, in file order.
+
+    The constructor comes first, with `__init__`'s arguments. A class with no
+    `__init__` of its own and a base class inherits one this does not read, so
+    it is written `Name(...)`: bidict's `bidict()` claimed it took nothing. A
+    property is listed as an attribute, and other dunders are left out: what
+    a test calls, not how Python reaches it.
+    """
+    init = next((n for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                 and n.name == "__init__"), None)
+    empty = ast.arguments(posonlyargs=[], args=[], vararg=None, kwonlyargs=[],
+                          kw_defaults=[], kwarg=None, defaults=[])
+    out = [Member(node.name, _without_first(init.args) if init else empty, owner=node.name,
+                  inherited=init is None and bool(node.bases))]
+    for n in node.body:
+        if not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) or n.name.startswith("_"):
+            continue
+        marks = _decorators(n)
+        if "overload" in marks:
+            # A typing stub for one call shape; the real method follows it.
+            continue
+        name = f"{node.name}.{n.name}"
+        if "property" in marks or "cached_property" in marks:
+            out.append(Member(name, empty, n.returns, attribute=True, owner=node.name))
+        elif "setter" in marks or "deleter" in marks:
+            continue
+        else:
+            args = _without_first(n.args, first="staticmethod" not in marks)
+            out.append(Member(name, args, n.returns, owner=node.name))
+    return out
+
+
+def read_interface(source):
+    """
+    What tests may call, in file order: the public top level functions, and
+    each public class as its constructor and public methods.
+
+    A module made only of classes, such as iniconfig or bidict, used to be
+    refused by `--scaffold` for having "no public top level functions", after
+    `--score` had already raised questions about it.
+    """
+    tree = ast.parse(source)
+    out = []
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if not node.name.startswith("_") and "overload" not in _decorators(node):
+                out.append(node)
+        elif isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
+            out.extend(class_members(node))
+    return out
+
+
+def guess_entrypoint(functions, stem=None):
     """
     Which function runs the whole thing end to end.
 
@@ -243,6 +346,21 @@ def guess_entrypoint(functions):
     says so.
     """
     names = [f.name for f in functions]
+    plain = [f for f in functions if not isinstance(f, Member)]
+    if not plain:
+        # Only classes: a constructor, where every use starts. The class named
+        # as the module is (IniConfig in iniconfig), else the one with the most
+        # methods, else the first.
+        classes = [f for f in functions if f.name == f.owner]
+        if not classes:
+            return None
+        key = (stem or "").replace("_", "").lower()
+        named = [c for c in classes if c.name.lower() == key]
+        if named:
+            return named[0]
+        size = {c.name: sum(1 for f in functions if f.owner == c.name) for c in classes}
+        return max(classes, key=lambda c: size[c.name])
+    functions = plain
     for f in functions:
         if f.name.startswith("run_"):
             return f
@@ -372,7 +490,7 @@ def starter_columns(source):
     such a file, and a header made up from argument names would be wrong.
     """
     names = []
-    for fn in read_functions(source):
+    for fn in read_interface(source):
         a = fn.args
         for arg in a.posonlyargs + a.args + a.kwonlyargs:
             name = arg.arg
@@ -394,6 +512,31 @@ def _source_rel(source_path, project_root):
     return (rel if rel is not None else os.path.abspath(source_path)).replace(os.sep, "/")
 
 
+def used_by(source_path):
+    """
+    The files beside `source_path` that import it, by name. cachetools'
+    `_cached.py` is all private helpers, reached only through `__init__.py`.
+    """
+    import re
+
+    folder = os.path.dirname(os.path.abspath(source_path))
+    stem = os.path.splitext(os.path.basename(source_path))[0]
+    pattern = re.compile(r"^\s*(from\s+\.%s\s+import|from\s+\.\s+import\s+.*\b%s\b|"
+                         r"import\s+\S*\b%s\b)" % ((re.escape(stem),) * 3), re.M)
+    out = []
+    for name in sorted(os.listdir(folder)):
+        path = os.path.join(folder, name)
+        if not name.endswith(".py") or os.path.samefile(path, source_path):
+            continue
+        try:
+            with open(path, encoding="utf-8-sig", errors="replace") as handle:
+                if pattern.search(handle.read()):
+                    out.append(name)
+        except OSError:
+            continue
+    return out
+
+
 def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
     """The task YAML text for one Python file, or a reason it cannot be built."""
     # utf-8-sig, not utf-8: Python runs a file that starts with a byte-order
@@ -403,12 +546,16 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
     with open(source_path, "r", encoding="utf-8-sig", errors="replace") as handle:
         source = handle.read()
     try:
-        functions = read_functions(source)
+        functions = read_interface(source)
     except SyntaxError as e:
         return None, f"{source_path} does not parse: {e}"
     if not functions:
-        return None, (f"{source_path} has no public top level functions, so there is "
-                      f"no interface to describe. Tests need something to call.")
+        users = used_by(source_path)
+        through = (f" Tests reach it through {', '.join(users)}, which imports it: "
+                   f"scaffold that instead." if users else "")
+        return None, (f"{source_path} has no public top level functions or classes, so "
+                      f"there is no interface to describe. Tests need something to call."
+                      + through)
 
     stem = os.path.splitext(os.path.basename(source_path))[0]
     if stem == "__init__":
@@ -420,7 +567,7 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
     # disagree about what the task that tests existing code is called. Both
     # jobs share one data folder, since they read the same inputs.
     task_id = base + (VERIFY_SUFFIX if seed == "existing" else "")
-    entry = guess_entrypoint(functions)
+    entry = guess_entrypoint(functions, stem)
     inputs = inputs or [f"inputs_private/data/{base}/input_01.csv"]
 
     fn_lines = "\n".join(
