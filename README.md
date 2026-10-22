@@ -25,22 +25,24 @@ never saw the acceptance criteria and discovered that rate limit from a failing
 test: it then added `or rate > 100` by itself, so the 9 of 9 is code eventually
 passing the test suite after applying fixes in an automated repair loop.*
 
-A student who writes the exam paper, writes the answer key and then sits the
-exam will pass. That is what happens when one model is given the acceptance
-criteria and asked to produce both the implementation and the suite that checks
-it. Everything goes green, and the green means nothing. **qikly takes the answer
-key away from the student: the coding agent never sees the acceptance criteria.**
-
 <!-- 2026-10-14: grouped into parts with this map, same sections and
      wording; every heading kept, so every existing link still lands. -->
 | | |
 |---|---|
-| **Get started** | [Start here](#start-here) · [What it is for](#what-it-is-for) · [From your coding agent](#use-it-from-your-coding-agent) |
+| **Get started** | [Why use qikly?](#why-use-qikly) · [Start here](#start-here) · [What it is for](#what-it-is-for) · [From your coding agent](#use-it-from-your-coding-agent) |
 | **How it works** | [The idea](#the-idea) · [What makes this different](#what-makes-this-different) |
 | **Running it** | [Four ways to use it](#how-to-use-the-tools-in-this-project) · [Free commands](#the-free-commands-in-detail) · [The demo](#what---demo-looks-like) · [Your own data](#your-own-data-in-full) · [Test data](#two-kinds-of-test-data-from-two-different-sources) · [Running](#running) · [When a run stalls](#when-a-run-does-not-converge) · [Output](#output) · [Two free checks](#two-free-checks-on-what-your-tests-are-not-measuring) |
 | **Set up** | [Configuration](#configuration-and-llm-provider) · [Use it in CI](#use-it-in-ci) · [Version check](#version-check) |
 | **Reference** | [Features](#features) · [Where it fits today](#where-it-fits-today) · [What it has caught](#examples-of-what-qikly-has-actually-caught) · [Further reading](#further-reading) |
 | **Community** | [The badge](#using-qikly-show-it) · [Contributing a task](#contributing-a-task) · [Where this came from](#where-this-came-from) · [Privacy](#privacy) · [License](#license) |
+
+## Why use qikly?
+
+A student who writes the exam paper, writes the answer key and then sits the
+exam will pass. That is what happens when one model is given the acceptance
+criteria and asked to produce both the implementation and the suite that checks
+it. Everything goes green, and the green means nothing. **qikly takes the answer
+key away from the student: the coding agent never sees the acceptance criteria.**
 
 ## Start here
 

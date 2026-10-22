@@ -2429,8 +2429,14 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
         if found:
             if not brief:
                 print(f"Running {name} beside the questions its score raised, "
-                      f"in a separate process; nothing of yours is changed.")
+                      f"for up to {start.HINT_BUDGET} seconds, in a separate "
+                      f"process; nothing of yours is changed.")
             found = start.hinted(found, source, root)
+            late = sum(1 for q in found if q.get("unhinted"))
+            if late:
+                print(f"  Stopped after {start.HINT_BUDGET} seconds: {late} of the "
+                      f"{len(found)} questions are written without numbered options, "
+                      f"to answer in your own words.")
         text, used = with_questions(text, found, asked_on)
         asked = len(found) if used else 0
     if doc:

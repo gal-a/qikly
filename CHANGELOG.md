@@ -4,6 +4,15 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## Unreleased
+
+### Fixed
+- **`--scaffold` on a large module no longer takes minutes.** Where faults can be
+  planted was worked out again for every question: on tabulate's 3,000 lines
+  the step took 15 minutes with nothing on screen. It is now worked out once
+  per file (38 seconds), and running the code beside the questions stops
+  after 60 seconds, writing the rest without numbered options and saying so.
+
 ## 0.6.0
 
 > Three steps on one path: --score, --scaffold and --tasks, answered by number

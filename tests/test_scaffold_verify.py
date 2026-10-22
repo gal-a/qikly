@@ -459,3 +459,15 @@ def test_a_bare_number_where_there_are_no_options_is_said_not_crashed_on(tmp_pat
                for e in errors), errors
     # Not under a question qikly wrote: still no crash, and said.
     assert any("criterion 2 is 7, not a sentence" in e for e in errors), errors
+
+
+def test_running_the_code_beside_questions_stops_at_its_time_limit(scored, monkeypatch):
+    """
+    tabulate's ten questions took fifteen minutes with nothing on screen. With
+    no time left, every question is written without options, and said.
+    """
+    from qikly import score_questions, start
+    found, _ = score_questions.latest_for(str(scored / "pricing.py"),
+                                          str(scored / "qikly-suite-score"))
+    out = start.hinted(found, str(scored / "pricing.py"), str(scored), budget=0)
+    assert out and all(q.get("unhinted") and not q.get("hint_prompt") for q in out)

@@ -486,7 +486,7 @@ def enrich(questions, missed):
     from qikly import score_questions as sq
     from qikly.mutation import make_mutant
 
-    sources = {}
+    sources, sites = {}, {}
     for q in questions:
         path = q.get("path")
         if path and path not in sources:
@@ -497,7 +497,11 @@ def enrich(questions, missed):
             if (item.get("path") == path and line == q.get("line")
                     and sq.ask(kind, source, line) == q.get("question")):
                 q["kind"] = kind
-                for family, index, described in ms.sites(source or ""):
+                # Found once per file: worked out again for every question,
+                # tabulate's 3,000 lines took five and a half minutes here.
+                if path not in sites:
+                    sites[path] = ms.sites(source or "")
+                for family, index, described in sites[path]:
                     if described == item["change"]:
                         q["mutant"] = make_mutant(source, index, family)[0]
                         break
@@ -709,7 +713,13 @@ def _numbered(option):
             "now": label.endswith("as your code does now")}
 
 
-def hinted(questions, module, cwd):
+# Seconds --scaffold spends running the code beside its questions. On
+# tabulate, ten questions took fifteen minutes with nothing on screen, for one
+# set of options; past this, the rest are written as the score asked them.
+HINT_BUDGET = 60
+
+
+def hinted(questions, module, cwd, budget=HINT_BUDGET):
     """
     The saved questions about `module`, merged where they ask about the same
     call, each with what the code does beside the value in question where
@@ -718,8 +728,13 @@ def hinted(questions, module, cwd):
     ValueError, as rate 101 does now". Never what it does at the value
     itself: that is the question.
 
-    Anything that fails leaves the question as the score report asked it.
+    Anything that fails leaves the question as the score report asked it,
+    and so does every question still waiting once `budget` seconds have
+    gone: those are marked `unhinted`, so the caller can say so. The time is
+    checked between questions, so one slow question can run past it.
     """
+    import time
+    started = time.monotonic()
     try:
         tests = auto_tests(module, cwd)
         test_sources = _test_sources(tests) if tests else []
@@ -732,6 +747,11 @@ def hinted(questions, module, cwd):
         return list(questions)
     out, by_mark = [], {}
     for q in qs:
+        if time.monotonic() - started > budget:
+            q.pop("mutant", None)
+            q["unhinted"] = True
+            out.append(q)
+            continue
         try:
             prompt, options = so.menu(q, source, test_sources, root, q.get("mutant"))
         except Exception:
