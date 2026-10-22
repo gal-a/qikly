@@ -218,7 +218,7 @@ def test_a_suite_failing_on_its_own_is_said_to_be_the_setup_not_qikly():
     target = ms.Target("x", [], ["tests"], ".")
     lines = ms.setup_advice(["E   ModuleNotFoundError: No module named 'click'"], target)
     text = "\n".join(lines)
-    assert "your project's setup, not qikly" in text
+    assert "a problem in your project's environment (not a problem with qikly)" in text
     assert "-m pip install click" in text
     assert "python -m pytest tests" in text
 

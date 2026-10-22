@@ -1193,8 +1193,9 @@ def setup_advice(said, target):
 
     text = "\n".join(said or [])
     tests = " ".join(target.suites) or "your tests"
-    lines = ["This is your project's setup, not qikly: your tests fail on their own, "
-             "before any fault is planted. To fix it:"]
+    lines = ["This is a problem in your project's environment (not a problem with "
+             "qikly): your tests fail on their own, before any fault is planted. "
+             "To fix it:"]
     missing = re.search(r"No module named '([\w.]+)'", text)
     if missing:
         lines.append(f"  - install the missing package in the Python qikly runs in: "
