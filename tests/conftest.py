@@ -55,3 +55,6 @@ def _clean_llm_env(monkeypatch):
     for var in ("API_KEY", "LLM_PROVIDER", "LLM_MODEL", "GEMINI_API_KEY",
                 "OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(var, raising=False)
+    # And never a drafting call from --scaffold, even with a key in a
+    # settings file: a test that wants one patches the call itself.
+    monkeypatch.setenv("QIKLY_NO_DRAFT", "1")

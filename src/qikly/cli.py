@@ -2342,6 +2342,46 @@ def _do_scaffold(source, task_id, doc=None, fresh=False):
     return _scaffold_one(source, task_id, doc, fresh)
 
 
+def _draft_answers(text, source, root, questions, brief=False):
+    """
+    (text, note): the task file with a first draft of its answers written by
+    the spec agent, which reads the documentation and never the code, or the
+    file as it was, with a line saying why, when there is no key or the draft
+    could not be made. See spec_draft.py.
+    """
+    from qikly import spec_draft
+
+    if os.environ.get(spec_draft.NO_DRAFT) == "1":
+        return text, None
+    try:
+        from qikly.agent_api.providers.router import validate_config
+        provider = validate_config()
+    except Exception:
+        if not brief:
+            print("  No API key is set, so the answers are left for you to write. With "
+                  "a key, --scaffold drafts them from your README and docstrings.")
+        return text, None
+    name = os.path.basename(source)
+    if not brief:
+        print(f"Drafting the answers with {provider}: the spec agent reads {name}'s "
+              f"README and docstrings, never its code.")
+    try:
+        drafted = spec_draft.draft(source, root, questions)
+    except Exception as exc:                       # noqa: BLE001
+        print(f"  The draft could not be made ({type(exc).__name__}: {exc}), so the "
+              f"answers are left for you to write.")
+        return text, None
+    if not drafted:
+        print("  The spec agent's reply could not be read, so the answers are left "
+              "for you to write.")
+        return text, None
+    text, done, check = spec_draft.apply(text, drafted)
+    note = (f"{done} of {len(questions)} answers drafted, {check} marked "
+            f"{spec_draft.CHECK} to read first")
+    print(f"  {note}." if not brief else f"  {name}: {note}.")
+    return text, note
+
+
 def _scaffold_folder(folder):
     """
     One task file per module that the folder's last --score asked about, the
@@ -2439,6 +2479,8 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
                       f"to answer in your own words.")
         text, used = with_questions(text, found, asked_on)
         asked = len(found) if used else 0
+        if asked:
+            text, _ = _draft_answers(text, source, root, found, brief)
     if doc:
         text, doc_problem = _fill_criteria_from(text, doc, root)
         if doc_problem:
@@ -2569,11 +2611,23 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
     elif asked:
         print(f"  Its acceptance_criteria hold the {asked} question"
               f"{'' if asked == 1 else 's'} your --score run of {asked_on} raised.")
-        print("  Replace each TODO line with your answer, keeping the quotes and")
-        print("  naming a value someone could check. A TODO you leave is skipped.")
-        print("  Lines starting #? are notes for you: neither agent reads them.")
-        print("  Replace the requirements line too, marked TODO: MODIFY THIS:,")
-        print("  with what the module is for in your own words.")
+        drafted = "#? CHECK:" in text or "#? Drafted from" in text
+        if drafted:
+            print("  Each answer is a first draft by the spec agent, written without")
+            print("  your code. Run it as it is, or read the ones marked CHECK first")
+            print("  and change any that are wrong.")
+        criteria_part = text[text.index("acceptance_criteria:"):] \
+            if "acceptance_criteria:" in text else ""
+        if '- "TODO: ' in criteria_part:
+            print("  " + ("Answer the questions it left as TODO" if drafted else
+                          "Replace each TODO line with your answer") +
+                  ", with an option's number or a")
+            print("  sentence naming a value someone could check. A TODO you leave is")
+            print("  skipped. Lines starting #? are notes for you: neither agent reads them.")
+        from qikly.score_questions import REQUIREMENT_MARK
+        if REQUIREMENT_MARK in text:
+            print("  Replace the requirements line too, marked TODO: MODIFY THIS:,")
+            print("  with what the module is for in your own words.")
     elif not fresh:
         print("  No --score of it was found here, so there are no questions in it")
         print("  yet: write criteria of your own under acceptance_criteria, or")

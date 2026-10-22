@@ -352,7 +352,7 @@ def _tagged_tests(paths, criteria_count):
     test_sum in another read as tagged.
     """
     from qikly import traceability
-    pairs = set()
+    pairs = {}
     for path in paths:
         if not path.endswith(".py"):
             continue
@@ -365,8 +365,38 @@ def _tagged_tests(paths, criteria_count):
         for name, indices in traced.items():
             if isinstance(indices, list) and any(
                     0 < i <= criteria_count for i in indices):
-                pairs.add((stem, name))
+                pairs[(stem, name)] = [i for i in indices if 0 < i <= criteria_count]
     return pairs
+
+
+def criteria_with_origin(cwd, task_id):
+    """
+    The criteria in the order test generation numbers them, each with who
+    wrote it: "docs" for the spec agent quoting the documentation, "check"
+    for the spec agent judging from the module's purpose, "you" otherwise.
+    """
+    from qikly.score_questions import _ITEM, _scalar, expand_answers, is_todo
+    path = os.path.join(cwd, "inputs_private", "config", "tasks", task_id + ".yaml")
+    text = expand_answers(_read(path))[0]
+    lines = text.split("\n")
+    start = next((i for i, l in enumerate(lines) if l.startswith("acceptance_criteria:")), None)
+    out, origin = [], "you"
+    if start is None:
+        return out
+    for line in lines[start + 1:]:
+        if line and not line[0].isspace() and not line.startswith("#"):
+            break
+        if "#? CHECK:" in line:
+            origin = "check"
+        elif "#? Drafted from your documentation" in line:
+            origin = "docs"
+        item = _ITEM.match(line)
+        if item and not line.lstrip().startswith("#"):
+            value, _ = _scalar(item.group(3))
+            if value is not None and not is_todo(value):
+                out.append((value, origin))
+            origin = "you"
+    return out
 
 
 def _run(cwd, paths, criteria_count=0):
@@ -471,8 +501,25 @@ def report(say, cwd, written, result, task_id):
             "anything. qikly's change to its own copy, which makes them pass, is "
             "in " + os.path.join("outputs", "logs", "patches", task_id) + os.sep
             + "; read it before taking any of it:")
+        tagged = _tagged_tests(tests, 10 ** 6)
+        criteria = criteria_with_origin(cwd, task_id)
+        drafted = False
         for name in disagree:
             say(f"  {name}")
+            key = (_stem_of(name.split("::")[0].replace("/", ".")),
+                   name.split("::")[-1].split("[")[0])
+            for i in tagged.get(key, [])[:2]:
+                if 0 < i <= len(criteria):
+                    text, origin = criteria[i - 1]
+                    note = {"docs": "  (drafted from your documentation)",
+                            "check": "  (drafted from the module's purpose: check it)"
+                            }.get(origin, "")
+                    drafted = drafted or origin != "you"
+                    say(f"      criterion {i}: {text}{note}")
+        if drafted:
+            say("  A drafted criterion was written without your code. Where it and "
+                "your code disagree, which one is right is yours to decide: change "
+                "the criterion in the task file, or the code.")
     if missing:
         say("These call something your code does not have, usually a helper "
             "qikly's coding agent added to its copy while fixing it. Take the "

@@ -278,6 +278,10 @@ _MODE_ROLE = {
     # tests: a separate look is the point, so it does not share the test role.
     "suite_consistency": "review",
     "fixture_proposal": "fixtures",
+    # The first draft of a task's answers, from the documentation alone: a
+    # role of its own, so it can be pointed at another model than the agents
+    # that write the tests and the code.
+    "spec_draft": "spec",
 }
 
 # role -> the group entry it falls back to before `default`
