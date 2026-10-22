@@ -1183,6 +1183,32 @@ def write(result, gaps, out_dir=OUT_DIR, invoked_from=None, advice=None):
     return path
 
 
+def setup_advice(said, target):
+    """
+    What to look at when a suite fails before any fault is planted, said as
+    the project's setup rather than a fault in qikly: a first user read
+    "No module named 'click'" as qikly being broken.
+    """
+    import sys
+
+    text = "\n".join(said or [])
+    tests = " ".join(target.suites) or "your tests"
+    lines = ["This is your project's setup, not qikly: your tests fail on their own, "
+             "before any fault is planted. To fix it:"]
+    missing = re.search(r"No module named '([\w.]+)'", text)
+    if missing:
+        lines.append(f"  - install the missing package in the Python qikly runs in: "
+                     f"{sys.executable} -m pip install {missing.group(1).split('.')[0]}")
+        lines.append("    (if it is your own package, install your project instead: "
+                     "pip install -e .)")
+    if re.search(r"requires a different Python|SyntaxError|invalid syntax", text):
+        lines.append(f"  - check the Python version: qikly runs Python "
+                     f"{sys.version.split()[0]}; your project may need another")
+    lines.append(f"  - from your project's root folder, run  python -m pytest {tests}  "
+                 f"and fix what it reports until it passes, then score again")
+    return lines
+
+
 def _invite_lines(result):
     """
     A short request at the end of the report, made only when the user has
@@ -1255,6 +1281,7 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
                 if extra:
                     env["PYTHONPATH"] = os.pathsep.join(
                         extra + [env.get("PYTHONPATH", "")]).rstrip(os.pathsep)
+                said = []
                 for suite in target.suites:
                     where = os.path.join(target.root, suite)
                     tail = _pytest_tail(where, target.root, lines=4, env=env)
@@ -1262,7 +1289,10 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
                         print(f"[{task_id}] what pytest said:")
                         for line in tail:
                             print(f"[{task_id}]     {line}")
+                        said = tail
                         break
+                for line in setup_advice(said, target):
+                    print(f"[{task_id}] {line}")
             except Exception:
                 pass
         else:

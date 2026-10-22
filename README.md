@@ -46,14 +46,31 @@ key away from the student: the coding agent never sees the acceptance criteria.*
 
 ## Start here
 
-Run these from your project's root folder. Each takes one module or a whole
+**Before you start**, three things:
+
+1. **Install qikly**: `pip install --upgrade qikly`.
+2. **Set one API key**, for steps 2 and 3: Google Gemini (free tier, no card),
+   Anthropic or OpenAI. In the terminal you will run qikly from:
+
+   ```bash
+   export GEMINI_API_KEY="..."          # macOS and Linux
+   $env:GEMINI_API_KEY = "..."          # Windows PowerShell
+   ```
+
+   [Getting a key, and the other two providers](https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md).
+   Step 1 needs no key; without one, step 2 leaves every answer for you to
+   write.
+3. **Check your tests pass on their own**, from your project's root folder:
+   `python -m pytest`. qikly runs them the same way, so a missing package or
+   the wrong Python version stops step 1 too.
+
+Then run these from that root folder. Each takes one module or a whole
 folder, and the same path in every step:
 
 ```bash
-pip install --upgrade qikly
 qikly --score my_module.py       # 1. what your tests miss         free, no key
-qikly --scaffold my_module.py    # 2. the drafted spec, to check   a fraction of a cent with a key
-qikly --tasks my_module.py       # 3. the run                      needs an API key
+qikly --scaffold my_module.py    # 2. the drafted spec, to check   a fraction of a cent
+qikly --tasks my_module.py       # 3. the run                      a cent or so
 ```
 
 1. **`--score` scores the tests you have.** It plants faults in a copy of your

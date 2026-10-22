@@ -275,7 +275,7 @@ def draft(module, cwd, questions, seed=None, call=None):
     if not isinstance(data, dict):
         return None
     documentation = _squash(readme + "\n" + interface)
-    answers = {}
+    answers, dropped = {}, 0
     for item in data.get("answers") or []:
         if not isinstance(item, dict):
             continue
@@ -290,6 +290,7 @@ def draft(module, cwd, questions, seed=None, call=None):
         quote = item.get("quote") if isinstance(item.get("quote"), str) else ""
         if source_of == "docs" and not quoted(quote, documentation):
             # A quote that is not there is a claim with nothing behind it.
+            dropped += 1
             continue
         answers[number] = {"criterion": " ".join(criterion.split()),
                            "source": source_of, "quote": " ".join(quote.split()),
@@ -297,7 +298,7 @@ def draft(module, cwd, questions, seed=None, call=None):
     requirements = data.get("requirements")
     return {"requirements": " ".join(requirements.split())
             if isinstance(requirements, str) else None,
-            "answers": answers}
+            "answers": answers, "dropped": dropped}
 
 
 # ---------------------------------------------------- into the task file --

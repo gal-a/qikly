@@ -2367,6 +2367,9 @@ def _draft_answers(text, source, root, questions, brief=False):
               f"README and docstrings, never its code.")
     try:
         drafted = spec_draft.draft(source, root, questions)
+    except KeyboardInterrupt:
+        print("\n  Drafting stopped, so the answers are left for you to write.")
+        return text, None
     except Exception as exc:                       # noqa: BLE001
         print(f"  The draft could not be made ({type(exc).__name__}: {exc}), so the "
               f"answers are left for you to write.")
@@ -2378,8 +2381,28 @@ def _draft_answers(text, source, root, questions, brief=False):
     text, done, check = spec_draft.apply(text, drafted)
     note = (f"{done} of {len(questions)} answers drafted, {check} marked "
             f"{spec_draft.CHECK} to read first")
+    if drafted.get("dropped"):
+        note += (f"; {drafted['dropped']} left as TODO because the quote given for it "
+                 f"is not in your documentation")
     print(f"  {note}." if not brief else f"  {name}: {note}.")
-    return text, note
+    return text, drafted
+
+
+def _say_draft(drafted, dest, target):
+    """The drafted answers on screen, the ones to check first, then the rest."""
+    from qikly import spec_draft
+    answers = sorted(drafted["answers"].items(), key=lambda kv: (not kv[1]["check"], kv[0]))
+    print()
+    print("  The draft:")
+    if drafted.get("requirements"):
+        print(f"    what it is for: {drafted['requirements']}")
+    for _, answer in answers:
+        tag = spec_draft.CHECK if answer["check"] else "docs "
+        print(f"    {tag}  {answer['criterion']}")
+    print(f"  {spec_draft.CHECK}: judged from the module's purpose, so read it first; "
+          f"docs: quoted from your documentation.")
+    print(f"  To run it as it is:  qikly --tasks {target}")
+    print(f"  To change an answer, edit:  {os.path.abspath(dest)}")
 
 
 def _scaffold_folder(folder):
@@ -2459,7 +2482,7 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
     # criteria section, where the answers belong. Not with --fresh, whose job
     # is a new implementation, and not with --from-doc, whose criteria come
     # from the document.
-    asked, asked_on, found = 0, None, []
+    asked, asked_on, found, drafted_answers = 0, None, [], None
     from qikly.scaffold import with_questions
     if not fresh and not doc:
         from qikly import score_questions
@@ -2479,8 +2502,7 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
                       f"to answer in your own words.")
         text, used = with_questions(text, found, asked_on)
         asked = len(found) if used else 0
-        if asked:
-            text, _ = _draft_answers(text, source, root, found, brief)
+
     if doc:
         text, doc_problem = _fill_criteria_from(text, doc, root)
         if doc_problem:
@@ -2525,6 +2547,11 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
                       f"Edit that one, or move it aside to write it again"
                       + ("." if brief else ", or pass --task-id to write a "
                          "different name."))
+    if asked and not fresh and not doc:
+        # Here, not earlier: after the name is settled and nothing already
+        # exists, so a renamed task keeps its draft and no draft is paid for
+        # that is then refused.
+        text, drafted_answers = _draft_answers(text, source, root, found, brief)
     os.makedirs(dest_dir, exist_ok=True)
     with open(dest, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(text)
@@ -2637,14 +2664,22 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
         print("  the code:")
         print("    requirements         the decisions: what the code must do, in your words")
         print("    acceptance_criteria  the consequences: what must hold, with boundary values")
+    if drafted_answers and drafted_answers.get("answers"):
+        _say_draft(drafted_answers, dest, target)
     if data_note:
         print()
         print("  " + data_note)
     steps = []
     if data_step:
         steps.append(data_step)
-    steps.append("answer the questions in the task file above" if asked
-                 else "fill in the task file above")
+    left = '- "TODO: ' in text[text.index("acceptance_criteria:"):]         if "acceptance_criteria:" in text else True
+    if drafted_answers and drafted_answers.get("answers"):
+        steps.append("read the draft above, CHECK first, and change any answer you "
+                     "disagree with in the task file"
+                     + ("; answer or leave the ones left as TODO" if left else ""))
+    else:
+        steps.append("answer the questions in the task file above" if asked
+                     else "fill in the task file above")
     steps.append(f"check it, free:  qikly --validate {target}")
     steps.append(f"run it (needs an API key):  qikly --tasks {target}")
     print()

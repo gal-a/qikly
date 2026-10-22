@@ -848,9 +848,13 @@ footer {
          qikly --tasks pricing.py (5 model calls, about $0.0017), and the
          change the run made to its own copy. Lines are trimmed, not
          reworded. -->
-    <p class="audit-note"><b>Run these from your project's root folder.</b>
-      Each takes one module or a whole folder, and every step takes the same
-      path.</p>
+    <p class="audit-note"><b>Before you start:</b> install with
+      <code>pip install --upgrade qikly</code>, set one API key for steps 2
+      and 3, such as <code>GEMINI_API_KEY</code> (Gemini's free tier needs no
+      card; <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-preflight-key">how</a>),
+      and check your tests pass on their own with <code>python -m pytest</code>.
+      Then run the steps from your project's root folder. Each takes one
+      module or a whole folder, and every step takes the same path.</p>
     <ol class="steps">
       <li class="row">
         <div class="step">

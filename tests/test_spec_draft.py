@@ -179,3 +179,45 @@ def test_take_tests_says_who_wrote_each_criterion(scored, monkeypatch):
     criteria = take_tests.criteria_with_origin(str(scored), "PRICING_VERIFY")
     assert criteria[0] == ("apply_discount(100, 0) returns 100.0", "docs")
     assert all(origin == "check" for _, origin in criteria[1:])
+
+
+def test_the_draft_is_shown_on_screen_check_first(scored, monkeypatch, capsys):
+    _drafting(monkeypatch, _answers)
+    capsys.readouterr()
+    cli._do_scaffold("pricing.py", None)
+    out = capsys.readouterr().out
+    draft = out[out.index("The draft:"):]
+    assert draft.index("CHECK  ") < draft.index("docs   apply_discount(100, 0) returns 100.0")
+    assert "To run it as it is:  qikly --tasks pricing.py" in out
+    assert "To change an answer, edit:" in out
+
+
+def test_a_dropped_quote_is_counted_and_said(scored, monkeypatch, capsys):
+    def reply(prompt):
+        data = json.loads(_answers(prompt))
+        data["answers"][0]["quote"] = "A rate of 0 is a free gift."
+        return json.dumps(data)
+    _drafting(monkeypatch, reply)
+    capsys.readouterr()
+    cli._do_scaffold("pricing.py", None)
+    assert "1 left as TODO because the quote given for it is not in your documentation" \
+        in capsys.readouterr().out
+
+
+def test_stopping_the_draft_still_writes_the_file(scored, monkeypatch, capsys):
+    def reply(prompt):
+        raise KeyboardInterrupt
+    _drafting(monkeypatch, reply)
+    assert cli._do_scaffold("pricing.py", None) == 0
+    assert "Drafting stopped" in capsys.readouterr().out
+    assert '- "TODO: ' in (scored / TASK).read_text(encoding="utf-8")
+
+
+def test_a_suite_failing_on_its_own_is_said_to_be_the_setup_not_qikly():
+    from qikly import mutation_score as ms
+    target = ms.Target("x", [], ["tests"], ".")
+    lines = ms.setup_advice(["E   ModuleNotFoundError: No module named 'click'"], target)
+    text = "\n".join(lines)
+    assert "your project's setup, not qikly" in text
+    assert "-m pip install click" in text
+    assert "python -m pytest tests" in text
