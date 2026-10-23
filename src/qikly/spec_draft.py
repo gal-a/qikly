@@ -243,6 +243,14 @@ that names a concrete call and its expected result, such as
 "parse('') raises ValueError". Use the module's real function names and
 arguments, as the documentation shows them.
 
+Each criterion must answer its own question: the call must use the input the
+question is about, so that the expected result depends on the answer. A
+question about inputs that differ only by spaces around them is answered with
+such an input, as in "parse(' 12 ') returns 12"; a question about a value, a
+boundary or an option is answered with a call that uses that value, sits on
+that boundary or sets that option. A true statement about the module that
+would hold whatever the answer is does not answer the question.
+
 Answer every question you can. A question about a private helper is about
 the public functions that use it: answer it as a call to one of those. For
 each answer, say where it comes from:
