@@ -329,3 +329,25 @@ def test_a_function_reexported_through_all_counts_as_the_modules():
     names = spec_draft.interface_names(source)
     assert {"slugify", "smart_truncate"} <= names
     assert spec_draft.other_function("slugify('a b') == 'a-b'", "smart_truncate('a b') returns 'a-b'", names)
+
+
+def test_a_question_about_a_default_names_its_parameter():
+    """iniconfig: "this False flipped" said nothing of which parameter."""
+    source = ("class IniConfig:\n"
+              "    @classmethod\n"
+              "    def parse(\n"
+              "        cls,\n"
+              "        path,\n"
+              "        strip_section_whitespace: bool = False,\n"
+              "    ):\n"
+              "        if path is not None and strip_section_whitespace:\n"
+              "            return 1\n")
+    default = {"function": "parse", "line": 6, "code": "strip_section_whitespace: bool = False,",
+               "question": "Your tests pass with this `False` flipped. What behaviour depends on it?"}
+    body = {"function": "parse", "line": 8, "code": "if path is not None and strip_section_whitespace:",
+            "question": "Your tests pass whether this uses `and` or `or`. Which is right?"}
+    named = spec_draft.with_parameters([default, body], source)
+    assert named[0]["parameter"] == "strip_section_whitespace"
+    assert "parameter" not in named[1], "a line in the body is not a default"
+    assert "the parameter strip_section_whitespace" in spec_draft.neutral_question(named[0])
+    assert "parameter" not in default, "the saved questions are not changed"

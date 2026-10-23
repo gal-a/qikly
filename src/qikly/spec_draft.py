@@ -175,6 +175,37 @@ def public_callers(source):
     return {k: sorted(v) for k, v in reach.items()}
 
 
+_PARAMETER = re.compile(r"^\s*\**([A-Za-z_]\w*)\s*[:=]")
+
+
+def with_parameters(questions, source):
+    """
+    `questions` with the parameter named where a question is about a
+    parameter's default: the question about iniconfig's
+    `strip_section_whitespace: bool = False,` reached the spec agent as "Your
+    tests pass with this False flipped", which says nothing of which one. The
+    agent already reads every signature with its defaults, so the name
+    reveals nothing of the code. Copies; the originals are the saved questions.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return questions
+    signatures = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.body:
+            signatures.append((node.lineno, node.body[0].lineno))
+    out = []
+    for q in questions:
+        line, code = q.get("line"), q.get("code") or ""
+        found = _PARAMETER.match(code)
+        if (found and isinstance(line, int) and found.group(1) not in ("self", "cls")
+                and any(start <= line < first for start, first in signatures)):
+            q = dict(q, parameter=found.group(1))
+        out.append(q)
+    return out
+
+
 def in_classes(questions, source):
     """
     `questions` with a method's name given with its class: step 1 records
@@ -225,7 +256,8 @@ def neutral_question(q, callers=None):
     users = (callers or {}).get(where)
     if where and users:
         where += f" (used by {', '.join(users[:4])})"
-    return (f"In {where}: " if where else "") + " ".join(kept)
+    about = f"About the default of the parameter {q['parameter']}. " if q.get("parameter") else ""
+    return (f"In {where}: " if where else "") + about + " ".join(kept)
 
 
 # -------------------------------------------------------------- the agent --
@@ -417,7 +449,8 @@ def draft(module, cwd, questions, seed=None, call=None):
     readme = readme_text(module, cwd)
     interface = interface_text(source)
     prompt = build_prompt(os.path.basename(module), readme, interface,
-                          in_classes(questions, source), public_callers(source))
+                          in_classes(with_parameters(questions, source), source),
+                          public_callers(source))
     if call is None:
         from qikly.agent_api.call_llm import call_llm as call
     if seed is None:
