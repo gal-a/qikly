@@ -237,8 +237,10 @@ def test_a_module_gets_its_own_tests_before_the_whole_package(tmp_path):
     (pkg / "email.py").write_text("def email(v):\n    return '@' in v\n")
     tests = tmp_path / "tests"
     tests.mkdir()
-    (tests / "test_card.py").write_text("from validators import card_number\n")
-    (tests / "test_email.py").write_text("from validators import email\n")
+    (tests / "test_card.py").write_text("from validators import card_number\n\n"
+                                        "def test_a():\n    pass\n")
+    (tests / "test_email.py").write_text("from validators import email\n\n"
+                                         "def test_a():\n    pass\n")
     (tmp_path / "pyproject.toml").write_text("")
     picked = start.importing_tests(str(pkg / "card.py"), str(tmp_path))
     assert [os.path.basename(p) for p in picked] == ["test_card.py"]
@@ -359,6 +361,40 @@ def test_a_stdlib_dotted_import_is_not_an_import_of_the_project(tmp_path):
     (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
     found = start.importing_tests(str(tmp_path / "src" / "geo" / "path.py"), str(tmp_path))
     assert not found
+
+
+def test_demo_scripts_named_like_tests_are_not_the_tests(tmp_path):
+    # phart's examples/ held three *_test.py demo scripts importing the
+    # renderer and no test in any of them; they outnumbered tests/, so step 1
+    # was pointed at examples/ and ran no tests at all.
+    (tmp_path / "src" / "phart").mkdir(parents=True)
+    (tmp_path / "src" / "phart" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "src" / "phart" / "renderer.py").write_text("def draw(g):\n    return g\n",
+                                                            encoding="utf-8")
+    (tmp_path / "examples").mkdir()
+    for name in ("a_test.py", "b_test.py", "c_test.py"):
+        (tmp_path / "examples" / name).write_text(
+            "from phart.renderer import draw\n\nprint(draw(1))\n", encoding="utf-8")
+    (tmp_path / "tests").mkdir()
+    for name in ("test_one.py", "test_two.py"):
+        (tmp_path / "tests" / name).write_text(
+            "from phart.renderer import draw\n\ndef test_draw():\n    assert draw(1) == 1\n",
+            encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
+    code = str(tmp_path / "src" / "phart" / "renderer.py")
+    assert start.auto_tests(code, str(tmp_path)) == str(tmp_path / "tests")
+
+
+def test_a_test_class_or_async_test_counts_as_a_test(tmp_path):
+    (tmp_path / "geo.py").write_text("def f(x):\n    return x\n", encoding="utf-8")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_a.py").write_text(
+        "import geo\n\nclass TestGeo:\n    def check(self):\n        pass\n", encoding="utf-8")
+    (tmp_path / "tests" / "test_b.py").write_text(
+        "import geo\n\nasync def test_f():\n    assert geo.f(1)\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
+    found = start.importing_tests(str(tmp_path / "geo.py"), str(tmp_path))
+    assert [os.path.basename(f) for f in found] == ["test_a.py", "test_b.py"]
 
 
 def test_a_sample_is_never_bigger_than_the_whole(monkeypatch):

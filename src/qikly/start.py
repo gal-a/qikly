@@ -247,6 +247,9 @@ def import_names(code):
     return sorted(n for n in names if n.isidentifier())
 
 
+_DEFINES_TEST = re.compile(r"^\s*(?:(?:async\s+)?def\s+test|class\s+Test)", re.M)
+
+
 def _test_files(root):
     out = []
     for here, dirs, names in os.walk(root):
@@ -350,7 +353,10 @@ def importing_tests(code, root):
     imported validators sent card.py's score through the whole suite,
     failing optional-dependency tests included.
     """
-    files = _test_files(root)
+    # Only files that define a test: phart's examples/ held *_test.py demo
+    # scripts that outnumbered tests/, and step 1 ran in examples/ with no
+    # tests at all.
+    files = [f for f in _test_files(root) if _DEFINES_TEST.search(_read(f))]
     modules, public = _specific(code)
     packages = set(import_names(code)) - modules if os.path.isfile(code) else set()
     if os.path.isdir(code):

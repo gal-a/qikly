@@ -25,6 +25,11 @@ packaging tools would read as `1.1`.
   a `.drafted.yaml` beside each task file.
 
 ### Fixed
+- **`--score` without `--score-tests` no longer picks a folder of demo
+  scripts.** A file counts as a test file only if it defines a test (a
+  `test` function or a `Test` class). A project whose `examples/` held three
+  `*_test.py` scripts importing the module, and no tests, had step 1 pointed
+  at `examples/`, where it ran no tests at all.
 - **Generated tests are written as UTF-8 on Windows.** They were written in the
   locale's encoding, cp1252, so a test holding a `€` became a file pytest could
   not parse, and one holding a `μ` could not be written at all. On
