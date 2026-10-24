@@ -25,6 +25,11 @@ packaging tools would read as `1.1`.
   a `.drafted.yaml` beside each task file.
 
 ### Fixed
+- **An `async` function is marked `async` in the task file.** The interface
+  listed `async def take_snapshot(...)` as `take_snapshot(...) -> str`, and
+  the test agent, which never sees the code, called it without awaiting it.
+  Every generated test for an async function then failed on code that was
+  right. Methods of a class are marked the same way.
 - **`--score` without `--score-tests` no longer picks a folder of demo
   scripts.** A file counts as a test file only if it defines a test (a
   `test` function or a `Test` class). A project whose `examples/` held three

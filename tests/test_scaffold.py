@@ -68,6 +68,22 @@ def test_signatures_keep_their_annotations(module):
     assert "transform(rows, tax_rate: Decimal) -> dict" in text
 
 
+def test_an_async_function_is_marked_async(tmp_path):
+    # The test agent never sees the code. trend-pulse's tools were listed as
+    # take_snapshot(...) -> str, so every generated test called a coroutine
+    # function without awaiting it and failed on code that was right.
+    p = tmp_path / "server.py"
+    p.write_text("async def take_snapshot(geo: str) -> str:\n    return geo\n\n"
+                 "def plain(x):\n    return x\n\n"
+                 "class Store:\n    async def get(self, key):\n        return key\n",
+                 encoding="utf-8")
+    text, problem = scaffold.build_task(str(p), str(tmp_path))
+    assert problem is None
+    assert "async take_snapshot(geo: str) -> str" in text
+    assert "async plain" not in text and "plain(x)" in text
+    assert "async Store.get(key)" in text or "async get(key)" in text
+
+
 def test_the_entrypoint_prefers_a_run_prefixed_function(module):
     fns = scaffold.read_functions(module.read_text(encoding="utf-8"))
     assert scaffold.guess_entrypoint(fns).name == "run_billing"

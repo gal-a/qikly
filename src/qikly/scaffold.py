@@ -221,6 +221,11 @@ def _signature(fn):
             sig += f" -> {ast.unparse(fn.returns)}"
         except Exception:
             pass
+    # The test agent never sees the code, so this is the only place it can
+    # learn a call has to be awaited. Without it, trend-pulse's tools read as
+    # plain functions and every generated test failed on correct code.
+    if isinstance(fn, ast.AsyncFunctionDef) or getattr(fn, "is_async", False):
+        sig = "async " + sig
     return sig
 
 
@@ -249,9 +254,10 @@ class Member:
     """
 
     def __init__(self, name, args, returns=None, attribute=False, owner=None,
-                 inherited=False):
+                 inherited=False, is_async=False):
         self.name, self.args, self.returns = name, args, returns
         self.attribute, self.owner, self.inherited = attribute, owner, inherited
+        self.is_async = is_async
 
 
 def _decorators(node):
@@ -357,7 +363,8 @@ def class_members(node):
             continue
         else:
             args = _without_first(n.args, first="staticmethod" not in marks)
-            out.append(Member(name, args, n.returns, owner=node.name))
+            out.append(Member(name, args, n.returns, owner=node.name,
+                              is_async=isinstance(n, ast.AsyncFunctionDef)))
     return out
 
 
