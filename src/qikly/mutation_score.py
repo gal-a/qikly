@@ -549,6 +549,11 @@ def _import_roots(target):
             i -= 1
         name = parts[i][:-3] if parts[i].endswith(".py") else parts[i]
         roots.add((name, "/".join(parts[:i])))
+        if name == "src" and i + 1 < len(parts) - 1:
+            # A stray src/__init__.py, as sqltesting ships, carries the climb
+            # past the real package, which is imported from src/ all the
+            # same. Both are kept, so `import src.pkg` still resolves too.
+            roots.add((parts[i + 1], "/".join(parts[:i + 1])))
     return sorted(roots)
 
 

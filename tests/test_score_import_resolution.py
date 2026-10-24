@@ -54,6 +54,34 @@ def test_import_roots_sees_through_a_src_layout(tmp_path):
     assert ("widget", "src") in roots, roots
 
 
+def test_a_stray_init_in_src_still_finds_the_package(tmp_path):
+    """
+    sqltesting ships an empty src/__init__.py, so the climb went one level
+    too far and named the package "src". The workspace's src/ never went on
+    PYTHONPATH, the suite imported the original, and step 1 refused to score.
+    """
+    root = str(tmp_path)
+    _pkg(root, "widget", under="src")
+    open(os.path.join(root, "src", "__init__.py"), "w").close()
+    target = mutation_score.from_paths(os.path.join(root, "src", "widget", "calc.py"),
+                                       _suite(root, "widget"))
+    roots = mutation_score._import_roots(target)
+    assert ("widget", "src") in roots, roots
+
+
+def test_a_stray_init_in_src_scores_instead_of_being_refused(tmp_path, monkeypatch):
+    root = str(tmp_path)
+    _pkg(root, "widget", under="src")
+    open(os.path.join(root, "src", "__init__.py"), "w").close()
+    target = mutation_score.from_paths(os.path.join(root, "src", "widget", "calc.py"),
+                                       _suite(root, "widget"))
+    # The original importable first, as an editable install makes it.
+    monkeypatch.setenv("PYTHONPATH", os.path.join(root, "src"))
+    result = mutation_score.score(target, mutants=2, seed=1)
+    assert result["baseline"] is True
+    assert result["caught"], "a fault the suite can see must be caught"
+
+
 def test_import_roots_handles_a_flat_layout(tmp_path):
     """A flat package imports from the workspace root, so the parent is empty."""
     root = str(tmp_path)

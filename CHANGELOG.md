@@ -25,6 +25,11 @@ packaging tools would read as `1.1`.
   a `.drafted.yaml` beside each task file.
 
 ### Fixed
+- **A project with an empty `src/__init__.py` can be scored.** The import
+  name was found by climbing `__init__.py` files, which went past the real
+  package to `src`. The copy under test was then never put on the path, the
+  suite imported the original, and `--score` refused with a message blaming
+  an installed copy.
 - **An `async` function is marked `async` in the task file.** The interface
   listed `async def take_snapshot(...)` as `take_snapshot(...) -> str`, and
   the test agent, which never sees the code, called it without awaiting it.
