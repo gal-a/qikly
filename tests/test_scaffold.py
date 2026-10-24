@@ -84,6 +84,20 @@ def test_an_async_function_is_marked_async(tmp_path):
     assert "async Store.get(key)" in text or "async get(key)" in text
 
 
+def test_a_public_alias_of_a_private_class_is_the_interface():
+    # msgspec-ext defines class _EmailStr and exports EmailStr = _EmailStr, so
+    # --scaffold said "no public top level functions or classes" for a module
+    # --score had just raised eleven questions about.
+    src = ("class _EmailStr(str):\n    def __new__(cls, value: str):\n"
+           "        return str.__new__(cls, value)\n"
+           "    def domain(self) -> str:\n        return self.split('@')[1]\n\n"
+           "def _parse(v):\n    return v\n\n"
+           "EmailStr = _EmailStr\nparse = _parse\n_Hidden = _EmailStr\n")
+    names = [f.name for f in scaffold.read_interface(src)]
+    assert "EmailStr" in names and "EmailStr.domain" in names and "parse" in names
+    assert not any(n.startswith("_") for n in names)
+
+
 def test_the_entrypoint_prefers_a_run_prefixed_function(module):
     fns = scaffold.read_functions(module.read_text(encoding="utf-8"))
     assert scaffold.guess_entrypoint(fns).name == "run_billing"

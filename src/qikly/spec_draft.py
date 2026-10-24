@@ -116,11 +116,10 @@ def interface_text(source):
         doc = ast.get_docstring(node)
         lines.append(f'{indent}    """{doc.strip()}"""' if doc else f"{indent}    ...")
 
-    for node in tree.body:
+    for node in _public_top(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if not node.name.startswith("_"):
-                signature(node)
-        elif isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
+            signature(node)
+        else:
             lines.append(f"class {node.name}:")
             doc = ast.get_docstring(node)
             if doc:
@@ -140,6 +139,31 @@ MIN_DOCS = 80
 QUOTE_WORDS = 4
 
 
+def _public_top(tree):
+    """
+    The module's public functions and classes, in file order, each under the
+    name callers use. A public alias of a private definition counts, under the
+    alias: msgspec-ext defines _EmailStr and exports EmailStr = _EmailStr.
+    """
+    import copy
+    out, private = [], {}
+    kinds = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+    for node in tree.body:
+        if isinstance(node, kinds):
+            if node.name.startswith("_"):
+                private[node.name] = node
+            else:
+                out.append(node)
+        elif (isinstance(node, ast.Assign) and len(node.targets) == 1
+              and isinstance(node.targets[0], ast.Name)
+              and not node.targets[0].id.startswith("_")
+              and isinstance(node.value, ast.Name) and node.value.id in private):
+            public = copy.copy(private[node.value.id])
+            public.name = node.targets[0].id
+            out.append(public)
+    return out
+
+
 def public_docstrings(source):
     """
     The docstrings `interface_text` shows the spec agent, and no others: the
@@ -150,11 +174,9 @@ def public_docstrings(source):
     except SyntaxError:
         return []
     nodes = [tree]
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith("_"):
-            nodes.append(node)
-        elif isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
-            nodes.append(node)
+    for node in _public_top(tree):
+        nodes.append(node)
+        if isinstance(node, ast.ClassDef):
             nodes += [item for item in node.body
                       if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
                       and (not item.name.startswith("_") or item.name == "__init__")]

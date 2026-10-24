@@ -25,6 +25,12 @@ packaging tools would read as `1.1`.
   a `.drafted.yaml` beside each task file.
 
 ### Fixed
+- **A public alias of a private class or function is part of the
+  interface.** A module that defines `class _EmailStr` and exports
+  `EmailStr = _EmailStr` was refused by `--scaffold` for having no public
+  functions or classes, right after `--score` raised questions about it. The
+  alias is now listed under its public name, and its docstring reaches the
+  spec agent.
 - **A project with an empty `src/__init__.py` can be scored.** The import
   name was found by climbing `__init__.py` files, which went past the real
   package to `src`. The copy under test was then never put on the path, the

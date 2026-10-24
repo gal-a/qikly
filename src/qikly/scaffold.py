@@ -377,14 +377,34 @@ def read_interface(source):
     refused by `--scaffold` for having "no public top level functions", after
     `--score` had already raised questions about it.
     """
+    import copy
     tree = ast.parse(source)
     out = []
+    private = {}
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if not node.name.startswith("_") and "overload" not in _decorators(node):
+            if node.name.startswith("_"):
+                private[node.name] = node
+            elif "overload" not in _decorators(node):
                 out.append(node)
-        elif isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
-            out.extend(class_members(node))
+        elif isinstance(node, ast.ClassDef):
+            if node.name.startswith("_"):
+                private[node.name] = node
+            else:
+                out.extend(class_members(node))
+        elif (isinstance(node, ast.Assign) and len(node.targets) == 1
+              and isinstance(node.targets[0], ast.Name)
+              and not node.targets[0].id.startswith("_")
+              and isinstance(node.value, ast.Name) and node.value.id in private):
+            # A public name for a private definition, as msgspec-ext exports
+            # EmailStr = _EmailStr. Callers use the public name, so the
+            # interface does too.
+            public = copy.copy(private[node.value.id])
+            public.name = node.targets[0].id
+            if isinstance(public, ast.ClassDef):
+                out.extend(class_members(public))
+            else:
+                out.append(public)
     return out
 
 

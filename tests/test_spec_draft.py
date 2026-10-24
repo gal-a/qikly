@@ -352,3 +352,12 @@ def test_a_question_about_a_default_names_its_parameter():
     assert "parameter" not in named[1], "a line in the body is not a default"
     assert "the parameter strip_section_whitespace" in spec_draft.neutral_question(named[0])
     assert "parameter" not in default, "the saved questions are not changed"
+
+
+def test_a_public_alias_carries_its_private_definitions_docs():
+    # msgspec-ext documents _EmailStr and exports it as EmailStr; the spec
+    # agent saw neither the name nor the docstring.
+    src = ('class _EmailStr(str):\n    """An email address, validated on creation."""\n\n'
+           'EmailStr = _EmailStr\n')
+    assert "An email address, validated on creation." in spec_draft.public_docstrings(src)
+    assert "class EmailStr:" in spec_draft.interface_text(src)
