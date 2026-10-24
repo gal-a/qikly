@@ -133,3 +133,30 @@ def test_questions_name_a_method_with_its_class():
         spec_draft.in_classes(questions, CLASSES), CLASSES)]
     assert again == named, "naming twice changes nothing"
     assert questions[0]["function"] == "get", "the saved questions are not changed"
+
+
+# ------------------------------------------- found by running qikly on itself --
+
+def test_the_class_named_as_the_module_wins_whatever_its_case_and_size(tmp_path):
+    """iniconfig: IniConfig over SectionWrapper, though SectionWrapper has more methods."""
+    source = ("class SectionWrapper:\n"
+              "    def get(self, k):\n        pass\n"
+              "    def items(self):\n        pass\n"
+              "    def lineof(self, k):\n        pass\n\n"
+              "class IniConfig:\n"
+              "    def __init__(self, path):\n        pass\n")
+    entry = _lines(tmp_path, source, name="iniconfig.py")["system_entrypoint"]
+    assert entry == "IniConfig(path)", "matched as the module is named, ignoring case"
+
+
+def test_used_by_reads_only_the_other_python_files(tmp_path):
+    _write(tmp_path, "def _wrapper(f):\n    return f\n", name="_cached.py")
+    (tmp_path / "pkg" / "README.md").write_text("from ._cached import _wrapper\n", encoding="utf-8")
+    assert scaffold.used_by(str(tmp_path / "pkg" / "_cached.py")) == []
+
+
+def test_a_commented_out_import_is_not_a_use(tmp_path):
+    _write(tmp_path, "def _wrapper(f):\n    return f\n", name="_cached.py")
+    _write(tmp_path, "# from ._cached import _wrapper\n\ndef cached(f):\n    return f\n",
+           name="__init__.py")
+    assert scaffold.used_by(str(tmp_path / "pkg" / "_cached.py")) == []

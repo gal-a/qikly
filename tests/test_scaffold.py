@@ -248,3 +248,28 @@ def test_check_criteria_exits_zero_on_a_clean_spec(monkeypatch, capsys):
 
     monkeypatch.setattr(cc, "check", lambda t, seed=None: [])
     assert cli._do_check_criteria("CALC_TAX") == 0
+
+
+# ------------------------------------------- found by running qikly on itself --
+
+def test_no_questions_leaves_the_placeholder():
+    text, used = scaffold.with_questions(scaffold.PLACEHOLDER_CRITERIA, [])
+    assert (text, used) == (scaffold.PLACEHOLDER_CRITERIA, False)
+
+
+def test_a_malformed_saved_question_is_skipped_not_a_crash():
+    text, used = scaffold.with_questions(scaffold.PLACEHOLDER_CRITERIA,
+                                         [None, {"question": None}, "a string"])
+    assert (text, used) == (scaffold.PLACEHOLDER_CRITERIA, False)
+
+
+def test_a_question_block_that_fails_says_it_was_not_used(monkeypatch):
+    from qikly import score_questions
+
+    def broken(*a, **k):
+        raise RuntimeError("cannot write the block")
+
+    monkeypatch.setattr(score_questions, "yaml_block", broken)
+    text, used = scaffold.with_questions(scaffold.PLACEHOLDER_CRITERIA,
+                                         [{"question": "What should f(0) do?"}])
+    assert (text, used) == (scaffold.PLACEHOLDER_CRITERIA, False)
