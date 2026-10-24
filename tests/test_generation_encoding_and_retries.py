@@ -98,3 +98,17 @@ def test_a_generator_without_guidance_still_retries(monkeypatch):
     monkeypatch.setattr(orch, "log_transaction", lambda *a, **k: None)
     assert "assert True" in orch._generate_one("integration", generator, "CALC_TAX", 1, None, 1)
     assert len(calls) == 2
+
+
+def test_async_tests_are_rejected_with_the_way_to_write_them():
+    # trend-pulse, once its tools were marked async: the test agent wrote
+    # `async def test_...` three times, was told only "contains no test_
+    # functions", and the run failed. pytest skips an async test without a
+    # plugin, so accepting it would pass without testing anything.
+    from qikly.orchestrator.orchestrator import _validate_generated_tests
+    source = "import asyncio\n\nasync def test_snapshot():\n    assert await f() == 1\n"
+    said = _validate_generated_tests(source, "unit")
+    assert said and "asyncio.run" in said and "async def" in said
+    sync = ("import asyncio\nfrom server import f\n\n"
+            "def test_snapshot():\n    assert asyncio.run(f()) == 1\n")
+    assert _validate_generated_tests(sync, "unit") is None

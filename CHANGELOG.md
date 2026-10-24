@@ -25,6 +25,12 @@ packaging tools would read as `1.1`.
   a `.drafted.yaml` beside each task file.
 
 ### Fixed
+- **A generated file of `async def test_` functions is sent back with the
+  way to write it.** pytest skips an async test unless a plugin runs it, so
+  such a file is still refused, but the reason given to the test agent was
+  "contains no test_ functions", and it wrote the same file three times. It
+  is now told to write `def test_` and call the function with
+  `asyncio.run(...)`.
 - **A public alias of a private class or function is part of the
   interface.** A module that defines `class _EmailStr` and exports
   `EmailStr = _EmailStr` was refused by `--scaffold` for having no public
