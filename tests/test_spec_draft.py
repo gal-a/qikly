@@ -112,9 +112,10 @@ def test_the_draft_lands_with_where_each_criterion_came_from(scored, monkeypatch
     text = (scored / TASK).read_text(encoding="utf-8")
     assert '- "Pricing helpers; a rate is a percentage."' in text
     assert "TODO: MODIFY THIS" not in text
-    assert '#? Drafted from your documentation: "A rate of 0 leaves the price as it is."' in text
+    assert ('#? Answer below drafted by qikly from your README or docstrings: '
+            '"A rate of 0 leaves the price as it is.". Keep it, or change it.') in text
     assert '- "apply_discount(100, 0) returns 100.0"' in text
-    assert "#? CHECK: drafted from the module's purpose" in text
+    assert "#? CHECK: your docs don't say. The answer below is qikly's guess" in text
     criteria_part = text[text.index("acceptance_criteria:"):]
     assert '- "TODO: ' not in criteria_part
 

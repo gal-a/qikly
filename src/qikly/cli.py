@@ -2408,8 +2408,8 @@ def _say_draft(drafted, dest, target):
     for _, answer in answers:
         tag = spec_draft.CHECK if answer["check"] else "docs "
         print(f"    {tag}  {answer['criterion']}")
-    print(f"  {spec_draft.CHECK}: judged from the module's purpose, so read it first; "
-          f"docs: quoted from your documentation.")
+    print(f"  {spec_draft.CHECK}: qikly's guess, so read it before you run; "
+          f"docs: quoted from your README or docstrings.")
     print(f"  To run it as it is:  qikly --tasks {target}")
     print(f"  To change an answer, edit:  {os.path.abspath(dest)}")
 

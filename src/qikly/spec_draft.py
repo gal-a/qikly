@@ -35,6 +35,13 @@ README_NAMES = ("README.md", "README.rst", "README.txt", "README")
 # Set to 1 to keep --scaffold from calling a model, as the test suite does.
 NO_DRAFT = "QIKLY_NO_DRAFT"
 CHECK = "CHECK"
+# The notes beside drafted answers in the task file. Each says where the
+# answer came from and what to do with it: written for someone reading a task
+# file for the first time, who does not know what a spec agent is.
+DRAFTED_DOCS = "Answer below drafted by qikly from your README or docstrings:"
+READ_FIRST = "Read it before you run."
+GUESSED = ("your docs don't say. The answer below is qikly's guess from what the "
+           "module is for. " + READ_FIRST)
 
 
 # ------------------------------------------------------- what it may read --
@@ -630,8 +637,8 @@ def apply(text, drafted):
         for i, line in enumerate(lines):
             if line.startswith("  - ") and REQUIREMENT_MARK in line:
                 lines[i] = "  - " + _quote(_printable(drafted["requirements"]))
-                lines.insert(i, "  #? Drafted by the spec agent from your README and "
-                                "docstrings. Change it if it misses the point.")
+                lines.insert(i, "  #? Drafted by qikly from your README and docstrings. "
+                                "Change it if it misses the point.")
                 break
     start = next((i for i, l in enumerate(lines) if l.startswith("acceptance_criteria:")), None)
     if start is None:
@@ -645,23 +652,22 @@ def apply(text, drafted):
             number += 1
             answer = drafted["answers"].get(number)
             if answer:
-                note = (f'  #? Drafted from your documentation: "{_printable(answer["quote"])}"'
+                note = (f'  #? {DRAFTED_DOCS} "{_printable(answer["quote"])}". '
+                        f"Keep it, or change it."
                         if answer["source"] == "docs" else
-                        f"  #? {CHECK}: drafted from the module's purpose; nothing "
-                        f"written decides it.")
+                        f"  #? {CHECK}: {GUESSED}")
                 lines[i] = "  - " + _quote(criterion_text(answer["criterion"]))
                 lines.insert(i, note)
                 done += 1
                 check += answer["check"]
                 i += 1
                 if answer.get("why"):
-                    lines.insert(i, f"  #? {CHECK}: {_printable(answer['why'])}.")
+                    lines.insert(i, f"  #? {CHECK}: {_printable(answer['why'])}. {READ_FIRST}")
                     i += 1
                 elif answer["check"] and answer["source"] == "docs":
                     # Counted and shown as CHECK, so marked CHECK in the file
                     # too: --take-tests reads its labels from here.
-                    lines.insert(i, f"  #? {CHECK}: the spec agent asked for this answer "
-                                    f"to be read first.")
+                    lines.insert(i, f"  #? {CHECK}: qikly was unsure of this answer. {READ_FIRST}")
                     i += 1
         i += 1
     return "\n".join(lines), done, check

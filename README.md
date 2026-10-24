@@ -91,7 +91,8 @@ qikly --tasks my_module.py       # 3. the run                      a cent or so
 
    ```yaml
    #? What should apply_discount(100, 100) do?
-   #? Drafted from your documentation: "...so a rate of 100 or more is rejected with ValueError..."
+   #? Answer below drafted by qikly from your README or docstrings: "...so a rate
+   #? of 100 or more is rejected with ValueError". Keep it, or change it.
    - "apply_discount(100, 100) raises ValueError"
    ```
 

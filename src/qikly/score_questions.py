@@ -643,7 +643,8 @@ def yaml_block(questions, written=None):
                 lines.append("  %s " % MARK + _printable(found + ask))
             else:
                 lines += _comment(prompt)
-            lines += _comment("Answer with a number, found by running your code:")
+            lines += _comment("To answer with a number, replace the answer line below "
+                              "with one of these:")
             options = q.get("hint_options") or []
             now = None
             for n, option in enumerate(options, 1):
@@ -651,7 +652,11 @@ def yaml_block(questions, written=None):
                     option = {"criterion": option, "note": "", "now": False}
                 note = option.get("note") or ""
                 if VALUE in option["criterion"]:
-                    note = f"write it as  {n}: the value" + (f"; {note}" if note else "")
+                    # "as rate 99 does now (it returns 1.0)" read as brackets
+                    # inside brackets once it was wrapped in the note's own.
+                    note = re.sub(r"^as (.+?) does now \(it returns (.+)\)$",
+                                  r"today \1 returns \2", note)
+                    note = f'write "{n}: <the value>"' + (f"; {note}" if note else "")
                 # On a line of its own, never wrapped: it is read back.
                 lines.append("  %s   %d = %s" % (MARK, n, exact_text(option["criterion"]))
                              + (f"   ({_printable(note)})" if note else ""))

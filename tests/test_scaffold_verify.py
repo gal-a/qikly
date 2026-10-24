@@ -95,7 +95,7 @@ def test_each_question_says_what_the_code_does_beside_the_value(scored):
     text = _task(scored)
     assert "#? What should apply_discount(100, 100) do?" in text
     assert "raises ValueError   (as rate 101 does now)" in text
-    assert "as rate 99 does now (it returns 1.0)" in text
+    assert "today rate 99 returns 1.0" in text
     # Never at the value itself: that is the question.
     assert "as rate 100 does now" not in text
     assert "#?   2 = apply_discount(100, 100) raises ValueError   (as rate 101 does now)" in text
@@ -106,7 +106,7 @@ def test_neither_agent_reads_the_notes(scored):
     from qikly.agent_api.agent_interface import _read_task
     cli._do_scaffold("pricing.py", None)
     sent = _read_task("PRICING_VERIFY")
-    assert "#?" not in sent and "found by running your code" not in sent
+    assert "#?" not in sent and "replace the answer line below" not in sent
     assert "rate 101" not in sent
 
 

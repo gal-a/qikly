@@ -52,6 +52,12 @@ packaging tools would read as `1.1`.
   was quoted word for word and given to `smart_truncate`, whose separator is a
   space; the quote check passed it. The task file now says which function the
   quote's example calls, beside the answer.
+- **The notes beside each answer in a task file say what to do.** "Answer
+  below drafted by qikly from your README or docstrings: ... Keep it, or change
+  it", and for a guess, "CHECK: your docs don't say. The answer below is
+  qikly's guess from what the module is for. Read it before you run." A
+  numbered option that needs a value now reads `write "1: <the value>"; today
+  rate 99 returns 1.0`. The old wording assumed you knew what a spec agent was.
 - **The spec agent's questions are better aimed.** Each answer must use the
   input its question is about (asked whether inputs that differ by
   surrounding spaces are the same, it had answered with an input with none),

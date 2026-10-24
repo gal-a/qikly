@@ -400,7 +400,8 @@ def criteria_with_origin(cwd, task_id):
             break
         if "#? CHECK:" in line:
             origin = "check"
-        elif "#? Drafted from your documentation" in line:
+        elif ("#? Answer below drafted by qikly from your README" in line
+              or "#? Drafted from your documentation" in line):
             origin = "docs"
         item = _ITEM.match(line)
         if item and not line.lstrip().startswith("#"):
@@ -528,8 +529,8 @@ def report(say, cwd, written, result, task_id):
             for i in tagged.get(key, [])[:2]:
                 if 0 < i <= len(criteria):
                     text, origin = criteria[i - 1]
-                    note = {"docs": "  (drafted from your documentation)",
-                            "check": "  (drafted from the module's purpose: check it)"
+                    note = {"docs": "  (drafted by qikly from your README or docstrings)",
+                            "check": "  (qikly's guess: read it first)"
                             }.get(origin, "")
                     drafted = drafted or origin != "you"
                     say(f"      criterion {i}: {text}{note}")

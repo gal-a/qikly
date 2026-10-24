@@ -142,9 +142,9 @@ folder, and every step takes the same path:
    answer to each of step 1's questions under `acceptance_criteria`. It reads
    your README and docstrings and never your code, so a test written from its
    draft can disagree with the code. Each answer says where it came from: a
-   quote from your documentation, checked word for word, or `CHECK` where it
-   was judged from the module's purpose. Run the draft as it is, or change
-   any answer.
+   quote from your README or docstrings, checked word for word, or `CHECK`
+   where your docs don't say and the answer is qikly's guess, to read before
+   you run. Run the draft as it is, or change any answer.
 
    What the documentation cannot decide is left as a TODO. Answer it, with
    or without quotes, by an option's number where qikly lists them (`- 2`),
