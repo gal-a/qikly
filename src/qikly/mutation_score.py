@@ -1208,9 +1208,15 @@ def setup_advice(said, target):
                      f"{sys.executable} -m pip install {missing.group(1).split('.')[0]}")
         lines.append("    (if it is your own package, install your project instead: "
                      "pip install -e .)")
-    if re.search(r"requires a different Python|SyntaxError|invalid syntax", text):
+    if re.search(r"requires a different Python", text):
         lines.append(f"  - check the Python version: qikly runs Python "
                      f"{sys.version.split()[0]}; your project may need another")
+    elif re.search(r"SyntaxError|invalid syntax", text):
+        # A typo in a test file is far likelier than a version mismatch, so
+        # the version is offered as the second explanation, not the only one.
+        lines.append(f"  - fix the syntax error pytest names; if that code is valid, "
+                     f"it may need a newer Python than the {sys.version.split()[0]} qikly "
+                     f"runs in")
     lines.append(f"  - from your project's root folder, run  python -m pytest {tests}  "
                  f"and fix what it reports until it passes, then score again")
     return lines

@@ -2390,6 +2390,10 @@ def _draft_answers(text, source, root, questions, brief=False):
         note += (f"; {drafted['dropped']} left as TODO because the quote given for it "
                  f"is not in your documentation")
     print(f"  {note}." if not brief else f"  {name}: {note}.")
+    if drafted.get("requirements_dropped"):
+        print(f"  The drafted line on what {name} is for gave away one of the answers, "
+              f"and the coding agent reads that line, so it was not used: write it "
+              f"yourself in place of the TODO.")
     return text, drafted
 
 

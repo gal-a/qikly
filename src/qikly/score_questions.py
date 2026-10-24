@@ -572,6 +572,28 @@ def _printable(text):
     return _UNPRINTABLE.sub("?", " ".join(str(text).split()))
 
 
+# Everything YAML reads as a line break, written as a visible escape instead.
+# A lone carriage return or U+2028 in a criterion broke it across two YAML
+# lines, and every later criterion was then matched to the wrong mark line.
+_LINE_BREAKS = (("\r\n", "\\n"), ("\n", "\\n"), ("\r", "\\r"), ("\x85", "\\x85"),
+                ("\u2028", "\\u2028"), ("\u2029", "\\u2029"), ("\t", "\\t"))
+
+
+def exact_text(text):
+    """
+    A criterion as one line with its spaces kept exactly.
+
+    `_printable` squeezes runs of spaces, as prose wants, which rewrote any
+    expected output aligned with spaces: an option `pad('ab') returns
+    'ab      |'` was written as `'ab |'`, and `keep` then saved a criterion
+    the code does not meet.
+    """
+    text = str(text).strip()
+    for old, new in _LINE_BREAKS:
+        text = text.replace(old, new)
+    return _UNPRINTABLE.sub("?", text)
+
+
 def _comment(text, width=78):
     """Marked comment lines, wrapped, whatever the code or the question holds."""
     import textwrap
@@ -631,7 +653,7 @@ def yaml_block(questions, written=None):
                 if VALUE in option["criterion"]:
                     note = f"write it as  {n}: the value" + (f"; {note}" if note else "")
                 # On a line of its own, never wrapped: it is read back.
-                lines.append("  %s   %d = %s" % (MARK, n, _printable(option["criterion"]))
+                lines.append("  %s   %d = %s" % (MARK, n, exact_text(option["criterion"]))
                              + (f"   ({_printable(note)})" if note else ""))
                 if option.get("now"):
                     now = n

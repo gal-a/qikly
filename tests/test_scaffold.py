@@ -273,3 +273,8 @@ def test_a_question_block_that_fails_says_it_was_not_used(monkeypatch):
     text, used = scaffold.with_questions(scaffold.PLACEHOLDER_CRITERIA,
                                          [{"question": "What should f(0) do?"}])
     assert (text, used) == (scaffold.PLACEHOLDER_CRITERIA, False)
+
+
+def test_without_the_placeholder_line_nothing_is_replaced():
+    text = "acceptance_criteria:\n  - \"a criterion the user wrote\"\n"
+    assert scaffold.with_questions(text, [{"question": "What should f(0) do?"}]) == (text, False)

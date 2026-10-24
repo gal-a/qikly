@@ -52,6 +52,36 @@ packaging tools would read as `1.1`.
   was quoted word for word and given to `smart_truncate`, whose separator is a
   space; the quote check passed it. The task file now says which function the
   quote's example calls, beside the answer.
+- **The spec agent's questions are better aimed.** Each answer must use the
+  input its question is about (asked whether inputs that differ by
+  surrounding spaces are the same, it had answered with an input with none),
+  and a question about a default names its parameter, on a one-line `def`
+  too.
+- **A drafted requirements line that gives away a criterion is not used.** The
+  coding agent reads that line, and the spec agent sees every question, so it
+  could write an answer into it. Checked with the measure `--validate` uses,
+  and for any call a criterion makes; `--scaffold` says so and leaves the
+  line for you.
+- **A quote has to say something to count as documentation.** At least four
+  words, two in every piece an ellipsis joins, and from the README or a
+  public docstring, not a signature: "slug" and `def f(x, strict=False):`
+  both passed. An answer whose quoted example gives another result, or which
+  the agent itself flagged, is marked `CHECK` in the file as well as on
+  screen. The documentation minimum counts only docstrings the agent is shown.
+- **Numbered options keep their spaces.** An option for padded output was
+  written squeezed, so `keep` saved a criterion the code does not meet. Every
+  character YAML reads as a line break (a lone carriage return, U+0085,
+  U+2028, U+2029) is now escaped in criteria, where one split a criterion and
+  shifted every later one.
+- **`--take-tests` names the right criterion** for a failing test when an
+  earlier criterion spans several lines or ends in a backslash.
+- **A dataclass is described by its fields**, `Point(x, y)` rather than
+  `Point()`, and a signature holding a double quote no longer makes invalid
+  task YAML.
+- **A README that is a one-line link is followed only to documentation inside
+  the project**, never to a source file or outside it.
+- **A syntax error in a project's tests is reported as one**, with the Python
+  version offered as the second explanation, not the first.
 - **A drafted answer that changes its quoted example is marked `CHECK`.** When
   the quote shows a call and the answer calls the same function with other
   arguments, the expected result is the agent's, not the documentation's:

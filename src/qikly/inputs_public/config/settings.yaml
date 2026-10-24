@@ -131,6 +131,11 @@ agents:
   # since this is the agent asked to find what nobody wrote down.
   review: {}
 
+  # Drafts the answers to step 1's questions in `--scaffold`, from the README
+  # and docstrings, never the code. A stronger model here drafts more answers;
+  # it is one call per module.
+  spec: {}
+
   # Proposes fixture rows for criteria that no existing row can trigger.
   # Runs only when a refinement round asks it to, and only ever writes a
   # proposal file for a human to accept: it never edits your fixtures.

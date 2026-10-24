@@ -39,19 +39,27 @@ CHECK = "CHECK"
 
 # ------------------------------------------------------- what it may read --
 
-def _read_readme(path):
+# What a README link may point at: documentation, never a source file. A
+# README holding only "pricing.py" put the module's whole code in the prompt.
+_DOC_SUFFIXES = (".md", ".rst", ".txt", ".markdown")
+
+
+def _read_readme(path, root=None):
     """
     A README's text, following it when it is a symbolic link git could not
     make. tenacity's README.rst links to doc/source/index.rst, and a Windows
     checkout without symlink support writes the link as a file holding only
     that path: 20 characters, so the spec agent was told there was no README.
+    Only to a documentation file inside the project.
     """
     with open(path, encoding="utf-8-sig", errors="replace") as handle:
         text = handle.read()
     target = text.strip()
     if target and "\n" not in target and len(target) < 260:
         linked = os.path.normpath(os.path.join(os.path.dirname(path), target))
-        if os.path.isfile(linked):
+        inside = root is None or os.path.normcase(os.path.abspath(linked)).startswith(
+            os.path.normcase(os.path.abspath(root)) + os.sep)
+        if os.path.isfile(linked) and linked.lower().endswith(_DOC_SUFFIXES) and inside:
             with open(linked, encoding="utf-8-sig", errors="replace") as handle:
                 return handle.read()
     return text
@@ -70,7 +78,7 @@ def readme_text(module, cwd):
             if os.path.isfile(path) and os.path.normcase(path) not in seen:
                 seen.add(os.path.normcase(path))
                 try:
-                    found.append(_read_readme(path))
+                    found.append(_read_readme(path, root))
                 except OSError:
                     pass
                 break
@@ -121,23 +129,39 @@ def interface_text(source):
 # draft from: with function names alone, the agent guessed that label('VIP')
 # raises ValueError, every answer a guess.
 MIN_DOCS = 80
+# Fewer words than this in a quote, and it proves nothing about the answer.
+QUOTE_WORDS = 4
+
+
+def public_docstrings(source):
+    """
+    The docstrings `interface_text` shows the spec agent, and no others: the
+    module's, and each public function's, class's and public method's.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    nodes = [tree]
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith("_"):
+            nodes.append(node)
+        elif isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
+            nodes.append(node)
+            nodes += [item for item in node.body
+                      if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+                      and (not item.name.startswith("_") or item.name == "__init__")]
+    return [doc for doc in (ast.get_docstring(n) for n in nodes) if doc]
 
 
 def documentation(module, cwd):
-    """The README and the module's docstrings: what a draft may rest on."""
+    """
+    The README and the docstrings the spec agent is shown: what a draft may
+    rest on. Every docstring in the file used to count, so a private helper's
+    could pass the minimum while the agent itself saw only function names.
+    """
     from qikly.start import _read
-    try:
-        tree = ast.parse(_read(module))
-    except SyntaxError:
-        tree = None
-    docs = []
-    if tree is not None:
-        for node in [tree] + list(ast.walk(tree)):
-            if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                doc = ast.get_docstring(node)
-                if doc:
-                    docs.append(doc)
-    return (readme_text(module, cwd) + "\n" + "\n".join(docs)).strip()
+    return (readme_text(module, cwd) + "\n" + "\n".join(public_docstrings(_read(module)))).strip()
 
 
 _LITERAL = re.compile(r"""^(-?\d+(\.\d+)?|'[^']*'|"[^"]*"|True|False|None)$""")
@@ -194,16 +218,36 @@ def with_parameters(questions, source):
     signatures = []
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.body:
-            signatures.append((node.lineno, node.body[0].lineno))
+            signatures.append((node.lineno, node.body[0].lineno, node))
     out = []
     for q in questions:
         line, code = q.get("line"), q.get("code") or ""
+        here = [n for start, first, n in signatures
+                if isinstance(line, int) and start <= line < first]
         found = _PARAMETER.match(code)
-        if (found and isinstance(line, int) and found.group(1) not in ("self", "cls")
-                and any(start <= line < first for start, first in signatures)):
-            q = dict(q, parameter=found.group(1))
+        name = found.group(1) if found and here else None
+        if name is None and here and code.lstrip().startswith(("def ", "async def ")):
+            name = _default_changed(here[-1], q.get("change") or "")
+        if name and name not in ("self", "cls"):
+            q = dict(q, parameter=name)
         out.append(q)
     return out
+
+
+def _default_changed(node, change):
+    """
+    The one parameter of a one-line `def` whose default is the value a change
+    flipped ("bool False -> True"), or None when none or several have it.
+    """
+    before = re.match(r"\s*\w+\s+(.+?)\s+->", change)
+    if not before:
+        return None
+    a = node.args
+    positional = a.posonlyargs + a.args
+    pairs = list(zip(positional[len(positional) - len(a.defaults):], a.defaults))
+    pairs += [(arg, d) for arg, d in zip(a.kwonlyargs, a.kw_defaults) if d is not None]
+    names = [arg.arg for arg, d in pairs if ast.unparse(d) == before.group(1)]
+    return names[0] if len(names) == 1 else None
 
 
 def in_classes(questions, source):
@@ -338,7 +382,11 @@ def quoted(quote, documentation):
     """
     pieces = [p.strip(" .,;:") for p in re.split(r"\.\.\.|\u2026", _squash(quote))]
     pieces = [p for p in pieces if p]
-    if not pieces:
+    # A quote is what lets an answer skip review, so it has to say something:
+    # "slug", "a" and "Slug ... configurable" all passed, being somewhere in
+    # any README. Four words in all, and two in every piece an ellipsis joins.
+    if (not pieces or sum(len(p.split()) for p in pieces) < QUOTE_WORDS
+            or any(len(p.split()) < 2 for p in pieces)):
         return False
     at = 0
     for piece in pieces:
@@ -357,12 +405,13 @@ def criterion_text(text):
     rewrote an expected output: tabulate aligns its columns with runs of
     spaces, so `'strings      numbers'` became a string no table prints. A line
     break becomes a visible `\\n`, so the task file keeps one criterion to a
-    line and the text still says where the break was.
+    line and the text still says where the break was. Every other character YAML
+    reads as a line break too (a lone carriage return, U+0085, U+2028, U+2029):
+    one of those split a criterion in two and shifted every later one.
     """
-    from qikly.score_questions import _UNPRINTABLE
+    from qikly.score_questions import exact_text
 
-    text = str(text).strip().replace("\r\n", "\n").replace("\n", "\\n").replace("\t", "\\t")
-    return _UNPRINTABLE.sub("?", text)
+    return exact_text(text)
 
 
 def interface_names(source):
@@ -387,6 +436,8 @@ def interface_names(source):
 
 
 _CALL = re.compile(r"\b([A-Za-z_][\w.]*)\s*\(")
+# A whole call with its arguments, one level of brackets: apply_discount(100, 100).
+_CALL_TEXT = re.compile(r"\b[A-Za-z_][\w.]*\([^()]*\)")
 
 
 def other_function(quote, criterion, names):
@@ -414,13 +465,25 @@ def other_function(quote, criterion, names):
         if not used[name] & shown[name]:
             return (f"the quote's example calls {name}() with other arguments, so "
                     f"the expected result here is the agent's, not your documentation's")
+    # The same call, another result: the quote shows `slugify('one two') ==
+    # 'one-two'` and the answer says it returns 'one_two'. Only compared when
+    # both say what comes back, after spacing and quote marks are evened out.
+    told, said = _results(quote, names), _results(criterion, names)
+    for key in sorted(set(told) & set(said)):
+        if told[key] != said[key]:
+            return (f"the quote's example of {key[0]}() gives another result than this "
+                    f"answer does")
     return None
 
 
-def _calls(text, names):
-    """{function: {argument text, spaces removed}} for each call to one of `names`."""
+def _norm(text):
+    """Text compared as code: no spaces, one kind of quote mark."""
+    return re.sub(r"\s+", "", text).replace('"', "'").rstrip(".,;")
+
+
+def _call_spans(text, names):
+    """(function, argument text, end of the call) for each call to one of `names`."""
     text = text or ""
-    found = {}
     for match in _CALL.finditer(text):
         name = match.group(1).rpartition(".")[2]
         if name not in names:
@@ -432,8 +495,32 @@ def _calls(text, names):
             elif text[at] in ")]}":
                 depth -= 1
                 if depth == 0:
-                    found.setdefault(name, set()).add(re.sub(r"\s+", "", text[start + 1:at]))
+                    yield name, text[start + 1:at], at + 1
                     break
+
+
+def _calls(text, names):
+    """{function: {argument text, compared as code}} for each call to one of `names`."""
+    found = {}
+    for name, args, _ in _call_spans(text, names):
+        found.setdefault(name, set()).add(_norm(args))
+    return found
+
+
+_RESULT = re.compile(r"^\s*(?:==|returns|->|gives|is)?\s*(?P<result>[^\s].*?)\s*$")
+
+
+def _results(text, names):
+    """{(function, arguments): what the text says it returns}, where it says."""
+    text = text or ""
+    found = {}
+    for name, args, end in _call_spans(text, names):
+        rest = text[end:].split(">>>")[0]
+        if re.match(r"\s*raises\b", rest):
+            continue
+        got = _RESULT.match(rest)
+        if got and got.group("result"):
+            found[(name, _norm(args))] = _norm(got.group("result"))
     return found
 
 
@@ -458,16 +545,24 @@ def draft(module, cwd, questions, seed=None, call=None):
         # 42 is cli.HARDCODED_SEED, the seed every run uses by default.
         seed = int(os.environ.get("AGENT_SEED") or 42)
     reply = call("spec_draft", prompt, seed=seed)
-    found = re.search(r"\{.*\}", reply or "", re.S)
-    if not found:
+    # The first complete JSON object in the reply. A greedy match from the
+    # first brace to the last made any brace after the JSON, in a note or a
+    # code fence, an unreadable reply.
+    data, reply = None, reply or ""
+    decoder = json.JSONDecoder()
+    for start in (m.start() for m in re.finditer(r"\{", reply)):
+        try:
+            candidate, _ = decoder.raw_decode(reply, start)
+        except ValueError:
+            continue
+        if isinstance(candidate, dict):
+            data = candidate
+            break
+    if data is None:
         return None
-    try:
-        data = json.loads(found.group(0))
-    except ValueError:
-        return None
-    if not isinstance(data, dict):
-        return None
-    documentation = _squash(readme + "\n" + interface)
+    # Quotes are checked against prose, not signatures: the interface text
+    # holds every `def` line, and "def f(x, strict=False):" passed as a quote.
+    documentation = _squash(readme + "\n" + "\n".join(public_docstrings(source)))
     names = interface_names(source)
     answers, dropped = {}, 0
     for item in data.get("answers") or []:
@@ -476,6 +571,10 @@ def draft(module, cwd, questions, seed=None, call=None):
         try:
             number = int(item.get("question"))
         except (TypeError, ValueError):
+            continue
+        if not 1 <= number <= len(questions):
+            # An answer to a question nobody asked: shown on screen, it was
+            # never written to the file, so the screen and the file disagreed.
             continue
         criterion = item.get("criterion")
         if not isinstance(criterion, str) or not criterion.strip():
@@ -492,9 +591,24 @@ def draft(module, cwd, questions, seed=None, call=None):
                            "check": source_of == "purpose" or bool(item.get("check")) or bool(why),
                            "why": why}
     requirements = data.get("requirements")
-    return {"requirements": " ".join(requirements.split())
-            if isinstance(requirements, str) else None,
-            "answers": answers, "dropped": dropped}
+    requirements = " ".join(requirements.split()) if isinstance(requirements, str) else None
+    # The requirements line is the one thing drafted here that the coding
+    # agent reads. The spec agent sees every question, so it can write a
+    # criterion into it, and only the prompt asked it not to: a requirement
+    # saying "apply_discount(100, 100) raises ValueError" handed the answer to
+    # the agent being tested. Checked here, with the measure --validate uses,
+    # and with the plainest test there is: a call a criterion makes.
+    leaked = False
+    if requirements:
+        from qikly.from_doc import restated
+        criteria = [a["criterion"] for a in answers.values()]
+        calls = {c for a in answers.values() for c in _CALL_TEXT.findall(a["criterion"])}
+        leaked = bool(restated([requirements], criteria)) or any(
+            call in requirements for call in calls)
+        if leaked:
+            requirements = None
+    return {"requirements": requirements, "answers": answers, "dropped": dropped,
+            "requirements_dropped": leaked}
 
 
 # ---------------------------------------------------- into the task file --
@@ -542,6 +656,12 @@ def apply(text, drafted):
                 i += 1
                 if answer.get("why"):
                     lines.insert(i, f"  #? {CHECK}: {_printable(answer['why'])}.")
+                    i += 1
+                elif answer["check"] and answer["source"] == "docs":
+                    # Counted and shown as CHECK, so marked CHECK in the file
+                    # too: --take-tests reads its labels from here.
+                    lines.insert(i, f"  #? {CHECK}: the spec agent asked for this answer "
+                                    f"to be read first.")
                     i += 1
         i += 1
     return "\n".join(lines), done, check

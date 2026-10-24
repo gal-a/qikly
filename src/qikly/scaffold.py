@@ -150,8 +150,13 @@ def default_requirement(source, name):
             f"what the tests show is wrong.")
 
 
+def _escaped(text):
+    """Text safe inside a double-quoted YAML string."""
+    return text.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def _quoted(text):
-    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    return '"' + _escaped(text) + '"'
 
 
 # A scaffold writes one of two task files, because one command cannot know which
@@ -282,6 +287,41 @@ def _without_first(args, first=True):
                          kwarg=args.kwarg, defaults=defaults)
 
 
+# Decorators that write an __init__ from the class's annotated fields.
+_FIELD_CLASSES = {"dataclass", "define", "frozen", "mutable", "attrs", "s"}
+
+
+def _generated_init(node):
+    """
+    The constructor arguments a dataclass-style decorator generates, or None.
+
+    `@dataclass class Point: x: float; y: float = 0.0` has no `__init__` to
+    read, and was described as `Point()`, a constructor taking nothing.
+    """
+    if not _decorators(node) & _FIELD_CLASSES:
+        return None
+    fields, defaults = [], []
+    for item in node.body:
+        if not (isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name)):
+            continue
+        annotation = ast.unparse(item.annotation)
+        if annotation.startswith(("ClassVar", "typing.ClassVar")) or item.target.id.startswith("_"):
+            continue
+        value = item.value
+        if (isinstance(value, ast.Call) and getattr(value.func, "attr", getattr(value.func, "id", ""))
+                in ("field", "ib", "attrib") and any(
+                    k.arg == "init" and isinstance(k.value, ast.Constant) and k.value.value is False
+                    for k in value.keywords)):
+            continue
+        fields.append(ast.arg(arg=item.target.id, annotation=item.annotation))
+        if value is not None:
+            defaults.append(value)
+        elif defaults:
+            defaults = []
+    return ast.arguments(posonlyargs=[], args=fields, vararg=None, kwonlyargs=[],
+                         kw_defaults=[], kwarg=None, defaults=defaults)
+
+
 def class_members(node):
     """
     The constructor and public methods of one class, in file order.
@@ -296,8 +336,13 @@ def class_members(node):
                  and n.name == "__init__"), None)
     empty = ast.arguments(posonlyargs=[], args=[], vararg=None, kwonlyargs=[],
                           kw_defaults=[], kwarg=None, defaults=[])
-    out = [Member(node.name, _without_first(init.args) if init else empty, owner=node.name,
-                  inherited=init is None and bool(node.bases))]
+    generated = None if init else _generated_init(node)
+    if init:
+        args = _without_first(init.args)
+    else:
+        args = generated or empty
+    out = [Member(node.name, args, owner=node.name,
+                  inherited=init is None and generated is None and bool(node.bases))]
     for n in node.body:
         if not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) or n.name.startswith("_"):
             continue
@@ -571,7 +616,7 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
     inputs = inputs or [f"inputs_private/data/{base}/input_01.csv"]
 
     fn_lines = "\n".join(
-        f'    - "{_signature(f)}  # TODO: what it does, e.g. reads one CSV and '
+        f'    - "{_escaped(_signature(f))}  # TODO: what it does, e.g. reads one CSV and '
         f'returns its rows"' for f in functions)
     in_lines = "\n".join(f'  - "{p}"' for p in inputs)
 
@@ -587,8 +632,8 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
             source_rel=source_rel, command=command, task_id=task_id, name=name,
             description=f"Tests for the existing {name}, from its owner's answers.",
             inputs=in_lines, module=module_path(source_path, task_id),
-            functions="\n".join(f'    - "{_signature(f)}"' for f in functions),
-            entrypoint=_signature(entry), requirement=_quoted(requirement)), None
+            functions="\n".join(f'    - "{_escaped(_signature(f))}"' for f in functions),
+            entrypoint=_escaped(_signature(entry)), requirement=_quoted(requirement)), None
     seed_block = {
         None: SEED_NONE,
         "none": SEED_NONE,
@@ -603,7 +648,7 @@ def build_task(source_path, project_root, task_id=None, inputs=None, seed=None):
         inputs=in_lines,
         module=module_path(source_path, task_id),
         functions=fn_lines,
-        entrypoint=f"{_signature(entry)}  # guessed, check this",
+        entrypoint=f"{_escaped(_signature(entry))}  # guessed, check this",
         source_rel=_source_rel(source_path, project_root),
     ), None
 

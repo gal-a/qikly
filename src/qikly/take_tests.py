@@ -375,14 +375,26 @@ def criteria_with_origin(cwd, task_id):
     wrote it: "docs" for the spec agent quoting the documentation, "check"
     for the spec agent judging from the module's purpose, "you" otherwise.
     """
-    from qikly.score_questions import _ITEM, _scalar, expand_answers, is_todo
+    import yaml
+
+    from qikly.score_questions import _ITEM, expand_answers, is_todo
     path = os.path.join(cwd, "inputs_private", "config", "tasks", task_id + ".yaml")
     text = expand_answers(_read(path))[0]
+    # The values come from YAML, as test generation reads them. Parsing each
+    # line by hand dropped what it could not read, a folded `- >` item or one
+    # ending in a backslash, and every later criterion was then reported
+    # under the wrong number.
+    try:
+        values = (yaml.safe_load(text) or {}).get("acceptance_criteria") or []
+    except yaml.YAMLError:
+        return []
     lines = text.split("\n")
     start = next((i for i, l in enumerate(lines) if l.startswith("acceptance_criteria:")), None)
-    out, origin = [], "you"
-    if start is None:
-        return out
+    if start is None or not isinstance(values, list):
+        return []
+    # Who wrote each item, read from the notes above it, item by item in file
+    # order: one entry for every top-level `- ` line, however its value parses.
+    origins, origin, indent = [], "you", None
     for line in lines[start + 1:]:
         if line and not line[0].isspace() and not line.startswith("#"):
             break
@@ -392,10 +404,15 @@ def criteria_with_origin(cwd, task_id):
             origin = "docs"
         item = _ITEM.match(line)
         if item and not line.lstrip().startswith("#"):
-            value, _ = _scalar(item.group(3))
-            if value is not None and not is_todo(value):
-                out.append((value, origin))
-            origin = "you"
+            if indent is None:
+                indent = item.group(1)
+            if item.group(1) == indent:
+                origins.append(origin)
+                origin = "you"
+    out = []
+    for value, origin in zip(values, origins + ["you"] * (len(values) - len(origins))):
+        if value is not None and not is_todo(value):
+            out.append((value if isinstance(value, str) else str(value), origin))
     return out
 
 
