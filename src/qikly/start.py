@@ -370,7 +370,17 @@ def importing_tests(code, root):
         # A whole package is tested by everything that imports it, including
         # `import humanize` followed by `humanize.naturalsize(...)`.
         return sorted(set(narrow) | set(broad))
-    return narrow or broad
+    # Tests --take-tests copied in are added to the user's own, never chosen
+    # instead of them. They import the module by name, so they always looked
+    # more specific: on email-validator the next --score ran only qikly's
+    # tests and dropped the library's suite without saying so.
+    def copied(f):
+        return "qikly_generated" in f.replace("\\", "/").split("/")
+
+    own = [f for f in narrow if not copied(f)] or [f for f in broad if not copied(f)]
+    added = [f for f in narrow if copied(f)] or [f for f in broad if copied(f)]
+    picked = set(own) | set(added)
+    return [f for f in files if f in picked]
 
 
 def auto_tests(code, cwd=None):

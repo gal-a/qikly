@@ -25,6 +25,11 @@ packaging tools would read as `1.1`.
   a `.drafted.yaml` beside each task file.
 
 ### Fixed
+- **`--score` after `--take-tests` still scores your own tests.** The tests
+  `--take-tests` copies in import the module by name, so they always looked
+  more specific than a suite that imports the package, and the next `--score`
+  ran only qikly's tests, dropping yours without saying so. Copied tests are
+  now added to your own, never chosen instead of them.
 - **A context manager is marked as one in the task file.** A function
   decorated with `@contextmanager` runs nothing until `with` enters it, and
   the interface listed it as a plain call, so a test of the error it raises

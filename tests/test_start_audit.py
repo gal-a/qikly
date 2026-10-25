@@ -385,6 +385,30 @@ def test_demo_scripts_named_like_tests_are_not_the_tests(tmp_path):
     assert start.auto_tests(code, str(tmp_path)) == str(tmp_path / "tests")
 
 
+def test_copied_tests_do_not_replace_the_users_own_suite(tmp_path):
+    # email-validator's tests import the package (from email_validator import
+    # ...), and the tests --take-tests copied in import the module itself
+    # (from email_validator.syntax import ...). The specific import won, so
+    # the next --score ran only qikly's tests and dropped the user's suite.
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("from .main import validate\n", encoding="utf-8")
+    (pkg / "syntax.py").write_text("def check(v):\n    return bool(v)\n", encoding="utf-8")
+    (pkg / "main.py").write_text("from .syntax import check\n\ndef validate(v):\n"
+                                 "    return check(v)\n", encoding="utf-8")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_main.py").write_text(
+        "from pkg import validate\n\ndef test_v():\n    assert validate('a')\n", encoding="utf-8")
+    copied = tmp_path / "tests" / "qikly_generated" / "syntax_verify" / "unit"
+    copied.mkdir(parents=True)
+    (copied / "test_unit.py").write_text(
+        "from pkg.syntax import check\n\ndef test_c():\n    assert check('a')\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
+    found = start.importing_tests(str(pkg / "syntax.py"), str(tmp_path))
+    names = sorted(os.path.basename(f) for f in found)
+    assert names == ["test_main.py", "test_unit.py"], names
+
+
 def test_a_test_class_or_async_test_counts_as_a_test(tmp_path):
     (tmp_path / "geo.py").write_text("def f(x):\n    return x\n", encoding="utf-8")
     (tmp_path / "tests").mkdir()
