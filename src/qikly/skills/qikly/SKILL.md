@@ -6,7 +6,7 @@ metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
   version: 0.3.8
-  requires: qikly >= 0.6.0
+  requires: qikly >= 0.6.1
 ---
 
 # qikly: tests written from a spec the coder never read
