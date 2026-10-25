@@ -27,7 +27,10 @@ permissions:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    # The suite runs twice per job, the second time with the optional SDKs,
+    # and on windows-latest with Python 3.10 the pair passed 15 minutes for
+    # the first time at 0.6.1: the second run was cancelled mid-way.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
