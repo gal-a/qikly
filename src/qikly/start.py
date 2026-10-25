@@ -399,7 +399,11 @@ def auto_tests(code, cwd=None):
     # A common folder holding the code itself would be scored as both, which
     # scoring refuses; the folder with most of the tests is the better guess.
     if code_dir == common or code_dir.startswith(common + os.sep):
-        return max(set(folders), key=folders.count)
+        # The user's own folders first: iniconfig's one test file in testing/
+        # was outvoted by the folder --take-tests copied tests into.
+        own = [d for d in folders
+               if "qikly_generated" not in d.replace("\\", "/").split("/")] or folders
+        return max(set(own), key=own.count)
     return common
 
 
