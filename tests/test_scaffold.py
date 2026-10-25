@@ -84,6 +84,22 @@ def test_an_async_function_is_marked_async(tmp_path):
     assert "async Store.get(key)" in text or "async get(key)" in text
 
 
+def test_a_context_manager_says_to_use_with(tmp_path):
+    # jsonl's open_stream is a @contextlib.contextmanager: calling it runs
+    # nothing until `with` enters it, so a test of its TypeError that only
+    # called it saw no error, on code that was right.
+    p = tmp_path / "streams.py"
+    p.write_text("import contextlib\n\n@contextlib.contextmanager\n"
+                 "def open_stream(source):\n    yield source\n\n"
+                 "@contextlib.asynccontextmanager\nasync def session():\n    yield 1\n\n"
+                 "def plain(x):\n    return x\n", encoding="utf-8")
+    text, problem = scaffold.build_task(str(p), str(tmp_path))
+    assert problem is None
+    assert "open_stream(source)  (a context manager: use it in a with statement)" in text
+    assert "async session()  (a context manager: use it in an async with statement)" in text
+    assert "plain(x)" in text and "plain(x)  (a context" not in text
+
+
 def test_a_public_alias_of_a_private_class_is_the_interface():
     # msgspec-ext defines class _EmailStr and exports EmailStr = _EmailStr, so
     # --scaffold said "no public top level functions or classes" for a module

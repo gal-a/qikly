@@ -226,6 +226,13 @@ def _signature(fn):
     # plain functions and every generated test failed on correct code.
     if isinstance(fn, ast.AsyncFunctionDef) or getattr(fn, "is_async", False):
         sig = "async " + sig
+    # The same for a context manager: jsonl's open_stream raises only when
+    # `with` enters it, so a test that just called it saw nothing.
+    marks = _decorators(fn) if hasattr(fn, "decorator_list") else getattr(fn, "marks", set())
+    if "asynccontextmanager" in marks:
+        sig += "  (a context manager: use it in an async with statement)"
+    elif "contextmanager" in marks:
+        sig += "  (a context manager: use it in a with statement)"
     return sig
 
 
@@ -254,10 +261,10 @@ class Member:
     """
 
     def __init__(self, name, args, returns=None, attribute=False, owner=None,
-                 inherited=False, is_async=False):
+                 inherited=False, is_async=False, marks=()):
         self.name, self.args, self.returns = name, args, returns
         self.attribute, self.owner, self.inherited = attribute, owner, inherited
-        self.is_async = is_async
+        self.is_async, self.marks = is_async, set(marks)
 
 
 def _decorators(node):
@@ -364,7 +371,7 @@ def class_members(node):
         else:
             args = _without_first(n.args, first="staticmethod" not in marks)
             out.append(Member(name, args, n.returns, owner=node.name,
-                              is_async=isinstance(n, ast.AsyncFunctionDef)))
+                              is_async=isinstance(n, ast.AsyncFunctionDef), marks=marks))
     return out
 
 

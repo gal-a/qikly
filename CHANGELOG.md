@@ -25,6 +25,11 @@ packaging tools would read as `1.1`.
   a `.drafted.yaml` beside each task file.
 
 ### Fixed
+- **A context manager is marked as one in the task file.** A function
+  decorated with `@contextmanager` runs nothing until `with` enters it, and
+  the interface listed it as a plain call, so a test of the error it raises
+  called it, saw no error, and failed on code that was right. Its signature
+  now says to use it in a `with` (or `async with`) statement.
 - **A generated file of `async def test_` functions is sent back with the
   way to write it.** pytest skips an async test unless a plugin runs it, so
   such a file is still refused, but the reason given to the test agent was
