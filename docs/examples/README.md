@@ -41,12 +41,13 @@ not what it does. Each answer says where it came from:
 
 ```yaml
   #? What should apply_discount(100, 100) do?
-  #? Drafted from your documentation: "...so a rate of 100 or more is rejected with ValueError..."
+  #? Answer below drafted by qikly from your README or docstrings: "...so a rate of 100 or more is rejected with ValueError". Keep it, or change it.
   - "apply_discount(100, 100) raises ValueError"
 ```
 
-or, where nothing written decides it, `#? CHECK: drafted from the module's
-purpose`, for you to read first. `pricing.py` accepts a rate of exactly 100,
+or, where nothing written decides it, `#? CHECK: your docs don't say. The
+answer below is qikly's guess from what the module is for. Read it before you
+run.`, for you to read first. `pricing.py` accepts a rate of exactly 100,
 so that drafted answer is what step 3 finds: the copied tests fail on it.
 
 ## Answering what the draft leaves
