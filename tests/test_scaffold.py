@@ -96,7 +96,9 @@ def test_a_context_manager_says_to_use_with(tmp_path):
     text, problem = scaffold.build_task(str(p), str(tmp_path))
     assert problem is None
     assert "open_stream(source)  (a context manager: use it in a with statement)" in text
-    assert "async session()  (a context manager: use it in an async with statement)" in text
+    # Entered with `async with`, never awaited, so no `async` prefix.
+    assert "session()  (a context manager: use it in an async with statement)" in text
+    assert "async session()" not in text
     assert "plain(x)" in text and "plain(x)  (a context" not in text
 
 
