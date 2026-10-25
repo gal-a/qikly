@@ -52,7 +52,7 @@ requirements:
 # for you, and neither agent reads them. Keep these values out of every
 # other line of this file, comments included: the coding agent reads the rest.
 acceptance_criteria:
-  #? 4 questions from qikly --score on 2026-10-19 18:02: what your tests do
+  #? 4 questions from qikly --score on 2026-10-25 10:48: what your tests do
   #? not check. Answer from what the code is meant to do, not from what it
   #? does now.
 
@@ -60,8 +60,8 @@ acceptance_criteria:
   #?     if rate < 0 or rate > MAX_RATE:
   #? Your tests never try rate at exactly 0.
   #? What should apply_discount(100, 0) do?
-  #? Answer with a number, found by running your code:
-  #?   1 = apply_discount(100, 0) returns VALUE   (write it as 1: the value; as rate 1 does now (it returns 99.0))
+  #? To answer with a number, replace the answer line below with one of these:
+  #?   1 = apply_discount(100, 0) returns VALUE   (write "1: <the value>"; today rate 1 returns 99.0)
   #?   2 = apply_discount(100, 0) raises ValueError   (as rate -1 does now)
   - "TODO: pick 1 or 2, or write your own"
 
@@ -75,7 +75,7 @@ acceptance_criteria:
   #? pricing.py, apply_discount, line 5:
   #?     if rate < 0 or rate > MAX_RATE:
   #? What should apply_discount(100, -11) do?
-  #? Answer with a number, found by running your code:
+  #? To answer with a number, replace the answer line below with one of these:
   #?   1 = apply_discount(100, -11) raises ValueError   (as your code does now)
   #?   2 = apply_discount(100, -11) returns 111.0
   #? (This also answers 2 more places your tests leave open on the same call.)
@@ -84,7 +84,7 @@ acceptance_criteria:
   #? pricing.py, apply_discount, line 7:
   #?     return round(price * (1 - rate / 100), 2)
   #? What should apply_discount(100, 10.333) do?
-  #? Answer with a number, found by running your code:
+  #? To answer with a number, replace the answer line below with one of these:
   #?   1 = apply_discount(100, 10.333) returns 89.667
   #?   2 = apply_discount(100, 10.333) returns 89.67   (as your code does now)
   - "TODO: pick 1 or 2, keep, or write your own"

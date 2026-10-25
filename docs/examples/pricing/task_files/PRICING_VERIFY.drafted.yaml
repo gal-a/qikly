@@ -38,8 +38,8 @@ interface:
 # line, keeping the quotes, for example:
 #   - "reads sensor readings and writes one summary per station per day"
 requirements:
-  #? Drafted by the spec agent from your README and docstrings. Change it if it misses the point.
-  - "Pricing helpers for a shop's checkout. Prices are in a currency with cents, and a rate is a percentage."
+  #? Drafted by qikly from your README and docstrings. Change it if it misses the point.
+  - "Pricing helpers for a shop's checkout; prices are in a currency with cents and a rate is a percentage."
 
 # ----------------------------------------------------------------------------
 # What must be true. The coding agent never sees this section; the test
@@ -54,7 +54,7 @@ requirements:
 # for you, and neither agent reads them. Keep these values out of every
 # other line of this file, comments included: the coding agent reads the rest.
 acceptance_criteria:
-  #? 6 questions from qikly --score on 2026-10-22 15:18: what your tests do
+  #? 6 questions from qikly --score on 2026-10-25 10:46: what your tests do
   #? not check. Answer from what the code is meant to do, not from what it
   #? does now.
 
@@ -62,55 +62,55 @@ acceptance_criteria:
   #?     if rate < 0 or rate > 100:
   #? Your tests never try rate at exactly 0.
   #? What should apply_discount(100, 0) do?
-  #? Answer with a number, found by running your code:
-  #?   1 = apply_discount(100, 0) returns VALUE   (write it as 1: the value; as rate 1 does now (it returns 99.0))
+  #? To answer with a number, replace the answer line below with one of these:
+  #?   1 = apply_discount(100, 0) returns VALUE   (write "1: <the value>"; today rate 1 returns 99.0)
   #?   2 = apply_discount(100, 0) raises ValueError   (as rate -1 does now)
-  #? Drafted from your documentation: "A rate of 0 leaves the price as it is."
-  - "apply_discount(100, 0) returns 100.0"
+  #? Answer below drafted by qikly from your README or docstrings: "A rate of 0 leaves the price as it is.". Keep it, or change it.
+  - "apply_discount(100, 0) returns 100"
 
   #? pricing.py, apply_discount, line 2:
   #?     if rate < 0 or rate > 100:
   #? What should apply_discount(100, -11) do?
-  #? Answer with a number, found by running your code:
+  #? To answer with a number, replace the answer line below with one of these:
   #?   1 = apply_discount(100, -11) raises ValueError   (as your code does now)
   #?   2 = apply_discount(100, -11) returns 111.0
   #? (This also answers 2 more places your tests leave open on the same call.)
-  #? Drafted from your documentation: "...and so is a negative rate."
+  #? Answer below drafted by qikly from your README or docstrings: "...and so is a negative rate.". Keep it, or change it.
   - "apply_discount(100, -11) raises ValueError"
 
   #? pricing.py, apply_discount, line 2:
   #?     if rate < 0 or rate > 100:
   #? Your tests never try rate at exactly 100.
   #? What should apply_discount(100, 100) do?
-  #? Answer with a number, found by running your code:
-  #?   1 = apply_discount(100, 100) returns VALUE   (write it as 1: the value; as rate 99 does now (it returns 1.0))
+  #? To answer with a number, replace the answer line below with one of these:
+  #?   1 = apply_discount(100, 100) returns VALUE   (write "1: <the value>"; today rate 99 returns 1.0)
   #?   2 = apply_discount(100, 100) raises ValueError   (as rate 101 does now)
-  #? Drafted from your documentation: "...so a rate of 100 or more is rejected with ValueError..."
+  #? Answer below drafted by qikly from your README or docstrings: "...so a rate of 100 or more is rejected with ValueError". Keep it, or change it.
   - "apply_discount(100, 100) raises ValueError"
 
   #? pricing.py, apply_discount, line 4:
   #?     return round(price * (1 - rate / 100), 2)
   #? What should apply_discount(100, 10.333) do?
-  #? Answer with a number, found by running your code:
+  #? To answer with a number, replace the answer line below with one of these:
   #?   1 = apply_discount(100, 10.333) returns 89.667
   #?   2 = apply_discount(100, 10.333) returns 89.67   (as your code does now)
-  #? CHECK: drafted from the module's purpose; nothing written decides it.
+  #? CHECK: your docs don't say. The answer below is qikly's guess from what the module is for. Read it before you run.
   - "apply_discount(100, 10.333) returns 89.67"
 
   #? pricing.py, label, line 8:
   #?     if code.strip().lower() == "vip":
   #? What should label(' vip ') do?
-  #? Answer with a number, found by running your code:
+  #? To answer with a number, replace the answer line below with one of these:
   #?   1 = label(' vip ') returns 'gold'   (as your code does now)
   #?   2 = label(' vip ') returns 'standard'
-  #? Drafted from your documentation: "The VIP code is labelled gold, whatever its letter case and with any spaces around it ignored; every other code is standard."
+  #? Answer below drafted by qikly from your README or docstrings: "The VIP code is labelled gold, whatever its letter case and with any spaces around it ignored". Keep it, or change it.
   - "label(' vip ') returns 'gold'"
 
   #? pricing.py, label, line 8:
   #?     if code.strip().lower() == "vip":
   #? What should label('VIP') do?
-  #? Answer with a number, found by running your code:
+  #? To answer with a number, replace the answer line below with one of these:
   #?   1 = label('VIP') returns 'gold'   (as your code does now)
   #?   2 = label('VIP') returns 'standard'
-  #? Drafted from your documentation: "The VIP code is labelled gold, whatever its letter case and with any spaces around it ignored; every other code is standard."
+  #? Answer below drafted by qikly from your README or docstrings: "The VIP code is labelled gold, whatever its letter case and with any spaces around it ignored". Keep it, or change it.
   - "label('VIP') returns 'gold'"

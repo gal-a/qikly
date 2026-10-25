@@ -53,7 +53,7 @@ requirements:
 # for you, and neither agent reads them. Keep these values out of every
 # other line of this file, comments included: the coding agent reads the rest.
 acceptance_criteria:
-  #? 6 questions from qikly --score on 2026-10-19 18:01: what your tests do
+  #? 6 questions from qikly --score on 2026-10-25 10:46: what your tests do
   #? not check. Answer from what the code is meant to do, not from what it
   #? does now.
 
@@ -61,15 +61,15 @@ acceptance_criteria:
   #?     if rate < 0 or rate > 100:
   #? Your tests never try rate at exactly 0.
   #? What should apply_discount(100, 0) do?
-  #? Answer with a number, found by running your code:
-  #?   1 = apply_discount(100, 0) returns VALUE   (write it as 1: the value; as rate 1 does now (it returns 99.0))
+  #? To answer with a number, replace the answer line below with one of these:
+  #?   1 = apply_discount(100, 0) returns VALUE   (write "1: <the value>"; today rate 1 returns 99.0)
   #?   2 = apply_discount(100, 0) raises ValueError   (as rate -1 does now)
   - "TODO: pick 1 or 2, or write your own"
 
   #? pricing.py, apply_discount, line 2:
   #?     if rate < 0 or rate > 100:
   #? What should apply_discount(100, -11) do?
-  #? Answer with a number, found by running your code:
+  #? To answer with a number, replace the answer line below with one of these:
   #?   1 = apply_discount(100, -11) raises ValueError   (as your code does now)
   #?   2 = apply_discount(100, -11) returns 111.0
   #? (This also answers 2 more places your tests leave open on the same call.)
@@ -79,15 +79,15 @@ acceptance_criteria:
   #?     if rate < 0 or rate > 100:
   #? Your tests never try rate at exactly 100.
   #? What should apply_discount(100, 100) do?
-  #? Answer with a number, found by running your code:
-  #?   1 = apply_discount(100, 100) returns VALUE   (write it as 1: the value; as rate 99 does now (it returns 1.0))
+  #? To answer with a number, replace the answer line below with one of these:
+  #?   1 = apply_discount(100, 100) returns VALUE   (write "1: <the value>"; today rate 99 returns 1.0)
   #?   2 = apply_discount(100, 100) raises ValueError   (as rate 101 does now)
   - "TODO: pick 1 or 2, or write your own"
 
   #? pricing.py, apply_discount, line 4:
   #?     return round(price * (1 - rate / 100), 2)
   #? What should apply_discount(100, 10.333) do?
-  #? Answer with a number, found by running your code:
+  #? To answer with a number, replace the answer line below with one of these:
   #?   1 = apply_discount(100, 10.333) returns 89.667
   #?   2 = apply_discount(100, 10.333) returns 89.67   (as your code does now)
   - "TODO: pick 1 or 2, keep, or write your own"
@@ -95,7 +95,7 @@ acceptance_criteria:
   #? pricing.py, label, line 8:
   #?     if code.strip().lower() == "vip":
   #? What should label(' vip ') do?
-  #? Answer with a number, found by running your code:
+  #? To answer with a number, replace the answer line below with one of these:
   #?   1 = label(' vip ') returns 'gold'   (as your code does now)
   #?   2 = label(' vip ') returns 'standard'
   - "TODO: pick 1 or 2, keep, or write your own"
@@ -103,7 +103,7 @@ acceptance_criteria:
   #? pricing.py, label, line 8:
   #?     if code.strip().lower() == "vip":
   #? What should label('VIP') do?
-  #? Answer with a number, found by running your code:
+  #? To answer with a number, replace the answer line below with one of these:
   #?   1 = label('VIP') returns 'gold'   (as your code does now)
   #?   2 = label('VIP') returns 'standard'
   - "TODO: pick 1 or 2, keep, or write your own"

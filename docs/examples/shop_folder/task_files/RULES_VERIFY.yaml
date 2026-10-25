@@ -52,14 +52,14 @@ requirements:
 # for you, and neither agent reads them. Keep these values out of every
 # other line of this file, comments included: the coding agent reads the rest.
 acceptance_criteria:
-  #? 3 questions from qikly --score on 2026-10-19 18:02: what your tests do
+  #? 3 questions from qikly --score on 2026-10-25 10:48: what your tests do
   #? not check. Answer from what the code is meant to do, not from what it
   #? does now.
 
   #? rules.py, label, line 5:
   #?     if code.strip().lower() == 'vip':
   #? What should label(' vip ') do?
-  #? Answer with a number, found by running your code:
+  #? To answer with a number, replace the answer line below with one of these:
   #?   1 = label(' vip ') returns 'gold'   (as your code does now)
   #?   2 = label(' vip ') returns 'standard'
   - "TODO: pick 1 or 2, keep, or write your own"
@@ -67,7 +67,7 @@ acceptance_criteria:
   #? rules.py, label, line 5:
   #?     if code.strip().lower() == 'vip':
   #? What should label('VIP') do?
-  #? Answer with a number, found by running your code:
+  #? To answer with a number, replace the answer line below with one of these:
   #?   1 = label('VIP') returns 'gold'   (as your code does now)
   #?   2 = label('VIP') returns 'standard'
   - "TODO: pick 1 or 2, keep, or write your own"
