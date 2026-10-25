@@ -4,6 +4,13 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## Unreleased
+
+### Changed
+- **Skill 0.3.9.** The README and the Skill say a suite that goes green
+  "can mean nothing", not that it does: a green suite may be hollow, and
+  scoring it is how you find out.
+
 ## 0.6.1
 
 ### Added

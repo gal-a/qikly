@@ -5,7 +5,7 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.3.8
+  version: 0.3.9
   requires: qikly >= 0.6.1
 ---
 
@@ -32,7 +32,7 @@ metadata:
 
 If you write a module and then write its tests, both come from one reading of
 the same ambiguous sentences. The
-suite goes green and the green means nothing.
+suite goes green and the green can mean nothing.
 
 **Python modules only.** qikly scaffolds from Python signatures and generates
 pytest suites; this Skill says nothing about any other language, and you should

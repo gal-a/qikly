@@ -261,6 +261,9 @@ SKILL_BODY_HASHES = {
     # implementation, which is the failure the Skill opens by warning against.
     "0.3.7": "744d3c7c624e728f48eb2ae2db031ec89b17a98b9c9ad9c0098a46390864048b",
     "0.3.8": "4ae26bea08928ed30568db0af1c7da091979bad9867b4e26a9a294c3c6cbe453",
+    # 0.3.9: "the green means nothing" became "can mean nothing": a green
+    # suite may be hollow, not must be.
+    "0.3.9": "1d5517416cac6458ab2b50eaac8f801eab3dba863efc3294f2aabac0e1392320",
 }
 
 

@@ -41,7 +41,7 @@ passing the test suite after applying fixes in an automated repair loop.*
 A student who writes the exam paper, writes the answer key and then sits the
 exam will pass. That is what happens when one model is given the acceptance
 criteria and asked to produce both the implementation and the suite that checks
-it. Everything goes green, and the green means nothing. **qikly takes the answer
+it. Everything goes green, and the green can mean nothing. **qikly takes the answer
 key away from the student: the coding agent never sees the acceptance criteria.**
 
 ## Start here
