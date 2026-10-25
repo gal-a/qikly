@@ -6,6 +6,7 @@ classes-only modules, the sweep fixes, and 0.6.0's numbered answers. Each test
 here reproduces one of its findings and fails on the code before the fix.
 """
 import json
+import os
 
 import yaml
 
@@ -202,3 +203,82 @@ def test_a_syntax_error_is_reported_as_one_first():
     lines = setup_advice(["E   SyntaxError: invalid syntax"], Target())
     text = "\n".join(lines)
     assert "fix the syntax error" in text and "check the Python version" not in text
+
+
+# ---- the second audit, of the fixes from the young-library sweep ----------
+
+def _write(root, rel, text):
+    path = root / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_a_src_package_with_a_stdlib_named_module_still_scores(tmp_path):
+    # A project that imports itself as src.app and keeps src/logging.py: the
+    # extra src root put that file ahead of the real logging module.
+    from qikly import mutation_score as ms
+    _write(tmp_path, "pyproject.toml", "")
+    _write(tmp_path, "src/__init__.py", "")
+    _write(tmp_path, "src/logging.py", "def note(m):\n    return m\n")
+    _write(tmp_path, "src/app/__init__.py", "")
+    code = _write(tmp_path, "src/app/calc.py", "from src.logging import note\n\ndef rate(x):\n"
+                  "    note('r')\n    return x if x <= 100 else 100\n")
+    _write(tmp_path, "tests/test_calc.py", "from src.app.calc import rate\n\ndef test_r():\n"
+           "    assert rate(150) == 100\n    assert rate(5) == 5\n")
+    target = ms.from_paths(str(code), str(tmp_path / "tests"))
+    assert ("app", "src") not in ms._import_roots(target)
+    assert ms.score(target, mutants=2, seed=1)["baseline"] is True
+
+
+def test_any_async_test_is_refused_even_beside_sync_ones():
+    from qikly.orchestrator.orchestrator import _validate_generated_tests
+    mixed = ("import asyncio\nfrom m import f\n\ndef test_a():\n    assert asyncio.run(f())\n\n"
+             "async def test_b():\n    assert await f()\n")
+    method = "from m import f\n\nclass TestX:\n    async def test_c(self):\n        assert await f()\n"
+    for source in (mixed, method):
+        said = _validate_generated_tests(source, "unit")
+        assert said and "asyncio.run" in said and "skips" not in said.split(":")[0]
+
+
+def test_a_factory_made_test_still_counts_when_nothing_else_does(tmp_path):
+    from qikly import start
+    _write(tmp_path, "pyproject.toml", "")
+    _write(tmp_path, "pkg/__init__.py", "")
+    code = _write(tmp_path, "pkg/calc.py", "def add(a, b):\n    return a + b\n")
+    _write(tmp_path, "tests/test_made.py", "from pkg.calc import add\n\ndef _make(n):\n"
+           "    def t():\n        assert add(n, 0) == n\n    return t\n\ntest_one = _make(1)\n")
+    assert start.auto_tests(str(code), str(tmp_path)) == str(tmp_path / "tests" / "test_made.py")
+
+
+def test_copied_tests_left_out_of_the_score_are_named(tmp_path):
+    import subprocess
+    import sys
+    _write(tmp_path, "pyproject.toml", "")
+    _write(tmp_path, "src/ini/__init__.py", "def parse(s):\n    return s if s else None\n")
+    _write(tmp_path, "testing/test_ini.py", "from ini import parse\n\ndef test_p():\n"
+           "    assert parse('a') == 'a'\n")
+    _write(tmp_path, "tests/qikly_generated/ini_verify/unit/test_unit.py",
+           "from ini import parse\n\ndef test_u():\n    assert parse('a') == 'a'\n")
+    out = subprocess.run([sys.executable, "-m", "qikly", "--score", "src/ini/__init__.py",
+                          "--score-mutants", "1", "--score-seed", "0"], cwd=tmp_path,
+                         capture_output=True, text=True, encoding="utf-8", errors="replace",
+                         timeout=600, env=dict(os.environ, PYTHONPATH=os.pathsep.join(
+                             [os.path.join(os.path.dirname(__file__), "..", "src"), str(tmp_path / "src")])))
+    assert "copied in is not under it" in out.stdout, out.stdout + out.stderr
+
+
+def test_signatures_of_async_context_managers_properties_and_aliases():
+    from qikly import scaffold
+    src = ("from contextlib import asynccontextmanager\nfrom typing import TypeAlias\n\n"
+           "@asynccontextmanager\nasync def session():\n    yield 1\n\n"
+           "class K:\n    @property\n    async def val(self):\n        return 1\n\n"
+           "class _EmailStr(str):\n    pass\n\nEmailStr: TypeAlias = _EmailStr\n\n"
+           "def _impl(x):\n    return x\n\nA = B = _impl\nC = A\n\n"
+           "def parse(x, y):\n    return x\n\nparse = _impl\n")
+    sigs = [scaffold._signature(f) for f in scaffold.read_interface(src)]
+    assert "session()  (a context manager: use it in an async with statement)" in sigs
+    assert "async K.val" in sigs
+    assert {"EmailStr()", "A(x)", "B(x)", "C(x)"} <= set(sigs) or \
+        {"A(x)", "B(x)", "C(x)"} <= set(sigs) and any(s.startswith("EmailStr") for s in sigs)
+    assert [s for s in sigs if s.startswith("parse")] == ["parse(x)"]

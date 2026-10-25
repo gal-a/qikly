@@ -549,12 +549,33 @@ def _import_roots(target):
             i -= 1
         name = parts[i][:-3] if parts[i].endswith(".py") else parts[i]
         roots.add((name, "/".join(parts[:i])))
-        if name == "src" and i + 1 < len(parts) - 1:
+        if (name == "src" and i + 1 < len(parts) - 1
+                and _suite_imports_bare(target, parts[i + 1])):
             # A stray src/__init__.py, as sqltesting ships, carries the climb
-            # past the real package, which is imported from src/ all the
-            # same. Both are kept, so `import src.pkg` still resolves too.
+            # past the real package, which its tests import from src/ all the
+            # same (`import sql_testing_library`). Only when they do: a
+            # project that imports itself as `src.app` and keeps a
+            # src/logging.py had that put ahead of the real logging module.
             roots.add((parts[i + 1], "/".join(parts[:i + 1])))
     return sorted(roots)
+
+
+def _suite_imports_bare(target, name):
+    """Whether any test file imports `name` itself, not as `src.name`."""
+    bare = re.compile(r"^\s*(?:from\s+%s[\s.]|import\s+%s\b)" % (name, name), re.M)
+    for suite in target.suites:
+        where = os.path.join(target.root, suite)
+        paths = [where] if os.path.isfile(where) else [
+            os.path.join(here, f) for here, _, names in os.walk(where)
+            for f in names if f.endswith(".py")]
+        for path in paths:
+            try:
+                with open(path, encoding="utf-8", errors="replace") as handle:
+                    if bare.search(handle.read()):
+                        return True
+            except OSError:
+                continue
+    return False
 
 
 # Put into each scored file for one watching run. It leaves a hit file beside

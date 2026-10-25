@@ -141,27 +141,12 @@ QUOTE_WORDS = 4
 
 def _public_top(tree):
     """
-    The module's public functions and classes, in file order, each under the
-    name callers use. A public alias of a private definition counts, under the
-    alias: msgspec-ext defines _EmailStr and exports EmailStr = _EmailStr.
+    The module's public functions and classes, each under the name callers
+    use, the same set the task file's interface lists (scaffold's
+    top_definitions): msgspec-ext defines _EmailStr and exports EmailStr.
     """
-    import copy
-    out, private = [], {}
-    kinds = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-    for node in tree.body:
-        if isinstance(node, kinds):
-            if node.name.startswith("_"):
-                private[node.name] = node
-            else:
-                out.append(node)
-        elif (isinstance(node, ast.Assign) and len(node.targets) == 1
-              and isinstance(node.targets[0], ast.Name)
-              and not node.targets[0].id.startswith("_")
-              and isinstance(node.value, ast.Name) and node.value.id in private):
-            public = copy.copy(private[node.value.id])
-            public.name = node.targets[0].id
-            out.append(public)
-    return out
+    from qikly.scaffold import top_definitions
+    return top_definitions(tree)
 
 
 def public_docstrings(source):

@@ -1708,6 +1708,22 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
             tests = os.path.abspath(found)
             print(f"Scoring against {shown_path(found, INVOKED_FROM)}, the test files that "
                   f"import it. To name others, add --score-tests <file or folder>.")
+            # One path is scored, so tests --take-tests copied in elsewhere
+            # (tests/qikly_generated/ beside a testing/ folder) are left out.
+            # Said, rather than left out silently.
+            from qikly.start import importing_tests, project_root
+            chosen = os.path.abspath(found)
+            left = [f for f in importing_tests(os.path.abspath(where),
+                                               project_root(os.path.abspath(where), INVOKED_FROM))
+                    if "qikly_generated" in f.replace("\\", "/").split("/")
+                    and not (os.path.abspath(f) == chosen
+                             or os.path.abspath(f).startswith(chosen + os.sep))]
+            if left:
+                print(f"  {len(left)} test file{'s' if len(left) != 1 else ''} that --take-tests "
+                      f"copied in {'are' if len(left) != 1 else 'is'} not under it, so "
+                      f"{'they are' if len(left) != 1 else 'it is'} not scored. To score "
+                      f"{'them' if len(left) != 1 else 'it'} too, name a folder holding "
+                      f"both with --score-tests.")
         if not (code and tests):
             print("--score is needed too: one says what to break, the "
                   "other says what should notice.", file=sys.stderr)

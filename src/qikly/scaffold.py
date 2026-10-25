@@ -224,11 +224,14 @@ def _signature(fn):
     # The test agent never sees the code, so this is the only place it can
     # learn a call has to be awaited. Without it, trend-pulse's tools read as
     # plain functions and every generated test failed on correct code.
-    if isinstance(fn, ast.AsyncFunctionDef) or getattr(fn, "is_async", False):
-        sig = "async " + sig
     # The same for a context manager: jsonl's open_stream raises only when
     # `with` enters it, so a test that just called it saw nothing.
     marks = _decorators(fn) if hasattr(fn, "decorator_list") else getattr(fn, "marks", set())
+    # Not for an async context manager, which is entered with `async with`
+    # and never awaited: `async` there told the agent to await it.
+    if ((isinstance(fn, ast.AsyncFunctionDef) or getattr(fn, "is_async", False))
+            and "asynccontextmanager" not in marks):
+        sig = "async " + sig
     if "asynccontextmanager" in marks:
         sig += "  (a context manager: use it in an async with statement)"
     elif "contextmanager" in marks:
@@ -365,7 +368,8 @@ def class_members(node):
             continue
         name = f"{node.name}.{n.name}"
         if "property" in marks or "cached_property" in marks:
-            out.append(Member(name, empty, n.returns, attribute=True, owner=node.name))
+            out.append(Member(name, empty, n.returns, attribute=True, owner=node.name,
+                              is_async=isinstance(n, ast.AsyncFunctionDef)))
         elif "setter" in marks or "deleter" in marks:
             continue
         else:
@@ -384,35 +388,55 @@ def read_interface(source):
     refused by `--scaffold` for having "no public top level functions", after
     `--score` had already raised questions about it.
     """
-    import copy
-    tree = ast.parse(source)
     out = []
-    private = {}
+    for node in top_definitions(ast.parse(source)):
+        if isinstance(node, ast.ClassDef):
+            out.extend(class_members(node))
+        else:
+            out.append(node)
+    return out
+
+
+def top_definitions(tree):
+    """
+    The module's public functions and classes, each under the name callers
+    use, as Python binds them: a later binding of a name replaces an earlier
+    one (`def parse` then `parse = _impl` is one entry, not two), and a name
+    bound to a definition is that definition under the new name, whether
+    written `EmailStr = _EmailStr` (msgspec-ext), `EmailStr: TypeAlias =
+    _EmailStr`, `A = B = _impl`, or through another public alias. Order is
+    each public name's last binding.
+    """
+    import copy
+    defs, order = {}, []
+
+    def bind(name, node):
+        if name in order:
+            order.remove(name)
+        if not name.startswith("_"):
+            order.append(name)
+        defs[name] = node
+
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if node.name.startswith("_"):
-                private[node.name] = node
-            elif "overload" not in _decorators(node):
-                out.append(node)
+            if "overload" not in _decorators(node):
+                bind(node.name, node)
         elif isinstance(node, ast.ClassDef):
-            if node.name.startswith("_"):
-                private[node.name] = node
+            bind(node.name, node)
+        else:
+            if isinstance(node, ast.Assign):
+                targets, value = node.targets, node.value
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                targets, value = [node.target], node.value
             else:
-                out.extend(class_members(node))
-        elif (isinstance(node, ast.Assign) and len(node.targets) == 1
-              and isinstance(node.targets[0], ast.Name)
-              and not node.targets[0].id.startswith("_")
-              and isinstance(node.value, ast.Name) and node.value.id in private):
-            # A public name for a private definition, as msgspec-ext exports
-            # EmailStr = _EmailStr. Callers use the public name, so the
-            # interface does too.
-            public = copy.copy(private[node.value.id])
-            public.name = node.targets[0].id
-            if isinstance(public, ast.ClassDef):
-                out.extend(class_members(public))
-            else:
-                out.append(public)
-    return out
+                continue
+            if isinstance(value, ast.Name) and value.id in defs:
+                for target in targets:
+                    if isinstance(target, ast.Name):
+                        alias = copy.copy(defs[value.id])
+                        alias.name = target.id
+                        bind(target.id, alias)
+    return [defs[name] for name in order]
 
 
 def guess_entrypoint(functions, stem=None):

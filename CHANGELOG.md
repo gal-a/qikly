@@ -25,6 +25,16 @@ packaging tools would read as `1.1`.
   a `.drafted.yaml` beside each task file.
 
 ### Fixed
+- **Fixes to this release's fixes, from a second audit.** A project that
+  imports itself as `src.app` and keeps a `src/logging.py` scores again
+  (the extra `src` root is added only when its tests import the package by
+  its own name). A generated test file with any `async def test_`, not only
+  a file of them, is sent back. A test file with no `def test`, such as
+  `test_one = _make(1)`, still counts when nothing else imports the code.
+  `--score` names the copied tests it leaves out. An async context manager
+  is not also marked `async`; an async property is; and `X: TypeAlias = _Y`,
+  `A = B = _f` and a name defined twice are each listed once, as Python
+  binds them.
 - **`--score` after `--take-tests` still scores your own tests.** The tests
   `--take-tests` copies in import the module by name, so they always looked
   more specific than a suite that imports the package, and the next `--score`

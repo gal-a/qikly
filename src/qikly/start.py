@@ -353,10 +353,17 @@ def importing_tests(code, root):
     imported validators sent card.py's score through the whole suite,
     failing optional-dependency tests included.
     """
-    # Only files that define a test: phart's examples/ held *_test.py demo
+    # Files that define a test first: phart's examples/ held *_test.py demo
     # scripts that outnumbered tests/, and step 1 ran in examples/ with no
-    # tests at all.
-    files = [f for f in _test_files(root) if _DEFINES_TEST.search(_read(f))]
+    # tests at all. If that finds nothing, every file the name matches, as
+    # before: a test made by a factory (`test_one = _make(1)`), re-exported
+    # with `import *` or picked up by a configured `python_functions` has no
+    # `def test`, and dropping them all said that no tests import the code.
+    found = _importing(code, [f for f in _test_files(root) if _DEFINES_TEST.search(_read(f))])
+    return found or _importing(code, _test_files(root))
+
+
+def _importing(code, files):
     modules, public = _specific(code)
     packages = set(import_names(code)) - modules if os.path.isfile(code) else set()
     if os.path.isdir(code):

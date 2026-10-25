@@ -708,16 +708,18 @@ def _validate_generated_tests(source, stage):
     except SyntaxError as e:
         return f"generated {stage} test file is not valid Python: {e}"
 
+    if re.search(r"^\s*async\s+def test_\w+\s*\(", source, re.MULTILINE):
+        # pytest runs an async test only through a plugin: without one it
+        # skips it (before 8.4) or fails it (since), and either way the test
+        # says nothing about the code. Any one is refused, not only a file of
+        # them: a mixed file failed on correct code every attempt. Said
+        # plainly, because this goes back to the agent, which, told only "no
+        # test_ functions", wrote the same async tests three times running.
+        return (f"generated {stage} test file has `async def test_` functions, "
+                f"which pytest does not run here: without a plugin it skips or "
+                f"fails them. Write each as `def test_...` and call the async "
+                f"function with asyncio.run(...)")
     if not re.search(r"^def test_\w+\s*\(", source, re.MULTILINE):
-        if re.search(r"^async\s+def test_\w+\s*\(", source, re.MULTILINE):
-            # pytest skips an async test unless a plugin runs it, so it would
-            # pass without testing anything. Said plainly, because this goes
-            # back to the agent: told only "no test_ functions", it wrote the
-            # same async tests three times running.
-            return (f"generated {stage} test file has only `async def test_` "
-                    f"functions, which pytest skips here instead of running. "
-                    f"Write each as `def test_...` and call the async function "
-                    f"with asyncio.run(...)")
         return f"generated {stage} test file contains no test_ functions"
 
     # A test that reads a name before anything assigns it raises NameError on
