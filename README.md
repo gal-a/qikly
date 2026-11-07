@@ -25,6 +25,23 @@ never saw the acceptance criteria and discovered that rate limit from a failing
 test: it then added `or rate > 100` by itself, so the 9 of 9 is code eventually
 passing the test suite after applying fixes in an automated repair loop.*
 
+[![qikly --score on the bundled pricing example: 10 of 13 planted faults missed, and three of the questions they leave open](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_score.png)](#start-here)
+
+**Try it now, free and with no API key:** `pip install --upgrade qikly`, then
+`qikly --score my_module.py` from your project's root folder. It plants faults
+in a copy of your code, one at a time, and turns each one your tests miss into a
+question about behaviour nothing checks. Above, a real run on the bundled
+[pricing example](https://github.com/gal-a/qikly/tree/main/docs/examples/pricing).
+
+**Run on 50 young Python libraries,** it surfaced 4 real problems as well as the
+test gaps, each confirmed by hand and reported upstream. 2 are fixed so far:
+[cyclopts #1044](https://github.com/BrianPugh/cyclopts/issues/1044), fixed in
+[#1047](https://github.com/BrianPugh/cyclopts/pull/1047), and
+[prompt-template #48](https://github.com/Goldziher/prompt-template/issues/48),
+fixed in v1.2.1. Fixes for
+[markdown-code-runner](https://github.com/basnijholt/markdown-code-runner/pull/64)
+and [xmltodict](https://github.com/martinblech/xmltodict/pull/437) are in review.
+
 <!-- 2026-10-14: grouped into parts with this map, same sections and
      wording; every heading kept, so every existing link still lands. -->
 | | |
@@ -918,6 +935,9 @@ The design write-up is in three parts, and each stands on its own.
 ---
 
 ## Using qikly? Show it
+
+If `--score` found something your tests missed, a
+[star on GitHub](https://github.com/gal-a/qikly) helps the next person find qikly.
 
 If qikly writes the tests for something you maintain, add the badge to its
 README. It tells readers the suite was written from the acceptance criteria by
