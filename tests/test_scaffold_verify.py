@@ -14,7 +14,9 @@ What these pin, in order of how much a failure would cost a first-time user:
 - the path given to --score names the task in every later step, for a file
   and for a folder.
 """
+import json
 import os
+import shutil
 import re
 
 import pytest
@@ -52,14 +54,34 @@ def _project(root, name="pricing.py"):
         TESTS.replace("from pricing", f"from {stem}"), encoding="utf-8")
 
 
+@pytest.fixture(scope="module")
+def _scored_once(tmp_path_factory):
+    """Step 1 run once for the whole file: about 10 seconds a run, and every
+    test below starts from the same scored project. Each test gets its own
+    copy, so nothing one test writes reaches another."""
+    root = tmp_path_factory.mktemp("scored")
+    _project(root)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(cli, "INVOKED_FROM", str(root))
+        mp.chdir(root)
+        mp.syspath_prepend(str(root))
+        assert cli._do_score_suite(None, None, None, code="pricing.py", tests=None) == 0
+    return root
+
+
 @pytest.fixture
-def scored(tmp_path, monkeypatch):
+def scored(_scored_once, tmp_path, monkeypatch):
     """A project scored the way step 1 scores it, run from its folder."""
-    _project(tmp_path)
+    shutil.copytree(_scored_once, tmp_path, dirs_exist_ok=True)
+    # Step 1 saves absolute paths: point the copy at its own folder, as a
+    # score taken here would have.
+    for saved in tmp_path.rglob("*.json"):
+        text = saved.read_text(encoding="utf-8")
+        saved.write_text(text.replace(json.dumps(str(_scored_once))[1:-1],
+                                      json.dumps(str(tmp_path))[1:-1]), encoding="utf-8")
     monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
     monkeypatch.chdir(tmp_path)
     monkeypatch.syspath_prepend(str(tmp_path))
-    assert cli._do_score_suite(None, None, None, code="pricing.py", tests=None) == 0
     return tmp_path
 
 

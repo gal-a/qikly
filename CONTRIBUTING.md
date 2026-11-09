@@ -89,6 +89,18 @@ qikly --demo --tasks <TASK_ID>             # a real run, about a cent on the def
 python -m pytest -q                        # the whole suite, offline
 ```
 
+The whole suite takes 8 to 12 minutes run serially. With
+`pip install pytest-xdist` it runs in parallel in a few minutes:
+
+```bash
+python -m pytest -q -n auto --dist loadgroup
+```
+
+`--dist loadgroup` matters: the tests that work in the real project folder
+are marked `xdist_group("project_root")` and must run on one worker, one
+after another. A new test that writes to the project folder rather than to
+`tmp_path` needs the same mark.
+
 A run that does not converge is still worth sending. Say so in the pull
 request: a task that stalls tells us something too.
 

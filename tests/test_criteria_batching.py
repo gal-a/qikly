@@ -26,6 +26,12 @@ import pytest
 from qikly.agent_api import agent_interface as ai
 from qikly.orchestrator import orchestrator as orch
 
+# Runs in, or reads, the real project folder (its outputs/ and task folders),
+# as do the other files in the "project_root" group. Under pytest-xdist the
+# group runs on one worker, one test after another, as in a serial run.
+# Needs --dist loadgroup; see CONTRIBUTING.md.
+pytestmark = pytest.mark.xdist_group("project_root")
+
 
 # --------------------------------------------------------- the setting ----
 

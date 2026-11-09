@@ -20,6 +20,9 @@ working directory is not verified.
 pytest -q
 ```
 
+Or in parallel, with pytest-xdist installed: `pytest -q -n auto --dist loadgroup`
+(`tools/release_check.py` does this by itself when it can).
+
 No API key should be set, and none is needed. Every test in `tests/` runs
 offline, and `conftest.py` fails any test that opens a socket. A suite that
 needs credentials gets skipped in CI, and a skipped suite catches nothing.

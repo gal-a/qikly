@@ -9,11 +9,19 @@ bundled one without a word. CONTRIBUTING.md states these rules for people; this
 states them for the build.
 """
 import os
+
+import pytest
 import re
 
 import yaml
 
 from qikly.scaffold import VERIFY_SUFFIX
+
+# Runs in, or reads, the real project folder (its outputs/ and task folders),
+# as do the other files in the "project_root" group. Under pytest-xdist the
+# group runs on one worker, one test after another, as in a serial run.
+# Needs --dist loadgroup; see CONTRIBUTING.md.
+pytestmark = pytest.mark.xdist_group("project_root")
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PUBLIC = os.path.join(ROOT, "src", "qikly", "inputs_public")

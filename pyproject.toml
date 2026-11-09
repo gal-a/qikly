@@ -136,6 +136,8 @@ packages = [
 # which holds generated suites from previous runs: they import task modules
 # that may not exist, and their failures say nothing about this package.
 testpaths = ["tests"]
+# Registered here so a run without pytest-xdist does not warn about it.
+markers = ["xdist_group(name): run on one xdist worker with the others of this name (--dist loadgroup)"]
 # No -q here. A project addopts of "-q" combines with a "-q" the user types
 # into -qq, and -qq suppresses the "N passed" summary line entirely: the run
 # then reports a bare "100%" and says nothing about how many tests ran or

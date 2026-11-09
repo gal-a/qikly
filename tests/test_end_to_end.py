@@ -18,6 +18,12 @@ from qikly.agent_api.agent_interface import task_config_path
 from qikly.orchestrator.orchestrator import orchestrate
 from qikly.paths import chdir_to_project_root
 
+# Runs in, or reads, the real project folder (its outputs/ and task folders),
+# as do the other files in the "project_root" group. Under pytest-xdist the
+# group runs on one worker, one test after another, as in a serial run.
+# Needs --dist loadgroup; see CONTRIBUTING.md.
+pytestmark = pytest.mark.xdist_group("project_root")
+
 TASK = "ZZ_SMOKE_TASK"
 
 # Every shared directory a run writes into under names carrying the task id.

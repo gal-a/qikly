@@ -244,7 +244,13 @@ def check_suite():
                 "LLM_PROVIDER", "LLM_MODEL", "QIKLY_PROJECT_ROOT"):
         env.pop(key, None)
     env["PYTHONPATH"] = os.path.join(ROOT, "src")
-    done = run([sys.executable, "-m", "pytest", "tests/", "-q"], env=env)
+    # In parallel when pytest-xdist is installed: about 2.5 minutes rather
+    # than 8 to 12 on a 12-core laptop. loadgroup keeps the tests that share
+    # the project folder on one worker (the "project_root" group).
+    import importlib.util
+    parallel = (["-n", "auto", "--dist", "loadgroup"]
+                if importlib.util.find_spec("xdist") else [])
+    done = run([sys.executable, "-m", "pytest", "tests/", "-q"] + parallel, env=env)
     tail = (done.stdout or done.stderr).strip().splitlines()[-1:]
     check("suite passes with no API key set", done.returncode == 0,
           " ".join(tail),

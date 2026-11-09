@@ -25,6 +25,12 @@ import pytest
 from qikly import cli
 from qikly.paths import resolve_input
 
+# Runs in, or reads, the real project folder (its outputs/ and task folders),
+# as do the other files in the "project_root" group. Under pytest-xdist the
+# group runs on one worker, one test after another, as in a serial run.
+# Needs --dist loadgroup; see CONTRIBUTING.md.
+pytestmark = pytest.mark.xdist_group("project_root")
+
 
 # The research scripts write throwaway variant configs into this same
 # directory and delete them when the run ends, so a task list read while an

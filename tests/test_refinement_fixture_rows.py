@@ -20,6 +20,12 @@ import pytest
 
 from qikly.orchestrator.tuning import propose_fixtures as pf
 
+# Runs in, or reads, the real project folder (its outputs/ and task folders),
+# as do the other files in the "project_root" group. Under pytest-xdist the
+# group runs on one worker, one test after another, as in a serial run.
+# Needs --dist loadgroup; see CONTRIBUTING.md.
+pytestmark = pytest.mark.xdist_group("project_root")
+
 _REFINE_SOURCE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "src", "qikly", "orchestrator", "tuning", "refine_acceptance_criteria.py")

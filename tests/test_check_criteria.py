@@ -16,6 +16,12 @@ import pytest
 
 from qikly.orchestrator.tuning import check_criteria as cc
 
+# Runs in, or reads, the real project folder (its outputs/ and task folders),
+# as do the other files in the "project_root" group. Under pytest-xdist the
+# group runs on one worker, one test after another, as in a serial run.
+# Needs --dist loadgroup; see CONTRIBUTING.md.
+pytestmark = pytest.mark.xdist_group("project_root")
+
 
 # ---------------------------------------------------------------- parsing ---
 

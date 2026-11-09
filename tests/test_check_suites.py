@@ -231,6 +231,12 @@ def test_guidance_for_a_suite_leaves_out_another_suites_findings():
 
 import qikly.orchestrator.orchestrator as orch
 
+# Runs in, or reads, the real project folder (its outputs/ and task folders),
+# as do the other files in the "project_root" group. Under pytest-xdist the
+# group runs on one worker, one test after another, as in a serial run.
+# Needs --dist loadgroup; see CONTRIBUTING.md.
+pytestmark = pytest.mark.xdist_group("project_root")
+
 
 @pytest.fixture
 def no_log(monkeypatch):

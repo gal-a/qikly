@@ -114,22 +114,36 @@ def sdk(monkeypatch):
     be in place before the import and the module has to be evicted afterwards,
     or a later test gets the fake by accident.
     """
+    import importlib
+
+    import qikly.agent_api.providers as package
+
     recorder = _Recorder()
     monkeypatch.setenv("API_KEY", "test-key")
+    before = set(sys.modules)
 
     def load(provider):
         monkeypatch.setitem(sys.modules, "openai", _openai_module(recorder))
         monkeypatch.setitem(sys.modules, "anthropic", _anthropic_module(recorder))
         name = f"qikly.agent_api.providers.{provider}"
+        # Both recorded, so a provider module loaded before this test, and the
+        # package attribute naming it, come back when monkeypatch undoes.
         monkeypatch.delitem(sys.modules, name, raising=False)
-        import importlib
-
+        monkeypatch.delattr(package, provider, raising=False)
         return importlib.import_module(name), recorder
 
     yield load
-    for name in list(sys.modules):
-        if name.startswith("qikly.agent_api.providers."):
-            sys.modules.pop(name, None)
+    # Evict only what this test imported for the first time, with the package
+    # attribute the import set. This used to evict every providers module,
+    # `router` included, while the package kept its `router` attribute: a later
+    # test that patched `router` then patched a module nothing used any more,
+    # and failed only when xdist happened to run it after this one.
+    for name in [n for n in sys.modules
+                 if n.startswith("qikly.agent_api.providers.") and n not in before]:
+        sys.modules.pop(name, None)
+        parent, _, child = name.rpartition(".")
+        if parent == package.__name__ and hasattr(package, child):
+            delattr(package, child)
 
 
 CASES = [

@@ -108,8 +108,15 @@ def test_the_default_model_is_known_without_the_optional_sdks(monkeypatch):
     for name in [m for m in sys.modules if m.split(".")[0] in ("anthropic", "openai")]:
         monkeypatch.delitem(sys.modules, name, raising=False)
 
-    from qikly.agent_api.providers import router
-    importlib.reload(router)
+    # A fresh import rather than a reload: a provider test's teardown evicts
+    # the providers' modules, and a reload of the stale `router` attribute
+    # it leaves behind fails with "not in sys.modules" (seen under xdist).
+    # The package attribute is recorded too, so both come back together.
+    import qikly.agent_api.providers as package
+
+    monkeypatch.delitem(sys.modules, "qikly.agent_api.providers.router", raising=False)
+    monkeypatch.delattr(package, "router", raising=False)
+    router = importlib.import_module("qikly.agent_api.providers.router")
 
     assert router.effective_model("anthropic") == "claude-sonnet-5"
     assert router.effective_model("openai") == "gpt-4o"
