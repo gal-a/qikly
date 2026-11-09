@@ -58,3 +58,29 @@ def _clean_llm_env(monkeypatch):
     # And never a drafting call from --scaffold, even with a key in a
     # settings file: a test that wants one patches the call itself.
     monkeypatch.setenv("QIKLY_NO_DRAFT", "1")
+
+
+def pytest_collection_modifyitems(config, items):
+    """
+    Put each test marked `xdist_group(name)` in its group, for
+    `--dist loadgroup` (see CONTRIBUTING.md).
+
+    pytest-xdist does this itself by appending "@<name>" to `item._nodeid`,
+    but pytest 9.2 reads a test's id from `item._id`, so with xdist 3.8.0 the
+    groups were silently ignored and the "project_root" tests ran on several
+    workers at once, writing to the same project folder. A test already
+    carrying a group suffix is left alone, so a fixed xdist does no harm.
+    """
+    if not getattr(config.option, "loadgroup", False):
+        return
+    for item in items:
+        names = sorted({str(m.args[0] if m.args else m.kwargs.get("name", "default"))
+                        for m in item.iter_markers("xdist_group")})
+        if not names or "@" in item.nodeid:
+            continue
+        tagged = "%s@%s" % (item.nodeid, "_".join(names))
+        if hasattr(item, "_id"):
+            from _pytest.nodeid import coerce_node_id
+            item._id = coerce_node_id(tagged)
+        else:
+            item._nodeid = tagged
