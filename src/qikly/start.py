@@ -775,7 +775,9 @@ def hinted(questions, module, cwd, budget=HINT_BUDGET):
         return list(questions)
     out, by_mark = [], {}
     for q in qs:
-        if time.monotonic() - started > budget:
+        # >=, not >: Windows' clock ticks about every 15.6 ms, so with a
+        # budget of 0 a fast start measured 0 elapsed and ran one question.
+        if time.monotonic() - started >= budget:
             q.pop("mutant", None)
             q["unhinted"] = True
             out.append(q)
