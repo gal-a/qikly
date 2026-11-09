@@ -79,6 +79,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e .
+          # The test runner only, not a qikly dependency: the suite runs in
+          # parallel. --dist loadgroup keeps the tests that work in the project
+          # folder on one worker (see CONTRIBUTING.md).
+          pip install pytest-xdist
 
       - name: Run the test suite
         # No API key is provided, and none is needed. A suite that requires
@@ -87,7 +91,7 @@ jobs:
         # Deliberately a bare `pip install -e .` above: only the Gemini SDK is
         # a dependency, and this is the install a first-time user performs, so
         # it is the one that has to be green.
-        run: pytest -q
+        run: pytest -q -n auto --dist loadgroup
 
       - name: Again with the optional SDKs installed
         # The provider tests skip themselves when their SDK is absent, which is
@@ -96,7 +100,7 @@ jobs:
         # or Anthropic SDK is supposed to be what turns this red.
         run: |
           pip install -e ".[all-providers]"
-          pytest -q
+          pytest -q -n auto --dist loadgroup
 
   package:
     runs-on: ubuntu-latest
