@@ -187,7 +187,13 @@ def test_every_documented_repo_url_points_at_the_real_one():
         # release workflow fetches it from there by URL. Listed here rather
         # than excluded by pattern, so adding a second one is a decision
         # somebody makes on purpose.
-        allowed = {"modelcontextprotocol/registry"}
+        #
+        # The README's results line is the other: it links the issues and pull
+        # requests filed upstream for problems qikly found in other libraries,
+        # so a reader can check each one. Named one by one for the same reason.
+        allowed = {"modelcontextprotocol/registry",
+                   "BrianPugh/cyclopts", "Goldziher/prompt-template",
+                   "basnijholt/markdown-code-runner", "martinblech/xmltodict"}
         wrong = sorted(
             {m for m in re.findall(r"github\.com/([\w.-]+/[\w.-]+)", text)
              if not m.startswith(owner + "/") and m.split("/")[0] not in reserved
