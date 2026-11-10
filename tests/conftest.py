@@ -60,6 +60,7 @@ def _clean_llm_env(monkeypatch):
     monkeypatch.setenv("QIKLY_NO_DRAFT", "1")
 
 
+@pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(config, items):
     """
     Put each test marked `xdist_group(name)` in its group, for
@@ -68,17 +69,19 @@ def pytest_collection_modifyitems(config, items):
     pytest-xdist does this itself by appending "@<name>" to `item._nodeid`,
     but pytest 9.2 reads a test's id from `item._id`, so with xdist 3.8.0 the
     groups were silently ignored and the "project_root" tests ran on several
-    workers at once, writing to the same project folder. A test already
-    carrying a group suffix is left alone, so a fixed xdist does no harm.
+    workers at once, writing to the same project folder. trylast runs this
+    after xdist's own hook, so a test xdist has already tagged (older pytest)
+    is left alone; an "@" inside a parametrize id's brackets is not a tag.
     """
     if not getattr(config.option, "loadgroup", False):
         return
     for item in items:
         names = sorted({str(m.args[0] if m.args else m.kwargs.get("name", "default"))
                         for m in item.iter_markers("xdist_group")})
-        if not names or "@" in item.nodeid:
+        nodeid = item.nodeid
+        if not names or nodeid.rfind("@") > nodeid.rfind("]"):
             continue
-        tagged = "%s@%s" % (item.nodeid, "_".join(names))
+        tagged = "%s@%s" % (nodeid, "_".join(names))
         if hasattr(item, "_id"):
             from _pytest.nodeid import coerce_node_id
             item._id = coerce_node_id(tagged)
