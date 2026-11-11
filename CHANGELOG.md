@@ -4,12 +4,32 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
-## Unreleased
+## 0.6.2
+
+### Fixed
+- **A time budget of 0 skips every question, on Windows too.** When
+  `--scaffold` runs your code beside each question, it stops once its time
+  budget is spent. The check was "more time than the budget has passed", and
+  Windows' clock ticks about every 15.6 ms, so with a budget of 0 a fast start
+  measured no time at all and still ran one question. The check is now
+  "at least the budget".
 
 ### Changed
 - **Skill 0.3.9.** The README and the Skill say a suite that goes green
   "can mean nothing", not that it does: a green suite may be hollow, and
   scoring it is how you find out.
+- **The README shows a real `--score` run** on the bundled pricing example,
+  starts with the one free command to try, and lists the four problems qikly
+  surfaced in other libraries, with their upstream status. The picture is
+  drawn from a real run by `tools/render_score_screenshot.py`.
+
+### For contributors
+- **The suite runs in a few minutes.** Two test files scored the same project
+  before every test; each now scores it once. With `pytest-xdist` the suite
+  runs in parallel (`pytest -q -n auto --dist loadgroup`), as CI now does; the
+  tests that work in the project folder stay on one worker. pytest 9.2 with
+  pytest-xdist 3.8.0 ignores `xdist_group` marks, so `tests/conftest.py`
+  tags them itself until xdist releases its fix.
 
 ## 0.6.1
 
