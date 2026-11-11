@@ -6,6 +6,8 @@ packaging tools would read as `1.1`.
 
 ## 0.6.2
 
+> Fix: on Windows, a zero time budget could still run one question; the README shows a real --score run
+
 ### Fixed
 - **A time budget of 0 skips every question, on Windows too.** When
   `--scaffold` runs your code beside each question, it stops once its time
