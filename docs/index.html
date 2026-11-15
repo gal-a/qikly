@@ -365,6 +365,12 @@ h1 {
 /* A long path, the task file's, wraps at its slashes instead of running
    out of the column. */
 .step p code { overflow-wrap: anywhere; }
+/* What each step's agent never sees, one line each, so it is not lost in
+   the paragraph above it (taken from the video's opening slide). */
+.step .never { margin: 0; padding: 0; list-style: none; font-size: .92rem; color: var(--ink-soft); }
+.step .never li + li { margin-top: 4px; }
+.step .never b { font-size: inherit; }
+.step .never em { font-style: normal; font-weight: 600; color: var(--alert); }
 .step .cost {
   align-self: flex-start;
   font-family: "IBM Plex Mono", monospace;
@@ -875,7 +881,10 @@ footer {
           card; <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-preflight-key">how</a>),
           and check your tests pass on their own with <code>python -m pytest</code>.
           Then run the steps from your project's root folder. Each takes one
-          module or a whole folder, and every step takes the same path.</p>
+          module or a whole folder, and every step takes the same path.
+          <b>No tests yet?</b> Start at step 2. <b>No code yet?</b>
+          <code>qikly --init</code> makes a blank task file for your answers,
+          and step 3 writes the code.</p>
       </li>
       <li class="row">
         <div class="step">
@@ -895,6 +904,9 @@ footer {
             answer is yours to write. <code>qikly --validate</code> with the
             same path checks the file, free.
             <a class="small-link" href="https://github.com/gal-a/qikly/tree/main/docs/examples" data-goatcounter-click="start-examples">A module and a folder, drafted and answered</a></p>
+          <ul class="never">
+            <li><b>Spec agent:</b> <em>never sees a function body</em></li>
+          </ul>
           <span class="cost key">a fraction of a cent with a <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-step2-key">key</a></span>
         </div>
         <figure class="eg">
@@ -921,6 +933,10 @@ footer {
             <code>qikly --take-tests</code> with the same path copies the new tests
             into your own tests folder, importing your code, and runs them on
             it: a test that fails there is one to compare with your answer.</p>
+          <ul class="never">
+            <li><b>Test agent:</b> <em>never sees the code</em> until the unit tests, written last</li>
+            <li><b>Coding agent:</b> <em>never sees your answers</em></li>
+          </ul>
           <span class="cost key">needs an <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-step3-key">API key</a></span>
         </div>
         <figure class="eg">
