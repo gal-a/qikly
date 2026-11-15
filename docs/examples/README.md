@@ -30,7 +30,7 @@ qikly --take-tests pricing.py         # the new tests, run on your own pricing.p
 For the folder example, use `shop` in place of `pricing.py` in every step:
 `--scaffold shop` writes one task file per module, `PRICING_VERIFY.yaml` and
 `RULES_VERIFY.yaml`, each seeded with the whole package so `from .rules
-import MAX_RATE` works in qikly's copy.
+import MAX_DISCOUNT_RATE` works in qikly's copy.
 
 ## The README is the spec agent's source
 
@@ -41,13 +41,13 @@ not what it does. Each answer says where it came from:
 
 ```yaml
   #? What should apply_discount(100, 100) do?
-  #? Answer below drafted by qikly from your README or docstrings: "...so a rate of 100 or more is rejected with ValueError". Keep it, or change it.
+  #? Answer below drafted by qikly from your README or docstrings: "...so a discount rate of 100 or more is rejected with ValueError". Keep it, or change it.
   - "apply_discount(100, 100) raises ValueError"
 ```
 
 or, where nothing written decides it, `#? CHECK: your docs don't say. The
 answer below is qikly's guess from what the module is for. Read it before you
-run.`, for you to read first. `pricing.py` accepts a rate of exactly 100,
+run.`, for you to read first. `pricing.py` accepts a discount rate of exactly 100,
 so that drafted answer is what step 3 finds: the copied tests fail on it.
 
 ## Answering what the draft leaves

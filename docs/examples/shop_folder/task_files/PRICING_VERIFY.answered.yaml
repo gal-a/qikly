@@ -28,8 +28,8 @@ outputs:
 interface:
   module: "shop.pricing"
   integration_functions:
-    - "apply_discount(price, rate)"
-  system_entrypoint: "apply_discount(price, rate)"
+    - "apply_discount(price, discount_rate)"
+  system_entrypoint: "apply_discount(price, discount_rate)"
 
 # ----------------------------------------------------------------------------
 # What the code is for, in your words. The coding agent reads this, so give
@@ -57,23 +57,23 @@ acceptance_criteria:
   #? does now.
 
   #? pricing.py, apply_discount, line 5:
-  #?     if rate < 0 or rate > MAX_RATE:
-  #? Your tests never try rate at exactly 0.
+  #?     if discount_rate < 0 or discount_rate > MAX_DISCOUNT_RATE:
+  #? Your tests never try discount_rate at exactly 0.
   #? What should apply_discount(100, 0) do?
   #? To answer with a number, replace the answer line below with one of these:
-  #?   1 = apply_discount(100, 0) returns VALUE   (write "1: <the value>"; today rate 1 returns 99.0)
-  #?   2 = apply_discount(100, 0) raises ValueError   (as rate -1 does now)
+  #?   1 = apply_discount(100, 0) returns VALUE   (write "1: <the value>"; today discount_rate 1 returns 99.0)
+  #?   2 = apply_discount(100, 0) raises ValueError   (as discount_rate -1 does now)
   - 1: 100.0
 
   #? pricing.py, apply_discount, line 5:
-  #?     if rate < 0 or rate > MAX_RATE:
-  #? Your tests pass whether this is `rate > MAX_RATE` or `rate >= MAX_RATE`,
+  #?     if discount_rate < 0 or discount_rate > MAX_DISCOUNT_RATE:
+  #? Your tests pass whether this is `discount_rate > MAX_DISCOUNT_RATE` or `discount_rate >= MAX_DISCOUNT_RATE`,
   #? so nothing checks the boundary itself. What should happen at exactly
-  #? `MAX_RATE`?
+  #? `MAX_DISCOUNT_RATE`?
   - apply_discount(100, 100) raises ValueError
 
   #? pricing.py, apply_discount, line 5:
-  #?     if rate < 0 or rate > MAX_RATE:
+  #?     if discount_rate < 0 or discount_rate > MAX_DISCOUNT_RATE:
   #? What should apply_discount(100, -11) do?
   #? To answer with a number, replace the answer line below with one of these:
   #?   1 = apply_discount(100, -11) raises ValueError   (as your code does now)
@@ -82,7 +82,7 @@ acceptance_criteria:
   - keep
 
   #? pricing.py, apply_discount, line 7:
-  #?     return round(price * (1 - rate / 100), 2)
+  #?     return round(price * (1 - discount_rate / 100), 2)
   #? What should apply_discount(100, 10.333) do?
   #? To answer with a number, replace the answer line below with one of these:
   #?   1 = apply_discount(100, 10.333) returns 89.667

@@ -28,9 +28,9 @@ outputs:
 interface:
   module: "outputs.agent_src.code.PRICING_VERIFY.pricing"
   integration_functions:
-    - "apply_discount(price, rate)"
+    - "apply_discount(price, discount_rate)"
     - "label(code)"
-  system_entrypoint: "apply_discount(price, rate)"
+  system_entrypoint: "apply_discount(price, discount_rate)"
 
 # ----------------------------------------------------------------------------
 # What the code is for, in your words. The coding agent reads this, so give
@@ -58,16 +58,16 @@ acceptance_criteria:
   #? does now.
 
   #? pricing.py, apply_discount, line 2:
-  #?     if rate < 0 or rate > 100:
-  #? Your tests never try rate at exactly 0.
+  #?     if discount_rate < 0 or discount_rate > 100:
+  #? Your tests never try discount_rate at exactly 0.
   #? What should apply_discount(100, 0) do?
   #? To answer with a number, replace the answer line below with one of these:
-  #?   1 = apply_discount(100, 0) returns VALUE   (write "1: <the value>"; today rate 1 returns 99.0)
-  #?   2 = apply_discount(100, 0) raises ValueError   (as rate -1 does now)
+  #?   1 = apply_discount(100, 0) returns VALUE   (write "1: <the value>"; today discount_rate 1 returns 99.0)
+  #?   2 = apply_discount(100, 0) raises ValueError   (as discount_rate -1 does now)
   - "1: 100.0"
 
   #? pricing.py, apply_discount, line 2:
-  #?     if rate < 0 or rate > 100:
+  #?     if discount_rate < 0 or discount_rate > 100:
   #? What should apply_discount(100, -11) do?
   #? To answer with a number, replace the answer line below with one of these:
   #?   1 = apply_discount(100, -11) raises ValueError   (as your code does now)
@@ -76,16 +76,16 @@ acceptance_criteria:
   - keep
 
   #? pricing.py, apply_discount, line 2:
-  #?     if rate < 0 or rate > 100:
-  #? Your tests never try rate at exactly 100.
+  #?     if discount_rate < 0 or discount_rate > 100:
+  #? Your tests never try discount_rate at exactly 100.
   #? What should apply_discount(100, 100) do?
   #? To answer with a number, replace the answer line below with one of these:
-  #?   1 = apply_discount(100, 100) returns VALUE   (write "1: <the value>"; today rate 99 returns 1.0)
-  #?   2 = apply_discount(100, 100) raises ValueError   (as rate 101 does now)
+  #?   1 = apply_discount(100, 100) returns VALUE   (write "1: <the value>"; today discount_rate 99 returns 1.0)
+  #?   2 = apply_discount(100, 100) raises ValueError   (as discount_rate 101 does now)
   - "2"
 
   #? pricing.py, apply_discount, line 4:
-  #?     return round(price * (1 - rate / 100), 2)
+  #?     return round(price * (1 - discount_rate / 100), 2)
   #? What should apply_discount(100, 10.333) do?
   #? To answer with a number, replace the answer line below with one of these:
   #?   1 = apply_discount(100, 10.333) returns 89.667

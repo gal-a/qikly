@@ -1,7 +1,7 @@
-from .rules import MAX_RATE
+from .rules import MAX_DISCOUNT_RATE
 
 
-def apply_discount(price, rate):
-    if rate < 0 or rate > MAX_RATE:
-        raise ValueError('rate out of range')
-    return round(price * (1 - rate / 100), 2)
+def apply_discount(price, discount_rate):
+    if discount_rate < 0 or discount_rate > MAX_DISCOUNT_RATE:
+        raise ValueError('discount_rate out of range')
+    return round(price * (1 - discount_rate / 100), 2)

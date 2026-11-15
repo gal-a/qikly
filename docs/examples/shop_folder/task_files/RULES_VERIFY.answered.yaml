@@ -73,7 +73,7 @@ acceptance_criteria:
   - "1"
 
   #? rules.py, line 1:
-  #?     MAX_RATE = 100
+  #?     MAX_DISCOUNT_RATE = 100
   #? Your tests pass whether this number is 100 or 101. What should it be, and
   #? which input would show the difference?
   - "TODO: your answer to the question above"

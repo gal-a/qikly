@@ -1,4 +1,4 @@
-MAX_RATE = 100
+MAX_DISCOUNT_RATE = 100
 
 
 def label(code):
