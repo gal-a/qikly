@@ -391,6 +391,20 @@ _UNPRINTABLE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f\ud800-\
 VALUE = "VALUE"
 _OPTION = re.compile(r"^[ \t]*#\?[ \t]+(\d+) = (.+?)(?:   \((.*)\))?[ \t]*$")
 _ITEM = re.compile(r"^([ \t]+)-([ \t]+)(.*?)[ \t]*$")
+# An option number with something around it: `1)`, `(1)`, `1.`, `#1`,
+# `option 1`, `Option 2: 99`. Each went to test generation as written, as the
+# criterion "1)" or "option 1", with no error anywhere.
+_DECORATED = re.compile(
+    r"(?i)(?:(?:pick|option|opt\.?|choice|answer|number|no\.?)[ \t]*|#[ \t]*|[(<])?"
+    r"(\d+)[ \t]*(?:[.);!,>\"']+|\([^)]*\))?(?:[ \t]*:[ \t]*(.+))?")
+# An option number, then a value or the option's own text after something
+# other than a colon: `2 = 99`, `2 -> 99`, `2) 99`, `2 (99)`, `1 = f(100)
+# raises ValueError` (the option line copied whole).
+_NUMBERED = re.compile(r"(\d+)[ \t]*(?:=|->|>|-|\)|\.|\(|：|;)[ \t]*(.+?)[ \t)]*")
+# Typographic quotes, which an editor or a chat window puts in for "".
+_SMART = "“”‘’"
+# Two or more option numbers: `1,2`, `1 2`, `1/2`, `1 and 2`, `1 or 2`.
+_SEVERAL = re.compile(r"(?i)\d+(?:[ \t]*(?:,|/|&|\+|\band\b|\bor\b)[ \t]*\d+|[ \t]+\d+)+")
 
 
 def _scalar(raw):
@@ -414,6 +428,11 @@ def _quote(text):
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
+def _listed(options, joiner=", "):
+    """The option numbers in numeric order: 1, 2, 10, not 1, 10, 2."""
+    return joiner.join(sorted(options, key=int))
+
+
 def expand_answers(text):
     """
     (text, expanded, problems): the task file with each short answer under
@@ -429,7 +448,8 @@ def expand_answers(text):
     """
     lines = (text or "").split("\n")
     start = next((i for i, l in enumerate(lines)
-                  if re.match(r"^acceptance_criteria[ \t]*:[ \t]*$", l)), None)
+                  if re.match(r"""^["']?acceptance_criteria["']?[ \t]*:[ \t]*(?:#.*)?$""", l)),
+                 None)
     if start is None:
         return text, [], []
     expanded, problems = [], []
@@ -437,6 +457,20 @@ def expand_answers(text):
     for i in range(start + 1, len(lines)):
         line = lines[i]
         if line and not line[0].isspace() and not line.startswith("#"):
+            # `- 1` typed at the left edge under a question qikly indented:
+            # YAML joins it with the indented line after it into one
+            # criterion, `1 - "f(5) returns 5"`, and nothing said so.
+            # A list written at the left edge throughout is fine YAML; only a
+            # mix joins lines, so look for an indented item before or after.
+            after = next((l for l in lines[i + 1:]
+                          if l.strip() and not l.lstrip().startswith("#")), "")
+            if re.match(r"^-(?:[ \t]|$)", line) and (
+                    number or re.match(r"^[ \t]+-(?:[ \t]|$)", after)):
+                problems.append(
+                    f"criterion {number + 1} starts at the left edge, but the "
+                    f"items around it are indented. Indent it to match them, "
+                    f"two spaces before the dash, or YAML joins it with the "
+                    f"line after it")
             break
         if re.match(r"^[ \t]*#\?", line):
             asked = True
@@ -458,12 +492,31 @@ def expand_answers(text):
         if value is None or is_todo(value):
             continue
         short = value.strip()
+        if len(short) > 1 and short[0] in _SMART and short[-1] in _SMART:
+            short = short[1:-1].strip()
         criterion, problem = None, None
         # Only under a question qikly numbered: anywhere else a line such as
         # `- 3: text` or `- id: 7` is the person's own YAML, a criterion
         # written as a mapping, and is left exactly as it is.
         pick = re.fullmatch(r"(\d+)(?:[ \t]*:[ \t]*(.+))?", short) if mine else None
-        if not mine and asked_here and re.fullmatch(r"-?\d+(?:\.\d+)?", short):
+        # `- -1`: the TODO line's own `- ` kept, then `-1` typed over the TODO.
+        # YAML reads it as the number minus one, which used to come out as two
+        # errors, "is empty" and "is -1, not a sentence", neither naming the slip.
+        # The same slip on an option that takes a value, `- -1: 0.0`, reads as
+        # a mapping, so it is caught here too, before YAML sees it.
+        negative = (re.fullmatch(r"-[ \t]*(\d+)(?:[ \t]*:[ \t]*(.+))?", short)
+                    if mine else None)
+        if negative:
+            digit, given = negative.group(1), negative.group(2)
+            fixed = digit + (f": {given.strip()}" if given else "")
+            if digit in mine:
+                problem = (f"criterion {number} is {short!r}: did you mean option "
+                           f"{digit}? Write it as  - {fixed}  (one dash, a space, "
+                           f"then the number)")
+            else:
+                problem = (f"criterion {number} answers {short!r}, but its options "
+                           f"are {_listed(mine)}")
+        elif not mine and asked_here and re.fullmatch(r"-?\d+(?:\.\d+)?", short):
             problem = (f"criterion {number} answers {short!r}, but that question "
                        f"has no numbered options: write the answer as a sentence "
                        f"that names a value, such as  MAX_RATE is 100")
@@ -471,25 +524,73 @@ def expand_answers(text):
             option = mine.get(pick.group(1))
             if option is None:
                 problem = (f"criterion {number} answers {short!r}, but "
-                           + (f"its options are {', '.join(sorted(mine))}" if mine
+                           + (f"its options are {_listed(mine)}" if mine
                               else "it has no numbered options") + "")
             elif VALUE in option and not pick.group(2):
                 problem = (f"criterion {number}: option {pick.group(1)} needs your "
                            f"value, written as  {pick.group(1)}: <the value>")
+            elif VALUE in option and re.fullmatch(r"<.*>", pick.group(2).strip()):
+                problem = (f"criterion {number}: replace {pick.group(2).strip()} "
+                           f"with your value, as in  {pick.group(1)}: 0")
             elif VALUE not in option and pick.group(2):
                 problem = (f"criterion {number}: option {pick.group(1)} takes no "
                            f"value, so write just  {pick.group(1)}")
             else:
                 criterion = option.replace(VALUE, (pick.group(2) or "").strip())
+        elif mine and _SEVERAL.fullmatch(short):
+            numbers = re.findall(r"\d+", short)
+            if len(numbers) == 2 and VALUE in mine.get(numbers[0], ""):
+                # `2 99` or `2, 99`: a value for option 2, without its colon.
+                problem = (f"criterion {number} is {short!r}: did you mean option "
+                           f"{numbers[0]} with the value {numbers[1]}? Write it "
+                           f"as  - {numbers[0]}: {numbers[1]}")
+            else:
+                problem = (f"criterion {number} is {short!r}, but a question takes "
+                           f"one answer: pick {_listed(mine, ' or ')}, or write "
+                           f"your own as a sentence")
+        elif mine and _DECORATED.fullmatch(short):
+            found = _DECORATED.fullmatch(short)
+            digit, given = found.group(1), found.group(2)
+            if digit in mine:
+                # `2 (99)`: the value in brackets, for an option that takes one.
+                bracketed = re.search(r"\(([^)]*)\)", short)
+                if not given and bracketed and len(bracketed.group(1).split()) <= 2:
+                    given = bracketed.group(1)
+                fixed = digit + ("" if VALUE not in mine[digit] else
+                                 f": {given.strip()}" if given else ": <the value>")
+                problem = (f"criterion {number} is {short!r}: did you mean option "
+                           f"{digit}? Write it as  - {fixed}")
+            else:
+                problem = (f"criterion {number} answers {short!r}, but its options "
+                           f"are {_listed(mine)}")
         elif short.lower() == "keep" and (mine or not quoted):
             if mine_now is None:
                 problem = (f"criterion {number} answers 'keep', which picks the "
                            f"option marked (as your code does now), and this "
                            f"question has none: "
-                           + (f"pick {' or '.join(sorted(mine))}, or write the answer"
+                           + (f"pick {_listed(mine, ' or ')}, or write the answer"
                               if mine else "write the answer as a sentence"))
             else:
                 criterion = mine[mine_now]
+        elif mine and _NUMBERED.fullmatch(short) and _NUMBERED.fullmatch(short).group(1) in mine:
+            found = _NUMBERED.fullmatch(short)
+            digit, rest = found.group(1), found.group(2).strip()
+            if VALUE in mine[digit]:
+                given = rest if len(rest.split()) <= 2 and VALUE not in rest else "<the value>"
+                fixed = f"{digit}: {given}"
+            else:
+                fixed = digit
+            problem = (f"criterion {number} is {short!r}: did you mean option "
+                       f"{digit}? Write it as  - {fixed}")
+        elif mine and len(short.split()) <= 2 and "(" not in short:
+            # `first`, `keep it`, `n/a`, `raises ValueError`: none is an
+            # answer this question takes, and none is a criterion on its own,
+            # since the question is removed before the tests are written.
+            example = mine[_listed(mine).split(", ")[0]].replace(VALUE, "0")
+            problem = (f"criterion {number} is {short!r}, which this question does "
+                       f"not take as an answer. Write an option number "
+                       f"({_listed(mine, ' or ')}), keep, or a whole sentence "
+                       f"that stands on its own, such as  - {_quote(example)}")
         if problem:
             problems.append(problem)
             lines[i] = prefix + _quote(f"TODO: {short} could not be read: {problem}")

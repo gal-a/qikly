@@ -95,6 +95,8 @@ Return [] if there are none. Return only the JSON array.
 
 
 def _as_lines(items):
+    if isinstance(items, str):
+        items = [items]  # one requirement written as a string, not one per letter
     return "\n".join(f"- {x}" for x in (items or [])) or "(none)"
 
 

@@ -40,6 +40,7 @@ phrased "reject large amounts" produces a test at some arbitrary large number;
 highest-leverage habit in writing a bar, and it is invisible until you measure
 what the suite misses.
 """
+import json
 import os
 import re
 
@@ -135,6 +136,136 @@ def _header_only(path):
     return len(lines) == 1
 
 
+def _yaml_problem(exc, raw):
+    """YAML's complaint, with the line it is on and the usual cause named."""
+    problem = getattr(exc, "problem", None)
+    context = getattr(exc, "context", None)
+    # The first line of str(exc) is the context ("while scanning ..."); the
+    # problem itself, the part that says what is wrong, came after it.
+    said = ", ".join(p for p in (problem, context) if p) or str(exc).split("\n")[0]
+    mark = getattr(exc, "problem_mark", None)
+    if mark is None:
+        return said
+    lines = (raw or "").split("\n")
+    if context and "quoted scalar" in context and getattr(exc, "context_mark", None):
+        # An unclosed quote: YAML notices lines later; the quote is where
+        # the context mark is.
+        opened = exc.context_mark.line
+        text = lines[opened].strip()[:50] if opened < len(lines) else ""
+        return (f"a quote opened on line {opened + 1} is never closed: {text!r}. "
+                f"Close it at the end of that line")
+    # The mark can land on the line after the one at fault, so show both.
+    start = max(mark.line - 1, 0)
+    near = lines[start:mark.line + 1]
+    shown = "; ".join(f"line {start + n + 1}: {l.strip()[:50]!r}"
+                      for n, l in enumerate(near) if l.strip())
+    hint = ""
+    if "\t" in said or any("\t" in l for l in near):
+        hint = ". There is a tab on one of these lines, and YAML needs spaces"
+    elif re.search(r"block (mapping|collection|end)|block sequence", said):
+        hint = (". Check the indent of these lines: each `- ` item lines up "
+                "with the ones beside it")
+    return f"{said}, near {shown}{hint}"
+
+
+def _as_written(raw, item):
+    """
+    The text of the `- ` line that YAML read as `item`, as the person typed
+    it. Rebuilt from the parsed value it came out changed: `yes` as True,
+    1.50 as 1.5, an accented letter as \\u00e9.
+    """
+    for line in (raw or "").split("\n"):
+        found = re.match(r"^[ \t]*-[ \t]+(.+?)[ \t]*$", line)
+        if not found:
+            continue
+        try:
+            if yaml.safe_load("- " + found.group(1)) == [item]:
+                return re.split(r"[ \t]#", found.group(1), 1)[0].strip()
+        except yaml.YAMLError:
+            continue
+    if isinstance(item, dict):
+        return "; ".join(f"{k}: {v}" for k, v in item.items())
+    return str(item)
+
+
+def _kind(value):
+    """What a value is, in the words a person filling in the file uses."""
+    return {dict: "a mapping", list: "a list", bool: "true or false", int: "a number",
+            float: "a number", str: "text"}.get(type(value), "a date or other value")
+
+
+def _quoted(text):
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+_TEXT_FIELDS = ("task_id", "task_name", "description")
+_LIST_OF_TEXT = ("inputs",)
+
+
+def _shape(task, name):
+    """(errors, warnings) for fields of the wrong kind, before any check reads them."""
+    errors, warnings = [], []
+
+    kind = _kind
+
+    for field in _TEXT_FIELDS:
+        value = task.get(field)
+        if isinstance(value, (dict, list)):
+            errors.append(f"{name}: {field} should be one line of text, not {kind(value)}")
+    requirements = task.get("requirements")
+    if isinstance(requirements, str):
+        # One string is a fine way to write one requirement. The restatement
+        # checks read requirements item by item, and on a string that meant
+        # letter by letter, so they found nothing.
+        task["requirements"] = [requirements]
+    elif requirements is not None and not isinstance(requirements, list):
+        errors.append(f"{name}: requirements should be a list, not {kind(requirements)}")
+    elif isinstance(requirements, list):
+        bad = [i for i, r in enumerate(requirements, 1) if not isinstance(r, str)]
+        if bad:
+            value = requirements[bad[0] - 1]
+            errors.append(f"{name}: requirement {bad[0]} is empty" if value is None else
+                          f"{name}: requirement {bad[0]} is {kind(value)}, not a "
+                          f"sentence. Put it in quotes if it has a colon in it")
+    for field in _LIST_OF_TEXT:
+        value = task.get(field)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            errors.append(f"{name}: {field} should be a list, one `- ` item per "
+                          f"file:\n  {field}:\n    - {value}")
+        elif not isinstance(value, list):
+            errors.append(f"{name}: {field} should be a list of file paths, not {kind(value)}")
+        elif any(not isinstance(v, str) or not v.strip() for v in value):
+            errors.append(f"{name}: every item under {field} should be a file path")
+    criteria = task.get("acceptance_criteria")
+    if criteria is not None and not isinstance(criteria, (list, str)):
+        errors.append(f"{name}: acceptance_criteria should be a list, not {kind(criteria)}")
+    interface = task.get("interface")
+    if interface is not None and not isinstance(interface, dict):
+        errors.append(f"{name}: interface should be a mapping, such as\n  interface:\n"
+                      f"    integration_functions:\n      - f(x)\n  not {kind(interface)}")
+    elif isinstance(interface, dict):
+        functions = interface.get("integration_functions")
+        if isinstance(functions, str):
+            interface["integration_functions"] = [functions]
+        elif functions is not None and not (isinstance(functions, list)
+                                            and all(isinstance(f, str) for f in functions)):
+            errors.append(f"{name}: interface.integration_functions should be a "
+                          f"list of signatures, such as  - f(x)")
+        entry = interface.get("system_entrypoint")
+        if entry is not None and not isinstance(entry, str):
+            errors.append(f"{name}: interface.system_entrypoint should be one line "
+                          f"of text, not {kind(entry)}")
+    seed = task.get("seed")
+    if isinstance(seed, dict):
+        for key in ("implementation", "tests"):
+            value = seed.get(key)
+            if value is not None and not isinstance(value, str):
+                errors.append(f"{name}: seed.{key} should be a file path, not {kind(value)}")
+    return errors, warnings
+
+
 def check_task(path):
     """
     Returns (errors, warnings) for one task file. Errors mean a run cannot
@@ -146,20 +277,43 @@ def check_task(path):
     from qikly.score_questions import expand_answers
     unread = []
     try:
-        with open(path, encoding="utf-8") as handle:
-            raw = handle.read()
+        # As a run reads it (agent_interface._read_task): UTF-8 with or
+        # without a BOM, else the local encoding. Plain UTF-8 here crashed on
+        # a file Notepad saved, and a BOM hid the acceptance_criteria key.
+        with open(path, "rb") as handle:
+            data = handle.read()
+        if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+            return [f"{name}: is saved as UTF-16 (Notepad calls it \"Unicode\"), "
+                    f"which a run cannot read. Save it as UTF-8"], []
+        else:
+            try:
+                raw = data.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                import locale
+                raw = data.decode(locale.getpreferredencoding(False), errors="replace")
+        raw = raw.replace("\r\n", "\n")
         # Read as both agents read it: a short answer, `2` or `keep`, as the
         # criterion it stands for, and one written without quotes as text.
+        written = raw
         raw, _, unread = expand_answers(raw)
         task = yaml.safe_load(raw)
     except OSError as exc:
         return [f"{name}: cannot be read: {exc}"], []
     except yaml.YAMLError as exc:
-        first = str(exc).split("\n")[0]
-        return [f"{name}: is not valid YAML: {first}"], []
+        return [f"{name}: is not valid YAML: {_yaml_problem(exc, written)}"], []
 
     if not isinstance(task, dict):
-        return [f"{name}: should be a mapping, not {type(task).__name__}"], []
+        if task is None:
+            return [f"{name}: is empty. Start from  qikly --scaffold <your module>"], []
+        return [f"{name}: should be a mapping of fields, such as  task_id: ..., "
+                f"not {_kind(task)}"], []
+
+    # A field of the wrong kind, `interface: text` or `inputs: 1.5`, ended
+    # this check in a traceback from whichever later check met it first.
+    shape_errors, shape_warnings = _shape(task, name)
+    if shape_errors:
+        return shape_errors + [f"{name}: {p}" for p in unread], shape_warnings
+    warnings.extend(shape_warnings)
 
     for field in REQUIRED:
         if not task.get(field):
@@ -185,7 +339,31 @@ def check_task(path):
         errors.append(f"{name}: acceptance_criteria should be a list")
     else:
         for i, item in enumerate(criteria, start=1):
-            if not isinstance(item, str) or not item.strip():
+            if isinstance(item, dict):
+                # `- f(100) returns: 0`: a sentence with a colon and a space,
+                # which YAML reads as a mapping. It crashed this check, and a
+                # run sent it on as "{'f(100) returns': 0}".
+                keys = [str(k).strip().lower() for k in item]
+                if len(item) == 1 and (keys[0] in ("todo", "answer", "my answer")
+                                       or keys[0].isdigit()):
+                    # `- TODO: 1`, `- Answer: 1`, `- 2: 5` under no question:
+                    # quoting these, as the general advice says, would send
+                    # "Answer: 1" to the tests or leave a TODO the run skips.
+                    errors.append(
+                        f"{name}: criterion {i} is {_as_written(written, item)!r}. "
+                        f"Write the answer alone, in place of the whole TODO "
+                        f"line: an option number such as  - 1  under a "
+                        f"numbered question, or else a sentence in quotes")
+                    continue
+                shown = _as_written(written, item)
+                errors.append(
+                    f"{name}: criterion {i} has a colon and a space in it, so "
+                    f"YAML reads it as a mapping, not a sentence. Put the whole "
+                    f"sentence in quotes:  - {_quoted(shown)}")
+                continue
+            if item is not None and not isinstance(item, str):
+                continue  # a bare number or yes/no, reported once below
+            if not item or not item.strip():
                 errors.append(f"{name}: criterion {i} is empty")
                 continue
             if not _CONCRETE.search(item):
@@ -283,12 +461,26 @@ def check_task(path):
     # question above" matched the template's own advice on replacing TODOs.
     # A bare number or a yes/no is none either: YAML reads `- 1` as 1.
     answered = [c for c in (task.get("acceptance_criteria") or [])
-                if isinstance(c, (str, dict)) and not is_todo(c)]
+                if isinstance(c, str) and not is_todo(c)]
     for n, c in enumerate(task.get("acceptance_criteria") or [], 1):
         if c is not None and not isinstance(c, (str, dict)):
-            errors.append(f"{name}: criterion {n} is {c!r}, not a sentence. Write "
-                          f"it as one that names a value, in quotes if it has a "
-                          f"colon in it")
+            number_like = isinstance(c, (int, float)) and not isinstance(c, bool)
+            if not number_like:
+                hint = ""
+            elif "#?" in written:
+                # The questions are there, so the number is not under one:
+                # typed below the TODO line instead of over it, or on the
+                # line after a bare dash.
+                hint = (". If it answers a numbered question, type it in place "
+                        "of that question's TODO line, on the same line as "
+                        "the dash")
+            else:
+                hint = (". If it answers a numbered question, the #? lines "
+                        "above it are gone, and they are what say which "
+                        "option a number means")
+            errors.append(f"{name}: criterion {n} is {_as_written(written, c)}, "
+                          f"not a sentence. Write it as one that names a value, "
+                          f"in quotes if it has a colon in it{hint}")
     for req, crit, score in restated(task.get("requirements"), answered):
         warnings.append(Note(
             f"{name}: a requirement restates a criterion ({int(score * 100)}% "
@@ -305,7 +497,16 @@ def check_task(path):
     # maintainer while going to the agent word for word. ADAS_HEADWAY's header
     # comment explained that a certain boundary was settled only in the
     # criteria, and then said which way it was settled.
-    for line, crit, score in _restated_outside_requirements(raw, task):
+    try:
+        outside = _restated_outside_requirements(raw, task)
+    except RuntimeError as exc:
+        # The handover's own guard: a criterion would still reach the coding
+        # agent after the block is removed, as one pasted word for word into
+        # requirements does. A run refuses with this message, so say it here,
+        # rather than end the check in a traceback.
+        errors.append(f"{name}: {exc}")
+        outside = []
+    for line, crit, score in outside:
         warnings.append(Note(
             f"{name}: a comment or description restates a criterion "
             f"({int(score * 100)}% of its words). Everything in this file "

@@ -346,7 +346,12 @@ def _surviving_criteria(task_text, handed_over):
         # used to raise AttributeError from the next line, which blocked the
         # run but with a stack trace where a sentence was intended.
         return ["<this file's root is not a mapping, so it is not a task>"]
-    authored = [normalise(r) for r in (parsed.get("requirements") or [])]
+    requirements = parsed.get("requirements") or []
+    if isinstance(requirements, str):
+        # One requirement written as a string, not a list of one: read
+        # letter by letter, it made a criterion pasted into it a "leak".
+        requirements = [requirements]
+    authored = [normalise(r) for r in requirements]
 
     # The handed-over text parsed back, so the comparison is value against
     # value. Comparing a parsed criterion against raw bytes made the same

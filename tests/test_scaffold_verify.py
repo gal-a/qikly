@@ -124,7 +124,7 @@ def test_each_question_says_what_the_code_does_beside_the_value(scored):
     assert '- "TODO: pick 1 or 2, or write your own"' in text
 
 
-def test_neither_agent_reads_the_notes(scored):
+def test_no_agent_reads_the_notes(scored):
     from qikly.agent_api.agent_interface import _read_task
     cli._do_scaffold("pricing.py", None)
     sent = _read_task("PRICING_VERIFY")

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>qikly</title>
-<meta name="description" content="Your AI writes both the code and its tests. How do you know the tests are really valid? The solution: two agents. One turns the acceptance criteria into tests. The other writes the code and never sees the acceptance criteria.">
+<meta name="description" content="Your AI writes both the code and its tests. How do you know the tests are really valid? The solution: agents kept apart. One writes the acceptance criteria from your docs, for you to check. One writes the tests from the acceptance criteria. One writes the code from your requirements, and never sees the acceptance criteria.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -847,7 +847,7 @@ footer {
       whole loop on a bundled task, nothing to fill in: tests written before any
       code, a coding agent that never sees the criteria, and a repair. About
       thirty seconds, well under a cent with a Gemini, OpenAI or Anthropic key.
-      <a class="small-link" href="#demo">Watch one run</a></p>
+      <a class="small-link" href="#demo">Watch one run</a> · <a class="small-link" href="https://towardsdatascience.com/qikly/" data-goatcounter-click="start-video">The 10-minute walkthrough</a></p>
     <!-- 2026-10-17: real excerpts on pricing.py with a two-test suite, branch
          build of 0.6.0, gemini-3.5-flash-lite. Step 1 is qikly --score;
          step 2 is the third question in the task file qikly --scaffold

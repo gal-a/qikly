@@ -125,7 +125,7 @@ requirements:
 #   - example_fn(0) returns 1.5      or write your own, naming a value
 # `qikly --validate` shows each short answer as the criterion it becomes.
 # A TODO you leave is skipped. The question lines above each TODO are notes
-# for you, and neither agent reads them. Keep these values out of every
+# for you, and no agent reads them. Keep these values out of every
 # other line of this file, comments included: the coding agent reads the rest.
 acceptance_criteria:
   - "TODO: one checkable statement, with its boundary value, e.g. a humidity of

@@ -2192,7 +2192,9 @@ def _module_of(task_file, as_written=False):
     a path to compare, or `as_written`, as the file gives it, for printing.
     """
     try:
-        with open(task_file, encoding="utf-8-sig") as handle:
+        # errors="replace": a file saved in another encoding is still read by
+        # the run, so its first line must not end --validate in a traceback.
+        with open(task_file, encoding="utf-8-sig", errors="replace") as handle:
             found = _HEADER.match(handle.readline().rstrip("\r\n"))
     except OSError:
         return None
@@ -2678,7 +2680,7 @@ def _scaffold_one(source, task_id, doc, fresh, brief=False):
                           "Replace each TODO line with your answer") +
                   ", with an option's number or a")
             print("  sentence naming a value someone could check. A TODO you leave is")
-            print("  skipped. Lines starting #? are notes for you: neither agent reads them.")
+            print("  skipped. Lines starting #? are notes for you: no agent reads them.")
         from qikly.score_questions import REQUIREMENT_MARK
         if REQUIREMENT_MARK in text:
             print("  Replace the requirements line too, marked TODO: MODIFY THIS:,")

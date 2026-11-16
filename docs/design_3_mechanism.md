@@ -9,7 +9,7 @@ all of them.
 **Part 3 of three.** [Part 1](design_1_case_study.md) makes the case and shows
 one repair end to end. [Part 2](design_2_performance.md) reports what was
 measured. This part is the architecture: what separates it from the
-alternatives, the five agents, and the command to run for whichever parts of a
+alternatives, the six agents, and the command to run for whichever parts of a
 task file you already have.
 
 
@@ -93,16 +93,18 @@ Two things are worth noticing about step 3. The reasoning and the diff are separ
 
 There is no separate "write the initial implementation" step anywhere. The first run happens against an empty source tree, fails on a collection error, and that failure feeds the same FIX and PATCH cycle as every later repair. The first line of code and the hundredth are produced by one mechanism.
 
-### The five agents
+### The six agents
 
-Everything above is done by five agents, each with its own definition file in
-`inputs_public/agent_defs/` and its own entry under `agents:` in
-`settings.yaml`, so any of them can be pointed at a different model without
-touching the others. Two of them exist because a single agent doing both jobs
+Everything above is done by six agents, each with its own entry under
+`agents:` in `settings.yaml`, so any of them can be pointed at a different
+model without touching the others. Five have a definition file in
+`inputs_public/agent_defs/`; the spec agent's prompt is built in
+`spec_draft.py`. Two of them exist because a single agent doing both jobs
 is the failure this project is about.
 
 | Agent | Settings key | Reads | Never reads | Produces |
 |---|---|---|---|---|
+| **Spec agent** | `spec` | the module's README and docstrings, its function names and signatures, and step 1's questions with the quoted code taken out | any function body | a first draft of the `requirements` line and one answer per question, each saying where it came from: a quote from the docs, checked word for word, or a judgement marked CHECK for a person to confirm |
 | **Coding agent** | `code` | requirements, interface, and pytest's output for whatever test just failed | the acceptance criteria | a FIX, the reasoning and the files it intends to touch, then a PATCH, a unified diff of only those files |
 | **Test-writing agent** | `test`, or `test_integration` / `test_system` / `test_unit` | requirements, interface, and every acceptance criterion in full | the implementation, except at the unit stage, which is written last and exists to name real functions | one pytest file per stage |
 | **Criteria drafter** | `criteria` | the requirements alone | any implementation, and any existing criteria | a first draft of the bar, only when `--generate-criteria` asks for one |

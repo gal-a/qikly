@@ -153,7 +153,7 @@ folder, and every step takes the same path:
    ValueError`; quote one that has a colon in it), or leave it: a TODO is
    skipped. Without a key every answer is yours, and the `requirements` line
    is marked `TODO: MODIFY THIS:`. Lines starting `#?` are notes for you, and
-   neither agent reads them. Then check it, free; it also shows each short
+   no agent reads them. Then check it, free; it also shows each short
    answer as the criterion it becomes:
 
    ```bash

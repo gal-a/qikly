@@ -33,6 +33,9 @@ in a copy of your code, one at a time, and turns each one your tests miss into a
 question about behaviour nothing checks. Above, a real run on the bundled
 [pricing example](https://github.com/gal-a/qikly/tree/main/docs/examples/pricing).
 
+**Watch it first:** a [10-minute walkthrough](https://towardsdatascience.com/qikly/)
+of all three steps on the bundled pricing example, with English subtitles.
+
 **Run on 50 young Python libraries,** it surfaced 4 real problems as well as the
 test gaps, each confirmed by hand and reported upstream. 2 are fixed so far:
 [cyclopts #1044](https://github.com/BrianPugh/cyclopts/issues/1044), fixed in
@@ -124,7 +127,7 @@ qikly --tasks my_module.py       # 3. the run                      a cent or so
    Without a key, every answer is yours to write, and the `requirements`
    line is marked `TODO: MODIFY THIS:`. On a folder it writes one task file
    for each module step 1 asked about. Lines starting `#?` are notes for you,
-   and neither agent reads them. This file is the one source of truth: change
+   and no agent reads them. This file is the one source of truth: change
    it and run step 3 again. `qikly --validate my_module.py` checks it, free,
    and shows each short answer as the criterion it becomes.
 3. **`--tasks` runs it**, which needs an API key (Google Gemini, Anthropic or
@@ -930,7 +933,7 @@ The design write-up is in three parts, and each stands on its own.
 |---|---|
 | **[1. The case](https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md)** | Why an agent that writes its own tests is grading its own homework, and one `CALC_TAX` repair followed end to end: what the coding agent was given, the test it failed, the reasoning it produced from the failure alone, and the one-line patch. Start here. |
 | **[2. How well it works](https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md)** | Three sweeps and 967 runs, the benchmark defect found and corrected between them, the unit-stage gap, what makes a run stall, and the results this project measured and then withdrew. |
-| **[3. How it is built](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md)** | What separates this from the alternatives, the five agents and what each may read, the FIX and PATCH separation, the thirteen example tasks, watching a run live, supplying your own code or tests, and the tools for generating and evaluating acceptance criteria. |
+| **[3. How it is built](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md)** | What separates this from the alternatives, the six agents and what each may read, the FIX and PATCH separation, the thirteen example tasks, watching a run live, supplying your own code or tests, and the tools for generating and evaluating acceptance criteria. |
 
 ---
 
