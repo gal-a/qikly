@@ -15,26 +15,34 @@
 [![Claude Code](https://img.shields.io/badge/Claude_Code-one--line_MCP_setup-D97757?logo=claude&logoColor=white)](https://github.com/gal-a/qikly#use-it-from-your-coding-agent)
 [![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22qikly%5Bmcp%5D%22%2C%22qikly-mcp%22%5D%7D)
 
-[![qikly: one spec in, code and tests out, written by a coding agent and a test agent that are kept apart](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_hero.png)](https://test.qikly.com)
+**Find out what your tests miss.** Free, no key, about 30 seconds, from your
+project's root folder:
 
-**The problem: Your AI writes both the code and its tests. How do you know the tests are really valid?**
+```
+pip install qikly
+qikly --score my_module.py
+```
+
+[![qikly --score on the bundled pricing example: 10 of 13 planted faults missed, and three of the questions they leave open](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_score.png)](#start-here)
+
+It plants faults in a copy of your code, one at a time, and turns each one your
+tests miss into a question about behaviour nothing checks. Nothing of yours is
+changed. Above, a real run on the bundled
+[pricing example](https://github.com/gal-a/qikly/tree/main/docs/examples/pricing),
+whose two tests both pass.
+
+**Watch it first:** a [10-minute walkthrough](https://towardsdatascience.com/qikly/)
+of all three steps on the bundled pricing example, with English subtitles.
+
+**Then close the gaps: your AI writes both the code and its tests. How do you know the tests are really valid?**
+
+[![qikly: one spec in, code and tests out, written by a coding agent and a test agent that are kept apart](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_hero.png)](https://test.qikly.com)
 
 *One logged run. The test agent builds the test suite: it was told, from the
 spec's acceptance criteria, that a rate may not exceed 100. The coding agent
 never saw the acceptance criteria and discovered that rate limit from a failing
 test: it then added `or rate > 100` by itself, so the 9 of 9 is code eventually
 passing the test suite after applying fixes in an automated repair loop.*
-
-[![qikly --score on the bundled pricing example: 10 of 13 planted faults missed, and three of the questions they leave open](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_score.png)](#start-here)
-
-**Try it now, free and with no API key:** `pip install --upgrade qikly`, then
-`qikly --score my_module.py` from your project's root folder. It plants faults
-in a copy of your code, one at a time, and turns each one your tests miss into a
-question about behaviour nothing checks. Above, a real run on the bundled
-[pricing example](https://github.com/gal-a/qikly/tree/main/docs/examples/pricing).
-
-**Watch it first:** a [10-minute walkthrough](https://towardsdatascience.com/qikly/)
-of all three steps on the bundled pricing example, with English subtitles.
 
 **Run on 50 young Python libraries,** it surfaced 4 real problems as well as the
 test gaps, each confirmed by hand and reported upstream. 2 are fixed so far:

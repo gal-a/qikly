@@ -371,7 +371,7 @@ h1 {
 .step .never li + li { margin-top: 4px; }
 .step .never b { font-size: inherit; }
 .step .never em { font-style: normal; font-weight: 600; color: var(--alert); }
-.step .cost {
+.step .cost, .hero-try .cost {
   align-self: flex-start;
   font-family: "IBM Plex Mono", monospace;
   font-size: .72rem;
@@ -380,7 +380,13 @@ h1 {
   border-radius: 999px;
   padding: 3px 10px;
 }
-.step .cost.free { color: var(--accent); background: var(--accent-soft); }
+.step .cost.free, .hero-try .cost.free { color: var(--accent); background: var(--accent-soft); }
+/* The free first step, ahead of everything else in the hero: one command and
+   what it printed, before the story of the paid steps. */
+.hero-try { display: flex; flex-direction: column; gap: 12px; margin: 18px 0 30px; }
+.hero-try .lead { margin: 0; font-size: 1.08rem; display: flex; flex-wrap: wrap;
+  align-items: center; gap: 10px; }
+.hero-try .eg { max-width: 640px; }
 .step .cost.key { color: var(--code); background: var(--code-soft); }
 .steps .row:last-child .step { border-top-color: var(--code); }
 
@@ -807,6 +813,21 @@ footer {
   <header class="hero">
     <p class="eyebrow">Functional tests for backend Python</p>
     <h1>Independent test generation for AI-written code</h1>
+    <!-- 2026-11-16: the free first step leads, before the story of the paid
+         steps: one command and a real result, from the pricing example. -->
+    <div class="hero-try">
+      <p class="lead"><b>Find out what your tests miss</b>
+        <span class="cost free">free, no key, about 30 seconds</span></p>
+      <div class="install">
+        <span><span class="prompt">$</span> pip install qikly</span>
+        <span><span class="prompt">$</span> qikly --score my_module.py</span>
+      </div>
+      <figure class="eg">
+        <figcaption>What it printed for pricing.py, whose two tests both pass</figcaption>
+<pre><span class="dim">[pricing.py]</span> <span class="alert">10 of 13 planted faults missed (77%)</span>, 3 caught.
+<span class="dim">[pricing.py]</span> 8 questions your tests leave open, in the same report.</pre>
+      </figure>
+    </div>
     <!-- The image straight under the headline, then the explanation, then the
          run in the image as its example: one argument read top to bottom,
          rather than a caption standing apart from it. -->
