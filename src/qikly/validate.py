@@ -180,7 +180,7 @@ def _as_written(raw, item):
             continue
         try:
             if yaml.safe_load("- " + found.group(1)) == [item]:
-                return re.split(r"[ \t]#", found.group(1), 1)[0].strip()
+                return re.split(r"[ \t]#", found.group(1), maxsplit=1)[0].strip()
         except yaml.YAMLError:
             continue
     if isinstance(item, dict):

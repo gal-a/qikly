@@ -421,7 +421,7 @@ def _scalar(raw):
         return raw[1:-1].replace("''", "'"), True
     if raw[0] in "|>[{&*!":
         return None, None
-    return re.split(r"\s#", raw, 1)[0].strip(), False
+    return re.split(r"\s#", raw, maxsplit=1)[0].strip(), False
 
 
 def _quote(text):
