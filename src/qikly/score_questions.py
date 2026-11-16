@@ -580,7 +580,7 @@ def expand_answers(text):
                               if mine else "write the answer as a sentence"))
             else:
                 criterion = mine[mine_now]
-        elif mine and _NUMBERED.fullmatch(short) and _NUMBERED.fullmatch(short).group(1) in mine:
+        elif mine and _numbered_slip(short, mine):
             found = _NUMBERED.fullmatch(short)
             digit, rest = found.group(1), found.group(2).strip()
             if VALUE in mine[digit]:
@@ -590,9 +590,11 @@ def expand_answers(text):
                 fixed = digit
             problem = (f"criterion {number} is {short!r}: did you mean option "
                        f"{digit}? Write it as  - {fixed}")
-        elif mine and len(short.split()) <= 2 and not re.search(r"\w\(", short):
+        elif (mine and len(short.split()) <= 2 and not re.search(r"\w\(", short)
+              and not _is_comparison(short)):
             # A bracket after a name is a call, `f(1)`, so a sentence; any
-            # other bracket, `yes (x)` or `(first`, is not.
+            # other bracket, `yes (x)` or `(first`, is not. A comparison,
+            # `MAX_RATE=100` or `rate<=0.5`, is a criterion however short.
             # `first`, `keep it`, `n/a`, `raises ValueError`: none is an
             # answer this question takes, and none is a criterion on its own,
             # since the question is removed before the tests are written.
@@ -610,6 +612,48 @@ def expand_answers(text):
     if options:
         problems.append(_unanswered(options))
     return "\n".join(lines), expanded, problems
+
+
+_PICK_WORDS = {"option", "opt", "answer", "pick", "choice", "keep", "yes", "no", "number"}
+
+
+def _is_comparison(short):
+    """
+    Whether a short answer is a comparison, `MAX_RATE=100` or `rate<=0.5`,
+    and so a criterion however short. The name starts a word, the value is a
+    number, a name or a quoted value, and `option=2` or `<Keep>x` are not:
+    the first version let those through as criteria.
+    """
+    found = re.search(r"(?:^|\s)([A-Za-z_][\w.]*)[ \t]*(?:==|!=|<=|>=|=|<|>)"
+                      r"[ \t]*(?:-?\d|[A-Za-z_]|[\"'][\w-])", short)
+    if not found or found.group(1).lower() in _PICK_WORDS:
+        return False
+    return not re.search(r"<\w*>", short)
+
+
+def _numbered_slip(short, mine):
+    """
+    Whether an answer is an option number with a value or the option's text
+    after it, `2 = 99` or a pasted option line, rather than a sentence that
+    happens to start with a number. "1.5 is returned for f(100)" and "2-digit
+    codes are rejected" are sentences, and the first version of this refused
+    them and dropped them from the run.
+    """
+    found = _NUMBERED.fullmatch(short)
+    if not found or found.group(1) not in mine:
+        return False
+    if re.match(r"\d+[.,]\d", short):
+        return False  # a decimal number, not an option and a separator
+    # `2 = [1, 2, 3]` or `1 = f(100) raises TypeError`: no sentence starts
+    # with an option number and then `=`, `->`, a full-width colon or `;`,
+    # so after those it is a slip at any length. After `)`, `.`, `-` or `(`
+    # it is one only when short, since "2-digit codes are rejected" is not.
+    if re.match(r"\d+[ \t]*(?:=|->|\uff1a|;)", short):
+        return True
+    rest = found.group(2).strip().strip("\"'")
+    pasted = mine[found.group(1)].replace(VALUE, "").strip()
+    return bool(len(rest.split()) <= 2
+                or (pasted and rest.startswith(pasted[:max(len(pasted) - 6, 1)])))
 
 
 def _unanswered(options):

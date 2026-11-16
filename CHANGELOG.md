@@ -4,6 +4,60 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## 0.6.3
+
+> Clearer first steps: `--validate` reads hand-typed answers, `--score` never hangs, and the MCP tools check their arguments
+
+### Changed
+- **`--score` exits 1 when your tests fail before any fault is planted.** It
+  printed the right advice but exited 0, which told a script or CI that the
+  score had been taken. If your CI runs `qikly --score` on a suite that does
+  not pass on its own, it now goes red.
+- **A run prints what `--validate` finds before it starts,** so an answer
+  it cannot read is no longer left out without a word. The run still goes
+  ahead as before.
+- **Six agents, not five,** in the docs: the spec agent that drafts answers
+  from your docs is in the mechanism table, and the headline describes the
+  three agents the same way.
+- **Skill 0.3.10:** the `--validate` row lists answers it cannot read and
+  fields of the wrong kind.
+
+### Fixed
+- **Hand-typed answers in the task file.** `--validate` now gives one
+  message that names the fix for answers it cannot read, where it used to
+  send them to test generation as written or crash: `- -1`, `1)`, `option 1`,
+  `1,2`, `2 = 99`, `2: <the value>`, a pasted option line, words such as
+  `first` or `keep it`, an answer at the left edge that YAML would join with
+  the next line, and an answer line deleted or commented out. Answers in
+  typographic quotes are read. Sentences that start with a number or
+  compare values, such as `1.5 is returned for f(100)` or `MAX_RATE=100`,
+  are still criteria.
+- **Fields of the wrong kind** (`interface: text`, `inputs: 1.5`, an
+  unquoted signature with a colon in it) are named instead of ending
+  `--validate` in a traceback. A criterion with an unquoted colon gets the
+  quotes advice, with your text as you typed it.
+- **Files saved in the local Windows encoding or with a BOM** are read by
+  `--validate` and by a run as they are by test generation; a UTF-16 file
+  is named. YAML errors quote the lines and name tabs, indents and unclosed
+  quotes.
+- **One requirement written as a string** is no longer checked letter by
+  letter by the restatement and leak checks.
+- **`--score` never hangs on a test that hangs.** The untouched suite has a
+  15-minute limit, then one message; `QIKLY_SUITE_TIMEOUT=<seconds>` gives a
+  slow suite more time.
+- **`--score` names the real problem** for a missing file, a non-Python
+  file, a name in the wrong case, a syntax error in the module, and a path
+  past Windows' 260-character limit.
+- **A run's output can no longer fail on a character the console cannot
+  print,** when output goes to a file, CI or an MCP host.
+- **MCP:** `qikly_run` checks `provider` and `model` before starting
+  anything, so an unknown provider no longer starts a run. Missing or
+  unknown arguments, folders and non-Python files get plain messages, and
+  `qikly_validate` no longer passes on an error message that could quote a
+  criterion.
+- **Keys:** when the chosen provider has no key but another provider's key
+  is set, the message names it and the `LLM_PROVIDER` that would use it.
+
 ## 0.6.2
 
 > Fix: on Windows, a zero time budget could still run one question; the README shows a real --score run

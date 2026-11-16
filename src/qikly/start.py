@@ -41,6 +41,11 @@ class SuiteStuck(Exception):
 SUITE_TIMEOUT = 900
 
 
+def _suite_limit():
+    from qikly.mutation_score import suite_limit
+    return suite_limit(SUITE_TIMEOUT)
+
+
 def is_terminal():
     """
     Whether someone can answer. `isatty()` alone is not enough on Windows,
@@ -452,12 +457,12 @@ def _fit_to_time(console, tests, cwd, planted):
     try:
         subprocess.run([sys.executable, "-m", "pytest", "-q", "-x", "--color=no",
                         "-p", "no:cacheprovider", tests], cwd=cwd,
-                       capture_output=True, text=True, timeout=SUITE_TIMEOUT)
+                       capture_output=True, text=True, timeout=_suite_limit())
     except subprocess.TimeoutExpired:
         # It went on to the scoring run, which then hung for good on the same
         # test: 15 minutes of nothing on screen, then forever.
         from qikly.mutation_score import stuck_message
-        raise SuiteStuck(stuck_message("score", [tests], SUITE_TIMEOUT))
+        raise SuiteStuck(stuck_message("score", [tests], _suite_limit()))
     except OSError:
         return planted
     each = max(time.monotonic() - started, 0.3)

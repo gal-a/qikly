@@ -154,6 +154,9 @@ def build_prompt(requirements, criteria, description=None):
     is where the task says what it is for, and a criterion measuring something
     else is wrong in a way the requirements alone cannot show.
     """
+    if isinstance(description, list):
+        # A description written as a list of lines, not its Python repr.
+        description = "\n".join(str(d) for d in description)
     return PROMPT.format(description=(description or "(none)"),
                          requirements=_as_lines(requirements),
                          criteria=_as_lines(criteria))

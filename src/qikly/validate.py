@@ -198,7 +198,8 @@ def _quoted(text):
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-_TEXT_FIELDS = ("task_id", "task_name", "description")
+# description may be a list of lines, which a run sends as written.
+_TEXT_FIELDS = ("task_id", "task_name")
 _LIST_OF_TEXT = ("inputs",)
 
 
@@ -208,6 +209,12 @@ def _shape(task, name):
 
     kind = _kind
 
+    description = task.get("description")
+    if description is not None and not (
+            isinstance(description, (str, int, float))
+            or (isinstance(description, list) and all(isinstance(d, str) for d in description))):
+        errors.append(f"{name}: description should be text, or a list of lines of "
+                      f"text, not {_kind(description)}")
     for field in _TEXT_FIELDS:
         value = task.get(field)
         if isinstance(value, (dict, list)):
@@ -249,6 +256,14 @@ def _shape(task, name):
         functions = interface.get("integration_functions")
         if isinstance(functions, str):
             interface["integration_functions"] = [functions]
+        elif isinstance(functions, list) and any(isinstance(f, dict) for f in functions):
+            # `- fee(amount: int) -> float`: the colon and space make it a
+            # mapping, and 0.6.2 let it through as one.
+            bad = next(f for f in functions if isinstance(f, dict))
+            shown = "; ".join(f"{k}: {v}" for k, v in bad.items())
+            errors.append(f"{name}: an interface signature has a colon and a space "
+                          f"in it, so YAML reads it as a mapping. Put it in quotes:  "
+                          f"- {_quoted(shown)}")
         elif functions is not None and not (isinstance(functions, list)
                                             and all(isinstance(f, str) for f in functions)):
             errors.append(f"{name}: interface.integration_functions should be a "
@@ -509,7 +524,14 @@ def check_task(path):
         # agent after the block is removed, as one pasted word for word into
         # requirements does. A run refuses with this message, so say it here,
         # rather than end the check in a traceback.
-        errors.append(f"{name}: {exc}")
+        # Said only when nothing above already explains it: a bare `- 1` or a
+        # mapping criterion has its own error, and this one, quoting the same
+        # criterion, came second and read as a different problem.
+        quoted = re.search(r"starting with (['\"])(.*?)\1", str(exc))
+        explained = quoted and any(f"{name}: criterion " in e and quoted.group(2) in e
+                                   for e in errors)
+        if not explained:
+            errors.append(f"{name}: {exc}")
         outside = []
     for line, crit, score in outside:
         warnings.append(Note(

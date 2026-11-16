@@ -890,7 +890,7 @@ def _score_once(target, mutants, seed, code_root):
         import time
         baseline_began = time.monotonic()
         try:
-            baseline_passed = _suite_passes(workspace, target, env, timeout=BASELINE_TIMEOUT)
+            baseline_passed = _suite_passes(workspace, target, env, timeout=suite_limit(BASELINE_TIMEOUT))
             stuck = False
         except _Stuck:
             baseline_passed, stuck = False, True
@@ -1297,14 +1297,34 @@ def _invite_lines(result):
             "rate = 100\". Please don't post your code.", ""]
 
 
+def suite_limit(default):
+    """
+    How long the untouched suite may take, in seconds: QIKLY_SUITE_TIMEOUT if
+    it is set to a positive number, else `default`. A suite that genuinely
+    takes longer than the default could not be scored at all without it.
+    """
+    import math
+    import threading
+    try:
+        value = float(os.environ.get("QIKLY_SUITE_TIMEOUT", ""))
+    except ValueError:
+        return default
+    if not math.isfinite(value) or value <= 0:
+        return default
+    # Past this, subprocess raises OverflowError: a huge value means "no
+    # practical limit", so it gets the largest one the platform takes.
+    return min(value, threading.TIMEOUT_MAX)
+
+
 def stuck_message(label, suites, seconds):
     """What to say when the untouched suite does not finish."""
-    took = f"{int(seconds // 60)} minutes" if seconds >= 60 else f"{seconds:g} seconds"
-    return (f"[{label}] your tests did not finish within {took} "
-            f"on the untouched code, so nothing was planted. A test is probably "
-            f"waiting for input or a network connection, or stuck in a loop. "
-            f"Run  python -m pytest {' '.join(suites)}  to see which one, or "
-            f"name a smaller set with --score-tests <file>.")
+    took = (f"{seconds / 60:.3g} minutes" if seconds >= 60 else f"{seconds:g} seconds")
+    return (f"[{label}] your tests did not finish within {took} on the untouched "
+            f"code, so nothing was planted. Either a test is waiting for input or "
+            f"a network connection, or stuck in a loop: run  python -m pytest "
+            f"{' '.join(suites)}  to see which one. Or the suite is just slow: "
+            f"allow it more time with QIKLY_SUITE_TIMEOUT=<seconds>, or name a "
+            f"smaller set with --score-tests <file>.")
 
 
 class Unscored(str):
@@ -1336,7 +1356,7 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
     path = write(result, gaps, report_dir(target, invoked_from), invoked_from)
 
     if not result["baseline"] and result.get("baseline_timeout"):
-        print(stuck_message(task_id, target.suites, BASELINE_TIMEOUT))
+        print(stuck_message(task_id, target.suites, suite_limit(BASELINE_TIMEOUT)))
         return Unscored(path)
     if not result["baseline"]:
         if target.task_id is None:

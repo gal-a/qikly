@@ -73,6 +73,7 @@ def test_a_long_path_gets_the_windows_limit_named():
 def test_a_test_that_hangs_is_named_instead_of_hanging(here, monkeypatch, capsys):
     from qikly import start
     monkeypatch.setattr(start, "SUITE_TIMEOUT", 3)
+    monkeypatch.delenv("QIKLY_SUITE_TIMEOUT", raising=False)
     (here / "calc.py").write_text("def rate(x):\n    if x > 100:\n        return 100\n    return x\n")
     (here / "tests").mkdir()
     (here / "tests" / "test_calc.py").write_text(
@@ -87,6 +88,7 @@ def test_the_scoring_run_has_its_own_limit(here, monkeypatch, capsys):
     # untouched suite's own limit is what stops it.
     from qikly import mutation_score as ms
     monkeypatch.setattr(ms, "BASELINE_TIMEOUT", 3.0)
+    monkeypatch.delenv("QIKLY_SUITE_TIMEOUT", raising=False)
     (here / "calc.py").write_text("def rate(x):\n    if x > 100:\n        return 100\n    return x\n")
     (here / "tests").mkdir()
     (here / "tests" / "test_calc.py").write_text(
@@ -102,3 +104,40 @@ def test_a_syntax_error_is_one_line_not_a_traceback(here, capsys):
     assert cli._do_score_suite(None, None, None, code="calc.py") == 1
     err = capsys.readouterr().err
     assert "calc.py, line 1, does not parse" in err and "Traceback" not in err, err
+
+
+def test_named_tests_skip_the_case_check(here):
+    # 0.6.2 scored `--score CALC.PY --score-tests ...`; the case only matters
+    # when qikly searches for the tests itself.
+    assert cli._score_target_problem("Calc.py", check_case=False) is None
+
+
+def test_a_name_that_exists_exactly_is_never_refused(here, monkeypatch):
+    # A case-sensitive disk with both Calc.py and calc.py.
+    monkeypatch.setattr(cli.os, "listdir", lambda folder: ["Calc.py", "calc.py", "notes.txt"])
+    assert cli._score_target_problem("calc.py") is None
+
+
+def test_a_slow_suite_can_be_given_more_time(monkeypatch):
+    from qikly import mutation_score as ms
+    monkeypatch.setenv("QIKLY_SUITE_TIMEOUT", "3600")
+    assert ms.suite_limit(900) == 3600
+    monkeypatch.setenv("QIKLY_SUITE_TIMEOUT", "nonsense")
+    assert ms.suite_limit(900) == 900
+    assert "QIKLY_SUITE_TIMEOUT" in ms.stuck_message("x", ["tests"], 900)
+
+
+def test_a_huge_limit_is_the_largest_the_platform_takes(monkeypatch):
+    # 999999999 ended --score in OverflowError from subprocess.
+    import threading
+    from qikly import mutation_score as ms
+    for value in ("999999999", "1e12", "inf", "1e999"):
+        monkeypatch.setenv("QIKLY_SUITE_TIMEOUT", value)
+        assert ms.suite_limit(900) in (threading.TIMEOUT_MAX, 900), value
+    monkeypatch.setenv("QIKLY_SUITE_TIMEOUT", "nan")
+    assert ms.suite_limit(900) == 900
+
+
+def test_ninety_seconds_is_not_one_minute():
+    from qikly import mutation_score as ms
+    assert "1.5 minutes" in ms.stuck_message("x", ["tests"], 90)

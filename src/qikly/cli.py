@@ -246,6 +246,11 @@ def _run_task_process(task_id, seed, generate_criteria, resume=False):
     # it starts without the signal also reaching the parent that sent it. No
     # effect on Windows, which kills the tree by parent id instead.
     _own_process_group()
+    # A spawned child does not inherit the parent's UTF-8 streams: with
+    # output to a file, CI or an MCP host it wrote cp1252, and one arrow or
+    # Hebrew letter in a printed criterion failed the run.
+    from qikly.console import use_utf8
+    use_utf8()
     # The heartbeat writes to stderr, which the prefixing below does not
     # touch, so under a sweep thirteen concurrent tasks produced lines saying
     # "[test_integration] still waiting" with nothing to say whose they were.
@@ -1660,7 +1665,7 @@ def _do_install_skill(agent, force, dry_run):
     return 0
 
 
-def _score_target_problem(code):
+def _score_target_problem(code, check_case=True):
     """
     What is wrong with the module `--score` was given, or None. A missing
     file, a text file and a name in the wrong case were all reported as
@@ -1678,10 +1683,16 @@ def _score_target_problem(code):
     # Windows finds `Calc.py` for calc.py, but `import calc` in the tests
     # does not match it, so no test seemed to import it.
     folder, typed = os.path.split(os.path.abspath(where))
+    # Only when the tests are searched for, which is what the case breaks;
+    # and never when the name exists exactly as typed, as it can beside a
+    # differently cased twin on a case-sensitive disk.
     try:
-        actual = next((n for n in os.listdir(folder) if n.lower() == typed.lower()), typed)
+        names = os.listdir(folder)
     except OSError:
-        actual = typed
+        names = [typed]
+    if not check_case or typed in names:
+        return None
+    actual = next((n for n in names if n.lower() == typed.lower()), typed)
     if actual != typed:
         return (f"The file is called {actual}, not {typed}. Write it with that "
                 f"case:  qikly --score {os.path.join(os.path.dirname(code), actual)}")
@@ -1720,7 +1731,7 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
     stamp(project_root_matters=not (code or tests))
 
     if code or tests:
-        problem = _score_target_problem(code) if code else None
+        problem = _score_target_problem(code, check_case=not tests) if code else None
         if problem:
             print(problem, file=sys.stderr)
             return 1

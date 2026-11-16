@@ -275,3 +275,87 @@ def test_the_last_question_without_an_answer_is_named(tmp_path):
     errors = _errors(tmp_path, 'acceptance_criteria:\n  - "f(5) returns 5"\n'
                      + QUESTION.split("\n", 1)[1])
     assert len(errors) == 1 and "has no answer line under it" in errors[0], errors
+
+
+# From an audit of 0.6.3: these were criteria in 0.6.2, and the first
+# version of the answer checks refused them and dropped them from the run.
+THREE = ("acceptance_criteria:\n  #? What?\n  #?   1 = f(100) raises ValueError\n"
+         "  #?   2 = f(100) returns VALUE\n  #?   3 = f(100) returns 0\n")
+
+
+@pytest.mark.parametrize("answer", [
+    '"1.5 is returned for f(100)"', "2-digit codes are rejected by f(100)",
+    "3 - 1 equals f(2)", "1 > 0 holds and f(100) returns 100", "2.0 is what f(100) returns",
+    "MAX_RATE=100", "rate==0.5", "result>=100",
+])
+def test_a_sentence_that_starts_with_a_number_or_compares_is_a_criterion(tmp_path, answer):
+    assert _errors(tmp_path, THREE + f"  - {answer}\n") == []
+
+
+def test_an_unquoted_signature_names_the_quotes(tmp_path):
+    path = tmp_path / "F.yaml"
+    path.write_text('task_id: "F"\nrequirements: "r"\ninterface:\n  integration_functions:\n'
+                    '    - fee(amount: int) -> float\nacceptance_criteria:\n  - "fee(1) is 1"\n')
+    errors = check_task(str(path))[0]
+    assert len(errors) == 1 and '- "fee(amount: int) -> float"' in errors[0], errors
+
+
+def test_a_description_written_as_a_list_is_fine(tmp_path):
+    path = tmp_path / "F.yaml"
+    path.write_text('task_id: "F"\ndescription:\n  - "one"\n  - "two"\nrequirements: "r"\n'
+                    'interface:\n  integration_functions: ["f(x)"]\n'
+                    'acceptance_criteria:\n  - "f(1) returns 1"\n')
+    assert check_task(str(path))[0] == []
+
+
+def test_a_bare_number_is_not_also_reported_as_a_handover_problem(tmp_path):
+    errors = _errors(tmp_path, "acceptance_criteria:\n  - 1\n" + OTHER)
+    assert len(errors) == 1, errors
+
+
+def test_the_run_warning_never_stops_a_run_on_a_cp1252_stream(tmp_path, monkeypatch):
+    import io
+    import sys
+    from qikly.orchestrator import orchestrator
+    path = tmp_path / "F.yaml"
+    path.write_text(HEAD + "acceptance_criteria:\n  - fee(100) returns: 101 \u2192 up\n",
+                    encoding="utf-8")
+    monkeypatch.setattr(orchestrator, "task_config_path", lambda task_id: str(path))
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(io.BytesIO(), encoding="cp1252"))
+    orchestrator._say_what_validate_finds("F")  # must not raise
+
+
+# From the review of the audit fixes.
+@pytest.mark.parametrize("answer", [
+    "2 = [1, 2, 3]", "2 = 0.5 per cent", "2 -> not a number", "2 = 99 (ninety nine)",
+    "1 = fee(100) raises TypeError", "option=2", "answer=2", "keep=1", "yes=1",
+    "opt>2", "<2>99", "<Keep>x", "a<b>", "x=-", "x='", "x !y", "n/a=1",
+])
+def test_slips_the_comparison_and_length_rules_used_to_let_through(tmp_path, answer):
+    errors = _errors(tmp_path, QUESTION + f"  - {answer}\n" + OTHER)
+    assert len(errors) == 1, errors
+
+
+def test_the_handover_error_still_shows_beside_an_unrelated_one(tmp_path):
+    path = tmp_path / "F.yaml"
+    path.write_text('task_id: "F"\ndescription: "fee(1) returns 1"\nrequirements: "r"\n'
+                    'interface:\n  integration_functions: ["fee(x)"]\n'
+                    'acceptance_criteria:\n  - "fee(1) returns 1"\n  - 7\n')
+    errors = check_task(str(path))[0]
+    assert any("criterion 2 is 7" in e for e in errors), errors
+    assert any("cannot be stripped safely" in e for e in errors), errors
+
+
+@pytest.mark.parametrize("value", ["{a: 1}", "[{a: 1}]"])
+def test_a_description_that_is_not_text_is_named(tmp_path, value):
+    path = tmp_path / "F.yaml"
+    path.write_text(f'task_id: "F"\ndescription: {value}\nrequirements: "r"\n'
+                    'interface:\n  integration_functions: ["f(x)"]\n'
+                    'acceptance_criteria:\n  - "f(1) returns 1"\n')
+    assert any("description should be text" in e for e in check_task(str(path))[0])
+
+
+def test_both_spec_checks_read_a_list_description_as_lines():
+    from qikly.orchestrator.tuning import check_criteria, check_suites
+    assert "one\ntwo" in check_criteria.build_prompt(["r"], ["c"], ["one", "two"])
+    assert "one\ntwo" in check_suites.build_prompt(["r"], ["c"], [], ["one", "two"])

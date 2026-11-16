@@ -98,6 +98,13 @@ Return a JSON object:
 """
 
 
+def _as_text(value):
+    """A description written as a list of lines, as one block of text."""
+    if isinstance(value, list):
+        return "\n".join(str(v) for v in value)
+    return value if value is None else str(value)
+
+
 def _as_lines(items):
     if isinstance(items, str):
         items = [items]  # one requirement written as a string, not one per letter
@@ -132,7 +139,7 @@ def build_prompt(requirements, criteria, suites, description=None):
     """
     blocks = "\n\n".join(f"=== {stage}: {name} ===\n{source}" for stage, name, source in suites)
     return (PROMPT
-            .replace("<<DESCRIPTION>>", description or "(none)")
+            .replace("<<DESCRIPTION>>", _as_text(description) or "(none)")
             .replace("<<REQUIREMENTS>>", _as_lines(requirements))
             .replace("<<CRITERIA>>", _as_lines(criteria))
             .replace("<<SUITES>>", blocks or "(none)"))

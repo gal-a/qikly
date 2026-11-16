@@ -301,20 +301,23 @@ def _say_what_validate_finds(task_id, printer=print):
     would have said, before anything is spent. Said, not enforced: the run
     goes ahead as it always has, and a check that fails here never stops it.
     """
+    # All of it inside the try, printing included: a message that quotes an
+    # arrow or a Hebrew letter could not be written to a cp1252 stream, and
+    # that ended the run this exists only to inform.
     try:
         from qikly.validate import check_task
         errors, _ = check_task(task_config_path(task_id))
+        if errors:
+            printer(f"[{task_id}] WARNING: qikly --validate finds {len(errors)} "
+                    f"problem(s) in this task file. The run goes ahead as it is, "
+                    f"and any criterion it cannot read is left out of it:")
+            for error in errors:
+                printer(f"[{task_id}]   - {error}")
+            printer(f"[{task_id}]   Fix them and run  qikly --validate --tasks "
+                    f"{task_id}  to check, before the next run.")
+        return errors
     except Exception:
         return []
-    if errors:
-        printer(f"[{task_id}] WARNING: qikly --validate finds {len(errors)} "
-                f"problem(s) in this task file. The run goes ahead, but an answer "
-                f"it cannot read is left out of it:")
-        for error in errors:
-            printer(f"[{task_id}]   - {error}")
-        printer(f"[{task_id}]   Fix them and run  qikly --validate --tasks "
-                f"{task_id}  to check, before the next run.")
-    return errors
 
 
 def _warn_if_no_acceptance_criteria(task_id):
