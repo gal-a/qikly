@@ -182,6 +182,9 @@ def _nearby_suite(code, tests):
 HEARTBEAT_SECONDS = 15
 # The least time a fault gets before it counts as stuck, in seconds.
 FAULT_TIMEOUT_FLOOR = 60.0
+# The untouched suite's own limit. Without one, a test that waits on a
+# socket or loops forever made --score hang with nothing on screen.
+BASELINE_TIMEOUT = 900.0
 
 
 def has_code(path):
@@ -465,9 +468,20 @@ def _suite_env(workspace, target):
     return env
 
 
-def _suite_passes(workspace, target, env=None):
-    """True only when every stage of the suite passes in this workspace."""
-    return _suite_verdict(workspace, target, env) == "pass"
+class _Stuck(Exception):
+    """The untouched suite did not finish within its time limit."""
+
+
+def _suite_passes(workspace, target, env=None, timeout=None):
+    """
+    True only when every stage of the suite passes in this workspace. Raises
+    _Stuck when it runs past `timeout`, which is not the same answer as a
+    failing suite and gets its own message.
+    """
+    verdict = _suite_verdict(workspace, target, env, timeout=timeout)
+    if verdict == "timeout":
+        raise _Stuck()
+    return verdict == "pass"
 
 
 def _drop_bytecode(workspace):
@@ -875,7 +889,11 @@ def _score_once(target, mutants, seed, code_root):
         env = _suite_env(workspace, target)
         import time
         baseline_began = time.monotonic()
-        baseline_passed = _suite_passes(workspace, target, env)
+        try:
+            baseline_passed = _suite_passes(workspace, target, env, timeout=BASELINE_TIMEOUT)
+            stuck = False
+        except _Stuck:
+            baseline_passed, stuck = False, True
         # Each fault gets ten times the untouched suite's time, and at least
         # a minute: slower than that, it is stuck rather than slow.
         fault_timeout = max(FAULT_TIMEOUT_FLOOR, 10 * (time.monotonic() - baseline_began))
@@ -883,6 +901,7 @@ def _score_once(target, mutants, seed, code_root):
         if not baseline_passed:
             return {"task": target.label, "baseline": False, "caught": [],
                     "missed": [], "unscorable": 0, "total": 0,
+                    "baseline_timeout": stuck,
                     "generated": target.task_id is not None}
 
         # A green baseline is not enough on its own: a suite that imports an
@@ -1278,6 +1297,25 @@ def _invite_lines(result):
             "rate = 100\". Please don't post your code.", ""]
 
 
+def stuck_message(label, suites, seconds):
+    """What to say when the untouched suite does not finish."""
+    took = f"{int(seconds // 60)} minutes" if seconds >= 60 else f"{seconds:g} seconds"
+    return (f"[{label}] your tests did not finish within {took} "
+            f"on the untouched code, so nothing was planted. A test is probably "
+            f"waiting for input or a network connection, or stuck in a loop. "
+            f"Run  python -m pytest {' '.join(suites)}  to see which one, or "
+            f"name a smaller set with --score-tests <file>.")
+
+
+class Unscored(str):
+    """
+    The report's path, when the suite failed before any fault was planted.
+    Still the path, so callers that print it are unchanged; marked, so the
+    command can exit non-zero. It exited 0, which told a script or CI that
+    the score had been taken.
+    """
+
+
 def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
     """The command's body: score, report, and say what the number is worth."""
     if isinstance(target, str):
@@ -1297,6 +1335,9 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
     gaps = unreachable_criteria(target.task_id)
     path = write(result, gaps, report_dir(target, invoked_from), invoked_from)
 
+    if not result["baseline"] and result.get("baseline_timeout"):
+        print(stuck_message(task_id, target.suites, BASELINE_TIMEOUT))
+        return Unscored(path)
     if not result["baseline"]:
         if target.task_id is None:
             # No run exists in this mode, so "get the run to converge" is
@@ -1337,7 +1378,7 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
         else:
             print(f"[{task_id}] the suite does not pass your current code, so a "
                   f"score would mean nothing. Report at {path}")
-        return path
+        return Unscored(path)
 
     total, caught = result["total"], len(result["caught"])
     print(f"[{task_id}] {headline(caught, total)}." if total

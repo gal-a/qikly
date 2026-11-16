@@ -264,6 +264,9 @@ SKILL_BODY_HASHES = {
     # 0.3.9: "the green means nothing" became "can mean nothing": a green
     # suite may be hollow, not must be.
     "0.3.9": "1d5517416cac6458ab2b50eaac8f801eab3dba863efc3294f2aabac0e1392320",
+    # 0.3.10: --validate catches answers it cannot read and fields of the
+    # wrong kind, and a run prints the same problems before it starts.
+    "0.3.10": "e333912772fa864306116a4bde62eacf60d931c8e64dfbe94392633a91fdea07",
 }
 
 

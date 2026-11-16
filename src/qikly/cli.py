@@ -1660,6 +1660,47 @@ def _do_install_skill(agent, force, dry_run):
     return 0
 
 
+def _score_target_problem(code):
+    """
+    What is wrong with the module `--score` was given, or None. A missing
+    file, a text file and a name in the wrong case were all reported as
+    "No test files that import it were found", which sent people to look at
+    their tests for a mistake in the path.
+    """
+    where = code if os.path.isabs(code) else os.path.join(INVOKED_FROM, code)
+    if not os.path.exists(where):
+        return (f"No such file: {code} (looked in {INVOKED_FROM}). Give the path "
+                f"to your module from this folder, such as  qikly --score src/pricing.py")
+    if os.path.isdir(where):
+        return None
+    if not where.lower().endswith(".py"):
+        return f"{code} is not a Python file. --score plants faults in a .py module"
+    # Windows finds `Calc.py` for calc.py, but `import calc` in the tests
+    # does not match it, so no test seemed to import it.
+    folder, typed = os.path.split(os.path.abspath(where))
+    try:
+        actual = next((n for n in os.listdir(folder) if n.lower() == typed.lower()), typed)
+    except OSError:
+        actual = typed
+    if actual != typed:
+        return (f"The file is called {actual}, not {typed}. Write it with that "
+                f"case:  qikly --score {os.path.join(os.path.dirname(code), actual)}")
+    return None
+
+
+def _long_path_hint(exc):
+    """A hint when a path went past Windows' 260-character limit."""
+    if os.name != "nt" or not isinstance(exc, OSError):
+        return ""
+    name = str(getattr(exc, "filename", "") or "")
+    if getattr(exc, "winerror", None) == 206 or len(name) >= 250:
+        return (". That path is longer than Windows allows by default (260 "
+                "characters), and qikly works in a copy of your project beside "
+                "it. Move the project to a shorter folder, such as C:\\code\\, "
+                "or turn on long paths in Windows")
+    return ""
+
+
 def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
     """
     `--score-suite`: how much of your own code can be broken without the suite
@@ -1679,6 +1720,10 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
     stamp(project_root_matters=not (code or tests))
 
     if code or tests:
+        problem = _score_target_problem(code) if code else None
+        if problem:
+            print(problem, file=sys.stderr)
+            return 1
         if code and not tests:
             # The test files that import the code, searched from the project
             # root: found the way --scaffold finds them for the data rows, so
@@ -1749,6 +1794,18 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
             except (start.Stop, EOFError, KeyboardInterrupt):
                 print("\nStopped before anything was planted.")
                 return 130
+            except start.SuiteStuck as stuck:
+                print(str(stuck), file=sys.stderr)
+                return 1
+            except SyntaxError as exc:
+                # It reached the user as a raw Python traceback.
+                where = os.path.basename(exc.filename or "") or "The module"
+                if where == "<unknown>":
+                    where = os.path.basename(code)
+                print(f"{where}, line {exc.lineno}, does not parse: {exc.msg}. "
+                      f"Fix it so Python can import it, then score again.",
+                      file=sys.stderr)
+                return 1
             if not mutants:
                 print("There is nothing in that code qikly knows how to change, "
                       "so there is nothing to score.")
@@ -1756,13 +1813,14 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
             if seed is None:
                 seed = 0
         try:
-            run(target, mutants=mutants, seed=seed,
-                invoked_from=INVOKED_FROM)
+            report = run(target, mutants=mutants, seed=seed,
+                         invoked_from=INVOKED_FROM)
         except Exception as exc:
             print(f"[{target.label}] could not be scored: "
-                  f"{type(exc).__name__}: {exc}")
+                  f"{type(exc).__name__}: {exc}{_long_path_hint(exc)}")
             return 1
-        return 0
+        from qikly.mutation_score import Unscored
+        return 1 if isinstance(report, Unscored) else 0
 
     ids = [t.strip() for t in tasks.split(",")] if tasks else discover_task_ids()
     for task_id in [t for t in ids if t]:

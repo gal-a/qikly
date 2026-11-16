@@ -239,6 +239,17 @@ def validate_config():
     if missing:
         problems.append("environment variable(s) " + ", ".join(missing))
 
+    if problems and not os.environ.get("API_KEY"):
+        # A key for another provider is set while this one was chosen: the
+        # usual cause is an LLM_PROVIDER left over from trying something else.
+        # Saying "get a Gemini key" to someone holding an OpenAI one sends them
+        # off to the wrong company.
+        others = [(name, var) for name, variables in _KEY_VARS.items() if name != provider
+                  for var in variables if os.environ.get(var)]
+        if others:
+            name, var = others[0]
+            problems[0] += (f". {var} is set, though: to use it, set "
+                            f"LLM_PROVIDER={name} instead of {provider}")
     if problems:
         # Say where to get one. This message is the moment somebody needs the
         # setup page, and it named what was missing and nothing about how to

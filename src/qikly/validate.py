@@ -399,7 +399,12 @@ def check_task(path):
     from qikly.score_questions import is_todo
     all_criteria = [c for c in (task.get("acceptance_criteria") or [])
                     if isinstance(c, str)]
-    skipped = sum(1 for c in all_criteria if is_todo(c))
+    # An answer that could not be read is also turned into a TODO, so the run
+    # skips it, but it already has its own error above: counted here too, it
+    # was reported as a TODO "still left" that the person never wrote.
+    skipped = sum(1 for c in all_criteria if is_todo(c) and " could not be read: " not in c)
+    all_criteria = [c for c in all_criteria
+                    if not (is_todo(c) and " could not be read: " in c)]
     if skipped and skipped == len(all_criteria):
         errors.append(
             f"{name}: none of its {skipped} acceptance criteria is answered "

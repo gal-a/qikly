@@ -486,3 +486,31 @@ def test_an_empty_reply_does_not_raise_an_index_error():
 
     with _pytest.raises(RuntimeError):
         _text_from(types.SimpleNamespace(content=[], stop_reason="end_turn"))
+
+
+def test_a_key_for_another_provider_is_named_when_the_chosen_one_has_none(monkeypatch):
+    # An LLM_PROVIDER left over from trying something else, with only an
+    # OpenAI key set, was told to get a Gemini key and nothing more.
+    from qikly.agent_api.providers import router
+
+    for var in ("API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    with pytest.raises(RuntimeError) as caught:
+        router.validate_config()
+    message = str(caught.value)
+    assert "OPENAI_API_KEY is set" in message and "LLM_PROVIDER=openai" in message, message
+
+
+def test_no_key_anywhere_still_says_only_where_to_get_one(monkeypatch):
+    from qikly.agent_api.providers import router
+
+    for var in ("API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENAI_API_KEY",
+                "ANTHROPIC_API_KEY"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    with pytest.raises(RuntimeError) as caught:
+        router.validate_config()
+    assert "is set, though" not in str(caught.value)
+    assert "PROVIDER_KEY_SETUP" in str(caught.value)

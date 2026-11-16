@@ -119,6 +119,26 @@ def qikly_run(task_id, provider=None, model=None):
     problem = where_we_looked(task_id)
     if problem:
         return _error(problem)
+    # The schema's enum is advice to the host, not a check: a run started
+    # with provider "evil", 5 or a list, and failed inside the run instead
+    # of here. An agent fills these in with no person reading them, and an
+    # empty string is how many hosts say "not given".
+    from qikly.agent_api.providers.router import _PROVIDERS
+    if provider in (None, ""):
+        provider = None
+    elif not isinstance(provider, str) or provider.strip().lower() not in _PROVIDERS:
+        return _error("provider must be one of %s, or left out for the project's "
+                      "setting, not %r" % (", ".join(_PROVIDERS), provider))
+    else:
+        provider = provider.strip().lower()
+    if model in (None, ""):
+        model = None
+    elif not isinstance(model, str) or not model.strip() or re.search(r"\s", model.strip()):
+        return _error("model must be one model name with no spaces, such as "
+                      "gemini-2.5-pro, or left out for the provider's default, "
+                      "not %r" % (model,))
+    else:
+        model = model.strip()
 
     env = None
     if provider or model:
@@ -237,6 +257,13 @@ def qikly_scaffold(file_path):
     candidates = [file_path] if os.path.isabs(file_path) else [
         os.path.join(root, file_path), os.path.abspath(file_path)]
     found = next((c for c in candidates if os.path.isfile(c)), None)
+    folder = next((c for c in candidates if os.path.isdir(c)), None)
+    if found is None and folder is not None:
+        return _error("%s is a folder. Pass one Python file in it, such as "
+                      "%s" % (file_path, os.path.join(file_path, "module.py")))
+    if found is not None and not found.lower().endswith(".py"):
+        return _error("%s is not a Python file. qikly_scaffold reads a .py "
+                      "module and returns a task that tests it" % file_path)
     if found is None:
         return _error(
             "no such file: %s. Looked under the project root %s and under the "

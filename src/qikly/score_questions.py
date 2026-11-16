@@ -471,11 +471,19 @@ def expand_answers(text):
                     f"items around it are indented. Indent it to match them, "
                     f"two spaces before the dash, or YAML joins it with the "
                     f"line after it")
+            if re.match(r"^-(?:[ \t]|$)", line):
+                options = {}  # answered at the left edge, said above or valid
             break
         if re.match(r"^[ \t]*#\?", line):
             asked = True
         found = _OPTION.match(line)
         if found:
+            if found.group(1) in options:
+                # A second question's options began before the first one had
+                # an answer line: it was deleted or commented out, and the run
+                # dropped that question without a word.
+                problems.append(_unanswered(options))
+                options, now = {}, None
             options[found.group(1)] = found.group(2)
             if "your code does now" in (found.group(3) or ""):
                 now = found.group(1)
@@ -582,7 +590,9 @@ def expand_answers(text):
                 fixed = digit
             problem = (f"criterion {number} is {short!r}: did you mean option "
                        f"{digit}? Write it as  - {fixed}")
-        elif mine and len(short.split()) <= 2 and "(" not in short:
+        elif mine and len(short.split()) <= 2 and not re.search(r"\w\(", short):
+            # A bracket after a name is a call, `f(1)`, so a sentence; any
+            # other bracket, `yes (x)` or `(first`, is not.
             # `first`, `keep it`, `n/a`, `raises ValueError`: none is an
             # answer this question takes, and none is a criterion on its own,
             # since the question is removed before the tests are written.
@@ -597,7 +607,17 @@ def expand_answers(text):
         elif criterion:
             expanded.append((short, criterion))
             lines[i] = prefix + _quote(criterion)
+    if options:
+        problems.append(_unanswered(options))
     return "\n".join(lines), expanded, problems
+
+
+def _unanswered(options):
+    first = options[_listed(options).split(", ")[0]]
+    return (f"a question has no answer line under it (its option "
+            f"{_listed(options).split(', ')[0]} is {first!r}), so a run leaves it "
+            f"out. Write the answer below its options, as  - 1, or delete the "
+            f"question's #? lines")
 
 
 def drop_question_lines(text):

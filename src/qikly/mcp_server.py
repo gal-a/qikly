@@ -177,6 +177,36 @@ TOOL_SPECS = [
 ]
 
 
+def _parameters(handler):
+    import inspect
+    return inspect.signature(handler).parameters
+
+
+def _example(handler):
+    params = _parameters(handler)
+    first = next(iter(params), "")
+    return '{"%s": "..."}' % first
+
+
+def _argument_problem(name, handler, arguments):
+    """
+    A missing or unknown argument, said in the tool's terms. Python's own
+    TypeError ("qikly_run() missing 1 required positional argument") is what
+    an agent used to get back, and it names the function, not the fix.
+    """
+    import inspect
+    params = _parameters(handler)
+    unknown = sorted(str(k) for k in arguments if k not in params)
+    if unknown:
+        return "%s does not take %s. It takes: %s" % (
+            name, ", ".join(repr(k) for k in unknown), ", ".join(params))
+    missing = [p for p, spec in params.items()
+               if spec.default is inspect.Parameter.empty and p not in arguments]
+    if missing:
+        return "%s is required" % " and ".join(missing)
+    return None
+
+
 def call_tool(name, arguments):
     """
     Dispatch one tool call and return its JSON text.
@@ -187,6 +217,13 @@ def call_tool(name, arguments):
     handler = getattr(mcp_tools, name, None)
     if name not in mcp_tools.TOOLS or handler is None:
         payload = {"ok": False, "error": "unknown tool: %s" % name}
+    elif arguments is not None and not isinstance(arguments, dict):
+        payload = {"ok": False, "error": "bad arguments for %s: it takes its "
+                   "arguments as an object, such "
+                   "as %s, not %s" % (name, _example(handler), type(arguments).__name__)}
+    elif _argument_problem(name, handler, arguments or {}):
+        payload = {"ok": False, "error": "bad arguments for %s: %s" % (
+            name, _argument_problem(name, handler, arguments or {}))}
     else:
         try:
             payload = handler(**(arguments or {}))

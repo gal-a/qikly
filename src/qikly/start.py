@@ -33,6 +33,14 @@ class Stop(Exception):
     """The user asked to stop, or input ran out. Never an error."""
 
 
+class SuiteStuck(Exception):
+    """The suite did not finish once on the untouched code."""
+
+
+# How long the suite may take once, untouched, before --score says it is stuck.
+SUITE_TIMEOUT = 900
+
+
 def is_terminal():
     """
     Whether someone can answer. `isatty()` alone is not enough on Windows,
@@ -444,8 +452,13 @@ def _fit_to_time(console, tests, cwd, planted):
     try:
         subprocess.run([sys.executable, "-m", "pytest", "-q", "-x", "--color=no",
                         "-p", "no:cacheprovider", tests], cwd=cwd,
-                       capture_output=True, text=True, timeout=900)
-    except (subprocess.TimeoutExpired, OSError):
+                       capture_output=True, text=True, timeout=SUITE_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        # It went on to the scoring run, which then hung for good on the same
+        # test: 15 minutes of nothing on screen, then forever.
+        from qikly.mutation_score import stuck_message
+        raise SuiteStuck(stuck_message("score", [tests], SUITE_TIMEOUT))
+    except OSError:
         return planted
     each = max(time.monotonic() - started, 0.3)
     total = each * planted

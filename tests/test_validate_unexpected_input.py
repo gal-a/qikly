@@ -151,6 +151,35 @@ def test_a_number_typed_below_the_todo_line_says_where_it_goes(tmp_path):
     assert len(errors) == 1 and "in place of that question's TODO line" in errors[0], errors
 
 
+def test_an_unreadable_answer_is_not_also_called_a_todo_left(tmp_path):
+    path = tmp_path / "F.yaml"
+    path.write_text(HEAD + QUESTION + "  - first\n" + OTHER, encoding="utf-8")
+    errors, warnings = check_task(str(path))
+    assert len(errors) == 1, errors
+    assert not any("still left as TODO" in w for w in warnings), warnings
+
+
+def test_a_run_says_what_validate_finds_before_it_starts(tmp_path, monkeypatch):
+    from qikly.orchestrator import orchestrator
+    path = tmp_path / "F.yaml"
+    path.write_text(HEAD + QUESTION + "  - 1)\n" + OTHER, encoding="utf-8")
+    monkeypatch.setattr(orchestrator, "task_config_path", lambda task_id: str(path))
+    said = []
+    errors = orchestrator._say_what_validate_finds("F", printer=said.append)
+    assert len(errors) == 1
+    assert "left out of it" in said[0] and "did you mean option 1?" in said[1], said
+
+
+def test_a_clean_file_makes_a_run_say_nothing(tmp_path, monkeypatch):
+    from qikly.orchestrator import orchestrator
+    path = tmp_path / "F.yaml"
+    path.write_text(HEAD + QUESTION + "  - 1\n" + OTHER, encoding="utf-8")
+    monkeypatch.setattr(orchestrator, "task_config_path", lambda task_id: str(path))
+    said = []
+    assert orchestrator._say_what_validate_finds("F", printer=said.append) == []
+    assert said == []
+
+
 def test_an_empty_file_is_named(tmp_path):
     path = tmp_path / "F.yaml"
     path.write_text("", encoding="utf-8")
@@ -223,3 +252,26 @@ def test_one_requirement_as_a_string_is_still_checked_for_restating(tmp_path):
     path.write_text(yaml.safe_dump(task), encoding="utf-8")
     _, warnings = check_task(str(path))
     assert any("a requirement restates a criterion" in w for w in warnings), warnings
+
+
+# Found by editing every answer line of the pricing example ~700 ways each.
+@pytest.mark.parametrize("answer", ["yes (x)", "(first", "(null)", "one (x)", "(keep", "<Keep (x)"])
+def test_a_bracket_does_not_make_a_short_answer_a_sentence(tmp_path, answer):
+    errors = _errors(tmp_path, QUESTION + f"  - {answer}\n" + OTHER)
+    assert len(errors) == 1 and "does not take as an answer" in errors[0], errors
+
+
+def test_a_call_in_a_short_answer_is_still_a_sentence(tmp_path):
+    assert _errors(tmp_path, QUESTION + '  - "f(100) is 0"\n' + OTHER) == []
+
+
+@pytest.mark.parametrize("edit", ["", "  # - 1\n"])
+def test_a_deleted_or_commented_answer_line_is_named(tmp_path, edit):
+    errors = _errors(tmp_path, QUESTION + edit + QUESTION.split("\n", 1)[1] + "  - 1\n")
+    assert len(errors) == 1 and "has no answer line under it" in errors[0], errors
+
+
+def test_the_last_question_without_an_answer_is_named(tmp_path):
+    errors = _errors(tmp_path, 'acceptance_criteria:\n  - "f(5) returns 5"\n'
+                     + QUESTION.split("\n", 1)[1])
+    assert len(errors) == 1 and "has no answer line under it" in errors[0], errors

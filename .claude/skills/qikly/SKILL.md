@@ -5,7 +5,7 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.3.9
+  version: 0.3.10
   requires: qikly >= 0.6.1
 ---
 
@@ -374,7 +374,7 @@ yet.
 
 | Command | Cost | Use it when |
 |---|---|---|
-| `qikly --validate --tasks X` | free | always, before any run. Catches a missing input file, a leftover TODO, a criterion made of adjectives, a requirement restating a criterion, and criteria the data cannot reach |
+| `qikly --validate --tasks X` | free | always, before any run. Catches a missing input file, a leftover TODO, an answer it cannot read (`1)`, `first`, `2 = 99`), a field of the wrong kind, a criterion made of adjectives, a requirement restating a criterion, and criteria the data cannot reach. A run prints the same problems before it starts |
 | `qikly --explain X` | free | to show the user exactly what each agent receives, criteria present on one side and absent on the other |
 | `qikly --score-suite --tasks X` | free, and slow | after a run converges, to find what the suite would not have noticed. It plants one fault at a time in the code and reports which ones the tests missed. Free because every fault is an edit to the code's syntax tree and no model is asked anything; slow because each fault means running your whole suite again |
 | `qikly --score PATH --score-tests PATH` | free, and slow | **for a suite qikly did not write**, which is what somebody already has before they have anything else. Point it at a module or package and the tests for it, and it reports which planted faults the tests did not notice, with a question for the user about each, which `--scaffold` then writes into the task file. No task file, no run, no model call. The report lands in `qikly-suite-score/` in the directory they ran it from |

@@ -293,6 +293,30 @@ def verify_task_id(task_id):
         )
     return task_id
 
+def _say_what_validate_finds(task_id, printer=print):
+    """
+    A run never called `--validate`, so an answer it could not read, `1)` or
+    `first`, was left out of the run without a word, and the person found
+    out only from tests that never asked their question. Say what --validate
+    would have said, before anything is spent. Said, not enforced: the run
+    goes ahead as it always has, and a check that fails here never stops it.
+    """
+    try:
+        from qikly.validate import check_task
+        errors, _ = check_task(task_config_path(task_id))
+    except Exception:
+        return []
+    if errors:
+        printer(f"[{task_id}] WARNING: qikly --validate finds {len(errors)} "
+                f"problem(s) in this task file. The run goes ahead, but an answer "
+                f"it cannot read is left out of it:")
+        for error in errors:
+            printer(f"[{task_id}]   - {error}")
+        printer(f"[{task_id}]   Fix them and run  qikly --validate --tasks "
+                f"{task_id}  to check, before the next run.")
+    return errors
+
+
 def _warn_if_no_acceptance_criteria(task_id):
     """
     acceptance_criteria isn't required by anything in this file -- test
@@ -310,9 +334,10 @@ def _warn_if_no_acceptance_criteria(task_id):
     """
     # As test generation will read it: criteria left as TODO are skipped,
     # so a file of nothing but TODOs has none.
-    from qikly.score_questions import drop_question_lines
-    with open(task_config_path(task_id), "r", encoding="utf-8") as f:
-        task_config = yaml.safe_load(drop_question_lines(f.read())) or {}
+    # Read as test generation reads it: a BOM or the local encoding is fine
+    # there, and plain UTF-8 here stopped the run before it began.
+    from qikly.agent_api.agent_interface import _read_task
+    task_config = yaml.safe_load(_read_task(task_id)) or {}
     if not task_config.get("acceptance_criteria"):
         print(
             f"[{task_id}] WARNING: no acceptance_criteria defined. Test generation "
@@ -1248,6 +1273,7 @@ def orchestrate(task_id, seed=None, resume=False):
     global TRANSACTIONS_PATH, SAVE_TRANSACTIONS, RUN_TIMESTAMP, RUN_STAGES
 
     task_id = verify_task_id(task_id)
+    _say_what_validate_finds(task_id)
     _warn_if_no_acceptance_criteria(task_id)
     # Before anything reads the spec: the generated code will open this
     # task's fixtures at inputs_private/data/<task_id>/ relative to the working
