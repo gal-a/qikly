@@ -190,8 +190,8 @@ a { color: var(--accent); }
 }
 .topbar-cta code { font-size: .92em; }
 @media (max-width: 520px) {
-  /* The command is the point of the button, so it keeps its place and the
-     plain link goes rather than both shrinking into illegibility. */
+  /* The star button is the point of the bar, so it keeps its place and
+     any plain link goes rather than both shrinking into illegibility. */
   .topbar-links a:not(.topbar-cta) { display: none; }
   .topbar-inner { padding: 8px 16px; }
   .topbar-cta { padding: 4px 10px; }
@@ -387,6 +387,13 @@ h1 {
 .hero-try .lead { margin: 0; font-size: 1.08rem; display: flex; flex-wrap: wrap;
   align-items: center; gap: 10px; }
 .hero-try .eg { max-width: 640px; }
+.hero-try .shot { margin: 4px 0 0; }
+.hero-try .shot figcaption { margin-top: 8px; }
+.hero-try .hero-result pre { font-size: 1.05rem !important; line-height: 1.6; white-space: pre-wrap; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.hero-actions .btn { padding: 11px 18px; }
+.star-band { text-align: center; }
+.star-band p { margin: 0 auto 18px; max-width: 52ch; }
 .step .cost.key { color: var(--code); background: var(--code-soft); }
 .steps .row:last-child .step { border-top-color: var(--code); }
 
@@ -792,10 +799,8 @@ footer {
       </svg>
     </a>
     <nav class="topbar-links">
-      <a href="https://github.com/gal-a/qikly" data-goatcounter-click="bar-github">GitHub</a>
-      <a class="topbar-cta"
-         href="https://github.com/gal-a/qikly/blob/main/docs/skill.md"
-         data-goatcounter-click="bar-skill"><code>qikly --install-skill</code></a>
+      <a class="topbar-cta" href="https://github.com/gal-a/qikly"
+         data-goatcounter-click="bar-star">Star on GitHub</a>
     </nav>
   </div>
 </div>
@@ -811,64 +816,36 @@ footer {
        scores, and its count came from a scorer later found to reuse stale
        bytecode. -->
   <header class="hero">
-    <p class="eyebrow">Functional tests for backend Python</p>
-    <h1>Independent test generation for AI-written code</h1>
-    <!-- 2026-11-16: the free first step leads, before the story of the paid
-         steps: one command and a real result, from the pricing example. -->
+    <p class="eyebrow">For Python developers whose AI writes the code and the tests</p>
+    <h1>Find out what your tests miss</h1>
+    <!-- 2026-11-17: the free first step is the whole hero: what it does, a
+         real result as the image, the two commands, then a star and the
+         video. The paid loop and its image moved to the band after Start. -->
     <div class="hero-try">
-      <p class="lead"><b>Find out what your tests miss</b>
-        <span class="cost free">free, no key, about 30 seconds</span></p>
-      <div class="install">
-        <span><span class="prompt">$</span> pip install qikly</span>
-        <span><span class="prompt">$</span> qikly --score my_module.py</span>
-      </div>
-      <figure class="eg">
-        <figcaption>What it printed for pricing.py, whose two tests both pass</figcaption>
-<pre><span class="dim">[pricing.py]</span> <span class="alert">10 of 13 planted faults missed (77%)</span>, 3 caught.
-<span class="dim">[pricing.py]</span> 8 questions your tests leave open, in the same report.</pre>
+      <p class="lead">It breaks a copy of your code and shows what your tests
+        let through. <span class="cost free">free, no key, about 30 seconds</span></p>
+      <!-- Real lines from the pricing example's run (qikly_score.png), trimmed,
+           not reworded. -->
+      <figure class="eg hero-result">
+        <figcaption>On the bundled pricing example, whose two tests pass</figcaption>
+<pre><span class="alert">10 of 13 planted faults missed</span>
+Your tests pass whether rate &gt; 100 or rate &gt;= 100.
+What should happen at exactly 100?</pre>
       </figure>
-    </div>
-    <!-- The image straight under the headline, then the explanation, then the
-         run in the image as its example: one argument read top to bottom,
-         rather than a caption standing apart from it. -->
-    <figure class="shot">
-      <img src="images/qikly_hero.png" width="3200" height="1680"
-           alt="The coder never sees the answer key. Its tests come from criteria it was never shown, so they can disagree with it. Two code panels kept apart: calc.py written by the coding agent, and test_calc.py written by the test agent, which asserts a tax rate limit the coding agent was never given. The suite passes 9 of 9.">
-      <!-- 2026-10-14: the run the image shows, in small text under it, so the
-           hero reads image, command, and nothing in between. The idea itself
-           is the section after the hero, The Concept. -->
-      <figcaption>
-        <p>This was run by two independent AI agents:</p>
-        <ol>
-          <li><b>The Test Agent builds the test suite:</b> it was told, from
-            the spec's acceptance criteria, that the rate may not exceed
-            100.</li>
-          <li><b>The Coding Agent never saw the acceptance criteria and
-            discovered that rate limit from a failing test:</b> it then added
-            <code style="white-space:nowrap">or rate &gt; 100</code> by itself,
-            so the 9 of 9 is code eventually passing the test suite after
-            applying fixes in an automated repair loop.</li>
-        </ol>
-      </figcaption>
-    </figure>
-    <!-- The install line and the source link on one row. The design write-up
-         is linked from Read more in the Start section. -->
-    <div class="links install-row">
       <div class="install">
         <span><span class="prompt">$</span> pip install qikly</span>
+        <span><span class="prompt">$</span> qikly --score your_module.py</span>
       </div>
-      <a class="btn btn-primary" href="https://github.com/gal-a/qikly" data-goatcounter-click="hero-github">Source on GitHub</a>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="https://github.com/gal-a/qikly" data-goatcounter-click="hero-star">Star on GitHub</a>
+        <a class="btn" href="https://towardsdatascience.com/qikly/" data-goatcounter-click="hero-video">Watch the 10-minute video walkthrough</a>
+      </div>
     </div>
   </header>
 
   <section class="band">
     <p class="eyebrow">Start</p>
     <h2>Create a test suite for your own code</h2>
-    <p class="try-first"><b>See it work first:</b> <code>qikly --demo</code> runs the
-      whole loop on a bundled task, nothing to fill in: tests written before any
-      code, a coding agent that never sees the criteria, and a repair. About
-      thirty seconds, well under a cent with a Gemini, OpenAI or Anthropic key.
-      <a class="small-link" href="#demo">Watch one run</a> · <a class="small-link" href="https://towardsdatascience.com/qikly/" data-goatcounter-click="start-video">The 10-minute walkthrough</a></p>
     <!-- 2026-10-17: real excerpts on pricing.py with a two-test suite, branch
          build of 0.6.0, gemini-3.5-flash-lite. Step 1 is qikly --score;
          step 2 is the third question in the task file qikly --scaffold
@@ -896,12 +873,12 @@ footer {
         </figure>
       </li>
       <li class="note">
-        <p class="audit-note"><b>Before you start:</b> install with
-          <code>pip install --upgrade qikly</code>, set one API key for steps 2
-          and 3, such as <code>GEMINI_API_KEY</code> (Gemini's free tier needs no
-          card; <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-preflight-key">how</a>),
-          and check your tests pass on their own with <code>python -m pytest</code>.
-          Then run the steps from your project's root folder. Each takes one
+        <p class="audit-note"><b>For steps 2 and 3:</b> set one API key,
+          such as <code>GEMINI_API_KEY</code> (Gemini's free tier needs no
+          card; <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-preflight-key">how</a>).
+          For every step, install or upgrade with <code>pip install --upgrade qikly</code>,
+          check your tests pass on their own with <code>python -m pytest</code>,
+          and run from your project's root folder. Each step takes one
           module or a whole folder, and every step takes the same path.
           <b>No tests yet?</b> Start at step 2. <b>No code yet?</b>
           <code>qikly --init</code> makes a blank task file for your answers,
@@ -912,23 +889,19 @@ footer {
           <span class="n">Step 2</span>
           <b>Check the drafted spec</b>
           <code class="cmd"><span>qikly</span> <span>--scaffold</span> <span>your_module.py</span><span class="or">or</span><span>qikly</span> <span>--scaffold</span> <span>your_project_folder</span></code>
-          <p>Set a key first, such as <code>GEMINI_API_KEY</code>, or one for
-            Anthropic or OpenAI. A spec agent then writes the task file,
-            <code>inputs_private/config/tasks/<wbr>YOUR_MODULE_VERIFY.yaml</code>:
-            a line on what the module is for and an answer to each of step
-            1's questions, as acceptance criteria. It reads your README and
-            docstrings, <b>never your code</b>, so it says what the code
-            should do, not what it does. Each answer says where it came from;
-            the ones it had to judge are marked <code>CHECK</code>. Run it as
-            it is, or change any you disagree with. What the docs do not
-            decide is left as a TODO to answer, or skip. Without a key, every
-            answer is yours to write. <code>qikly --validate</code> with the
-            same path checks the file, free.
+          <p>A spec agent reads your README and docstrings, <b>never your
+            code</b>, and writes an answer to each of step 1's questions as
+            acceptance criteria, in
+            <code>inputs_private/config/tasks/<wbr>YOUR_MODULE_VERIFY.yaml</code>.
+            The answers it had to judge are marked <code>CHECK</code>, and what
+            your docs do not decide is left as a TODO for you. Keep or change
+            any of them, and <code>qikly --validate</code> with the same path
+            checks the file, free.
             <a class="small-link" href="https://github.com/gal-a/qikly/tree/main/docs/examples" data-goatcounter-click="start-examples">A module and a folder, drafted and answered</a></p>
           <ul class="never">
             <li><b>Spec agent:</b> <em>never sees a function body</em></li>
           </ul>
-          <span class="cost key">a fraction of a cent with a <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-step2-key">key</a></span>
+          <span class="cost key">a fraction of a cent with a key</span>
         </div>
         <figure class="eg">
           <figcaption>An answer the spec agent drafted for pricing.py</figcaption>
@@ -958,7 +931,7 @@ footer {
             <li><b>Test agent:</b> <em>never sees the code</em> until the unit tests, written last</li>
             <li><b>Coding agent:</b> <em>never sees your answers</em></li>
           </ul>
-          <span class="cost key">needs an <a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-step3-key">API key</a></span>
+          <span class="cost key">about a cent with a key</span>
         </div>
         <figure class="eg">
           <figcaption>The new tests on your own code, and the fix the run made in its copy</figcaption>
@@ -989,10 +962,36 @@ from your criteria:
       <li><a href="https://github.com/gal-a/qikly#start-here" data-goatcounter-click="start-readme">Every other way in</a><span>the demo, a finished example, and a task written from nothing</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/PROVIDER_KEY_SETUP.md" data-goatcounter-click="start-provider-keys">API key setup</a><span>for the run: Gemini, OpenAI or Anthropic, and what a wrong key looks like</span></li>
       <li><a href="https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md" data-goatcounter-click="start-quick-start">Quick start</a><span>the same path, command by command</span></li>
-      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">Design 1: the case</a><span>why an agent that writes its own tests grades its own homework</span></li>
-      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">Design 2: how well it works</a><span>the measured results</span></li>
-      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md" data-goatcounter-click="design-3">Design 3: how it is built</a><span>the agents and what each may read</span></li>
+      <li><span class="design-links">The design:
+        <a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">the case</a> ·
+        <a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">how well it works</a> ·
+        <a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md" data-goatcounter-click="design-3">how it is built</a></span></li>
     </ul>
+  </section>
+
+  <section class="band">
+    <p class="eyebrow">Then close the gaps</p>
+    <h2>Independent test generation for AI-written code</h2>
+    <figure class="shot">
+      <img src="images/qikly_hero.png" width="3200" height="1680" loading="lazy"
+           alt="The coder never sees the answer key. Its tests come from criteria it was never shown, so they can disagree with it. Two code panels kept apart: calc.py written by the coding agent, and test_calc.py written by the test agent, which asserts a tax rate limit the coding agent was never given. The suite passes 9 of 9.">
+      <!-- 2026-10-14: the run the image shows, in small text under it, so the
+           hero reads image, command, and nothing in between. The idea itself
+           is the section after the hero, The Concept. -->
+      <figcaption>
+        <p>This was run by two independent AI agents:</p>
+        <ol>
+          <li><b>The Test Agent builds the test suite:</b> it was told, from
+            the spec's acceptance criteria, that the rate may not exceed
+            100.</li>
+          <li><b>The Coding Agent never saw the acceptance criteria and
+            discovered that rate limit from a failing test:</b> it then added
+            <code style="white-space:nowrap">or rate &gt; 100</code> by itself,
+            so the 9 of 9 is code eventually passing the test suite after
+            applying fixes in an automated repair loop.</li>
+        </ol>
+      </figcaption>
+    </figure>
   </section>
 
   <section class="band">
@@ -1155,6 +1154,11 @@ from your criteria:
   <section class="band" id="demo">
     <p class="eyebrow">See it run end-to-end on a bundled task</p>
     <h2>One command, about thirty seconds, nothing written outside its folder</h2>
+    <p><code>qikly --demo</code> runs the whole loop on a bundled task, nothing
+      to fill in: tests written before any code, a coding agent that never sees
+      the criteria, and a repair. Well under a cent with a Gemini, OpenAI or
+      Anthropic key. Or <a href="https://towardsdatascience.com/qikly/" data-goatcounter-click="demo-video">watch the 10-minute video walkthrough</a>
+      of all three steps.</p>
     <figure class="demo">
       <img src="images/qikly_demo.gif" width="811" height="820" loading="lazy"
            alt="A qikly --demo run: the acceptance criteria are withheld from the coding agent, three test suites are generated, a test fails, a patch is applied, and the suite goes green.">
@@ -1162,6 +1166,12 @@ from your criteria:
         are withheld, the suites are generated, a test fails, a patch lands, and
         it goes green. 38 seconds on gemini-3.5-flash-lite, not sped up.</figcaption>
     </figure>
+  </section>
+
+  <section class="band star-band">
+    <h2>Did it find something your tests miss?</h2>
+    <p>A star on GitHub helps the next developer find qikly.</p>
+    <a class="btn btn-primary" href="https://github.com/gal-a/qikly" data-goatcounter-click="close-star">Star on GitHub</a>
   </section>
 
   <p class="origin">The separation this tool enforces is ordinary practice in safety-critical engineering, where verification is required to be independent of implementation as part of a V&amp;V (Verification &amp; Validation) methodology for testing. This library's author worked in that setting on General Motors' autonomous vehicle program before building this toolset.</p>
