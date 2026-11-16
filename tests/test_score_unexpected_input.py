@@ -106,6 +106,7 @@ def test_a_syntax_error_is_one_line_not_a_traceback(here, capsys):
     assert "calc.py, line 1, does not parse" in err and "Traceback" not in err, err
 
 
+@pytest.mark.skipif(os.name != "nt", reason="only Windows finds a file by another case")
 def test_named_tests_skip_the_case_check(here):
     # 0.6.2 scored `--score CALC.PY --score-tests ...`; the case only matters
     # when qikly searches for the tests itself.
@@ -131,9 +132,13 @@ def test_a_huge_limit_is_the_largest_the_platform_takes(monkeypatch):
     # 999999999 ended --score in OverflowError from subprocess.
     import threading
     from qikly import mutation_score as ms
+    import math
     for value in ("999999999", "1e12", "inf", "1e999"):
         monkeypatch.setenv("QIKLY_SUITE_TIMEOUT", value)
-        assert ms.suite_limit(900) in (threading.TIMEOUT_MAX, 900), value
+        limit = ms.suite_limit(900)
+        # The cap is the platform's: about 4.3 million seconds on Windows,
+        # far more on Linux, where 999999999 is a valid limit as it stands.
+        assert math.isfinite(limit) and 0 < limit <= threading.TIMEOUT_MAX, value
     monkeypatch.setenv("QIKLY_SUITE_TIMEOUT", "nan")
     assert ms.suite_limit(900) == 900
 
