@@ -16,11 +16,11 @@
 [![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22qikly%5Bmcp%5D%22%2C%22qikly-mcp%22%5D%7D)
 
 **Find out what your tests miss.** Free, no key, about 30 seconds, from your
-project's root folder:
+project's root folder, pointed at any module of yours that has tests:
 
 ```
 pip install qikly
-qikly --score my_module.py
+qikly --score your_module.py
 ```
 
 [![qikly --score on the bundled pricing example: 10 of 13 planted faults missed, and three of the questions they leave open](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_score.png)](#start-here)
@@ -31,7 +31,7 @@ changed. Above, a real run on the bundled
 [pricing example](https://github.com/gal-a/qikly/tree/main/docs/examples/pricing),
 whose two tests both pass.
 
-**Watch it first:** a [10-minute walkthrough](https://towardsdatascience.com/qikly/)
+**Watch it first:** a [10-minute video walkthrough](https://www.youtube.com/watch?v=paNIbTQPkmk)
 of all three steps on the bundled pricing example, with English subtitles.
 
 **Then close the gaps: your AI writes both the code and its tests. How do you know the tests are really valid?**

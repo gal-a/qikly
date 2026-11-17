@@ -308,16 +308,15 @@ The PyPI badge at the top of the README keeps showing the previous version for
 up to 12 hours. shields.io caches it for that long and ignores a shorter
 `cacheSeconds`, so this corrects itself and needs no action.
 
-Then check the landing page's footer links still answer. One points at the
-author's books site, which this repository does not control:
+Then check the landing page's footer links still answer. They point at sites
+this repository does not control:
 
 ```bash
 QIKLY_CHECK_LINKS=1 python -m pytest -q tests/test_landing_page_footer.py
 ```
 
-In PowerShell, set `$env:QIKLY_CHECK_LINKS=1` first. If the books address has
-moved, change `BOOKS_URL` in that test and the footer in `docs/index.html`
-together.
+In PowerShell, set `$env:QIKLY_CHECK_LINKS=1` first. If an address has moved,
+change it in that test and in the footer in `docs/index.html` together.
 
 ## Third-party listings, last
 

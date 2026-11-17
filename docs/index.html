@@ -174,7 +174,7 @@ a { color: var(--accent); }
 /* The drawn mark, which used to sit in the hero. It is the only copy now:
    a plain-text "qikly" in the bar with the real one directly below it was
    the same word twice, in two typefaces. */
-.topbar-mark .qmark { height: 22px; width: auto; display: block; overflow: visible; }
+.topbar-mark .qmark { height: 34px; width: auto; display: block; overflow: visible; }
 .topbar-links {
   display: flex;
   align-items: center;
@@ -371,7 +371,7 @@ h1 {
 .step .never li + li { margin-top: 4px; }
 .step .never b { font-size: inherit; }
 .step .never em { font-style: normal; font-weight: 600; color: var(--alert); }
-.step .cost, .hero-try .cost {
+.step .cost, .hero-try .cost, .hero-panel .cost {
   align-self: flex-start;
   font-family: "IBM Plex Mono", monospace;
   font-size: .72rem;
@@ -387,13 +387,9 @@ h1 {
 .hero-try .lead { margin: 0; font-size: 1.08rem; display: flex; flex-wrap: wrap;
   align-items: center; gap: 10px; }
 .hero-try .eg { max-width: 640px; }
-.hero-try .shot { margin: 4px 0 0; }
-.hero-try .shot figcaption { margin-top: 8px; }
-.hero-try .hero-result pre { font-size: 1.05rem !important; line-height: 1.6; white-space: pre-wrap; }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.hero-actions .btn { padding: 11px 18px; }
 .star-band { text-align: center; }
 .star-band p { margin: 0 auto 18px; max-width: 52ch; }
+.star-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .step .cost.key { color: var(--code); background: var(--code-soft); }
 .steps .row:last-child .step { border-top-color: var(--code); }
 
@@ -484,6 +480,126 @@ h1 {
 
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--ground); }
 .btn:hover { border-color: var(--accent); }
+
+/* ------------------------------------------------------- hero panel -- */
+/* Fixed dark colours in both themes: it is the hero image's palette, and the
+   image is dark. Wider than the column on a desktop, the column on a phone. */
+.hero.hero-panel {
+  position: relative;
+  margin: 22px 0 0;
+  padding: 40px 44px 44px;
+  gap: 18px;
+  border: 1px solid #1e2b2c;
+  border-bottom: 1px solid #1e2b2c;
+  border-radius: 20px;
+  color: #e6efee;
+  background:
+    radial-gradient(circle, rgba(87,184,189,.10) 1.6px, transparent 1.8px) 0 0 / 26px 26px,
+    radial-gradient(ellipse 45% 55% at 76% 42%, rgba(14,106,112,.32), transparent 70%),
+    radial-gradient(ellipse 40% 45% at 16% 92%, rgba(168,85,247,.20), transparent 70%),
+    linear-gradient(135deg, #0a1112, #0d1a1b 55%, #0b1416);
+  overflow: hidden;
+}
+@media (min-width: 980px) {
+  .hero.hero-panel { width: min(1160px, calc(100vw - 48px)); left: 50%; transform: translateX(-50%); }
+}
+.hero-panel .eyebrow { color: #57b8bd; white-space: nowrap; margin: 0; font-size: .74rem; letter-spacing: .18em; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 40px; align-items: center; }
+.hero-left { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+.hero-left .hero-actions { margin-top: 6px; }
+@media (min-width: 861px) { .hero-left { margin-top: 6px; } }
+.hero-panel h1 {
+  font-size: clamp(2.2rem, 5.2vw, 3.8rem);
+  max-width: 13ch;
+  background: linear-gradient(90deg, #ffffff, #8fdcdc);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+}
+.hero-panel .lead { margin: 0; font-size: 1.12rem; color: #c3d0cf; max-width: none; }
+@media (min-width: 861px) {
+  .hero-panel .lead { max-width: none; font-size: clamp(.95rem, 1.35vw, 1.12rem); }
+  .hero-panel .lead .ln { display: block; white-space: nowrap; }
+}
+.hero-panel .cost.free { color: #57b8bd; background: #112f2e; }
+.hero-panel .install { background: rgba(0,0,0,.35); border-color: #1e4144; border-left-color: #57b8bd; color: #e6efee; }
+.hero-panel .install .prompt { color: #6d7b79; }
+.hero-panel .btn { background: transparent; border-color: #3d4a4a; color: #e6efee; }
+.hero-panel .btn-primary { background: #57b8bd; border-color: #57b8bd; color: #0b0f10; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.hero-actions .btn { padding: 11px 18px; display: inline-flex; align-items: center; gap: 9px; }
+.btn-icon { flex: 0 0 auto; }
+.hero-panel .btn-video { font-size: 1.02rem; font-weight: 600; padding: 13px 22px; box-shadow: 0 0 0 4px rgba(87,184,189,.18), 0 6px 22px rgba(87,184,189,.25); }
+.hero-panel .btn-video:hover { background: #7fd0d4; border-color: #7fd0d4; }
+.hero-try-it { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; margin-top: 34px; font-family: "IBM Plex Sans", sans-serif; }
+.hero-try-it .install { width: 100%; box-sizing: border-box; }
+
+.hero-art { display: flex; flex-direction: column; gap: 14px; font-family: "IBM Plex Mono", monospace; }
+.card { position: relative; border-radius: 14px; border: 2px solid; padding: 12px 18px 18px; }
+.card pre { margin: 10px 0 0; padding: 0; background: none; border: 0; color: inherit;
+  font: inherit; font-size: .84rem; line-height: 1.6; white-space: pre; overflow: hidden; }
+.hero-grid > * { min-width: 0; }
+.card-head { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid; }
+.card-head b { font-size: .95rem; }
+.card-head .tag { margin-left: auto; font-size: .7rem; letter-spacing: .08em; }
+.card-head .dot { width: 9px; height: 9px; border-radius: 50%; }
+.card-test { background: #0f2224; border-color: #2b8f95; color: #9dc7c8; transform: rotate(1deg); }
+.card-test .card-head { border-color: #1e4144; }
+.card-test .card-head b { color: #c7f0ef; }
+.card-test .tag { color: #6fb9bd; display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; letter-spacing: .02em; white-space: nowrap; }
+.card-test .flask { flex: 0 0 auto; }
+.card-test .dot { background: #57b8bd; }
+.card-fault { background: #171226; border-color: #a855f7; color: #b9a7d6; transform: rotate(-1deg); }
+.card-fault .card-head { border-color: #3b2b57; }
+.card-fault .card-head b { color: #e9d8ff; }
+.card-fault .tag { color: #fb923c; display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; letter-spacing: .02em; white-space: nowrap; }
+.card-fault .card-head .sub { color: #a78bda; font-size: .8rem; }
+.card-fault .bug { flex: 0 0 auto; }
+.card.card-fault { padding-bottom: 30px; }
+/* Never cut the comparison the card is about: wrap before clipping, and
+   shrink a little on mid-width screens where the column is narrow. */
+.card-fault pre { white-space: pre-wrap; font-size: clamp(.72rem, 1.1vw, .84rem); }
+.card-fault .hit { border-radius: 4px; padding: 0 3px; white-space: nowrap; }
+.card-fault .was .hit { background: rgba(138,127,163,.16); }
+.card-fault .now .hit { background: rgba(251,146,60,.16); }
+.card-fault .card-head .sub { white-space: nowrap; }
+
+.card-fault .dot { background: #a855f7; }
+.card-fault .was { color: #8a7fa3; }
+.card-fault .now { color: #fb923c; font-weight: 500; }
+.card-fault .ask { color: #e9d8ff; }
+.pill { position: absolute; right: 16px; bottom: -16px; border-radius: 999px; border: 2px solid;
+  padding: 3px 14px; font-size: .84rem; font-weight: 500; }
+.pill.pass { background: #0f2a18; border-color: #15803d; color: #4ade80; }
+.pill.miss { background: #2a1610; border-color: #c2410c; color: #fb923c; }
+.apart { position: relative; text-align: center; margin: 10px 0 4px; }
+.apart .prompt { color: #6d7b79; }
+.apart::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px dashed #3d4a4a; }
+.apart > span { position: relative; display: inline-block; padding: 4px 18px; border-radius: 999px;
+  background: #0d1a1b; border: 1px solid #2b8f95; color: #57b8bd; font-size: .82rem; font-weight: 500; letter-spacing: .04em; }
+/* Less air between the panel and the first section. */
+.hero.hero-panel + .band { padding-top: 40px; }
+
+@media (max-width: 860px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 34px; }
+  .hero-panel h1 { max-width: none; }
+}
+@media (max-width: 620px) {
+  .hero.hero-panel { padding: 26px 18px 34px; border-radius: 14px; }
+  .hero-panel .eyebrow { white-space: nowrap; font-size: .6rem; letter-spacing: .05em; }
+  .card-fault .card-head .sub { font-size: .7rem; white-space: nowrap; }
+  .card-fault .card-head { gap: 8px; }
+  .apart > span { white-space: nowrap; font-size: .72rem; padding: 4px 12px; }
+  .card pre { font-size: .72rem; white-space: pre-wrap; }
+  .hero-actions { width: 100%; }
+  .hero-actions .btn { flex: 1 1 100%; justify-content: center; }
+  .hero-panel .btn-video { white-space: nowrap; font-size: .95rem; padding: 12px 14px; }
+  .card { padding: 10px 12px 18px; }
+  .card-test, .card-fault { transform: none; }
+  .card-head b { font-size: .82rem; }
+  .card-head .tag { font-size: .6rem; }
+  .pill { font-size: .74rem; right: 10px; }
+  .hero-panel .lead { max-width: none; }
+}
 
 /* --------------------------------------------------------- sections -- */
 
@@ -817,30 +933,47 @@ footer {
        The "8 out of 8" anecdote was dropped: it is a caution about mutation
        scores, and its count came from a scorer later found to reuse stale
        bytecode. -->
-  <header class="hero">
-    <p class="eyebrow">For Python developers whose AI writes the code and the tests</p>
-    <h1>Find out what your tests miss</h1>
-    <!-- 2026-11-17: the free first step is the whole hero: what it does, a
-         real result as the image, the two commands, then a star and the
-         video. The paid loop and its image moved to the band after Start. -->
-    <div class="hero-try">
-      <p class="lead">It breaks a copy of your code and shows what your tests
-        let through. <span class="cost free">free, no key, about 30 seconds</span></p>
-      <!-- Real lines from the pricing example's run (qikly_score.png), trimmed,
-           not reworded. -->
-      <figure class="eg hero-result">
-        <figcaption>On the bundled pricing example, whose two tests pass</figcaption>
-<pre><span class="alert">10 of 13 planted faults missed</span>
-Your tests pass whether rate &gt; 100 or rate &gt;= 100.
-What should happen at exactly 100?</pre>
-      </figure>
-      <div class="install">
-        <span><span class="prompt">$</span> pip install qikly</span>
-        <span><span class="prompt">$</span> qikly --score your_module.py</span>
+  <header class="hero hero-panel">
+    <!-- 2026-11-17: the hero is a panel in the style of qikly_hero.png: the
+         same ground, dot grid, glows and tilted cards, with live text. The
+         cards are the bundled pricing example: its real passing test, and one
+         planted fault from its real --score run that the tests let through.
+         The card shortens the example's parameter name, discount_rate, to
+         discount; the fault and the 10 of 13 are unchanged. -->
+    <p class="eyebrow">Your AI wrote the code and the tests. Both pass.</p>
+    <div class="hero-grid">
+      <div class="hero-left">
+        <h1>Find out what your tests miss</h1>
+        <p class="lead"><span class="ln">qikly breaks a copy of your backend Python code</span>
+          <span class="ln">and shows which bugs your tests let through.</span></p>
+        <span class="cost free">free · no API key · ~30 seconds</span>
+        <div class="install">
+          <span><span class="prompt">$</span> pip install qikly</span>
+          <span><span class="prompt">$</span> qikly --score your_module.py</span>
+        </div>
+        <div class="hero-actions">
+          <a class="btn btn-primary btn-video" href="https://www.youtube.com/watch?v=paNIbTQPkmk" data-goatcounter-click="hero-video"><svg class="btn-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="1.5" y="4.5" width="21" height="15" rx="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 9v6l5-3z" fill="currentColor"/></svg>Watch the 10-min walkthrough</a>
+        </div>
       </div>
-      <div class="hero-actions">
-        <a class="btn btn-primary" href="https://github.com/gal-a/qikly" data-goatcounter-click="hero-star">Star on GitHub</a>
-        <a class="btn" href="https://towardsdatascience.com/qikly/" data-goatcounter-click="hero-video">Watch the 10-minute video walkthrough</a>
+      <div class="hero-right">
+      <div class="hero-art" role="img" aria-label="On the bundled pricing example, both tests pass, yet qikly --score finds 10 of 13 planted faults missed, such as changing discount &gt; 100 to &gt;= 100, which the tests pass either way, and asks what should happen at exactly 100.">
+        <div class="card card-test">
+          <div class="card-head"><span class="dot"></span><b>test_pricing.py</b><span class="tag"><svg class="flask" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 3h6M10 3v6L4.5 18.5A2 2 0 0 0 6.2 21.5h11.6a2 2 0 0 0 1.7-3L14 9V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><path d="M7.2 15h9.6l2 3.6a1 1 0 0 1-.9 1.4H6.1a1 1 0 0 1-.9-1.4z" fill="currentColor"/></svg><span class="tag-text">your tests</span></span></div>
+<pre>def test_discount():
+    assert apply_discount(100, 10) == 90
+
+def test_label():
+    assert label("vip") == "gold"</pre>
+          <span class="pill pass">&#10003; 2/2 passed</span>
+        </div>
+        <div class="apart"><span><span class="prompt">$</span> qikly --score &nbsp;&darr; plants 13 faults</span></div>
+        <div class="card card-fault">
+          <div class="card-head"><span class="dot"></span><b>pricing.py</b><span class="tag"><svg class="bug" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 4l2 3M16 4l-2 3"/><path d="M3 10h4M17 10h4M3 15h4M17 15h4M5 20l3-2M19 20l-3-2"/></g><ellipse cx="12" cy="14" rx="5" ry="7" fill="currentColor"/><path d="M12 9v11" stroke="#171226" stroke-width="1.5"/></svg><span class="tag-text">bugs planted by qikly</span></span></div>
+<pre><span class="was">-   if discount &lt; 0 or <span class="hit">discount &gt; 100</span>:</span>
+<span class="now">+   if discount &lt; 0 or <span class="hit">discount &gt;= 100</span>:</span></pre>
+          <span class="pill miss">&#10007; 10 of 13 faults missed</span>
+        </div>
+      </div>
       </div>
     </div>
   </header>
@@ -974,6 +1107,7 @@ from your criteria:
   <section class="band">
     <p class="eyebrow">Then close the gaps</p>
     <h2>Independent test generation for AI-written code</h2>
+    <p>This is step 3 above, <code>qikly --tasks</code>.</p>
     <figure class="shot">
       <img src="images/qikly_hero.png" width="3200" height="1680" loading="lazy"
            alt="The coder never sees the answer key. Its tests come from criteria it was never shown, so they can disagree with it. Two code panels kept apart: calc.py written by the coding agent, and test_calc.py written by the test agent, which asserts a tax rate limit the coding agent was never given. The suite passes 9 of 9.">
@@ -1159,7 +1293,7 @@ from your criteria:
     <p><code>qikly --demo</code> runs the whole loop on a bundled task, nothing
       to fill in: tests written before any code, a coding agent that never sees
       the criteria, and a repair. Well under a cent with a Gemini, OpenAI or
-      Anthropic key. Or <a href="https://towardsdatascience.com/qikly/" data-goatcounter-click="demo-video">watch the 10-minute video walkthrough</a>
+      Anthropic key. Or <a href="https://www.youtube.com/watch?v=paNIbTQPkmk" data-goatcounter-click="demo-video">watch the 10-minute video walkthrough</a>
       of all three steps.</p>
     <figure class="demo">
       <img src="images/qikly_demo.gif" width="811" height="820" loading="lazy"
@@ -1172,8 +1306,12 @@ from your criteria:
 
   <section class="band star-band">
     <h2>Did it find something your tests miss?</h2>
-    <p>A star on GitHub helps the next developer find qikly.</p>
-    <a class="btn btn-primary" href="https://github.com/gal-a/qikly" data-goatcounter-click="close-star">Star on GitHub</a>
+    <p>A star on GitHub helps the next developer find qikly. Tell me what it
+      found, or where it got stuck, in a discussion.</p>
+    <div class="star-actions">
+      <a class="btn btn-primary" href="https://github.com/gal-a/qikly" data-goatcounter-click="close-star">Star on GitHub</a>
+      <a class="btn" href="https://github.com/gal-a/qikly/discussions" data-goatcounter-click="close-discuss">Start a discussion</a>
+    </div>
   </section>
 
   <p class="origin">The separation this tool enforces is ordinary practice in safety-critical engineering, where verification is required to be independent of implementation as part of a V&amp;V (Verification &amp; Validation) methodology for testing. This library's author worked in that setting on General Motors' autonomous vehicle program before building this toolset.</p>
@@ -1185,7 +1323,6 @@ from your criteria:
     <span><a href="https://github.com/gal-a/qikly/blob/main/PRIVACY.md" data-goatcounter-click="footer-privacy">Privacy</a></span>
     <span><a href="https://qikly.substack.com/subscribe" data-goatcounter-click="footer-substack">Newsletter</a></span>
     <span><a href="https://x.com/GA4198498563411" data-goatcounter-click="footer-x">X</a></span>
-    <span>Also by the author: <a href="https://leanpub.com/applied-statistics-for-data-science" data-goatcounter-click="footer-books">Applied Statistics for Data Science</a></span>
     <span>Built by <a href="https://www.linkedin.com/in/galarav/" data-goatcounter-click="footer-linkedin">Gal Arav</a></span>
   </footer>
 

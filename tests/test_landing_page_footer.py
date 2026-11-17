@@ -20,7 +20,6 @@ import urllib.request
 import pytest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BOOKS_URL = "https://leanpub.com/applied-statistics-for-data-science"
 SUBSTACK_URL = "https://qikly.substack.com/subscribe"
 X_URL = "https://x.com/GA4198498563411"
 LINKEDIN_URL = "https://www.linkedin.com/in/galarav/"
@@ -43,8 +42,7 @@ def test_the_footer_carries_every_channel_we_want_counted():
     footer = _footer()
     for url, counter in ((SUBSTACK_URL, "footer-substack"),
                          (X_URL, "footer-x"),
-                         (LINKEDIN_URL, "footer-linkedin"),
-                         (BOOKS_URL, "footer-books")):
+                         (LINKEDIN_URL, "footer-linkedin")):
         pattern = r'<a href="%s"[^>]*data-goatcounter-click="%s"' % (
             re.escape(url), re.escape(counter))
         assert re.search(pattern, footer), (
@@ -52,10 +50,11 @@ def test_the_footer_carries_every_channel_we_want_counted():
             % (url, counter))
 
 
-def test_the_footer_links_the_books():
-    # Other attributes may sit beside href, such as the click counter's name.
-    pattern = r'Also by the author: <a href="%s"[^>]*>Applied Statistics for Data Science</a>'
-    assert re.search(pattern % re.escape(BOOKS_URL), _footer())
+def test_the_footer_names_no_retired_book():
+    # The Leanpub book was retired in November 2026 ahead of a publishing
+    # contract. Its page still loads, so nothing else would notice a stale
+    # link coming back. Re-add the book with its new address once announced.
+    assert "leanpub.com" not in _footer()
 
 
 @pytest.mark.skipif(not os.environ.get("QIKLY_CHECK_LINKS"),
