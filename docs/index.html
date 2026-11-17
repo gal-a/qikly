@@ -548,10 +548,10 @@ h1 {
 .card-test .tag { color: #6fb9bd; display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; letter-spacing: .02em; white-space: nowrap; }
 .card-test .flask { flex: 0 0 auto; }
 .card-test .dot { background: #57b8bd; }
-.card-fault { background: #171226; border-color: #a855f7; color: #b9a7d6; transform: rotate(-1deg); }
-.card-fault .card-head { border-color: #3b2b57; }
-.card-fault .card-head b { color: #e9d8ff; }
-.card-fault .tag { color: #fb923c; display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; letter-spacing: .02em; white-space: nowrap; }
+.card-fault { background: #131219; border-color: #6e6390; color: #b9a7d6; transform: rotate(-1deg); }
+.card-fault .card-head { border-color: #2a2738; }
+.card-fault .card-head b { color: #ddd6ee; }
+.card-fault .tag { color: #f4a4a4; display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; letter-spacing: .02em; white-space: nowrap; }
 .card-fault .card-head .sub { color: #a78bda; font-size: .8rem; }
 .card-fault .bug { flex: 0 0 auto; }
 .card.card-fault { padding-bottom: 30px; }
@@ -560,17 +560,17 @@ h1 {
 .card-fault pre { white-space: pre-wrap; font-size: clamp(.72rem, 1.1vw, .84rem); }
 .card-fault .hit { border-radius: 4px; padding: 0 3px; white-space: nowrap; }
 .card-fault .was .hit { background: rgba(138,127,163,.16); }
-.card-fault .now .hit { background: rgba(251,146,60,.16); }
+.card-fault .now .hit { background: rgba(244,164,164,.13); }
 .card-fault .card-head .sub { white-space: nowrap; }
 
-.card-fault .dot { background: #a855f7; }
-.card-fault .was { color: #8a7fa3; }
-.card-fault .now { color: #fb923c; font-weight: 500; }
+.card-fault .dot { background: #8a7fb0; }
+.card-fault .was { color: #7f7a92; }
+.card-fault .now { color: #f4a4a4; font-weight: 500; }
 .card-fault .ask { color: #e9d8ff; }
 .pill { position: absolute; right: 16px; bottom: -16px; border-radius: 999px; border: 2px solid;
   padding: 3px 14px; font-size: .84rem; font-weight: 500; }
 .pill.pass { background: #0f2a18; border-color: #15803d; color: #4ade80; }
-.pill.miss { background: #2a1610; border-color: #c2410c; color: #fb923c; }
+.pill.miss { background: #2a1618; border-color: #a34848; color: #f4a4a4; }
 .apart { position: relative; text-align: center; margin: 10px 0 4px; }
 .apart .prompt { color: #6d7b79; }
 .apart::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px dashed #3d4a4a; }
@@ -968,7 +968,7 @@ def test_label():
         </div>
         <div class="apart"><span><span class="prompt">$</span> qikly --score &nbsp;&darr; plants 13 faults</span></div>
         <div class="card card-fault">
-          <div class="card-head"><span class="dot"></span><b>pricing.py</b><span class="tag"><svg class="bug" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 4l2 3M16 4l-2 3"/><path d="M3 10h4M17 10h4M3 15h4M17 15h4M5 20l3-2M19 20l-3-2"/></g><ellipse cx="12" cy="14" rx="5" ry="7" fill="currentColor"/><path d="M12 9v11" stroke="#171226" stroke-width="1.5"/></svg><span class="tag-text">bugs planted by qikly</span></span></div>
+          <div class="card-head"><span class="dot"></span><b>pricing.py</b><span class="tag"><svg class="bug" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 4l2 3M16 4l-2 3"/><path d="M3 10h4M17 10h4M3 15h4M17 15h4M5 20l3-2M19 20l-3-2"/></g><ellipse cx="12" cy="14" rx="5" ry="7" fill="currentColor"/><path d="M12 9v11" stroke="#131219" stroke-width="1.5"/></svg><span class="tag-text">bugs planted by qikly</span></span></div>
 <pre><span class="was">-   if discount &lt; 0 or <span class="hit">discount &gt; 100</span>:</span>
 <span class="now">+   if discount &lt; 0 or <span class="hit">discount &gt;= 100</span>:</span></pre>
           <span class="pill miss">&#10007; 10 of 13 faults missed</span>
