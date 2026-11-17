@@ -172,8 +172,10 @@ def test_a_newer_version_is_announced_once(monkeypatch, capsys):
     assert capsys.readouterr().out.strip() == message
 
 
-def test_a_failing_release_title_still_announces_the_version(monkeypatch):
+def test_a_failing_release_title_still_announces_the_version(monkeypatch, capsys):
     """The title is cosmetic; losing it must not lose the message."""
+    # capsys keeps the announcement out of the run's own output, where it
+    # read as a real "qikly 99.0.0 is available" notice.
     monkeypatch.delenv(vc.NO_CHECK_ENV, raising=False)
 
     def get(url):
