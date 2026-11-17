@@ -189,12 +189,12 @@ a { color: var(--accent); }
   color: var(--accent);
 }
 .topbar-cta code { font-size: .92em; }
+.topbar-cta.star { background: var(--accent); color: var(--ground); }
 @media (max-width: 520px) {
-  /* The star button is the point of the bar, so it keeps its place and
-     any plain link goes rather than both shrinking into illegibility. */
-  .topbar-links a:not(.topbar-cta) { display: none; }
+  /* Both buttons stay on a phone, smaller, rather than one disappearing. */
+  .topbar-links { gap: 8px; font-size: .84rem; }
   .topbar-inner { padding: 8px 16px; }
-  .topbar-cta { padding: 4px 10px; }
+  .topbar-cta { padding: 6px 9px; }
 }
 
 /* ------------------------------------------------------------- hero -- */
@@ -799,7 +799,9 @@ footer {
       </svg>
     </a>
     <nav class="topbar-links">
-      <a class="topbar-cta" href="https://github.com/gal-a/qikly"
+      <a class="topbar-cta" href="https://github.com/gal-a/qikly/blob/main/docs/skill.md"
+         data-goatcounter-click="bar-skill">Install AI Skill</a>
+      <a class="topbar-cta star" href="https://github.com/gal-a/qikly"
          data-goatcounter-click="bar-star">Star on GitHub</a>
     </nav>
   </div>
