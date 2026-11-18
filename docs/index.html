@@ -611,23 +611,26 @@ h1 {
 .apart::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px dashed #3d4a4a; }
 .apart > span { position: relative; display: inline-block; padding: 4px 18px; border-radius: 999px;
   background: #0d1a1b; border: 1px solid #2b8f95; color: #57b8bd; font-size: .82rem; font-weight: 500; letter-spacing: .04em; }
-/* "Show another fault": steps the card through the run's real misses. */
-.try-fault { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 30px; }
+/* "Next bug": steps the card through the run's real misses. Two lines, the
+   button at the end of the second, right after the count it changes. */
+.try-fault { margin-top: 30px; }
 .hero-panel .btn-try { background: rgba(244,164,164,.08); border-color: #a34848; color: #f4a4a4;
-  font: inherit; font-size: .9rem; font-weight: 500; padding: 9px 16px; cursor: pointer; }
-.hero-panel .btn-try:hover { background: rgba(244,164,164,.16); }
+  font: inherit; font-size: .82rem; font-weight: 600; padding: 3px 10px; margin-left: 8px;
+  border-radius: 999px; cursor: pointer; vertical-align: middle; }
+.hero-panel .btn-try:hover { background: rgba(244,164,164,.18); }
 .hero-panel .btn-try:focus-visible { outline: 2px solid #f4a4a4; outline-offset: 2px; }
-.try-fault .note { margin: 0; font-size: .86rem; color: #c3d0cf; text-wrap: balance; }
+.try-fault .note { margin: 0; font-size: .9rem; line-height: 1.9; color: #c3d0cf; }
+.try-fault .note .ln { display: block; }
 .try-fault .note .nw { white-space: nowrap; }
-/* One line from 1000px up; narrower there is no room, so it wraps. */
+/* Each line on one line from 1000px up; narrower, the second may wrap. */
 @media (min-width: 1000px) {
-  .try-fault .note { white-space: nowrap; font-size: clamp(.74rem, .95vw, .86rem); }
+  .try-fault .note .ln { white-space: nowrap; }
 }
 .try-fault .note b { color: #4ade80; font-weight: 500; }
 .try-fault .note .but { color: #ffffff; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .try-fault .note .count { display: inline-block; color: #f4a4a4; font-weight: 500; white-space: nowrap;
   border-radius: 999px; padding: 0 6px; }
-.hero-panel .btn-try { display: inline-flex; align-items: center; gap: 8px; }
+.hero-panel .btn-try { display: inline-flex; align-items: center; gap: 6px; }
 .btn-try .again { flex: 0 0 auto; }
 .pill.rerun { animation: rerun .6s ease-out; }
 .try-fault .count.rerun { animation: rerun-miss .6s ease-out; }
@@ -1041,8 +1044,9 @@ def test_label():
            same --score run missed, rewritten with the card's shorter name.
            Without JavaScript the button stays hidden and the card is static. -->
       <div class="try-fault" hidden>
-        <button type="button" class="btn btn-try" data-goatcounter-click="hero-next-fault">Show another bug they miss<svg class="again" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M19.97 12.7A8 8 0 1 1 17.66 6.34" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M12.9 6.34H17.66V1.6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        <p class="note" aria-live="polite">Your tests still say <b>&#10003; 2/2 passed</b>, <strong class="but">but</strong> qikly finds bugs they <span class="nw">missed: <span class="count">1 of 10</span></span></p>
+        <p class="note"><span class="ln">Your tests still say <b>&#10003; 2/2 passed</b>,</span>
+          <span class="ln"><span aria-live="polite"><strong class="but">but</strong> qikly finds bugs they <span class="nw">missed: <span class="count">1 of 10</span></span></span>
+          <button type="button" class="btn btn-try" data-goatcounter-click="hero-next-fault">Show next bug<svg class="again" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M19.97 12.7A8 8 0 1 1 17.66 6.34" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M12.9 6.34H17.66V1.6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span></p>
       </div>
       </div>
     </div>
