@@ -548,7 +548,12 @@ h1 {
 .hero-panel .lead { margin: 0; font-size: 1.12rem; color: #c3d0cf; max-width: none; }
 @media (min-width: 861px) {
   .hero-panel .lead { max-width: none; font-size: clamp(.95rem, 1.35vw, 1.12rem); }
-  .hero-panel .lead .ln { display: block; white-space: nowrap; }
+  .hero-panel .lead .ln { display: block; text-wrap: balance; }
+}
+/* One line each only where the second fits beside the cards; narrower, it
+   wraps inside its column rather than running under them. */
+@media (min-width: 1300px) {
+  .hero-panel .lead .ln { white-space: nowrap; }
 }
 .hero-panel .cost.free { color: #57b8bd; background: #112f2e; }
 .hero-panel .install { background: rgba(0,0,0,.35); border-color: #1e4144; border-left-color: #57b8bd; color: #e6efee; }
@@ -612,12 +617,25 @@ h1 {
   font: inherit; font-size: .9rem; font-weight: 500; padding: 9px 16px; cursor: pointer; }
 .hero-panel .btn-try:hover { background: rgba(244,164,164,.16); }
 .hero-panel .btn-try:focus-visible { outline: 2px solid #f4a4a4; outline-offset: 2px; }
-.try-fault .note { margin: 0; font-size: .86rem; color: #c3d0cf; }
+.try-fault .note { margin: 0; font-size: .86rem; color: #c3d0cf; text-wrap: balance; }
+.try-fault .note .nw { white-space: nowrap; }
+/* One line from 1000px up; narrower there is no room, so it wraps. */
+@media (min-width: 1000px) {
+  .try-fault .note { white-space: nowrap; font-size: clamp(.74rem, .95vw, .86rem); }
+}
 .try-fault .note b { color: #4ade80; font-weight: 500; }
-.try-fault .note .count { color: #f4a4a4; font-weight: 500; white-space: nowrap; }
+.try-fault .note .but { color: #ffffff; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.try-fault .note .count { display: inline-block; color: #f4a4a4; font-weight: 500; white-space: nowrap;
+  border-radius: 999px; padding: 0 6px; }
+.hero-panel .btn-try { display: inline-flex; align-items: center; gap: 8px; }
+.btn-try .again { flex: 0 0 auto; }
 .pill.rerun { animation: rerun .6s ease-out; }
+.try-fault .count.rerun { animation: rerun-miss .6s ease-out; }
+.btn-try .again.rerun { animation: spin .5s ease-out; }
 @keyframes rerun { 0% { transform: scale(1); } 35% { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(74,222,128,.25); } 100% { transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { .pill.rerun { animation: none; } }
+@keyframes rerun-miss { 0% { transform: scale(1); } 35% { transform: scale(1.18); box-shadow: 0 0 0 5px rgba(244,164,164,.28); } 100% { transform: scale(1); } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pill.rerun, .try-fault .count.rerun, .btn-try .again.rerun { animation: none; } }
 /* Less air between the panel and the first section. */
 .hero.hero-panel + .band { padding-top: 40px; }
 
@@ -988,8 +1006,8 @@ footer {
     <div class="hero-grid">
       <div class="hero-left">
         <h1>Find out what your tests miss</h1>
-        <p class="lead"><span class="ln">qikly breaks a copy of your backend Python code</span>
-          <span class="ln">and shows which bugs your tests let through.</span></p>
+        <p class="lead"><span class="ln">See which bugs your Python tests miss.</span>
+          <span class="ln">Then get stronger tests, written by an agent that never saw your code.</span></p>
         <span class="cost free">free · no API key · ~30 seconds</span>
         <div class="install">
           <span><span class="prompt">$</span> pip install qikly</span>
@@ -1023,8 +1041,8 @@ def test_label():
            same --score run missed, rewritten with the card's shorter name.
            Without JavaScript the button stays hidden and the card is static. -->
       <div class="try-fault" hidden>
-        <button type="button" class="btn btn-try" data-goatcounter-click="hero-next-fault">Show another bug they miss &#8635;</button>
-        <p class="note" aria-live="polite">Your tests say <b>&#10003; 2/2 passed</b> &rarr; qikly finds cases your tests missed: <span class="count">1 of 10</span></p>
+        <button type="button" class="btn btn-try" data-goatcounter-click="hero-next-fault">Show another bug they miss<svg class="again" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M19.97 12.7A8 8 0 1 1 17.66 6.34" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M12.9 6.34H17.66V1.6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <p class="note" aria-live="polite">Your tests still say <b>&#10003; 2/2 passed</b>, <strong class="but">but</strong> qikly finds bugs they <span class="nw">missed: <span class="count">1 of 10</span></span></p>
       </div>
       </div>
     </div>
@@ -1507,10 +1525,14 @@ from your criteria:
     pre.appendChild(line("was", "-", FAULTS[at][0]));
     pre.appendChild(document.createTextNode("\n"));
     pre.appendChild(line("now", "+", FAULTS[at][1]));
-    pill.classList.remove("rerun");
-    void pill.offsetWidth;  // restart the animation on every click
-    pill.classList.add("rerun");
-    note.querySelector(".count").textContent = (at + 1) + " of 10";
+    var count = note.querySelector(".count");
+    count.textContent = (at + 1) + " of 10";
+    [pill, count, button.querySelector(".again")].forEach(function (el) {
+      if (!el) return;
+      el.classList.remove("rerun");
+      void el.getBoundingClientRect();  // restart the animation on every click
+      el.classList.add("rerun");
+    });
   });
   box.hidden = false;
 })();
