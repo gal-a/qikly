@@ -190,8 +190,16 @@ a { color: var(--accent); }
 }
 .topbar-cta code { font-size: .92em; }
 .topbar-cta.star { background: var(--accent); color: var(--ground); }
+/* The bar is sticky, so a jump to #faq, #found or #demo would land its
+   heading under it. */
+html { scroll-padding-top: 72px; }
+/* Quiet text links, not more buttons: they must not compete with the star. */
+.topbar-text { color: var(--ink-soft); }
+.topbar-text:hover { color: var(--accent); }
 @media (max-width: 520px) {
-  /* Both buttons stay on a phone, smaller, rather than one disappearing. */
+  /* Both buttons stay on a phone, smaller, rather than one disappearing. The
+     text links go: there is no room, and on a phone people scroll anyway. */
+  .topbar-text { display: none; }
   .topbar-links { gap: 8px; font-size: .84rem; }
   .topbar-inner { padding: 8px 16px; }
   .topbar-cta { padding: 6px 9px; }
@@ -387,6 +395,28 @@ h1 {
 .hero-try .lead { margin: 0; font-size: 1.08rem; display: flex; flex-wrap: wrap;
   align-items: center; gap: 10px; }
 .hero-try .eg { max-width: 640px; }
+/* Works with: names only. Logos would load from third parties the privacy
+   page does not mention. */
+.works-with { display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 8px 10px; margin: 26px 0 0; font-size: .9rem; color: var(--ink-soft); }
+.works-with .label { font-weight: 600; color: var(--ink); margin-right: 4px; }
+.works-with .chip { border: 1px solid var(--rule); background: var(--surface); border-radius: 999px;
+  padding: 3px 12px; white-space: nowrap; }
+.works-with .chip small { color: var(--ink-faint); font-size: .78rem; }
+/* Found in real libraries */
+.found-list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; }
+.found-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: baseline;
+  border: 1px solid var(--rule); background: var(--surface); border-radius: 10px; padding: 12px 16px; }
+.found-list a { font-weight: 600; }
+.found-list .what { grid-column: 1 / -1; color: var(--ink-soft); font-size: .94rem; }
+.found-list .state { font-size: .82rem; font-weight: 600; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+.found-list .state.fixed { color: var(--accent); background: var(--accent-soft); }
+.found-list .state.open { color: var(--ink-soft); background: var(--surface-2); }
+/* FAQ */
+.faq details { border-top: 1px solid var(--rule); padding: 12px 0; }
+.faq details:last-of-type { border-bottom: 1px solid var(--rule); }
+.faq summary { cursor: pointer; font-weight: 600; }
+.faq details p { margin: 10px 0 0; color: var(--ink-soft); max-width: 70ch; }
 .star-band { text-align: center; }
 .star-band p { margin: 0 auto 18px; max-width: 52ch; }
 .star-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
@@ -576,6 +606,18 @@ h1 {
 .apart::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px dashed #3d4a4a; }
 .apart > span { position: relative; display: inline-block; padding: 4px 18px; border-radius: 999px;
   background: #0d1a1b; border: 1px solid #2b8f95; color: #57b8bd; font-size: .82rem; font-weight: 500; letter-spacing: .04em; }
+/* "Show another fault": steps the card through the run's real misses. */
+.try-fault { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 30px; }
+.hero-panel .btn-try { background: rgba(244,164,164,.08); border-color: #a34848; color: #f4a4a4;
+  font: inherit; font-size: .9rem; font-weight: 500; padding: 9px 16px; cursor: pointer; }
+.hero-panel .btn-try:hover { background: rgba(244,164,164,.16); }
+.hero-panel .btn-try:focus-visible { outline: 2px solid #f4a4a4; outline-offset: 2px; }
+.try-fault .note { margin: 0; font-size: .86rem; color: #c3d0cf; }
+.try-fault .note b { color: #4ade80; font-weight: 500; }
+.try-fault .note .count { color: #f4a4a4; font-weight: 500; white-space: nowrap; }
+.pill.rerun { animation: rerun .6s ease-out; }
+@keyframes rerun { 0% { transform: scale(1); } 35% { transform: scale(1.12); box-shadow: 0 0 0 6px rgba(74,222,128,.25); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .pill.rerun { animation: none; } }
 /* Less air between the panel and the first section. */
 .hero.hero-panel + .band { padding-top: 40px; }
 
@@ -915,6 +957,8 @@ footer {
       </svg>
     </a>
     <nav class="topbar-links">
+      <a class="topbar-text" href="#faq" data-goatcounter-click="bar-faq">FAQ</a>
+      <a class="topbar-text" href="https://towardsdatascience.com/author/arav.012/" data-goatcounter-click="bar-articles">Articles</a>
       <a class="topbar-cta" href="https://github.com/gal-a/qikly/blob/main/docs/skill.md"
          data-goatcounter-click="bar-skill">Install AI Skill</a>
       <a class="topbar-cta star" href="https://github.com/gal-a/qikly"
@@ -974,9 +1018,31 @@ def test_label():
           <span class="pill miss">&#10007; 10 of 13 faults missed</span>
         </div>
       </div>
+      <!-- Outside the role="img" art on purpose: a button inside an image is
+           hidden from screen readers. Each step is one of the 10 faults the
+           same --score run missed, rewritten with the card's shorter name.
+           Without JavaScript the button stays hidden and the card is static. -->
+      <div class="try-fault" hidden>
+        <button type="button" class="btn btn-try" data-goatcounter-click="hero-next-fault">Show another bug they miss &#8635;</button>
+        <p class="note" aria-live="polite">Your tests say <b>&#10003; 2/2 passed</b> &rarr; qikly finds cases your tests missed: <span class="count">1 of 10</span></p>
+      </div>
       </div>
     </div>
   </header>
+
+  <!-- Each name here was checked against the code, 2026-11-18: the Skill was
+       seen loading in Claude Code, Codex, Cursor and Gemini CLI
+       (skill_install.py); the MCP server runs in Claude Code and VS Code.
+       Copilot is left out: its path is documented, not yet observed. -->
+  <p class="works-with"><span class="label">Works with</span>
+    <span class="chip">Claude Code</span>
+    <span class="chip">Codex</span>
+    <span class="chip">Cursor</span>
+    <span class="chip">Gemini CLI</span>
+    <span class="chip">VS Code <small>MCP</small></span>
+    <span class="chip">GitHub Actions</span>
+    <span class="chip">any terminal</span>
+  </p>
 
   <section class="band">
     <p class="eyebrow">Start</p>
@@ -1101,6 +1167,31 @@ from your criteria:
         <a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">the case</a> ·
         <a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">how well it works</a> ·
         <a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md" data-goatcounter-click="design-3">how it is built</a></span></li>
+    </ul>
+  </section>
+
+  <!-- The states go stale: check them with
+       private_docs/research/check_upstream_reports.py (in the private repo)
+       and update this list the day one changes. Checked 2026-11-18. -->
+  <section class="band" id="found">
+    <p class="eyebrow">Found in real code</p>
+    <h2>What it found in other people's libraries</h2>
+    <p>Scored on 50 open-source Python libraries, it turned up 4 real problems
+      in the libraries themselves. Each was checked by hand and reported to
+      the maintainers, and 2 are fixed so far.</p>
+    <ul class="found-list">
+      <li><a href="https://github.com/BrianPugh/cyclopts/issues/1044" data-goatcounter-click="found-cyclopts">cyclopts</a>
+        <span class="state fixed">fixed in 5.4.0</span>
+        <span class="what">An error that crashed when it was printed.</span></li>
+      <li><a href="https://github.com/Goldziher/prompt-template/issues/48" data-goatcounter-click="found-prompt-template">prompt-template</a>
+        <span class="state fixed">fixed in 1.2.1</span>
+        <span class="what">A README example that fails as written.</span></li>
+      <li><a href="https://github.com/basnijholt/markdown-code-runner/pull/64" data-goatcounter-click="found-markdown-code-runner">markdown-code-runner</a>
+        <span class="state open">reported, awaiting a reply</span>
+        <span class="what">Empties the file it runs on, on Windows.</span></li>
+      <li><a href="https://github.com/martinblech/xmltodict/pull/437" data-goatcounter-click="found-xmltodict">xmltodict</a>
+        <span class="state open">reported, awaiting a reply</span>
+        <span class="what">README namespace examples that no longer hold.</span></li>
     </ul>
   </section>
 
@@ -1304,6 +1395,49 @@ from your criteria:
     </figure>
   </section>
 
+  <section class="band faq" id="faq">
+    <p class="eyebrow">FAQ</p>
+    <h2>Good questions, straight answers</h2>
+    <details>
+      <summary>Does my code leave my machine?</summary>
+      <p>Not for <code>qikly --score</code>: it runs on your machine and calls
+        no model. The steps that use a model, drafting the spec, writing the tests
+        and repairing the code, send what they need to the provider whose key
+        you set: Gemini,
+        OpenAI or Anthropic. Apart from that, the only network call is a check
+        for a newer release, which you can turn off. The
+        <a href="https://github.com/gal-a/qikly/blob/main/PRIVACY.md" data-goatcounter-click="faq-privacy">privacy page</a>
+        has the details.</p>
+    </details>
+    <details>
+      <summary>Do I need an API key?</summary>
+      <p>Not to start. <code>qikly --score</code> needs no key. Steps 2 and 3
+        need one key from Gemini, OpenAI or Anthropic.</p>
+    </details>
+    <details>
+      <summary>What does it cost?</summary>
+      <p><code>qikly --score</code> is free. With a key, drafting the spec costs
+        a fraction of a cent and a full run about a cent.</p>
+    </details>
+    <details>
+      <summary>Does it change my code?</summary>
+      <p>No. <code>--score</code> plants its faults in a temporary copy, and
+        the code and tests a run writes go into <code>outputs/</code>. They
+        reach your source tree only if you copy them there, for example with
+        <code>--take-tests</code>.</p>
+    </details>
+    <details>
+      <summary>Which languages does it support?</summary>
+      <p>Python, with pytest. It is built for self-contained modules that
+        transform data, such as ETL, merges, calculations and validation, not
+        for a large repository.</p>
+    </details>
+    <details>
+      <summary>Is it open source?</summary>
+      <p>Yes, under the Apache License 2.0.</p>
+    </details>
+  </section>
+
   <section class="band star-band">
     <h2>Did it find something your tests miss?</h2>
     <p>A star on GitHub helps the next developer find qikly. Tell me what it
@@ -1327,6 +1461,60 @@ from your criteria:
   </footer>
 
 </div>
+
+<!-- The hero's "Show another fault": the 10 faults the pricing example's real
+     --score run missed (10 of 13), in its order, with discount_rate shortened
+     to discount as on the card. Each is [line before, line after], and each
+     line is [text, changed part, text]. Built from text nodes, never HTML. -->
+<script>
+(function () {
+  var FAULTS = [
+    [["if discount < 0 or ", "discount > 100", ":"], ["if discount < 0 or ", "discount >= 100", ":"]],
+    [["if ", "discount < 0", " or discount > 100:"], ["if ", "discount <= 0", " or discount > 100:"]],
+    [["if ", "discount < 0 or discount > 100", ":"], ["if ", "False", ":"]],
+    [["", "raise ValueError(\"discount out of range\")", ""], ["", "pass", ""]],
+    [["if code", ".strip()", ".lower() == \"vip\":"], ["if code", "", ".lower() == \"vip\":"]],
+    [["if discount < 0 or discount > ", "100", ":"], ["if discount < 0 or discount > ", "101", ":"]],
+    [["return round(price * (1 - discount / 100), ", "2", ")"], ["return round(price * (1 - discount / 100), ", "3", ")"]],
+    [["if discount < 0 ", "or", " discount > 100:"], ["if discount < 0 ", "and", " discount > 100:"]],
+    [["if discount < ", "0", " or discount > 100:"], ["if discount < ", "1", " or discount > 100:"]],
+    [["if code.strip()", ".lower()", " == \"vip\":"], ["if code.strip()", "", " == \"vip\":"]]
+  ];
+  var box = document.querySelector(".try-fault");
+  var pre = document.querySelector(".card-fault pre");
+  var pill = document.querySelector(".card-test .pill");
+  if (!box || !pre || !pill) return;
+  var button = box.querySelector("button"), note = box.querySelector(".note");
+  var at = 0;
+
+  function line(cls, sign, parts) {
+    var span = document.createElement("span");
+    span.className = cls;
+    span.appendChild(document.createTextNode(sign + "   " + parts[0]));
+    if (parts[1]) {
+      var hit = document.createElement("span");
+      hit.className = "hit";
+      hit.textContent = parts[1];
+      span.appendChild(hit);
+    }
+    span.appendChild(document.createTextNode(parts[2]));
+    return span;
+  }
+
+  button.addEventListener("click", function () {
+    at = (at + 1) % FAULTS.length;
+    pre.textContent = "";
+    pre.appendChild(line("was", "-", FAULTS[at][0]));
+    pre.appendChild(document.createTextNode("\n"));
+    pre.appendChild(line("now", "+", FAULTS[at][1]));
+    pill.classList.remove("rerun");
+    void pill.offsetWidth;  // restart the animation on every click
+    pill.classList.add("rerun");
+    note.querySelector(".count").textContent = (at + 1) + " of 10";
+  });
+  box.hidden = false;
+})();
+</script>
 
 <!-- GoatCounter: page views, plus clicks on links marked data-goatcounter-click.
      No cookies and no personal data. The site code is assembled from two

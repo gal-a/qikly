@@ -15,6 +15,8 @@
 [![Claude Code](https://img.shields.io/badge/Claude_Code-one--line_MCP_setup-D97757?logo=claude&logoColor=white)](https://github.com/gal-a/qikly#use-it-from-your-coding-agent)
 [![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22qikly%5Bmcp%5D%22%2C%22qikly-mcp%22%5D%7D)
 
+[Website](https://test.qikly.com) · [Start here](https://github.com/gal-a/qikly#start-here) · [Use it from your agent](https://github.com/gal-a/qikly#use-it-from-your-coding-agent) · [What it has caught](https://github.com/gal-a/qikly#examples-of-what-qikly-has-actually-caught) · [Where it fits today](https://github.com/gal-a/qikly#where-it-fits-today) · [Contributing](https://github.com/gal-a/qikly#contributing-a-task) · [Privacy](https://github.com/gal-a/qikly#privacy)
+
 **Find out what your tests miss.** Free, no key, about 30 seconds, from your
 project's root folder, pointed at any module of yours that has tests:
 
@@ -928,6 +930,14 @@ missed half the planted faults, and the two thirds of planted faults that no
 suite could have caught because the data never reached them.
 
 [docs/FINDINGS.md](https://github.com/gal-a/qikly/blob/main/docs/FINDINGS.md)
+
+**In other people's libraries:** scored on 50 open-source Python libraries, it
+turned up 4 real problems in the libraries themselves, each checked by hand and
+reported to the maintainers. 2 are fixed so far:
+[cyclopts](https://github.com/BrianPugh/cyclopts/issues/1044) (fixed in 5.4.0) and
+[prompt-template](https://github.com/Goldziher/prompt-template/issues/48) (fixed in 1.2.1);
+[markdown-code-runner](https://github.com/basnijholt/markdown-code-runner/pull/64) and
+[xmltodict](https://github.com/martinblech/xmltodict/pull/437) are awaiting a reply.
 
 ## Further reading
 
