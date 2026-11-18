@@ -190,10 +190,13 @@ def test_every_documented_repo_url_points_at_the_real_one():
         #
         # The README's results line is the other: it links the issues and pull
         # requests filed upstream for problems qikly found in other libraries,
-        # so a reader can check each one. Named one by one for the same reason.
+        # so a reader can check each one; the landing page's "Found in real
+        # code" list links the same reports. Named one by one for the same
+        # reason: each new finding is added here on purpose.
         allowed = {"modelcontextprotocol/registry",
                    "BrianPugh/cyclopts", "Goldziher/prompt-template",
-                   "basnijholt/markdown-code-runner", "martinblech/xmltodict"}
+                   "basnijholt/markdown-code-runner", "martinblech/xmltodict",
+                   "onlyreadai/onlyread"}
         wrong = sorted(
             {m for m in re.findall(r"github\.com/([\w.-]+/[\w.-]+)", text)
              if not m.startswith(owner + "/") and m.split("/")[0] not in reserved

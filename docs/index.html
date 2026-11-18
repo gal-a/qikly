@@ -399,19 +399,34 @@ h1 {
    page does not mention. */
 .works-with { display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
   gap: 8px 10px; margin: 26px 0 0; font-size: .9rem; color: var(--ink-soft); }
-.works-with .label { font-weight: 600; color: var(--ink); margin-right: 4px; }
+.works-with .label { font-weight: 600; color: var(--ink); margin-right: 4px; white-space: nowrap; }
+.works-with > * { flex-shrink: 0; }
 .works-with .chip { border: 1px solid var(--rule); background: var(--surface); border-radius: 999px;
   padding: 3px 12px; white-space: nowrap; }
 .works-with .chip small { color: var(--ink-faint); font-size: .78rem; }
-/* Found in real libraries */
-.found-list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; }
-.found-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: baseline;
-  border: 1px solid var(--rule); background: var(--surface); border-radius: 10px; padding: 12px 16px; }
-.found-list a { font-weight: 600; }
-.found-list .what { grid-column: 1 / -1; color: var(--ink-soft); font-size: .94rem; }
-.found-list .state { font-size: .82rem; font-weight: 600; border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+/* One line wherever it fits: the row may be wider than the text column, so
+   it is centred on the page rather than kept inside the column. */
+@media (min-width: 900px) {
+  .works-with { flex-wrap: nowrap; gap: 6px; font-size: .84rem; width: max-content;
+    position: relative; left: 50%; transform: translateX(-50%); }
+  .works-with .chip { padding: 2px 10px; }
+}
+/* Found in real libraries: one line per entry, newest first. Past 6 or 7
+   entries, show the newest 5 and link to the full list. */
+.found-list { list-style: none; margin: 14px 0 0; padding: 0; border: 1px solid var(--rule);
+  border-radius: 10px; background: var(--surface); }
+.found-list li { display: grid; grid-template-columns: 11.5rem minmax(0, 1fr) auto;
+  grid-template-areas: "name what state"; gap: 4px 16px; align-items: baseline; padding: 9px 16px; }
+.found-list li + li { border-top: 1px solid var(--rule); }
+.found-list a { grid-area: name; font-weight: 600; }
+.found-list .what { grid-area: what; color: var(--ink-soft); font-size: .92rem; }
+.found-list .state { grid-area: state; font-size: .78rem; font-weight: 600; border-radius: 999px;
+  padding: 1px 9px; white-space: nowrap; }
 .found-list .state.fixed { color: var(--accent); background: var(--accent-soft); }
-.found-list .state.open { color: var(--ink-soft); background: var(--surface-2); }
+.found-note { margin: 10px 0 0; font-size: .9rem; color: var(--ink-soft); }
+@media (max-width: 620px) {
+  .found-list li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name state" "what what"; }
+}
 /* FAQ */
 .faq details { border-top: 1px solid var(--rule); padding: 12px 0; }
 .faq details:last-of-type { border-bottom: 1px solid var(--rule); }
@@ -1066,6 +1081,32 @@ def test_label():
     <span class="chip">any terminal</span>
   </p>
 
+  <!-- The states go stale: check them with
+       private_docs/research/check_upstream_reports.py (in the private repo)
+       and update this list the day one changes. Checked 2026-11-18. -->
+  <section class="band" id="found">
+    <p class="eyebrow">Found in real code</p>
+    <h2>What it found in other people's libraries</h2>
+    <!-- Newest change first. OnlyRead came after the study, so the note
+         under the list says which four came from it. -->
+    <ul class="found-list">
+      <li><a href="https://github.com/onlyreadai/onlyread/pull/45" data-goatcounter-click="found-onlyread">OnlyRead</a>
+        <span class="state fixed">test merged</span>
+        <span class="what">A release check its tests could not tell had broken.</span></li>
+      <li><a href="https://github.com/BrianPugh/cyclopts/issues/1044" data-goatcounter-click="found-cyclopts">cyclopts</a>
+        <span class="state fixed">fixed in 5.4.0</span>
+        <span class="what">An error that crashed when it was printed.</span></li>
+      <li><a href="https://github.com/Goldziher/prompt-template/issues/48" data-goatcounter-click="found-prompt-template">prompt-template</a>
+        <span class="state fixed">fixed in 1.2.1</span>
+        <span class="what">A README example that fails as written.</span></li>
+      <li><a href="https://github.com/basnijholt/markdown-code-runner/pull/64" data-goatcounter-click="found-markdown-code-runner">markdown-code-runner</a>
+        <span class="what">Empties the file it runs on, on Windows.</span></li>
+      <li><a href="https://github.com/martinblech/xmltodict/pull/437" data-goatcounter-click="found-xmltodict">xmltodict</a>
+        <span class="what">README namespace examples that no longer hold.</span></li>
+    </ul>
+    <p class="found-note">The last four came from <a href="https://towardsdatascience.com/i-mutation-tested-50-python-libraries-tests-in-the-young-ones-missed-41-of-planted-faults/" data-goatcounter-click="found-article">a study of 50 Python libraries</a>.</p>
+  </section>
+
   <section class="band">
     <p class="eyebrow">Start</p>
     <h2>Create a test suite for your own code</h2>
@@ -1179,6 +1220,7 @@ from your criteria:
     <p class="eyebrow also">Other ways in</p>
     <ul class="also-list">
       <li><code>qikly --install-skill</code><span>teaches Claude Code, Gemini CLI, Codex or Cursor to drive qikly</span></li>
+      <li><a href="https://github.com/gal-a/qikly/blob/main/docs/mcp.md" data-goatcounter-click="start-mcp">MCP server</a><span>lets your agent in Claude Code or VS Code run qikly, without ever seeing your criteria</span></li>
     </ul>
     <p class="eyebrow also">Read more</p>
     <ul class="also-list">
@@ -1189,31 +1231,6 @@ from your criteria:
         <a href="https://github.com/gal-a/qikly/blob/main/docs/design_1_case_study.md" data-goatcounter-click="design-1">the case</a> ·
         <a href="https://github.com/gal-a/qikly/blob/main/docs/design_2_performance.md" data-goatcounter-click="design-2">how well it works</a> ·
         <a href="https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md" data-goatcounter-click="design-3">how it is built</a></span></li>
-    </ul>
-  </section>
-
-  <!-- The states go stale: check them with
-       private_docs/research/check_upstream_reports.py (in the private repo)
-       and update this list the day one changes. Checked 2026-11-18. -->
-  <section class="band" id="found">
-    <p class="eyebrow">Found in real code</p>
-    <h2>What it found in other people's libraries</h2>
-    <p>Scored on 50 open-source Python libraries, it turned up 4 real problems
-      in the libraries themselves. Each was checked by hand and reported to
-      the maintainers, and 2 are fixed so far.</p>
-    <ul class="found-list">
-      <li><a href="https://github.com/BrianPugh/cyclopts/issues/1044" data-goatcounter-click="found-cyclopts">cyclopts</a>
-        <span class="state fixed">fixed in 5.4.0</span>
-        <span class="what">An error that crashed when it was printed.</span></li>
-      <li><a href="https://github.com/Goldziher/prompt-template/issues/48" data-goatcounter-click="found-prompt-template">prompt-template</a>
-        <span class="state fixed">fixed in 1.2.1</span>
-        <span class="what">A README example that fails as written.</span></li>
-      <li><a href="https://github.com/basnijholt/markdown-code-runner/pull/64" data-goatcounter-click="found-markdown-code-runner">markdown-code-runner</a>
-        <span class="state open">reported, awaiting a reply</span>
-        <span class="what">Empties the file it runs on, on Windows.</span></li>
-      <li><a href="https://github.com/martinblech/xmltodict/pull/437" data-goatcounter-click="found-xmltodict">xmltodict</a>
-        <span class="state open">reported, awaiting a reply</span>
-        <span class="what">README namespace examples that no longer hold.</span></li>
     </ul>
   </section>
 
