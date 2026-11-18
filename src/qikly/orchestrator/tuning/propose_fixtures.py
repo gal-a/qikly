@@ -72,6 +72,8 @@ def _machine_share(task_id):
     A sidecar also works for JSON and JSONL inputs, which have nowhere to put
     a trailing comment at all.
     """
+    from qikly.agent_api.prompts.fixture_proposal_prompt import looks_binary, text_encoding
+
     try:
         with open(task_config_path(task_id), encoding="utf-8") as handle:
             paths = (yaml.safe_load(handle) or {}).get("inputs") or []
@@ -92,8 +94,11 @@ def _machine_share(task_id):
 
     total = machine = 0
     for path in paths:
+        if looks_binary(path):
+            # It has no rows, so counting its lines would put noise in the share.
+            continue
         try:
-            with open(path, encoding="utf-8", errors="replace") as handle:
+            with open(path, encoding=text_encoding(path), errors="replace") as handle:
                 rows = [r.strip() for r in handle.read().splitlines()[1:] if r.strip()]
         except OSError:
             continue
@@ -133,10 +138,14 @@ def render(task_id, criteria, proposals):
                   "drifts toward whatever a model finds interesting stops "
                   "describing what you actually process.", ""]
 
-    unreachable = [p for p in proposals if not p.get("covered")]
+    # Still counted as unreachable by every caller, which is true: nothing in
+    # the data reaches them. They are listed apart because there is no row
+    # to paste, and filing them under "already reachable" said the opposite.
+    no_row = [p for p in proposals if p.get("no_row")]
+    unreachable = [p for p in proposals if not p.get("covered") and not p.get("no_row")]
     covered = [p for p in proposals if p.get("covered")]
 
-    if not unreachable:
+    if not unreachable and not no_row:
         lines += ["Nothing to propose: every criterion already has data that "
                   "reaches it.", ""]
     for p in unreachable[:MAX_PROPOSALS]:
@@ -159,6 +168,13 @@ def render(task_id, criteria, proposals):
         lines += [f"{len(unreachable) - MAX_PROPOSALS} further proposal(s) were "
                   f"withheld: {MAX_PROPOSALS} is the cap for one round, so the "
                   "fixtures cannot be rewritten in a single sitting.", ""]
+    if no_row:
+        lines += ["## No row can reach these", "",
+                  "Nothing in the data reaches these criteria, and no row in a text "
+                  "file could: they need a different input, such as another audio "
+                  "or image file, named in the task's `inputs`. Criteria: "
+                  + ", ".join(str(p["criterion"]) for p in sorted(
+                      no_row, key=lambda x: x["criterion"])), ""]
     if covered:
         lines += ["## Already reachable", "",
                   "No row needed for criteria: "

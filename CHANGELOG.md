@@ -4,6 +4,27 @@ Versions follow [semantic versioning](https://semver.org). Version strings are
 PEP 440 normalised, so they are written `1.0.1` rather than `1.01`, which
 packaging tools would read as `1.1`.
 
+## Unreleased
+
+### Fixed
+- **`--score` no longer blames your environment for a suite that passes.**
+  When your tests read a file outside the folder that holds both the code and
+  the tests, they fail in qikly's copy and pass at home. It said "a problem in
+  your project's environment" beside a pytest run that said "passed". It now
+  says the copy is the cause, and how to score them.
+- **`--score` leaves no `__pycache__` in your folder** when it shows what
+  pytest said about a suite that fails.
+- **`--propose-fixtures` handles binary fixtures,** such as audio clips and
+  images: they are named to the agent, never shown, and never take a proposed
+  row. A criterion only a non-text input could reach gets the answer `no row`
+  and its own section, instead of being listed as already reachable.
+  UTF-16 and UTF-32 text with a byte order mark is read as text.
+
+### Docs
+- **Accepting a proposed fixture row:** add it to `.accepted_proposals`. The
+  reference said to mark the row with `# proposed`, which puts the comment
+  inside the row's last field.
+
 ## 0.6.3
 
 > Clearer first steps: `--validate` reads hand-typed answers, `--score` never hangs, and the MCP tools check their arguments

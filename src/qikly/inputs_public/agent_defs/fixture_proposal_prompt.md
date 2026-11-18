@@ -17,7 +17,8 @@ Task specification:
 Criteria to check, each one numbered:
 {criteria}
 
-The fixture files as they stand today, verbatim:
+The fixture files as they stand today. Text files are shown verbatim; a
+binary file, or one that could not be read, is only named:
 {fixtures}
 
 ## What to propose
@@ -37,9 +38,12 @@ A proposed row must:
   would actually process. A row nobody would ever see makes the measurement
   describe a world that does not exist.
 - **be the data itself, never a description of it.** "(empty file)" or
-  "a row with no timestamp" cannot be appended to anything. If a
-  criterion can only be exercised by something other than a row, say
-  `covered` and leave it.
+  "a row with no timestamp" cannot be appended to anything. If the
+  existing data does not reach a criterion and no row in a text file could,
+  because it needs a binary input such as an image or an audio clip, or no
+  file at all, say `no row`. Never say `covered` for it: `covered` means the
+  existing data already reaches the criterion. A binary file never takes a
+  row.
 - **say what should happen to it.** Accepted, or rejected and for which
   reason. Without that you have proposed an input, not a test case.
 
@@ -56,8 +60,10 @@ Nothing else. No prose before or after.
 - [criterion 4] [input_02.csv] TXN-1099,1e2,2026-01-05 | rejected: amount is not a plain decimal
 - [criterion 7] [input_01.csv] WIDGET-3,receive,0,2026-01-04 09:00 | rejected: quantity must be positive
 - [criterion 2] covered
+- [criterion 5] no row
 ```
 
-Each line is either a proposal in the four-part form above, or the word
-`covered` when the existing rows already reach that criterion. Every criterion
-in the list must appear exactly once.
+Each line is a proposal in the four-part form above, the word `covered` when
+the existing rows already reach that criterion, or `no row` when nothing does
+and no row in a text file could. Every criterion in the list must appear
+exactly once.

@@ -1072,6 +1072,10 @@ def render(result, gaps):
                        "tests that run and pass on their own."
                        if result.get("generated") is False
                        else "Get the run to converge first.")
+        if result.get("outside_copy"):
+            lines += ["**Not scored.** " + result["outside_copy"][0], "",
+                      result["outside_copy"][1].strip().lstrip("- ").capitalize() + ".", ""]
+            return "\n".join(lines) + "\n"
         lines += ["**Not scored.** The suite does not pass the untouched "
                   "implementation, so a mutant failing says nothing: it would "
                   "fail for the reason the original does. " + nothing_yet, ""]
@@ -1234,6 +1238,50 @@ def write(result, gaps, out_dir=OUT_DIR, invoked_from=None, advice=None):
     return path
 
 
+def passes_in_place(target, env=None):
+    """
+    True when the suite passes in the user's own tree, run the way scoring
+    runs it.
+
+    Scoring runs the suite in a copy of `target.root`, the folder that holds
+    both the code and the tests. A test that reads a file outside that
+    folder, such as a manifest one level up, fails in the copy and passes at
+    home. Told only "your tests fail on their own", next to a pytest run that
+    said "12 passed", the user was sent to fix an environment that was fine.
+
+    Not through `_suite_verdict`, which deletes `__pycache__` folders before
+    it runs: harmless in a copy, a change to the user's files here. Writing
+    bytecode is switched off instead, so the run leaves nothing behind.
+    """
+    env = dict(env if env is not None else os.environ)
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    try:
+        for suite in target.suites:
+            result = subprocess.run(
+                [sys.executable, "-m", "pytest", os.path.join(target.root, suite),
+                 "-q", "--tb=no", "-x", "-o", "addopts=", "-p", "no:cacheprovider"],
+                cwd=target.root, capture_output=True, text=True, env=env,
+                timeout=suite_limit(BASELINE_TIMEOUT))
+            if result.returncode != 0:
+                return False
+        return bool(target.suites)
+    except Exception:
+        return False
+
+
+def outside_copy_lines(target):
+    """What to say when the suite passes at home and fails in qikly's copy."""
+    return [
+        f"Your tests pass in your own folder but fail in qikly's copy of it. "
+        f"qikly scores a copy of {target.root}, the folder that holds both the "
+        f"code and the tests, so your tests most likely read a file or import "
+        f"a module from outside it, such as a file one folder up.",
+        "  - to score them, put the tests (or a copy) in a folder that sits above "
+        "everything they read, such as your repository's root folder, and point "
+        "--score-tests at it",
+    ]
+
+
 def setup_advice(said, target):
     """
     What to look at when a suite fails before any fault is planted, said as
@@ -1353,13 +1401,22 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
         return None
 
     gaps = unreachable_criteria(target.task_id)
+    if (not result["baseline"] and not result.get("baseline_timeout")
+            and target.task_id is None and passes_in_place(target)):
+        # Decided before the report is written, so the file a user keeps
+        # says the same as the console.
+        result["outside_copy"] = outside_copy_lines(target)
     path = write(result, gaps, report_dir(target, invoked_from), invoked_from)
 
     if not result["baseline"] and result.get("baseline_timeout"):
         print(stuck_message(task_id, target.suites, suite_limit(BASELINE_TIMEOUT)))
         return Unscored(path)
     if not result["baseline"]:
-        if target.task_id is None:
+        if result.get("outside_copy"):
+            print(f"[{task_id}] nothing was scored. Report at {path}")
+            for line in result["outside_copy"]:
+                print(f"[{task_id}] {line}")
+        elif target.task_id is None:
             # No run exists in this mode, so "get the run to converge" is
             # advice about something the user does not have. The usual cause
             # is that pytest collected nothing at all.
@@ -1376,6 +1433,9 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
                 # With the same source roots scoring adds, so the error shown
                 # is the one scoring met, not a different import failure.
                 env = dict(os.environ)
+                # This one runs in the user's own folder, so it must not
+                # leave __pycache__ there: nothing of theirs is modified.
+                env["PYTHONDONTWRITEBYTECODE"] = "1"
                 extra = [os.path.join(target.root, *parent.split("/"))
                          for _, parent in _import_roots(target) if parent]
                 if extra:

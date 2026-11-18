@@ -178,3 +178,123 @@ def test_the_prompt_says_data_not_description():
     with open(path, encoding="utf-8") as handle:
         text = handle.read()
     assert "never a description of it" in text
+
+
+# ------------------------------------------------------ binary fixtures ----
+
+def _wav(path):
+    """
+    A real, tiny WAV file: standard library only. Its samples hold NUL bytes,
+    as real audio does, and newline bytes too, so a reader that counts lines
+    in it finds "rows" that are not there.
+    """
+    import wave
+
+    with wave.open(str(path), "wb") as clip:
+        clip.setnchannels(1)
+        clip.setsampwidth(2)
+        clip.setframerate(8000)
+        clip.writeframes(b"\x00\x0a" * 400)
+    return str(path)
+
+
+def test_a_binary_fixture_is_named_but_not_decoded(tmp_path):
+    """
+    An audio clip decoded with errors="replace" never fails: it turns into
+    replacement characters, and the model is asked to propose rows for noise.
+    Named, so the model knows the input exists; not shown, so it is not read.
+    """
+    from qikly.agent_api.prompts.fixture_proposal_prompt import read_fixtures
+
+    clip = _wav(tmp_path / "clip_01.wav")
+    text = read_fixtures([clip])
+    assert "### clip_01.wav" in text
+    assert "binary or non-UTF-8 file" in text and "no row can be proposed" in text
+    assert "�" not in text
+
+
+def test_a_text_fixture_beside_a_binary_one_is_still_shown(tmp_path):
+    from qikly.agent_api.prompts.fixture_proposal_prompt import read_fixtures
+
+    rows = tmp_path / "input_01.csv"
+    rows.write_text("id,amount\nA,1\n", encoding="utf-8")
+    text = read_fixtures([str(rows), _wav(tmp_path / "clip_01.wav")])
+    assert "A,1" in text and "binary or non-UTF-8 file" in text
+
+
+def test_a_missing_fixture_is_not_called_binary(tmp_path):
+    from qikly.agent_api.prompts.fixture_proposal_prompt import looks_binary, read_fixtures
+
+    missing = str(tmp_path / "gone.csv")
+    assert looks_binary(missing) is False
+    assert "could not be read" in read_fixtures([missing])
+
+
+def test_the_machine_share_does_not_count_lines_of_a_binary_file(tmp_path, monkeypatch):
+    rows = tmp_path / "input_01.csv"
+    rows.write_text("id,amount\nA,1\nB,2\n", encoding="utf-8")
+    clip = _wav(tmp_path / "clip_01.wav")
+    config = tmp_path / "TASK.yaml"
+    config.write_text("inputs:\n  - %r\n  - %r\n" % (str(rows), clip), encoding="utf-8")
+    monkeypatch.setattr(pf, "task_config_path", lambda task_id: str(config))
+    assert pf._machine_share("TASK") == (0, 2)
+
+
+def test_utf16_text_with_a_byte_order_mark_is_read_as_text(tmp_path):
+    """
+    Excel's "Unicode Text" export is UTF-16 with a byte order mark. Its NUL
+    bytes made the first version of this check call it binary.
+    """
+    from qikly.agent_api.prompts.fixture_proposal_prompt import looks_binary, read_fixtures
+
+    for codec in ("utf-16", "utf-32"):
+        rows = tmp_path / f"input_{codec}.csv"
+        rows.write_text("id,amount\nA,1\n", encoding=codec)
+        assert looks_binary(str(rows)) is False
+        text = read_fixtures([str(rows)])
+        assert "id,amount" in text and "A,1" in text and "binary" not in text
+
+
+def test_utf16_rows_are_counted_in_the_machine_share(tmp_path, monkeypatch):
+    rows = tmp_path / "input_01.csv"
+    rows.write_text("id,amount\nA,1\nB,2\n", encoding="utf-16")
+    (tmp_path / pf.ACCEPTED_FILE).write_text("B,2\n", encoding="utf-8")
+    config = tmp_path / "TASK.yaml"
+    config.write_text("inputs:\n  - %r\n" % str(rows), encoding="utf-8")
+    monkeypatch.setattr(pf, "task_config_path", lambda task_id: str(config))
+    assert pf._machine_share("TASK") == (1, 2)
+
+
+def test_no_row_is_its_own_answer_not_covered():
+    proposals = _extract_fixture_proposals(
+        "- [criterion 1] no row\n- [criterion 2] covered\n", 5)
+    assert proposals == [{"criterion": 1, "covered": False, "no_row": True},
+                         {"criterion": 2, "covered": True}]
+
+
+def test_a_no_row_criterion_is_not_reported_as_already_reachable(monkeypatch):
+    """
+    The old prompt sent these to `covered`, and the report then filed them
+    under "Already reachable": the opposite of the truth.
+    """
+    monkeypatch.setattr(pf, "_machine_share", lambda task_id: (0, 0))
+    text = pf.render("T", ["short clips are rejected", "ids are unique"],
+                     [{"criterion": 1, "covered": False, "no_row": True},
+                      {"criterion": 2, "covered": True}])
+    no_row, reachable = text.split("## No row can reach these")[1].split("## Already reachable")
+    assert "Criteria: 1" in no_row
+    assert "No row needed for criteria: 2" in reachable
+    assert "Nothing to propose" not in text
+
+
+def test_a_row_proposed_for_a_binary_file_becomes_no_row(tmp_path):
+    from qikly.agent_api.agent_interface import _no_rows_into_binary_files
+
+    clip = _wav(tmp_path / "clip_01.wav")
+    rows = tmp_path / "input_01.csv"
+    rows.write_text("id\nA\n", encoding="utf-8")
+    proposals = [{"criterion": 1, "covered": False, "file": "clip_01.wav", "row": "x", "outcome": "rejected"},
+                 {"criterion": 2, "covered": False, "file": "input_01.csv", "row": "B", "outcome": "accepted"}]
+    out = _no_rows_into_binary_files(proposals, [clip, str(rows)])
+    assert out[0] == {"criterion": 1, "covered": False, "no_row": True}
+    assert out[1] == proposals[1]

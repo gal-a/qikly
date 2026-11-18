@@ -448,3 +448,69 @@ def test_a_missing_tests_folder_names_the_test_file_beside_the_code(project):
     output = done.stdout + done.stderr
     assert "no suite at" in output
     assert "try --score-tests test_pricing.py" in output, output[-400:]
+
+
+# ------------------------------------------- tests that read outside the copy ----
+
+READS_ONE_FOLDER_UP = '''import json, pathlib
+from pricing import line_total
+
+SETTINGS = json.loads((pathlib.Path(__file__).resolve().parents[1] / "settings.json").read_text())
+
+
+def test_line_total():
+    assert line_total(SETTINGS["quantity"], 3) == 6
+'''
+
+
+def _reads_one_folder_up(tmp_path):
+    """
+    The layout met on a real repository: the code and its test sit in one
+    folder, and the test reads a file from the folder above. Scoring copies
+    only the folder that holds both, so the file is missing there.
+    """
+    lib = tmp_path / "harness"
+    lib.mkdir()
+    (lib / "pricing.py").write_text(MODULE, encoding="utf-8")
+    (lib / "test_pricing.py").write_text(READS_ONE_FOLDER_UP, encoding="utf-8")
+    (tmp_path / "settings.json").write_text('{"quantity": 2}', encoding="utf-8")
+    return lib
+
+
+def test_a_suite_that_passes_at_home_is_not_blamed_on_the_environment(tmp_path):
+    """
+    It said "a problem in your project's environment", next to a pytest run
+    that said "1 passed". The user was sent to fix something that was fine.
+    """
+    lib = _reads_one_folder_up(tmp_path)
+    done = _run(["--score-code", "pricing.py", "--score-tests", "test_pricing.py",
+                 "--score-mutants", "3", "--score-seed", "1"], str(lib))
+    out = done.stdout + done.stderr
+    assert "fail in qikly's copy" in out
+    assert "problem in your project's environment" not in out
+    assert "repository's root folder" in out
+    report = next((lib / "qikly-suite-score").glob("*.md")).read_text(encoding="utf-8")
+    assert "fail in qikly's copy" in report
+
+
+def test_checking_at_home_leaves_nothing_behind(tmp_path):
+    lib = _reads_one_folder_up(tmp_path)
+    _run(["--score-code", "pricing.py", "--score-tests", "test_pricing.py",
+          "--score-mutants", "3", "--score-seed", "1"], str(lib))
+    left = {p.name for p in lib.rglob("*")} - {"pricing.py", "test_pricing.py"}
+    assert not {n for n in left if n == "__pycache__" or n.endswith(".pyc")}
+
+
+def test_a_suite_that_fails_at_home_still_gets_the_setup_advice(tmp_path):
+    (tmp_path / "pricing.py").write_text(MODULE, encoding="utf-8")
+    (tmp_path / "test_pricing.py").write_text(
+        "from pricing import line_total\n\n\ndef test_wrong():\n"
+        "    assert line_total(2, 3) == 7\n", encoding="utf-8")
+    done = _run(["--score-code", "pricing.py", "--score-tests", "test_pricing.py",
+                 "--score-mutants", "3", "--score-seed", "1"], str(tmp_path))
+    out = done.stdout + done.stderr
+    assert "problem in your project's environment" in out
+    assert "fail in qikly's copy" not in out
+    # Showing what pytest said runs the suite in the user's folder, and it
+    # used to leave __pycache__ there.
+    assert not list(tmp_path.rglob("__pycache__"))

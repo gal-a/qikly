@@ -7,6 +7,53 @@ from qikly.agent_api.prompts.template_loader import load_template
 # criteria it is meant to be compared against.
 MAX_ROWS_PER_FILE = 40
 
+# How much of a file to look at before deciding it is binary. A NUL byte near
+# the start is the test git uses too. UTF-8 text never has one; UTF-16 and
+# UTF-32 text always does, which is why a byte order mark is checked first.
+_SNIFF_BYTES = 8192
+
+# Longest first, because the UTF-32 little-endian mark begins with UTF-16's.
+_BOMS = ((b"\xff\xfe\x00\x00", "utf-32"), (b"\x00\x00\xfe\xff", "utf-32"),
+         (b"\xff\xfe", "utf-16"), (b"\xfe\xff", "utf-16"))
+
+
+def _head(path):
+    """The first bytes of a file, or None if it cannot be read."""
+    try:
+        with open(path, "rb") as handle:
+            return handle.read(_SNIFF_BYTES)
+    except OSError:
+        return None
+
+
+def text_encoding(path):
+    """
+    The codec to read a text fixture with. Excel's "Unicode Text" export is
+    UTF-16 with a byte order mark, and read as UTF-8 it is noise.
+    """
+    head = _head(path) or b""
+    for mark, codec in _BOMS:
+        if head.startswith(mark):
+            return codec
+    return "utf-8"
+
+
+def looks_binary(path):
+    """
+    True for a file that is not UTF-8 text and does not say which encoding it
+    is: an image, an audio clip, a pickle, or UTF-16 with no byte order mark.
+
+    Decoding one with errors="replace" never fails, which is the problem. It
+    turns the bytes into replacement characters, and the model is then asked
+    to propose rows for a "file" that is noise, or a count of its "rows" goes
+    into a report. A file that cannot be read says False, so the caller's own
+    handling of a missing file still applies.
+    """
+    head = _head(path)
+    if head is None or text_encoding(path) != "utf-8":
+        return False
+    return b"\0" in head
+
 
 def read_fixtures(paths, max_rows=MAX_ROWS_PER_FILE):
     """
@@ -20,8 +67,14 @@ def read_fixtures(paths, max_rows=MAX_ROWS_PER_FILE):
     blocks = []
     for path in paths:
         name = os.path.basename(path)
+        if looks_binary(path):
+            # Named, so the model knows the input exists, and said to hold no
+            # rows, so it does not propose one for a file it cannot append to.
+            blocks.append(f"### {name}\n(binary or non-UTF-8 file, {os.path.getsize(path)} "
+                          f"bytes: contents not shown, and no row can be proposed for it)")
+            continue
         try:
-            with open(path, encoding="utf-8", errors="replace") as handle:
+            with open(path, encoding=text_encoding(path), errors="replace") as handle:
                 lines = handle.read().splitlines()
         except OSError as e:
             blocks.append(f"### {name}\n(could not be read: {type(e).__name__})")

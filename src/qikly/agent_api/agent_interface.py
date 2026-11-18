@@ -567,13 +567,32 @@ def agent_propose_fixture_rows(task_id, criteria, seed=None):
     paths = [p for p in (config.get("inputs") or [])]
     task = _task_without_acceptance_criteria(task_id)
     prompt = build_fixture_proposal_prompt(task, criteria, read_fixtures(paths))
-    return _extract_fixture_proposals(call_llm("fixture_proposal", prompt, seed=seed),
-                                      len(criteria))
+    proposals = _extract_fixture_proposals(call_llm("fixture_proposal", prompt, seed=seed),
+                                           len(criteria))
+    return _no_rows_into_binary_files(proposals, paths)
+
+
+def _no_rows_into_binary_files(proposals, paths):
+    """
+    A row proposed for a binary fixture becomes `no row`.
+
+    The prompt says such a file takes no row, but a model can still propose
+    one, and pasting text into a WAV file breaks it. The criterion is kept,
+    not dropped: nothing in the data reaches it, and the report should say so.
+    """
+    from qikly.agent_api.prompts.fixture_proposal_prompt import looks_binary
+
+    binary = {os.path.basename(p) for p in paths
+              if isinstance(p, str) and looks_binary(p)}
+    return [{"criterion": p["criterion"], "covered": False, "no_row": True}
+            if p.get("file") in binary else p for p in proposals]
 
 
 def _extract_fixture_proposals(text, criteria_count):
     """
-    Parse `- [criterion N] [file] row | outcome` lines, and `covered`.
+    Parse `- [criterion N] [file] row | outcome` lines, `covered`, and
+    `no row`, which means nothing in the data reaches the criterion and no
+    row in a text file could: only a non-text input, or no input at all.
 
     Anything that does not match the documented shape is dropped rather than
     guessed at: a malformed row would be written into a proposal file that a
@@ -595,6 +614,9 @@ def _extract_fixture_proposals(text, criteria_count):
         rest = head.group(2).strip()
         if rest.lower().startswith("covered"):
             out.append({"criterion": index, "covered": True})
+            continue
+        if re.match(r"no\s+row\b", rest, re.I):
+            out.append({"criterion": index, "covered": False, "no_row": True})
             continue
         body = re.match(r"\[([^\]]+)\]\s*(.+?)\s*\|\s*(.+)$", rest)
         if not body:

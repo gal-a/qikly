@@ -404,12 +404,18 @@ qikly --propose-fixtures --tasks <MY_TASKS>
 ```
 
 A separate agent reads your criteria and your fixture files and says, for each
-criterion, either `covered` or here is the smallest row that would reach it.
+criterion, `covered`, the smallest row that would reach it, or `no row` when
+no row in a text file could, because the criterion needs a binary input such
+as an audio clip or an image. Binary fixtures are named to the agent, never
+shown, and never take a proposed row.
 The answer goes to `outputs/reports/fixture_proposals/`, laid out with each row
 printed under the criterion it exists to reach so you judge the two together.
 
 **It never edits a fixture.** To accept a row, paste it into the named file and
-append `  # proposed`. To reject one, do nothing. Two reasons for the gate,
+add the same line to `.accepted_proposals` in that folder, so the report's
+count of machine-proposed rows stays honest. Do not mark the row itself: a
+trailing comment lands inside the last field. To reject one, do nothing.
+Two reasons for the gate,
 neither about the model being untrustworthy. A row is only right or wrong
 relative to its criterion, so it is harder to review than a sentence. And a
 fixture set that grows in whatever direction a model finds interesting stops
