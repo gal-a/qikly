@@ -199,7 +199,7 @@ not on every release. It is 0.x deliberately, and a test says so.
 
 ## 7c. The landing page catches up here
 
-`docs/index.html` is served at test.qikly.com to people running the *published*
+`docs/index.html` is served at qikly.com to people running the *published*
 version, so everything it names has to exist in the version they can install.
 Anything that has landed on the branch but not on PyPI waits, and this is the
 step where it goes in. Nothing tests that page, which is why it needs a line in

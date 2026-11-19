@@ -28,7 +28,7 @@ from qikly import __version__, mcp_tools
 
 SERVER_NAME = "qikly"
 SERVER_TITLE = "qikly"
-SERVER_SITE = "https://test.qikly.com/"
+SERVER_SITE = "https://qikly.com/"
 
 # Shipped inside the package rather than referenced from docs/, because docs/
 # is not in the wheel: a `file://` URI into the source tree resolves on the

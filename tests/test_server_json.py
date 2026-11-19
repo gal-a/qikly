@@ -129,7 +129,7 @@ def test_every_icon_is_served_from_our_own_domain_over_https():
     """
     assert _icons(), "the listing should carry an icon"
     for icon in _icons():
-        assert icon["src"].startswith("https://test.qikly.com/images/"), icon["src"]
+        assert icon["src"].startswith("https://qikly.com/images/"), icon["src"]
 
 
 def test_every_icon_url_points_at_a_file_that_exists_in_docs():

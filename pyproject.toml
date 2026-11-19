@@ -63,8 +63,8 @@ all-providers = ["openai>=1.0,<4", "anthropic>=0.30,<2"]
 mcp = ["mcp>=2.0,<3"]
 
 [project.urls]
-Homepage = "https://test.qikly.com/"
-Documentation = "https://test.qikly.com/"
+Homepage = "https://qikly.com/"
+Documentation = "https://qikly.com/"
 Repository = "https://github.com/gal-a/qikly"
 Issues = "https://github.com/gal-a/qikly/issues"
 Changelog = "https://github.com/gal-a/qikly/blob/main/CHANGELOG.md"

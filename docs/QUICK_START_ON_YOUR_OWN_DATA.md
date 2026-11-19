@@ -111,7 +111,7 @@ code.
 
 ## Your own module, start to first run
 
-The same three steps as [the home page](https://test.qikly.com/?ref=quick-start).
+The same three steps as [the home page](https://qikly.com/?ref=quick-start).
 Run them from your project's root folder. Each takes one module or a whole
 folder, and every step takes the same path:
 
@@ -313,7 +313,7 @@ or never got past install.
 reading it know the tests were written by an agent kept apart from the code:
 
 ```markdown
-[![tested with qikly](https://img.shields.io/badge/tested_with-qikly-2b8f95)](https://test.qikly.com/?ref=badge)
+[![tested with qikly](https://img.shields.io/badge/tested_with-qikly-2b8f95)](https://qikly.com/?ref=badge)
 ```
 
 ### Step 1 from inside VS Code

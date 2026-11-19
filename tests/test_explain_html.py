@@ -86,7 +86,7 @@ def test_the_page_loads_nothing_from_anywhere():
     page = explain.render_html(explain.build("MERGE_SALES"))
     for needle in ("<script", "<link", "<img", "src=", "@import", "url("):
         assert needle not in page, needle
-    assert re.findall(r'href="([^"]+)"', page) == ["https://test.qikly.com/?ref=explain"]
+    assert re.findall(r'href="([^"]+)"', page) == ["https://qikly.com/?ref=explain"]
 
 
 def test_the_command_writes_the_page_where_it_was_typed(tmp_path, monkeypatch):

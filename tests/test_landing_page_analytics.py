@@ -1,5 +1,5 @@
 """
-test.qikly.com counts visits, and clicks on its outbound links, with GoatCounter.
+qikly.com counts visits, and clicks on its outbound links, with GoatCounter.
 
 Added 2026-09-14, because GitHub's traffic numbers only show the people who
 reach the repository, never the ones who read the landing page and left.

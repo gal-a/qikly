@@ -4,7 +4,7 @@
   "title": "qikly",
   "description": "Generates tests from acceptance criteria, then converges code with an agent that never sees them.",
   "version": "0.6.3",
-  "websiteUrl": "https://test.qikly.com/",
+  "websiteUrl": "https://qikly.com/",
   "repository": {
     "source": "github",
     "url": "https://github.com/gal-a/qikly"
@@ -42,7 +42,7 @@
   ],
   "icons": [
     {
-      "src": "https://test.qikly.com/images/qikly_icon.png",
+      "src": "https://qikly.com/images/qikly_icon.png",
       "mimeType": "image/png",
       "sizes": [
         "128x128"
@@ -50,7 +50,7 @@
       "theme": "dark"
     },
     {
-      "src": "https://test.qikly.com/images/qikly_icon_light.png",
+      "src": "https://qikly.com/images/qikly_icon_light.png",
       "mimeType": "image/png",
       "sizes": [
         "128x128"
@@ -58,7 +58,7 @@
       "theme": "light"
     },
     {
-      "src": "https://test.qikly.com/images/qikly_icon.svg",
+      "src": "https://qikly.com/images/qikly_icon.svg",
       "mimeType": "image/svg+xml",
       "sizes": [
         "any"
@@ -66,7 +66,7 @@
       "theme": "dark"
     },
     {
-      "src": "https://test.qikly.com/images/qikly_icon_light.svg",
+      "src": "https://qikly.com/images/qikly_icon_light.svg",
       "mimeType": "image/svg+xml",
       "sizes": [
         "any"

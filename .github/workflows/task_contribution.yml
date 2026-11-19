@@ -52,7 +52,7 @@ jobs:
               "Once it is merged you are credited in the changelog for the release that ships it, and you can add this badge to your profile or README:",
               "",
               "```markdown",
-              "[![qikly task contributor](https://img.shields.io/badge/qikly-task_contributor-2b8f95)](https://test.qikly.com/?ref=contributor)",
+              "[![qikly task contributor](https://img.shields.io/badge/qikly-task_contributor-2b8f95)](https://qikly.com/?ref=contributor)",
               "```",
               "",
               "**Maintainer checklist before merging**",

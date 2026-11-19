@@ -398,7 +398,7 @@ def render_html(facts):
                "The whole task file. Highlighted lines are cut before the coding agent gets it.",
                before, removed)))
     parts.append('<footer>%s, built by the same functions a real run uses, with no model '
-                 'call. <a href="https://test.qikly.com/?ref=explain">test.qikly.com</a></footer>'
+                 'call. <a href="https://qikly.com/?ref=explain">qikly.com</a></footer>'
                  % esc(facts.get("task_path", task_id)))
     title = "qikly --explain %s: what each agent sees" % task_id
     return PAGE.replace("@@TITLE@@", esc(title)).replace("@@BODY@@", "\n".join(parts))

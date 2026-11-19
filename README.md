@@ -15,7 +15,7 @@
 [![Claude Code](https://img.shields.io/badge/Claude_Code-one--line_MCP_setup-D97757?logo=claude&logoColor=white)](https://github.com/gal-a/qikly#use-it-from-your-coding-agent)
 [![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22qikly%5Bmcp%5D%22%2C%22qikly-mcp%22%5D%7D)
 
-[Website](https://test.qikly.com) · [Start here](https://github.com/gal-a/qikly#start-here) · [Use it from your agent](https://github.com/gal-a/qikly#use-it-from-your-coding-agent) · [What it has caught](https://github.com/gal-a/qikly#examples-of-what-qikly-has-actually-caught) · [Where it fits today](https://github.com/gal-a/qikly#where-it-fits-today) · [Contributing](https://github.com/gal-a/qikly#contributing-a-task) · [Privacy](https://github.com/gal-a/qikly#privacy)
+[Website](https://qikly.com) · [Start here](https://github.com/gal-a/qikly#start-here) · [Use it from your agent](https://github.com/gal-a/qikly#use-it-from-your-coding-agent) · [What it has caught](https://github.com/gal-a/qikly#examples-of-what-qikly-has-actually-caught) · [Where it fits today](https://github.com/gal-a/qikly#where-it-fits-today) · [Contributing](https://github.com/gal-a/qikly#contributing-a-task) · [Privacy](https://github.com/gal-a/qikly#privacy)
 
 **Find out what your tests miss.** Free, no key, about 30 seconds, from your
 project's root folder, pointed at any module of yours that has tests:
@@ -38,7 +38,7 @@ of all three steps on the bundled pricing example, with English subtitles.
 
 **Then close the gaps: your AI writes both the code and its tests. How do you know the tests are really valid?**
 
-[![qikly: one spec in, code and tests out, written by a coding agent and a test agent that are kept apart](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_hero.png)](https://test.qikly.com)
+[![qikly: one spec in, code and tests out, written by a coding agent and a test agent that are kept apart](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_hero.png)](https://qikly.com)
 
 *One logged run. The test agent builds the test suite: it was told, from the
 spec's acceptance criteria, that a rate may not exceed 100. The coding agent
@@ -194,7 +194,7 @@ implementation of the same interface.
   prints "Requirement already satisfied", changes nothing, and
   `--install-skill` then writes that older Skill.
 - The [quick start](https://github.com/gal-a/qikly/blob/main/docs/QUICK_START_ON_YOUR_OWN_DATA.md) walks the same steps, then each command on its own.
-- [test.qikly.com](https://test.qikly.com) is the two minute version of this page, and
+- [qikly.com](https://qikly.com) is the two minute version of this page, and
   the one to send to somebody else.
 
 > **New: an agent Skill.** `qikly --install-skill` teaches Claude Code, Gemini
@@ -964,10 +964,10 @@ If qikly writes the tests for something you maintain, add the badge to its
 README. It tells readers the suite was written from the acceptance criteria by
 an agent kept apart from the code:
 
-[![tested with qikly](https://img.shields.io/badge/tested_with-qikly-2b8f95)](https://test.qikly.com/?ref=badge)
+[![tested with qikly](https://img.shields.io/badge/tested_with-qikly-2b8f95)](https://qikly.com/?ref=badge)
 
 ```markdown
-[![tested with qikly](https://img.shields.io/badge/tested_with-qikly-2b8f95)](https://test.qikly.com/?ref=badge)
+[![tested with qikly](https://img.shields.io/badge/tested_with-qikly-2b8f95)](https://qikly.com/?ref=badge)
 ```
 
 ## Contributing a task
