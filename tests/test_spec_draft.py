@@ -594,3 +594,80 @@ def test_the_body_of_a_sibling_the_module_imports_is_kept_out(tmp_path):
         encoding="utf-8")
     text = spec_draft.docs_text(str(pkg / "api.py"), str(tmp_path))
     assert "applies the rate" in text and "a * b + 17" not in text
+
+
+_TAX = ('"""Tax helpers.\n\nThese compute the tax on a price,\nwith a rate of twenty percent.\n"""\n\n'
+        "# A negative price is treated as zero.\n\n\n"
+        'def tax(p):\n    """The price with tax."""\n    if p < 0:\n        return 0\n'
+        "    return p * 1.2\n\n\n"
+        'def tax_all(prices_list):\n    """Tax every price."""\n'
+        "    return [tax(p) for p in prices_list]\n")
+
+
+def test_a_small_module_saved_as_text_never_reaches_the_spec_agent(tmp_path):
+    """Found by the second review: its docstrings and comments outnumbered the
+    lines long enough to match, so the copy passed for documentation."""
+    (tmp_path / "m.py").write_text(_TAX, encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "copy.txt").write_text(_TAX, encoding="utf-8")
+    assert "p * 1.2" not in spec_draft.docs_text(str(tmp_path / "m.py"), str(tmp_path))
+
+
+def test_a_readme_example_defining_the_users_own_function_is_kept(tmp_path):
+    """Found by the second review: every quickstart handler was dropped."""
+    (tmp_path / "m.py").write_text(_TAX, encoding="utf-8")
+    (tmp_path / "README.md").write_text(
+        "# m\n\n```python\nfrom m import tax_all\n\n\ndef handler(prices):\n"
+        "    return tax_all(prices)\n```\n", encoding="utf-8")
+    assert "def handler" in spec_draft.all_docs(str(tmp_path / "m.py"), str(tmp_path))
+
+
+def test_a_signature_list_of_the_modules_functions_is_kept(tmp_path):
+    """An API reference lists signatures with `...`: that is documentation."""
+    (tmp_path / "m.py").write_text(_TAX, encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "api.md").write_text(
+        "API of tax:\n\n```python\ndef tax(p: float) -> float: ...\n"
+        "def tax_all(prices_list): ...\n```\n", encoding="utf-8")
+    assert "def tax_all(prices_list): ..." in spec_draft.docs_text(
+        str(tmp_path / "m.py"), str(tmp_path))
+
+
+def test_prose_and_tables_sharing_a_fragment_with_the_code_are_kept(tmp_path):
+    """Found by the second review: a bare `media_id: str` line of an argument
+    list, an import or an rst underline in the module removed prose."""
+    (tmp_path / "m.py").write_text(
+        "from __future__ import annotations\n\n\n"
+        "def media_save(media_id: str,\n               folder: str = '.') -> bool:\n"
+        "    names = ['TextChannel', 'VoiceChannel',\n"
+        "             'StageChannel']\n"
+        "    return bool(media_id) and folder_exists(folder)\n", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    page = ("| media_save(media_id: str, folder) | bool | Save media |\n"
+            "It returns TextChannel, VoiceChannel or StageChannel.\n"
+            "We use from __future__ import annotations everywhere.\n")
+    (tmp_path / "docs" / "api.md").write_text(page, encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "m.py"), str(tmp_path))
+    for line in page.splitlines():
+        assert line in text, line
+
+
+def test_an_indented_rst_paragraph_starting_with_class_is_kept(tmp_path):
+    (tmp_path / "m.py").write_text(_TAX, encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "usage.rst").write_text(
+        "Notes on tax_all(prices).\n\n    class attributes are shared, and tax_all(prices) "
+        "returns one price per input.\n", encoding="utf-8")
+    assert "returns one price per input" in spec_draft.docs_text(
+        str(tmp_path / "m.py"), str(tmp_path))
+
+
+def test_a_hash_inside_a_string_is_not_a_comment():
+    assert spec_draft._normal('x = "a #b"  # note') == 'x="a#b"'
+
+
+def test_the_second_reviews_weak_criterion_cases():
+    for fine in ("Works when the list is empty and the total is zero",
+                 "Completes without error on an empty file and the report says 0 rows",
+                 "Completes for every file in the folder and the folder is empty after"):
+        assert spec_draft.weak_criterion(fine) is None, fine

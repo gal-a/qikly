@@ -132,11 +132,12 @@ def strip(source):
     asserts = {(a.lineno, a.col_offset): a for _, found in _vacuous(tree) for a in found}
     if not asserts:
         return source
-    lines = source.splitlines(keepends=True)
-    starts = [0]
-    for line in lines:
-        starts.append(starts[-1] + len(line.encode("utf-8")))
+    # Line starts in bytes, split as Python splits lines: str.splitlines also
+    # splits on form feeds and other characters a source line may hold.
     data = source.encode("utf-8")
+    starts = [0]
+    for line in data.splitlines(keepends=True):
+        starts.append(starts[-1] + len(line))
     for _, node in sorted(asserts.items(), reverse=True):
         calls = any(isinstance(n, ast.Call) for n in ast.walk(node.test))
         keep = ast.get_source_segment(source, node.test) if calls else None

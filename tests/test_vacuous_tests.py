@@ -95,6 +95,9 @@ def test_strip_keeps_the_calls_and_the_test():
         "def test_a():\n    if f(): assert True\n": "def test_a():\n    if f(): pass\n",
         "def test_a():\n    assert (f() == 3, 'msg')\n": "def test_a():\n    (f() == 3, 'msg')\n",
         "def test_a():\n    with x:\n        assert True\n": "def test_a():\n    with x:\n        pass\n",
+        # A form feed: str.splitlines splits on it, Python does not.
+        "def test_a():\n    x = 1\x0c\n    assert True\n": "def test_a():\n    x = 1\x0c\n    pass\n",
+        "def test_a():\n    s = 'é'; assert True\n": "def test_a():\n    s = 'é'; pass\n",
     }
     for src, want in cases.items():
         assert strip(src) == want, src

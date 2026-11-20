@@ -28,6 +28,7 @@ import functools
 import json
 import os
 import re
+import textwrap
 
 # Enough for a README and a module's docstrings, without paying for a whole
 # documentation site on every scaffold.
@@ -122,7 +123,7 @@ def docs_text(module, cwd):
         return ""
     if not names:
         return ""
-    return _docs_text_cached(root, _own_code(module, source), tuple(sorted(names)))
+    return _docs_text_cached(root, *_own_code(module, source), tuple(sorted(names)))
 
 
 # A documentation file larger than this is a generated site or a data dump,
@@ -132,24 +133,41 @@ _DOC_FILE_MAX = 400_000
 # is taken to be the module's own source; shorter lines ("return x") are too
 # common to judge.
 _SOURCE_LINE_MIN = 12
+# Outside a code block, a part of a line is taken to be code only when it has
+# an operator or bracket in it: a bare "media_id: str" or "TextChannel,
+# VoiceChannel," from an argument list also reads as prose.
+_OPERATOR = re.compile(r"[()=\[\]{}<>+*/%]")
 
 
 def _normal(line):
     """
     A line as compared with the module's source: doctest prompts, a trailing
     comment and all whitespace taken out, so a body reformatted in a docs page
-    or copied into a doctest still matches.
+    or copied into a doctest still matches. A `#` inside a string is kept.
     """
     line = re.sub(r"^\s*(?:>>>|\.\.\.)(?=\s|$)", "", line)
-    line = re.sub(r"(?:^|\s)#.*$", "", line)
+    quote = None
+    for at, char in enumerate(line):
+        if quote:
+            if char == quote:
+                quote = None
+        elif char in "'\"":
+            quote = char
+        elif char == "#" and (at == 0 or line[at - 1].isspace()):
+            line = line[:at]
+            break
     return re.sub(r"\s+", "", line)
 
 
 @functools.lru_cache(maxsize=64)
 def _code_lines(source):
     """
-    The source's code lines, normalised, without its docstrings and comments:
-    a docs page that restates a docstring is documentation, not code.
+    The source's code lines, normalised: the lines of its bodies. Left out are
+    docstrings, comments, lines of punctuation alone, imports, decorators and
+    the def and class lines with their signatures. Those are the interface,
+    which the spec agent sees anyway, and users write the same lines in their
+    own examples ("from pkg import load"); a "------" line is an rst
+    underline too.
     """
     try:
         tree = ast.parse(source)
@@ -157,26 +175,61 @@ def _code_lines(source):
         tree = None
     skip = set()
     for node in ast.walk(tree) if tree else ():
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            skip.update(range(node.lineno, node.end_lineno + 1))
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            top = min([d.lineno for d in node.decorator_list] + [node.lineno])
+            skip.update(range(top, node.body[0].lineno if node.body else node.lineno + 1))
         if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
             first = node.body[0] if node.body else None
             if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
                     and isinstance(first.value.value, str)):
                 skip.update(range(first.lineno, first.end_lineno + 1))
+        # The inside of a multi-line string is text, not code: a template
+        # that renders the project's own docs pages would match them.
+        if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                and node.end_lineno > node.lineno):
+            skip.update(range(node.lineno + 1, node.end_lineno))
     out = set()
-    for number, line in enumerate(source.splitlines(), 1):
+    # Split as Python numbers lines: str.splitlines also splits on form feeds.
+    for number, line in enumerate(re.split(r"\r\n|\r|\n", source), 1):
         if number in skip or line.lstrip().startswith("#"):
             continue
         line = _normal(line)
-        if len(line) >= _SOURCE_LINE_MIN:
+        if (len(line) >= _SOURCE_LINE_MIN and re.search(r"[A-Za-z0-9]", line)
+                and not _IDIOM.match(line)):
             out.add(line)
     return frozenset(out)
 
 
+# Lines any Python code has, normalised: matching one proves nothing.
+_IDIOM = re.compile(r"(?:except\b.*|try|else|finally):$|(\w+)=\1,?\)?$"
+                    r"|super\(\)\.\w+\(.*\)$|return(?:self\.)?\w+$|raise$|pass$")
+
+
+@functools.lru_cache(maxsize=64)
+def _defined_names(source):
+    """
+    The functions and classes the source defines at its top level, private
+    ones too. Not methods: a user's subclass that overrides `__init__` or
+    `validate` in an example is how the module is used. A method's body shown
+    under its own class is caught through the class's name.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return frozenset()
+    return frozenset(node.name for node in tree.body
+                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)))
+
+
 def _sibling_sources(module, source):
     """
-    The sources of the modules of the same package that this module imports.
-    A thin wrapper's behaviour lives in the module it delegates to, so that
-    module's body must stay out of the prompt too.
+    The sources of the modules of the same package that this module imports
+    (`from . import x`, `from .x import y`, `from .sub.x import y`, and the
+    same through the package's name). A thin wrapper's behaviour lives in the
+    module it delegates to, so that module's body must stay out of the prompt
+    too. Imports from a parent package (`from ..x`) are not followed.
     """
     here = os.path.dirname(os.path.realpath(module))
     package = os.path.basename(here)
@@ -195,17 +248,18 @@ def _sibling_sources(module, source):
             elif node.level != 1:
                 continue
             if parts:
-                wanted.add(parts[0])
+                wanted.add(tuple(parts))
             else:
-                wanted.update(alias.name for alias in node.names)
+                wanted.update((alias.name,) for alias in node.names)
         elif isinstance(node, ast.Import):
             for alias in node.names:
                 parts = alias.name.split(".")
                 if len(parts) > 1 and parts[0] == package:
-                    wanted.add(parts[1])
+                    wanted.add(tuple(parts[1:]))
     found = []
-    for name in sorted(wanted):
-        for path in (os.path.join(here, name + ".py"), os.path.join(here, name, "__init__.py")):
+    for parts in sorted(wanted):
+        for path in (os.path.join(here, *parts) + ".py",
+                     os.path.join(here, *parts, "__init__.py")):
             real = os.path.realpath(path)
             if (os.path.isfile(real) and real != os.path.realpath(module)
                     and real.startswith(here + os.sep)):
@@ -219,32 +273,61 @@ def _sibling_sources(module, source):
 
 
 def _own_code(module, source=None):
-    """The normalised code lines of the module and of the siblings it imports."""
+    """
+    The normalised code lines, and the names defined, of the module and of the
+    siblings it imports: (lines, names).
+    """
     if source is None:
         from qikly.start import _read
         try:
             source = _read(module)
         except (OSError, ValueError):
-            return frozenset()
-    own = set(_code_lines(source))
+            return frozenset(), frozenset()
+    lines, names = set(_code_lines(source)), set(_defined_names(source))
     for sibling in _sibling_sources(module, source):
-        own |= _code_lines(sibling)
-    return frozenset(own)
+        lines |= _code_lines(sibling)
+        names |= _defined_names(sibling)
+    return frozenset(lines), frozenset(names)
 
 
-def _is_source(line, own):
-    """A docs line that holds a code line of the module, in any layout."""
+_GRAM = 8
+
+
+@functools.lru_cache(maxsize=16)
+def _index(own):
+    """The code lines by their first 8 characters, to find one inside a line fast."""
+    index = {}
+    for code in own:
+        index.setdefault(code[:_GRAM], []).append(code)
+    return index
+
+
+def _is_source(line, own, in_code):
+    """
+    A docs line that holds a code line of the module. In a code block, a
+    doctest or a <pre>, any part of the line counts, so a body reformatted
+    onto one line is caught. In prose, the whole line must be a code line, or
+    hold one with an operator or bracket in it.
+    """
     line = _normal(line)
     if len(line) < _SOURCE_LINE_MIN:
         return False
-    return line in own or any(code in line for code in own)
+    if line in own:
+        return True
+    index = _index(own)
+    for at in range(len(line) - _GRAM + 1):
+        for code in index.get(line[at:at + _GRAM], ()):
+            if line.startswith(code, at) and (
+                    in_code or _OPERATOR.search(code)):
+                return True
+    return False
 
 
 # Cached on the module's code and names: one CLI run drafts several answers
 # from the same pages. A long-running process that drafts (the MCP server does
 # not today) would need the pages' modification times in the key.
 @functools.lru_cache(maxsize=16)
-def _docs_text_cached(root, own, names):
+def _docs_text_cached(root, own, defined, names):
     # A mention is a call or a backticked name; a bare word counts only for a
     # name long enough not to be ordinary English ("get", "run", "load").
     called = re.compile(r"`?\b(?:%s)\b(?:\(|`)" % "|".join(re.escape(n) for n in names))
@@ -281,7 +364,7 @@ def _docs_text_cached(root, own, names):
                     continue
                 if not mentions(text):
                     continue  # not about this module: no need to filter it
-                text = _without_code(text, own)
+                text = _without_code(text, own, defined)
                 if text is None:
                     continue
                 hits = mentions(text)
@@ -303,54 +386,127 @@ def _docs_text_cached(root, own, names):
 
 
 _CODE_DIRECTIVE = re.compile(r"^\s*\.\.\s+(?:code-block|code|sourcecode|literalinclude)::")
-_DEFINES = re.compile(r"\s*(?:(?:>>>|\.\.\.)\s*)?(?:async\s+)?(?:def|class)\s")
+_DEFINES = re.compile(r"\s*(?:(?:>>>|\.\.\.)\s*)?(?:async\s+)?"
+                      r"(?:def\s+(\w+)\s*\(|class\s+(\w+)\s*[(:])")
+_INLINE_CODE = re.compile(r"^\s*(?:>>>|\.\.\.)(?:\s|$)|<pre|<code", re.IGNORECASE)
 
 
-def _without_code(text, own):
+def _code_blocks(lines):
     """
-    The page with any code block that defines a function or class, and any
-    line holding a code line of the module or of a sibling it imports, taken
-    out. None when most of the page is that source: a copy of the code saved
-    as .txt. The spec agent must never see a function body, and documentation
-    pages can hold one. A body that differs from the current code (an old
-    version, rewritten) and sits outside a block with a def cannot be told
-    from prose.
+    The page's code blocks, as (first, end, body_first, kept): lines first to
+    end-1 are the block, its code starts at body_first, and kept is a header
+    line to keep when the block goes ("Example::"), or None.
     """
-    lines = text.splitlines()
-    source = [_is_source(line, own) for line in lines] if own else [False] * len(lines)
-    # A copy of the code: much of the module, and most of the page. A page
-    # that quotes a small module's three lines among its prose is still docs.
-    matched = sum(source)
-    if (own and matched >= max(3, len(own) // 3)
-            and matched * 2 >= sum(1 for line in lines if line.strip())):
-        return None
-    out, i = [], 0
+    blocks, i = [], 0
     while i < len(lines):
         line = lines[i]
         fence = re.match(r"^\s*(```|~~~)", line)
         rst = _CODE_DIRECTIVE.match(line) or (line.rstrip().endswith("::")
                                                 and not line.lstrip().startswith(".."))
-        # A Markdown code block: indented four spaces, after a blank line.
+        # A Markdown code block that defines something: indented four spaces,
+        # after a blank line. Other indented text is left as prose: rst
+        # indents the bodies of its directives, and those are documentation.
         indented = (not fence and not rst and re.match(r"(?: {4}|\t)\S", line)
-                    and (i == 0 or not lines[i - 1].strip()))
-        if fence or rst or indented:
-            j = i + 1
-            if fence:
-                while j < len(lines) and not lines[j].lstrip().startswith(fence.group(1)):
-                    j += 1
-                block, end = lines[i + 1:j], j + 1
-            else:
-                while j < len(lines) and (not lines[j].strip() or lines[j][:1] in (" ", "\t")):
-                    j += 1
-                block, end = (lines[i:j] if indented else lines[i + 1:j]), j
-            if any(_DEFINES.match(b) for b in block):
-                out.append(line if rst and not _CODE_DIRECTIVE.match(line) else "")
-                i = end
-                continue
-        if not source[i]:
-            out.append(line)
-        i += 1
-    return "\n".join(out)
+                    and (i == 0 or not lines[i - 1].strip()) and _DEFINES.match(line))
+        if not (fence or rst or indented):
+            i += 1
+            continue
+        j = i + 1
+        if fence:
+            while j < len(lines) and not lines[j].lstrip().startswith(fence.group(1)):
+                j += 1
+            blocks.append((i, min(j + 1, len(lines)), i + 1, None))
+            i = j + 1
+            continue
+        while j < len(lines) and (not lines[j].strip() or lines[j][:1] in (" ", "\t")):
+            j += 1
+        if indented:
+            blocks.append((i, j, i, None))
+        else:
+            blocks.append((i, j, i + 1, None if _CODE_DIRECTIVE.match(line) else i))
+        i = max(j, i + 1)
+    return blocks
+
+
+def _looks_like_python(text):
+    """A page that parses as Python and defines something: a copy of code."""
+    try:
+        tree = ast.parse(text)
+    except (SyntaxError, ValueError):
+        return False
+    return any(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+               for node in tree.body)
+
+
+_PROMPT = re.compile(r"^(\s*)(?:>>> |\.\.\. )")
+_STATEMENT = re.compile(r"^\s*(?:return|raise|yield|if|elif|for|while|with|try|assert|await)\b"
+                        r"|^\s*[\w.\[\]]+\s*[-+*/%|&]?=(?!=)")
+
+
+def _has_body(block):
+    """
+    A block whose definitions do something: a statement under a def beyond a
+    docstring, `...` or `pass`. A list of signatures is an API reference.
+    """
+    plain = [_PROMPT.sub(r"\1", line) for line in block]
+    try:
+        tree = ast.parse(textwrap.dedent("\n".join(plain)))
+    except (SyntaxError, ValueError):
+        return any(_STATEMENT.match(line) for line in plain[1:])
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for stmt in node.body:
+                if isinstance(stmt, ast.Pass) or (
+                        isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant)):
+                    continue  # pass, a docstring or `...`
+                return True
+    return False
+
+
+def _without_code(text, own, defined=frozenset()):
+    """
+    The page with the module's code taken out, or None when the page is a copy
+    of code (a module saved as .txt). The spec agent must never see a function
+    body, and documentation pages can hold one.
+
+    A code block that defines a function or class goes whole when it holds a
+    line of the module's code (or of a sibling it imports), or gives a body to
+    a function or class of the same name. A block that only lists the module's
+    signatures (stubs with `...` or a docstring) is kept: that is an API
+    reference. So is a block that defines only the user's own callback: it is
+    how the module is used. Anywhere else, only the lines that hold the
+    module's code go. A body that differs from the current code (an old
+    version, rewritten) under another name cannot be told from an example.
+    """
+    if _looks_like_python(text):
+        return None
+    lines = text.splitlines()
+    in_code = [bool(_INLINE_CODE.search(line)) for line in lines]
+    blocks = _code_blocks(lines)
+    for first, end, body, _ in blocks:
+        for k in range(body, end):
+            in_code[k] = True
+    source = ([_is_source(line, own, code) for line, code in zip(lines, in_code)]
+              if own else [False] * len(lines))
+    # Much of the module, and most of the page: a copy of the code that did
+    # not parse as a whole. (One that parses was caught above.)
+    matched = sum(source)
+    counted = sum(1 for line in lines if line.strip())
+    if own and matched >= max(3, len(own) // 3) and matched * 2 >= counted:
+        return None
+    drop = [False] * len(lines)
+    for first, end, body, kept in blocks:
+        block = lines[body:end]
+        names = {m.group(1) or m.group(2) for m in map(_DEFINES.match, block) if m}
+        held = sum(source[body:end])
+        # One shared line ("id: Mapped[int] = mapped_column(") in a user's own
+        # example costs that line; two, or a third of the block, are a body.
+        if names and ((names & defined and _has_body(block)) or held >= 2
+                      or (held and held * 3 >= sum(1 for b in block if b.strip()))):
+            for k in range(first, end):
+                drop[k] = k != kept
+    return "\n".join(line for k, line in enumerate(lines)
+                     if not drop[k] and not source[k])
 
 
 def all_docs(module, cwd):
@@ -360,7 +516,7 @@ def all_docs(module, cwd):
     """
     readme = readme_text(module, cwd)
     if readme:
-        readme = _without_code(readme, _own_code(module)) or ""
+        readme = _without_code(readme, *_own_code(module)) or ""
     return "\n\n".join(t for t in (readme, docs_text(module, cwd)) if t)
 
 
@@ -741,9 +897,12 @@ _STATES_A_RESULT = re.compile(
     re.IGNORECASE)
 # A condition says when, not what: "works when x is 0" names no result. It
 # ends at a comma, a semicolon or an "and" that goes on to a result:
-# "succeeds when the server is up and returns the body" names one.
+# "succeeds when the server is up and returns the body" and "works when the
+# list is empty and the total is zero" both name one. The cost: "works when x
+# is 0 and y is 1" is read as naming one too, a missed warning, not a false one.
 _CONDITION = re.compile(
-    r"\b(?:when|whenever|if|unless|for|given|on)\b.*?(?=[,;]|\band\s+(?:\w+\s+)?%s|$)"
+    r"\b(?:when|whenever|if|unless|for|given|on)\b.*?"
+    r"(?=[,;]|\band\b(?=[^,;]*?(?:%s|\b(?:is|are|equals?|says?|has|have)\b))|$)"
     % _RESULT_VERB, re.IGNORECASE)
 # A call, its name included: "update(cfg) works" names no result, though
 # "update" is a result verb.

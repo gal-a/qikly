@@ -10,10 +10,13 @@ packaging tools would read as `1.1`.
 - **`--scaffold` reads your docs folder too.** Besides the README and the
   docstrings, the spec agent now reads the pages of `docs/` (or `doc/`) that
   name the module's functions, most mentions first, never a source file, a
-  file outside the project, or a code block that defines a function. A line
-  of the module's code, or of a module of the same package it imports, is
-  taken out of these pages and of the README, also when it is reformatted, in
-  a doctest or behind a comment; a page restating a docstring is kept. On
+  file outside the project, or the module's code. A line of the module's
+  code, or of a module of the same package it imports, is taken out of these
+  pages and of the README, also when it is reformatted, in a doctest or
+  behind a comment. A code block that shows a body of the module goes whole,
+  and so does a page that is a copy of the code saved as text. An example
+  defining your own handler, a list of the module's signatures and a page
+  restating a docstring are kept. On
   jambo, the rule behind a question `--score` asked ("passing `None` clears
   every namespace") was only in `docs/source/usage.ref_cache.rst`, so the
   agent could not answer it. A quote from those pages now counts as docs.
@@ -34,7 +37,8 @@ packaging tools would read as `1.1`.
 - **A drafted criterion that names no expected value is marked `CHECK`,** with
   the reason beside it. "`clear_ref_cache()` runs without error" gave a test
   that could not tell a cache that cleared from one that did not. None of the
-  140 criteria in qikly's bundled, example and private tasks is flagged.
+  141 distinct acceptance criteria in qikly's bundled, example and private
+  task files is flagged.
 - **`--score` no longer blames your environment for a suite that passes.**
   When your tests read a file outside the folder that holds both the code and
   the tests, they fail in qikly's copy and pass at home. It said "a problem in
