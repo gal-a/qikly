@@ -10,16 +10,17 @@ packaging tools would read as `1.1`.
 - **`--scaffold` reads your docs folder too.** Besides the README and the
   docstrings, the spec agent now reads the pages of `docs/` (or `doc/`) that
   name the module's functions, most mentions first, never a source file, a
-  file outside the project, or the module's code. A line of the module's
-  code of 12 characters or more, or of a module of the same package it
-  imports, is taken out of these pages and of the README. In a code block or
-  a doctest it is caught also when reformatted or behind a comment. A code
-  block that defines something and gives a body to one of the module's
-  functions or classes, or holds two of its lines, goes whole; in any other
-  block only the module's lines go. So does a page that is a copy of
-  the code saved as text. An example defining your own handler, a list of
-  the module's signatures and a page restating a docstring are kept.
-  Shorter lines of a body (`return 0`) can still pass outside such a block. On
+  file outside the project, or the module's code. A page that is a copy of
+  the code saved as text is left out whole. From the other pages and the
+  README, a line of the module's code, or of a module of the same package
+  it imports, is taken out; in a code block or a doctest also when
+  reformatted or behind a comment. A code block that defines something and
+  gives a body to one of the module's functions or classes, or holds two of
+  its lines or a third of its lines, goes whole; in any other block only the
+  module's lines go. An example defining your own handler, a list of the
+  module's signatures and a page restating a docstring are kept. Some body
+  lines can still pass outside such a block: lines under 12 characters
+  (`return 0`), and lines any code has (`except KeyError:`, `limit=None,`). On
   jambo, the rule behind a question `--score` asked ("passing `None` clears
   every namespace") was only in `docs/source/usage.ref_cache.rst`, so the
   agent could not answer it. A quote from those pages now counts as docs.

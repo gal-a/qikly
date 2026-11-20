@@ -185,14 +185,10 @@ def _code_lines(source):
             if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
                     and isinstance(first.value.value, str)):
                 skip.update(range(first.lineno, first.end_lineno + 1))
-        # The inside of a multi-line string of markup is text, not code: a
-        # template that renders the project's own docs pages would match
-        # them. A SQL or code string stays code: it is the body's behaviour.
-        if (isinstance(node, ast.Constant) and isinstance(node.value, str)
-                and node.end_lineno > node.lineno
-                and len(_MARKUP.findall(node.value)) * 2
-                >= max(2, sum(1 for x in node.value.splitlines() if x.strip()))):
-            skip.update(range(node.lineno + 1, node.end_lineno))
+        # The inside of a multi-line string stays code, even when it looks
+        # like markup: a C, YAML or diff string can too. A template that
+        # renders the project's own docs pages costs those pages' matching
+        # lines; that is the safe side.
     out = set()
     # Split as Python numbers lines: str.splitlines also splits on form feeds.
     for number, line in enumerate(re.split(r"\r\n|\r|\n", source), 1):
@@ -205,14 +201,12 @@ def _code_lines(source):
     return frozenset(out)
 
 
-# Lines of rst or Markdown markup: a list item, a table row, a directive or a
-# field. Not "# ": in a string of code that is a comment. A string is markup
-# when such lines are at least half of it.
-_MARKUP = re.compile(r"^\s*(?:[-*+|] |\.\. |:\w[\w-]*:|\* - )", re.MULTILINE)
 # Lines any Python code has, normalised: matching one proves nothing. A
-# keyword argument with a plain default ("bg_rgb=None,") is one too: an API
-# list in the docs repeats them.
-_IDIOM = re.compile(r"except.*:$|(\w+)=\1,?\)?$|\w+=[\w.'\"]*(?:,|\)|,\))$"
+# keyword argument with a literal default ("bg_rgb=None,") is one too: an API
+# list in the docs repeats them. One with a name as its value
+# ("url=UPLOAD_ENDPOINT_V2,") stays code.
+_IDIOM = re.compile(r"except.*:$|(\w+)=\1,?\)?$"
+                    r"|\w+=(?:None|True|False|-?\d[\d.]*|'[^']*'|\"[^\"]*\")(?:,|\)|,\))$"
                     r"|super\(\)\.\w+\(.*\)$|return(?:self\.)?\w+$")
 
 
@@ -410,11 +404,13 @@ def _code_blocks(lines):
     while i < len(lines):
         line = lines[i]
         fence = re.match(r"^\s*(```|~~~)", line)
-        # A line of tildes under a title, at least as long as the title, is
-        # an rst section underline; a short `~~~` after a sentence is a fence.
+        # A line of tildes under a title, at least as long as the title and
+        # followed by a blank line, is an rst section underline. A `~~~`
+        # after a sentence, or with code right under it, is a fence.
         if (fence and fence.group(1) == "~~~" and i and lines[i - 1].strip()
                 and not line.strip().strip("~")
-                and len(line.strip()) >= len(lines[i - 1].strip())):
+                and len(line.strip()) >= len(lines[i - 1].strip())
+                and (i + 1 >= len(lines) or not lines[i + 1].strip())):
             fence = None
         rst = _CODE_DIRECTIVE.match(line) or (line.rstrip().endswith("::")
                                                 and not line.lstrip().startswith(".."))

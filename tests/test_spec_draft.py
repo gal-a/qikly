@@ -747,6 +747,30 @@ def test_plain_assignments_and_code_strings_stay_code_and_a_short_tilde_fence_co
         assert body not in text, body
 
 
+def test_the_fifth_reviews_bypasses_are_closed(tmp_path):
+    """A C or YAML string looks like markup; a `~~~` fence right under a line
+    of the same length looks like an underline; a keyword argument whose value
+    is a name is a body line."""
+    (tmp_path / "m.py").write_text(
+        "def tax_all(prices):\n    total = sum(prices) * TAX_FACTOR\n    return total\n\n\n"
+        "def upload(session, data):\n    return session.post(\n"
+        "        url=UPLOAD_ENDPOINT_V2,\n        timeout=UPLOAD_TIMEOUT_SECONDS,\n    )\n\n\n"
+        "def ci():\n    return '''\n- name: migrate\n  run: python manage.py migrate --fake-initial\n"
+        "- name: test\n'''\n", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "api.md").write_text(
+        "Use tax_all(prices)\n~~~~~~~~~~~~~~~~~~~\ndef tax_all(prices):\n"
+        "    total = sum(prices) * TAX_FACTOR\n    return total\n~~~\n\n"
+        "upload(session, data) posts it.\n\n```python\nsession.post(\n"
+        "    url=UPLOAD_ENDPOINT_V2,\n    timeout=UPLOAD_TIMEOUT_SECONDS,\n)\n```\n\n"
+        "ci() runs:\n\n```yaml\n- name: migrate\n  run: python manage.py migrate --fake-initial\n"
+        "```\n", encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "m.py"), str(tmp_path))
+    assert "upload(session, data) posts it." in text
+    for body in ("TAX_FACTOR", "UPLOAD_ENDPOINT_V2", "--fake-initial"):
+        assert body not in text, body
+
+
 def test_a_hash_inside_a_string_is_not_a_comment():
     assert spec_draft._normal('x = "a #b"  # note') == 'x="a#b"'
 
