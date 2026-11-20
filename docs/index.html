@@ -1174,13 +1174,16 @@ def test_label():
 
   <!-- The states go stale: check them with
        private_docs/research/check_upstream_reports.py (in the private repo)
-       and update this list the day one changes. Checked 2026-11-18. -->
+       and update this list the day one changes. Checked 2026-11-20. -->
   <section class="band" id="found">
     <p class="eyebrow">Found in real code</p>
     <h2>What it found in other people's libraries</h2>
     <!-- Newest change first. OnlyRead came after the study, so the note
          under the list says which four came from it. -->
     <ul class="found-list">
+      <li><a href="https://github.com/Vedantgitbot/booth/pull/42" data-goatcounter-click="found-booth">booth</a>
+        <span class="state fixed">tests merged</span>
+        <span class="what">An evidence threshold no test checked at its edge.</span></li>
       <li><a href="https://github.com/AlexFlipnote/discord.http/pull/39" data-goatcounter-click="found-discord-http">discord.http</a>
         <span class="state fixed">tests merged</span>
         <span class="what">A download method no test had ever called.</span></li>

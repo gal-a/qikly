@@ -197,7 +197,7 @@ def test_every_documented_repo_url_points_at_the_real_one():
                    "BrianPugh/cyclopts", "Goldziher/prompt-template",
                    "basnijholt/markdown-code-runner", "martinblech/xmltodict",
                    "onlyreadai/onlyread",
-                   "AlexFlipnote/discord.http"}
+                   "AlexFlipnote/discord.http", "Vedantgitbot/booth"}
         wrong = sorted(
             {m for m in re.findall(r"github\.com/([\w.-]+/[\w.-]+)", text)
              if not m.startswith(owner + "/") and m.split("/")[0] not in reserved
