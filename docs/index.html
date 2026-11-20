@@ -444,11 +444,11 @@ h1 {
 /* Paging: the list shows a few rows at a time and moves on by itself. */
 .found-ctrls { display: flex; align-items: center; justify-content: flex-end; gap: 10px;
   margin: 8px 0 0; font-size: .82rem; color: var(--ink-soft); }
-.found-ctrls .btn-tour { width: 26px; height: 26px; border-radius: 50%; padding: 0;
+.found-ctrls .btn-tour, .found-ctrls .btn-step { width: 26px; height: 26px; border-radius: 50%; padding: 0;
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
   background: transparent; border: 1px solid var(--rule); color: var(--ink-soft); }
-.found-ctrls .btn-tour:hover { border-color: var(--accent); color: var(--accent); }
-.found-ctrls .btn-tour:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.found-ctrls .btn-tour:hover, .found-ctrls .btn-step:hover { border-color: var(--accent); color: var(--accent); }
+.found-ctrls .btn-tour:focus-visible, .found-ctrls .btn-step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .found-list li.off { display: none; }
 .found-list.paged li { transition: opacity .45s ease; }
 .found-list.paged li.fade { opacity: 0; }
@@ -1198,7 +1198,7 @@ def test_label():
       <li><a href="https://github.com/martinblech/xmltodict/pull/437" data-goatcounter-click="found-xmltodict">xmltodict</a>
         <span class="what">README namespace examples that no longer hold.</span></li>
     </ul>
-    <p class="found-ctrls" hidden><span class="found-page" aria-live="off">1 / 1</span><button type="button" class="btn-tour" aria-pressed="false" aria-label="Pause the list" data-goatcounter-click="found-tour-pause"><svg class="i-pause" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg><svg class="i-play" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></button></p>
+    <p class="found-ctrls" hidden><button type="button" class="btn-step prev" aria-label="Previous page" data-goatcounter-click="found-prev"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="found-page" aria-live="polite">1 / 1</span><button type="button" class="btn-step next" aria-label="Next page" data-goatcounter-click="found-next"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button type="button" class="btn-tour" aria-pressed="false" aria-label="Pause the list" data-goatcounter-click="found-tour-pause"><svg class="i-pause" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg><svg class="i-play" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></button></p>
     <p class="found-note">Four of these came from <a href="https://towardsdatascience.com/i-mutation-tested-50-python-libraries-tests-in-the-young-ones-missed-41-of-planted-faults/" data-goatcounter-click="found-article">a study of 50 Python libraries</a>.</p>
   </section>
 
@@ -1783,7 +1783,7 @@ from your criteria:
     if (ctrls && pages > 1) {
       var label = ctrls.querySelector(".found-page"),
           btn = ctrls.querySelector(".btn-tour"),
-          page = 0, held = false, hover = false, seen = false, timer = null;
+          page = 0, held = false, hover = false, seen = false, since = 0;
       var show = function (n) {
         page = (n + pages) % pages;
         [].forEach.call(rows, function (li, i) {
@@ -1795,12 +1795,15 @@ from your criteria:
           [].forEach.call(rows, function (li) { li.classList.remove("fade"); });
         });
         label.textContent = (page + 1) + " / " + pages;
+        since = 0;
       };
-      var tick = function () {
-        clearTimeout(timer);
+      // One steady clock: every second it checks whether to move on, so a
+      // missed hover or scroll event can never leave the list stuck.
+      setInterval(function () {
         if (held || hover || !seen) return;
-        timer = setTimeout(function () { show(page + 1); tick(); }, 6000);
-      };
+        since += 1;
+        if (since >= 6) show(page + 1);
+      }, 1000);
       // Keep the box the height of its tallest page, so nothing below jumps.
       var tallest = 0;
       for (var pg = 0; pg < pages; pg++) {
@@ -1814,15 +1817,17 @@ from your criteria:
         held = !held;
         btn.setAttribute("aria-pressed", String(held));
         btn.setAttribute("aria-label", held ? "Play the list" : "Pause the list");
-        tick();
+        since = 0;
       });
-      list.addEventListener("mouseenter", function () { hover = true; tick(); });
-      list.addEventListener("mouseleave", function () { hover = false; tick(); });
-      list.addEventListener("focusin", function () { hover = true; tick(); });
-      list.addEventListener("focusout", function () { hover = false; tick(); });
+      ctrls.querySelector(".prev").addEventListener("click", function () { show(page - 1); });
+      ctrls.querySelector(".next").addEventListener("click", function () { show(page + 1); });
+      list.addEventListener("mouseenter", function () { hover = true; });
+      list.addEventListener("mouseleave", function () { hover = false; });
+      list.addEventListener("focusin", function () { hover = true; });
+      list.addEventListener("focusout", function () { hover = false; });
       new IntersectionObserver(function (entries) {
-        seen = entries[0].isIntersecting; tick();
-      }, { threshold: 0.6 }).observe(list);
+        seen = entries[0].isIntersecting;
+      }, { threshold: 0.3 }).observe(list);
     }
   }
 })();
