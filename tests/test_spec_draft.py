@@ -727,6 +727,26 @@ def test_prose_after_a_block_nested_in_a_note_is_kept(tmp_path):
     assert "returns the taxed list" in text and "p * 1.2" not in text
 
 
+def test_plain_assignments_and_code_strings_stay_code_and_a_short_tilde_fence_counts(tmp_path):
+    """Found by the fourth review: the keyword-default idiom also exempted
+    `rate = DEFAULT_RATE`; a string of code with `# ` comments passed for
+    markup; a `~~~` fence after a sentence passed for an rst underline."""
+    (tmp_path / "m.py").write_text(
+        "DEFAULT_RATE = 0.2\n\n\ndef tax_all(prices):\n    rate = DEFAULT_RATE\n"
+        "    remaining = total_due - already_paid\n    return [p * rate for p in prices]\n\n\n"
+        "def script():\n    return '''\n# build step\nsubprocess.run(['make', 'all'], check=True)\n"
+        "# deploy step\nshutil.copytree(build_dir, deploy_dir)\n'''\n", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "api.md").write_text(
+        "Use tax_all(prices) and script():\n~~~\ndef tax_all(prices):\n"
+        "    rate = DEFAULT_RATE\n~~~\n\nInside: remaining = total_due - already_paid\n\n"
+        "```\nshutil.copytree(build_dir, deploy_dir)\n```\n", encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "m.py"), str(tmp_path))
+    assert "Use tax_all(prices)" in text
+    for body in ("DEFAULT_RATE", "already_paid", "copytree"):
+        assert body not in text, body
+
+
 def test_a_hash_inside_a_string_is_not_a_comment():
     assert spec_draft._normal('x = "a #b"  # note') == 'x="a#b"'
 

@@ -190,7 +190,8 @@ def _code_lines(source):
         # them. A SQL or code string stays code: it is the body's behaviour.
         if (isinstance(node, ast.Constant) and isinstance(node.value, str)
                 and node.end_lineno > node.lineno
-                and len(_MARKUP.findall(node.value)) >= 2):
+                and len(_MARKUP.findall(node.value)) * 2
+                >= max(2, sum(1 for x in node.value.splitlines() if x.strip()))):
             skip.update(range(node.lineno + 1, node.end_lineno))
     out = set()
     # Split as Python numbers lines: str.splitlines also splits on form feeds.
@@ -204,13 +205,14 @@ def _code_lines(source):
     return frozenset(out)
 
 
-# Lines of rst or Markdown markup: a list item, a table row, a heading, a
-# directive or a field.
-_MARKUP = re.compile(r"^\s*(?:[-*+|#] |\.\. |:\w[\w-]*:|\* - )", re.MULTILINE)
+# Lines of rst or Markdown markup: a list item, a table row, a directive or a
+# field. Not "# ": in a string of code that is a comment. A string is markup
+# when such lines are at least half of it.
+_MARKUP = re.compile(r"^\s*(?:[-*+|] |\.\. |:\w[\w-]*:|\* - )", re.MULTILINE)
 # Lines any Python code has, normalised: matching one proves nothing. A
 # keyword argument with a plain default ("bg_rgb=None,") is one too: an API
 # list in the docs repeats them.
-_IDIOM = re.compile(r"except.*:$|(\w+)=\1,?\)?$|\w+=[\w.'\"-]*,?\)?$"
+_IDIOM = re.compile(r"except.*:$|(\w+)=\1,?\)?$|\w+=[\w.'\"]*(?:,|\)|,\))$"
                     r"|super\(\)\.\w+\(.*\)$|return(?:self\.)?\w+$")
 
 
@@ -408,9 +410,11 @@ def _code_blocks(lines):
     while i < len(lines):
         line = lines[i]
         fence = re.match(r"^\s*(```|~~~)", line)
-        # A line of tildes under a title is an rst section underline.
+        # A line of tildes under a title, at least as long as the title, is
+        # an rst section underline; a short `~~~` after a sentence is a fence.
         if (fence and fence.group(1) == "~~~" and i and lines[i - 1].strip()
-                and not line.strip().strip("~")):
+                and not line.strip().strip("~")
+                and len(line.strip()) >= len(lines[i - 1].strip())):
             fence = None
         rst = _CODE_DIRECTIVE.match(line) or (line.rstrip().endswith("::")
                                                 and not line.lstrip().startswith(".."))
