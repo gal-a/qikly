@@ -662,6 +662,71 @@ def test_an_indented_rst_paragraph_starting_with_class_is_kept(tmp_path):
         str(tmp_path / "m.py"), str(tmp_path))
 
 
+def test_an_rst_tilde_underline_is_not_a_fence(tmp_path):
+    """Found by the third review: a `~~~~` underline opened a Markdown fence
+    and a whole style guide went with the block."""
+    (tmp_path / "m.py").write_text(_TAX, encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "guide.rst").write_text(
+        "Taxes\n~~~~~\n\nCall tax_all(prices) for a list.\n\nExample::\n\n"
+        "    def tax(p):\n        if p < 0:\n            return 0\n        return p * 1.2\n\n"
+        "Rounding\n~~~~~~~~\n\ntax_all(prices) never rounds.\n", encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "m.py"), str(tmp_path))
+    assert "Call tax_all(prices) for a list." in text and "never rounds" in text
+    assert "p * 1.2" not in text
+
+
+def test_a_fenced_body_of_a_module_function_that_only_calls_is_dropped(tmp_path):
+    """Found by the third review: the closing fence broke the parse, and the
+    fallback did not see a call as a body."""
+    (tmp_path / "m.py").write_text(
+        "import threading\n_t = threading.Timer(1, print)\n\n\n"
+        "def stop():\n    _t.cancel()\n", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "api.md").write_text(
+        "Call stop() to stop.\n\n```python\ndef stop():\n    _t.cancel()\n```\n",
+        encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "m.py"), str(tmp_path))
+    assert "Call stop() to stop." in text and "_t.cancel()" not in text
+
+
+def test_a_sql_string_in_a_body_stays_code(tmp_path):
+    """Found by the third review: a body that is mostly a SQL string leaked."""
+    (tmp_path / "m.py").write_text(
+        "def build_query(table):\n    return f'''\n        SELECT name, total FROM {table}\n"
+        "        WHERE total > 100 AND status = 'open'\n        ORDER BY total DESC\n    '''\n",
+        encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "api.md").write_text(
+        "build_query(table) builds the query.\n\n```sql\n"
+        "SELECT name, total FROM {table}\nWHERE total > 100 AND status = 'open'\n```\n",
+        encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "m.py"), str(tmp_path))
+    assert "builds the query" in text and "status = 'open'" not in text
+
+
+def test_an_api_bullet_repeating_keyword_defaults_is_kept(tmp_path):
+    """Found by the third review: `bg_rgb=None,` in a signature took bullets."""
+    (tmp_path / "m.py").write_text(
+        "def print_rgb(rgb, *values, style=None,\n              bg=None, bg_rgb=None,\n"
+        "              sep=' '):\n    text = sep.join(map(str, values))\n"
+        "    return paint(text, rgb, style, bg, bg_rgb)\n", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    bullet = "- `print_rgb(rgb, *values, style=None, bg=None, bg_rgb=None, sep=' ')` prints in colour"
+    (tmp_path / "docs" / "api.md").write_text(bullet + "\n", encoding="utf-8")
+    assert bullet in spec_draft.docs_text(str(tmp_path / "m.py"), str(tmp_path))
+
+
+def test_prose_after_a_block_nested_in_a_note_is_kept(tmp_path):
+    (tmp_path / "m.py").write_text(_TAX, encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "usage.rst").write_text(
+        ".. note::\n\n    Use it like::\n\n        def tax(p):\n            return p * 1.2\n\n"
+        "    After that, tax_all(prices) returns the taxed list.\n", encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "m.py"), str(tmp_path))
+    assert "returns the taxed list" in text and "p * 1.2" not in text
+
+
 def test_a_hash_inside_a_string_is_not_a_comment():
     assert spec_draft._normal('x = "a #b"  # note') == 'x="a#b"'
 

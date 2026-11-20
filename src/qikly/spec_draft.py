@@ -185,10 +185,12 @@ def _code_lines(source):
             if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
                     and isinstance(first.value.value, str)):
                 skip.update(range(first.lineno, first.end_lineno + 1))
-        # The inside of a multi-line string is text, not code: a template
-        # that renders the project's own docs pages would match them.
+        # The inside of a multi-line string of markup is text, not code: a
+        # template that renders the project's own docs pages would match
+        # them. A SQL or code string stays code: it is the body's behaviour.
         if (isinstance(node, ast.Constant) and isinstance(node.value, str)
-                and node.end_lineno > node.lineno):
+                and node.end_lineno > node.lineno
+                and len(_MARKUP.findall(node.value)) >= 2):
             skip.update(range(node.lineno + 1, node.end_lineno))
     out = set()
     # Split as Python numbers lines: str.splitlines also splits on form feeds.
@@ -202,9 +204,14 @@ def _code_lines(source):
     return frozenset(out)
 
 
-# Lines any Python code has, normalised: matching one proves nothing.
-_IDIOM = re.compile(r"(?:except\b.*|try|else|finally):$|(\w+)=\1,?\)?$"
-                    r"|super\(\)\.\w+\(.*\)$|return(?:self\.)?\w+$|raise$|pass$")
+# Lines of rst or Markdown markup: a list item, a table row, a heading, a
+# directive or a field.
+_MARKUP = re.compile(r"^\s*(?:[-*+|#] |\.\. |:\w[\w-]*:|\* - )", re.MULTILINE)
+# Lines any Python code has, normalised: matching one proves nothing. A
+# keyword argument with a plain default ("bg_rgb=None,") is one too: an API
+# list in the docs repeats them.
+_IDIOM = re.compile(r"except.*:$|(\w+)=\1,?\)?$|\w+=[\w.'\"-]*,?\)?$"
+                    r"|super\(\)\.\w+\(.*\)$|return(?:self\.)?\w+$")
 
 
 @functools.lru_cache(maxsize=64)
@@ -401,6 +408,10 @@ def _code_blocks(lines):
     while i < len(lines):
         line = lines[i]
         fence = re.match(r"^\s*(```|~~~)", line)
+        # A line of tildes under a title is an rst section underline.
+        if (fence and fence.group(1) == "~~~" and i and lines[i - 1].strip()
+                and not line.strip().strip("~")):
+            fence = None
         rst = _CODE_DIRECTIVE.match(line) or (line.rstrip().endswith("::")
                                                 and not line.lstrip().startswith(".."))
         # A Markdown code block that defines something: indented four spaces,
@@ -418,7 +429,22 @@ def _code_blocks(lines):
             blocks.append((i, min(j + 1, len(lines)), i + 1, None))
             i = j + 1
             continue
-        while j < len(lines) and (not lines[j].strip() or lines[j][:1] in (" ", "\t")):
+        # The block's content is as indented as its first line, at least
+        # deeper than a header's: a less indented line ends it, so the prose
+        # after a code block nested in `.. note::` is not part of the block.
+        start = i if indented else i + 1
+        while start < len(lines) and not lines[start].strip():
+            start += 1
+        if start >= len(lines):
+            i += 1
+            continue
+        depth = len(lines[start]) - len(lines[start].lstrip())
+        if not indented and depth <= len(line) - len(line.lstrip()):
+            i += 1
+            continue  # nothing indented under the header: not a block
+        j = start
+        while j < len(lines) and (not lines[j].strip()
+                                  or len(lines[j]) - len(lines[j].lstrip()) >= depth):
             j += 1
         if indented:
             blocks.append((i, j, i, None))
@@ -440,7 +466,7 @@ def _looks_like_python(text):
 
 _PROMPT = re.compile(r"^(\s*)(?:>>> |\.\.\. )")
 _STATEMENT = re.compile(r"^\s*(?:return|raise|yield|if|elif|for|while|with|try|assert|await)\b"
-                        r"|^\s*[\w.\[\]]+\s*[-+*/%|&]?=(?!=)")
+                        r"|^\s*[\w.\[\]]+\s*[-+*/%|&]?=(?!=)|^\s+[\w.]+\(.*\)\s*$")
 
 
 def _has_body(block):
@@ -448,7 +474,8 @@ def _has_body(block):
     A block whose definitions do something: a statement under a def beyond a
     docstring, `...` or `pass`. A list of signatures is an API reference.
     """
-    plain = [_PROMPT.sub(r"\1", line) for line in block]
+    plain = [_PROMPT.sub(r"\1", line) for line in block
+             if not re.match(r"\s*(?:```|~~~)", line)]  # a closing fence
     try:
         tree = ast.parse(textwrap.dedent("\n".join(plain)))
     except (SyntaxError, ValueError):

@@ -11,12 +11,14 @@ packaging tools would read as `1.1`.
   docstrings, the spec agent now reads the pages of `docs/` (or `doc/`) that
   name the module's functions, most mentions first, never a source file, a
   file outside the project, or the module's code. A line of the module's
-  code, or of a module of the same package it imports, is taken out of these
-  pages and of the README, also when it is reformatted, in a doctest or
-  behind a comment. A code block that shows a body of the module goes whole,
-  and so does a page that is a copy of the code saved as text. An example
-  defining your own handler, a list of the module's signatures and a page
-  restating a docstring are kept. On
+  code of 12 characters or more, or of a module of the same package it
+  imports, is taken out of these pages and of the README. In a code block or
+  a doctest it is caught also when reformatted or behind a comment. A code
+  block that gives a body to one of the module's functions or classes, or
+  holds two of its lines, goes whole, and so does a page that is a copy of
+  the code saved as text. An example defining your own handler, a list of
+  the module's signatures and a page restating a docstring are kept.
+  Shorter lines of a body (`return 0`) can still pass outside such a block. On
   jambo, the rule behind a question `--score` asked ("passing `None` clears
   every namespace") was only in `docs/source/usage.ref_cache.rst`, so the
   agent could not answer it. A quote from those pages now counts as docs.
