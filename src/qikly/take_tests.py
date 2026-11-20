@@ -529,7 +529,7 @@ def report(say, cwd, written, result, task_id):
             for i in tagged.get(key, [])[:2]:
                 if 0 < i <= len(criteria):
                     text, origin = criteria[i - 1]
-                    note = {"docs": "  (drafted by qikly from your README or docstrings)",
+                    note = {"docs": "  (drafted by qikly from your README, docs or docstrings)",
                             "check": "  (qikly's guess: read it first)"
                             }.get(origin, "")
                     drafted = drafted or origin != "you"

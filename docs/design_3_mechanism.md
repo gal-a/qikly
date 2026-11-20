@@ -104,7 +104,7 @@ is the failure this project is about.
 
 | Agent | Settings key | Reads | Never reads | Produces |
 |---|---|---|---|---|
-| **Spec agent** | `spec` | the module's README and docstrings, its function names and signatures, and step 1's questions with the quoted code taken out | any function body | a first draft of the `requirements` line and one answer per question, each saying where it came from: a quote from the docs, checked word for word, or a judgement marked CHECK for a person to confirm |
+| **Spec agent** | `spec` | the module's README, its docs folder's relevant pages and its docstrings, its function names and signatures, and step 1's questions with the quoted code taken out | any function body | a first draft of the `requirements` line and one answer per question, each saying where it came from: a quote from the docs, checked word for word, or a judgement marked CHECK for a person to confirm |
 | **Coding agent** | `code` | requirements, interface, and pytest's output for whatever test just failed | the acceptance criteria | a FIX, the reasoning and the files it intends to touch, then a PATCH, a unified diff of only those files |
 | **Test-writing agent** | `test`, or `test_integration` / `test_system` / `test_unit` | requirements, interface, and every acceptance criterion in full | the implementation, except at the unit stage, which is written last and exists to name real functions | one pytest file per stage |
 | **Criteria drafter** | `criteria` | the requirements alone | any implementation, and any existing criteria | a first draft of the bar, only when `--generate-criteria` asks for one |

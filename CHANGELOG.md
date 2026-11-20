@@ -6,7 +6,27 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
+### Added
+- **`--scaffold` reads your docs folder too.** Besides the README and the
+  docstrings, the spec agent now reads the pages of `docs/` (or `doc/`) that
+  name the module's functions, most mentions first, never a source file. On
+  jambo, the rule behind a question `--score` asked ("passing `None` clears
+  every namespace") was only in `docs/source/usage.ref_cache.rst`, so the
+  agent could not answer it. A quote from those pages now counts as docs.
+- **`--seed N`** sets the seed for `--scaffold` and `--tasks`. Three runs of one
+  task under the default seed wrote byte-identical tests; separate seeds give
+  separate samples.
+
 ### Fixed
+- **A generated test that can never fail is refused and written again.** A
+  test whose only check was `assert True` passed whatever the code did; on
+  jambo it hid a planted fault in the exact behaviour it was meant to test. Of
+  13,111 generated test files on disk, 22 were like that, and none of the
+  others is flagged.
+- **A drafted criterion that names no expected value is marked `CHECK`,** with
+  the reason beside it. "`clear_ref_cache()` runs without error" gave a test
+  that could not tell a cache that cleared from one that did not. Of 293
+  criteria in the bundled and private tasks, it is the only one flagged.
 - **`--score` no longer blames your environment for a suite that passes.**
   When your tests read a file outside the folder that holds both the code and
   the tests, they fail in qikly's copy and pass at home. It said "a problem in

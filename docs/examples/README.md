@@ -41,7 +41,7 @@ not what it does. Each answer says where it came from:
 
 ```yaml
   #? What should apply_discount(100, 100) do?
-  #? Answer below drafted by qikly from your README or docstrings: "...so a discount rate of 100 or more is rejected with ValueError". Keep it, or change it.
+  #? Answer below drafted by qikly from your README, docs or docstrings: "...so a discount rate of 100 or more is rejected with ValueError". Keep it, or change it.
   - "apply_discount(100, 100) raises ValueError"
 ```
 

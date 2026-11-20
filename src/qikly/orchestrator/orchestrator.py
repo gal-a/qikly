@@ -763,6 +763,15 @@ def _validate_generated_tests(source, stage):
     if detail:
         return f"generated {stage} test file uses a name before assigning it: {detail}"
 
+    # A test whose only assertion is always true passes whatever the code
+    # does. On jambo the test agent called clear_ref_cache(namespace=None) and
+    # then `assert True`, so the planted fault it should have caught escaped.
+    from qikly.agent_tools.vacuous_tests import describe as _vacuous
+
+    detail = _vacuous(source)
+    if detail:
+        return f"generated {stage} test file has a test that cannot fail: {detail}"
+
     return None
 
 GENERATE_TESTS_MAX_ATTEMPTS = 3

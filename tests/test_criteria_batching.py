@@ -180,7 +180,7 @@ def test_each_batch_is_written_to_its_own_file(tmp_path, monkeypatch):
     def fake_generator(task_id, seed=None, criteria=None):
         calls.append(criteria)
         n = len(calls)
-        return f"def test_generated_{n}():\n    assert True\n"
+        return f"def test_generated_{n}():\n    assert 1 + 1 == 2\n"
 
     monkeypatch.setattr(orch, "TEST_GENERATORS",
                         {"integration": (fake_generator, "test_integration.py")})
@@ -199,7 +199,7 @@ def test_a_single_batch_keeps_the_plain_filename(tmp_path, monkeypatch):
     """Batching off must leave the on-disk layout exactly as it was."""
     def fake_generator(task_id, seed=None, criteria=None):
         assert criteria is None, "the whole bar goes in one call when batching is off"
-        return "def test_x():\n    assert True\n"
+        return "def test_x():\n    assert 1 + 1 == 2\n"
 
     monkeypatch.setattr(orch, "TEST_GENERATORS",
                         {"integration": (fake_generator, "test_integration.py")})
@@ -220,7 +220,7 @@ def test_batches_do_not_all_get_the_same_seed(tmp_path, monkeypatch):
 
     def fake_generator(task_id, seed=None, criteria=None):
         seeds.append(seed)
-        return "def test_x():\n    assert True\n"
+        return "def test_x():\n    assert 1 + 1 == 2\n"
 
     monkeypatch.setattr(orch, "TEST_GENERATORS",
                         {"integration": (fake_generator, "test_integration.py")})

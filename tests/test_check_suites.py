@@ -124,7 +124,7 @@ def test_empty_sections_still_produce_a_readable_prompt():
 
 # ---------------------------------------------------------------- sources ---
 
-def _write_suite(tests_dir, stage, name="test_x.py", source="def test_a():\n    assert True\n"):
+def _write_suite(tests_dir, stage, name="test_x.py", source="def test_a():\n    assert 1 + 1 == 2\n"):
     d = os.path.join(tests_dir, stage)
     os.makedirs(d, exist_ok=True)
     with open(os.path.join(d, name), "w", encoding="utf-8") as handle:
@@ -309,11 +309,11 @@ def test_guidance_is_passed_to_a_generator_only_when_there_is_some(tmp_path, no_
 
     def old_style(task_id, seed=None, criteria=None):
         seen.append("old")
-        return "def test_a():\n    assert True\n"
+        return "def test_a():\n    assert 1 + 1 == 2\n"
 
     def new_style(task_id, seed=None, criteria=None, guidance=None):
         seen.append(guidance)
-        return "def test_a():\n    assert True\n"
+        return "def test_a():\n    assert 1 + 1 == 2\n"
 
     monkeypatch.setattr(orch, "TEST_GENERATORS",
                         {"integration": (old_style, "test_integration.py")})
@@ -330,7 +330,7 @@ def test_guidance_reaches_the_test_generation_prompt_and_its_mode(monkeypatch):
 
     def capture(mode, prompt, seed=None):
         seen["mode"], seen["prompt"] = mode, prompt
-        return "def test_a():\n    assert True\n"
+        return "def test_a():\n    assert 1 + 1 == 2\n"
 
     monkeypatch.setattr(ai, "call_llm", capture)
     from qikly.paths import chdir_to_project_root

@@ -115,13 +115,13 @@ qikly --tasks my_module.py       # 3. the run                      a cent or so
    Gemini, Anthropic or OpenAI), a spec agent then drafts the parts only an
    owner could write: a line on what the module is for, and an answer to
    each of step 1's questions as an acceptance criterion. **It reads your
-   README and docstrings, never your code**, so it says what the code should
+   README, docs and docstrings, never your code**, so it says what the code should
    do rather than what it does, and a test written from it can disagree
    with the code:
 
    ```yaml
    #? What should apply_discount(100, 100) do?
-   #? Answer below drafted by qikly from your README or docstrings: "...so a rate
+   #? Answer below drafted by qikly from your README, docs or docstrings: "...so a rate
    #? of 100 or more is rejected with ValueError". Keep it, or change it.
    - "apply_discount(100, 100) raises ValueError"
    ```
@@ -663,8 +663,11 @@ Thirteen example tasks ship with the tool across five domains, listed in
 [docs/design_3_mechanism.md](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md#example-tasks).
 
 **Measuring rather than producing.** One run is an artifact, not a rate: the
-same task with the same seed converges on some runs and not others. To claim
-how often anything converges, repeat the sweep and read the interval:
+same task with the same seed converges on some runs and not others. The model
+calls are seeded (42 by default), so the same seed tends to write the same
+tests: for independent samples, give each run its own seed with `--seed N`,
+as in `qikly --tasks pricing.py --seed 2`. To claim how often anything
+converges, repeat the sweep and read the interval:
 
 ```bash
 python -m qikly.orchestrator.run_all --repeat 10

@@ -65,11 +65,11 @@ def test_a_retry_is_told_why_the_last_draft_was_refused(monkeypatch):
 
     def generator(task_id, seed=None, criteria=None, guidance=None):
         told.append(guidance)
-        return "def test_x(:\n" if len(told) == 1 else "def test_x():\n    assert True\n"
+        return "def test_x(:\n" if len(told) == 1 else "def test_x():\n    assert 1 + 1 == 2\n"
 
     monkeypatch.setattr(orch, "log_transaction", lambda *a, **k: None)
     source = orch._generate_one("integration", generator, "CALC_TAX", 1, None, 1)
-    assert "assert True" in source
+    assert "assert 1 + 1 == 2" in source
     assert told[0] is None, "the first call is told nothing"
     assert "not valid Python" in told[1] and "rejected" in told[1]
 
@@ -79,7 +79,7 @@ def test_a_retry_keeps_the_suite_checks_guidance_too(monkeypatch):
 
     def generator(task_id, seed=None, criteria=None, guidance=None):
         told.append(guidance)
-        return "x = 1\n" if len(told) == 1 else "def test_x():\n    assert True\n"
+        return "x = 1\n" if len(told) == 1 else "def test_x():\n    assert 1 + 1 == 2\n"
 
     monkeypatch.setattr(orch, "log_transaction", lambda *a, **k: None)
     orch._generate_one("integration", generator, "CALC_TAX", 1, None, 1,
@@ -93,10 +93,10 @@ def test_a_generator_without_guidance_still_retries(monkeypatch):
 
     def generator(task_id, seed=None, criteria=None):
         calls.append(seed)
-        return "def test_x(:\n" if len(calls) == 1 else "def test_x():\n    assert True\n"
+        return "def test_x(:\n" if len(calls) == 1 else "def test_x():\n    assert 1 + 1 == 2\n"
 
     monkeypatch.setattr(orch, "log_transaction", lambda *a, **k: None)
-    assert "assert True" in orch._generate_one("integration", generator, "CALC_TAX", 1, None, 1)
+    assert "assert 1 + 1 == 2" in orch._generate_one("integration", generator, "CALC_TAX", 1, None, 1)
     assert len(calls) == 2
 
 

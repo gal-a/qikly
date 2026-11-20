@@ -133,7 +133,7 @@ def test_the_draft_lands_with_where_each_criterion_came_from(scored, monkeypatch
     text = (scored / TASK).read_text(encoding="utf-8")
     assert '- "Pricing helpers; a rate is a percentage."' in text
     assert "TODO: MODIFY THIS" not in text
-    assert ('#? Answer below drafted by qikly from your README or docstrings: '
+    assert ('#? Answer below drafted by qikly from your README, docs or docstrings: '
             '"A rate of 0 leaves the price as it is.". Keep it, or change it.') in text
     assert '- "apply_discount(100, 0) returns 100.0"' in text
     assert "#? CHECK: your docs don't say. The answer below is qikly's guess" in text
@@ -382,3 +382,73 @@ def test_a_public_alias_carries_its_private_definitions_docs():
            'EmailStr = _EmailStr\n')
     assert "An email address, validated on creation." in spec_draft.public_docstrings(src)
     assert "class EmailStr:" in spec_draft.interface_text(src)
+
+
+def test_the_docs_folder_pages_naming_the_module_are_read(tmp_path):
+    """jambo explains clear_ref_cache(None) only in docs/source/usage.ref_cache.rst.
+    A page naming the module's functions is read, the most mentions first; a
+    page naming nothing from it, a source file and a build folder are not."""
+    (tmp_path / "pricing.py").write_text(PRICING, encoding="utf-8")
+    docs = tmp_path / "docs" / "source"
+    docs.mkdir(parents=True)
+    (docs / "usage.rst").write_text(
+        "apply_discount(100, 100) raises ValueError. apply_discount is strict.\n",
+        encoding="utf-8")
+    (docs / "labels.md").write_text("label('vip') returns 'gold'.\n", encoding="utf-8")
+    (docs / "about.md").write_text("A project about prices.\n", encoding="utf-8")
+    (docs / "conf.py").write_text("# apply_discount apply_discount\n", encoding="utf-8")
+    (tmp_path / "docs" / "_build").mkdir()
+    (tmp_path / "docs" / "_build" / "copy.md").write_text("apply_discount\n", encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "pricing.py"), str(tmp_path))
+    assert "--- docs/source/usage.rst ---" in text
+    assert "--- docs/source/labels.md ---" in text
+    assert text.index("usage.rst") < text.index("labels.md")
+    assert "A project about prices." not in text
+    assert "conf.py" not in text and "_build" not in text
+
+
+def test_a_quote_from_the_docs_folder_is_kept(scored, monkeypatch):
+    """Before the docs folder was read, a quote from it failed the check that a
+    quote is really in the documentation, and the answer was dropped."""
+    (scored / "docs").mkdir()
+    (scored / "docs" / "rates.md").write_text(
+        "apply_discount rejects a rate of exactly 100 with ValueError.\n", encoding="utf-8")
+
+    def reply(prompt):
+        assert "rejects a rate of exactly 100" in prompt
+        data = json.loads(_answers(prompt))
+        data["answers"][0] = {"question": 1, "criterion": "apply_discount(100, 100) raises ValueError",
+                              "source": "docs",
+                              "quote": "apply_discount rejects a rate of exactly 100 with ValueError.",
+                              "check": False}
+        return json.dumps(data)
+    _drafting(monkeypatch, reply)
+    cli._do_scaffold("pricing.py", None)
+    text = (scored / TASK).read_text(encoding="utf-8")
+    assert '- "apply_discount(100, 100) raises ValueError"' in text
+
+
+def test_a_criterion_naming_no_expected_value_is_marked_check():
+    """jambo's one drafted answer, "clear_ref_cache() runs without error", gave a
+    test that passed whatever the call did. Over 293 criteria in the bundled
+    and private tasks, this is the only one the check flags."""
+    for weak in ("SchemaConverter().clear_ref_cache() runs without error",
+                 "parse('x') does not raise", "the call succeeds",
+                 "read_csv works on an empty file"):
+        assert spec_draft.weak_criterion(weak), weak
+    for fine in ("apply_discount(100, 100) raises ValueError",
+                 "apply_discount(100, 0) returns 100.0", "to_kelvin(0) is 273.15",
+                 "clear_ref_cache(None) runs without error and get_cached_ref('Person') "
+                 "returns None afterwards"):
+        assert spec_draft.weak_criterion(fine) is None, fine
+
+
+def test_the_weak_criterion_note_is_written_beside_the_answer(scored, monkeypatch):
+    def reply(prompt):
+        data = json.loads(_answers(prompt))
+        data["answers"][0]["criterion"] = "apply_discount(100, 0) runs without error"
+        return json.dumps(data)
+    _drafting(monkeypatch, reply)
+    cli._do_scaffold("pricing.py", None)
+    text = (scored / TASK).read_text(encoding="utf-8")
+    assert "#? CHECK: it names no expected value" in text

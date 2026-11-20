@@ -32,13 +32,20 @@ import re
 # documentation site on every scaffold.
 DOC_LIMIT = 24000
 README_NAMES = ("README.md", "README.rst", "README.txt", "README")
+# A project's documentation folder, read as well as its README: jambo explains
+# that clear_ref_cache(None) clears every namespace only in
+# docs/source/usage.ref_cache.rst, so a spec agent shown the README alone could
+# not answer the question --score asked about it. Its own budget, so a long
+# README does not crowd it out.
+DOC_DIRS = ("docs", "doc")
+DOCS_LIMIT = 24000
 # Set to 1 to keep --scaffold from calling a model, as the test suite does.
 NO_DRAFT = "QIKLY_NO_DRAFT"
 CHECK = "CHECK"
 # The notes beside drafted answers in the task file. Each says where the
 # answer came from and what to do with it: written for someone reading a task
 # file for the first time, who does not know what a spec agent is.
-DRAFTED_DOCS = "Answer below drafted by qikly from your README or docstrings:"
+DRAFTED_DOCS = "Answer below drafted by qikly from your README, docs or docstrings:"
 READ_FIRST = "Read it before you run."
 GUESSED = ("your docs don't say. The answer below is qikly's guess from what the "
            "module is for. " + READ_FIRST)
@@ -93,6 +100,62 @@ def readme_text(module, cwd):
             break
         here = os.path.dirname(here)
     return "\n\n".join(found)[:DOC_LIMIT]
+
+
+def docs_text(module, cwd):
+    """
+    Pages of the project's docs/ (or doc/) folder that name one of the
+    module's public functions, classes or methods, the most mentions first,
+    up to DOCS_LIMIT characters. Documentation files only, never source: the
+    spec agent must not see a function body. A page that names nothing from
+    the module is left out, so a large documentation site does not crowd the
+    relevant pages out of the prompt.
+    """
+    from qikly.start import _read, project_root
+
+    root = os.path.abspath(project_root(module, cwd))
+    try:
+        names = {n for n in interface_names(_read(module)) if len(n) > 2}
+    except (OSError, ValueError):
+        names = set()
+    if not names:
+        return ""
+    pattern = re.compile(r"\b(?:%s)\b" % "|".join(re.escape(n) for n in sorted(names)))
+    pages = []
+    for folder in DOC_DIRS:
+        top = os.path.join(root, folder)
+        if not os.path.isdir(top):
+            continue
+        for here, dirs, files in os.walk(top):
+            dirs[:] = sorted(d for d in dirs
+                             if not d.startswith((".", "_")) and d not in ("build", "site"))
+            for name in sorted(files):
+                if not name.lower().endswith(_DOC_SUFFIXES):
+                    continue
+                path = os.path.join(here, name)
+                try:
+                    with open(path, encoding="utf-8-sig", errors="replace") as handle:
+                        text = handle.read()
+                except OSError:
+                    continue
+                hits = len(pattern.findall(text))
+                if hits:
+                    rel = os.path.relpath(path, root).replace(os.sep, "/")
+                    pages.append((-hits, rel, text))
+    pages.sort()
+    out, used = [], 0
+    for _, rel, text in pages:
+        chunk = f"--- {rel} ---\n{text}"
+        if used + len(chunk) > DOCS_LIMIT:
+            continue  # a smaller relevant page may still fit
+        out.append(chunk)
+        used += len(chunk)
+    return "\n\n".join(out)
+
+
+def all_docs(module, cwd):
+    """The README and the documentation folder's relevant pages, as one text."""
+    return "\n\n".join(t for t in (readme_text(module, cwd), docs_text(module, cwd)) if t)
 
 
 def interface_text(source):
@@ -175,7 +238,7 @@ def documentation(module, cwd):
     could pass the minimum while the agent itself saw only function names.
     """
     from qikly.start import _read
-    return (readme_text(module, cwd) + "\n" + "\n".join(public_docstrings(_read(module)))).strip()
+    return (all_docs(module, cwd) + "\n" + "\n".join(public_docstrings(_read(module)))).strip()
 
 
 _LITERAL = re.compile(r"""^(-?\d+(\.\d+)?|'[^']*'|"[^"]*"|True|False|None)$""")
@@ -454,6 +517,37 @@ _CALL = re.compile(r"\b([A-Za-z_][\w.]*)\s*\(")
 _CALL_TEXT = re.compile(r"\b[A-Za-z_][\w.]*\([^()]*\)")
 
 
+# A criterion that says only that a call works. On jambo the one drafted
+# answer was "clear_ref_cache() runs without error": the test written from it
+# could not tell a cache that cleared from one that did not.
+_ONLY_WORKS = re.compile(
+    r"\b(?:runs?|succeeds?|works?|completes?|executes?)\b"
+    r"|\bwithout (?:an? )?(?:error|exception)s?\b"
+    r"|\b(?:does not|doesn't|never) (?:raise|fail|error|crash)\b"
+    r"|\bno (?:error|exception)s?\b", re.IGNORECASE)
+# What a criterion says when it does name an outcome.
+_STATES_A_RESULT = re.compile(
+    r"\b(?:returns?|raises?|equals?|gives?|yields?|produces?|contains?|includes?"
+    r"|becomes?|is|are|has|have|holds?|writes?|prints?|rejects?|accepts?|leaves?"
+    r"|clears?|removes?|adds?|sets?|keeps?)\b|==|!=|<|>", re.IGNORECASE)
+
+
+def weak_criterion(criterion):
+    """
+    Why a criterion needs a second look, or None: it says only that a call
+    runs or does not fail, and names no value, error or effect a test could
+    check. A test written from it passes whatever the call returns.
+    """
+    if not _ONLY_WORKS.search(criterion):
+        return None
+    rest = _ONLY_WORKS.sub(" ", criterion)
+    if _STATES_A_RESULT.search(rest):
+        return None
+    return ("it names no expected value: a test written from it passes "
+            "whatever the call returns. Say what the call should return, "
+            "raise or change")
+
+
 def other_function(quote, criterion, names):
     """
     Why a drafted answer needs a second look, or None: its quote shows a call
@@ -547,7 +641,7 @@ def draft(module, cwd, questions, seed=None, call=None):
     from qikly.start import _read
 
     source = _read(module)
-    readme = readme_text(module, cwd)
+    readme = all_docs(module, cwd)
     interface = interface_text(source)
     prompt = build_prompt(os.path.basename(module), readme, interface,
                           in_classes(with_parameters(questions, source), source),
@@ -599,7 +693,8 @@ def draft(module, cwd, questions, seed=None, call=None):
             # A quote that is not there is a claim with nothing behind it.
             dropped += 1
             continue
-        why = other_function(quote, criterion, names) if source_of == "docs" else None
+        why = ((other_function(quote, criterion, names) if source_of == "docs" else None)
+               or weak_criterion(criterion))
         answers[number] = {"criterion": criterion_text(criterion),
                            "source": source_of, "quote": " ".join(quote.split()),
                            "check": source_of == "purpose" or bool(item.get("check")) or bool(why),
@@ -644,7 +739,7 @@ def apply(text, drafted):
         for i, line in enumerate(lines):
             if line.startswith("  - ") and REQUIREMENT_MARK in line:
                 lines[i] = "  - " + _quote(_printable(drafted["requirements"]))
-                lines.insert(i, "  #? Drafted by qikly from your README and docstrings. "
+                lines.insert(i, "  #? Drafted by qikly from your README, docs and docstrings. "
                                 "Change it if it misses the point.")
                 break
     start = next((i for i, l in enumerate(lines) if l.startswith("acceptance_criteria:")), None)

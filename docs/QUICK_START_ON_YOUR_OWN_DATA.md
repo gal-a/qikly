@@ -140,9 +140,9 @@ folder, and every step takes the same path:
    file for each module step 1 asked about. With a key set, a spec agent then
    drafts the rest: a `requirements` line on what the module is for, and an
    answer to each of step 1's questions under `acceptance_criteria`. It reads
-   your README and docstrings and never your code, so a test written from its
+   your README, docs folder and docstrings and never your code, so a test written from its
    draft can disagree with the code. Each answer says where it came from: a
-   quote from your README or docstrings, checked word for word, or `CHECK`
+   quote from your README, docs or docstrings, checked word for word, or `CHECK`
    where your docs don't say and the answer is qikly's guess, to read before
    you run. Run the draft as it is, or change any answer.
 

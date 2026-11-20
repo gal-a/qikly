@@ -1035,6 +1035,12 @@ def _parse_args():
              "and ranges only: a run is an artifact, not a rate."
     )
     parser.add_argument(
+        "--seed", type=int, default=None, metavar="N",
+        help="The seed for the model calls of --scaffold and --tasks (default 42, "
+             "or AGENT_SEED). The same seed drafts and writes the same way twice; "
+             "run with different seeds to get independent samples."
+    )
+    parser.add_argument(
         "--repeats", type=int, default=0, metavar="N",
         help="With --compare-prompts, run N of each arm before reporting. "
              "Each is a full run, so this costs minutes to hours apiece."
@@ -2446,7 +2452,7 @@ def _draft_answers(text, source, root, questions, brief=False):
     except Exception:
         if not brief:
             print("  No API key is set, so the answers are left for you to write. With "
-                  "a key, --scaffold drafts them from your README and docstrings.")
+                  "a key, --scaffold drafts them from your README, docs and docstrings.")
         return text, None
     name = os.path.basename(source)
     if len(spec_draft.documentation(source, root)) < spec_draft.MIN_DOCS:
@@ -2456,7 +2462,7 @@ def _draft_answers(text, source, root, questions, brief=False):
         return text, None
     if not brief:
         print(f"Drafting the answers with {provider}: the spec agent reads {name}'s "
-              f"README and docstrings, never its code.")
+              f"README, docs and docstrings, never its code.")
     try:
         drafted = spec_draft.draft(source, root, questions)
     except KeyboardInterrupt:
@@ -2496,7 +2502,7 @@ def _say_draft(drafted, dest, target):
         tag = spec_draft.CHECK if answer["check"] else "docs "
         print(f"    {tag}  {answer['criterion']}")
     print(f"  {spec_draft.CHECK}: qikly's guess, so read it before you run; "
-          f"docs: quoted from your README or docstrings.")
+          f"docs: quoted from your README, docs or docstrings.")
     print(f"  To run it as it is:  qikly --tasks {target}")
     print(f"  To change an answer, edit:  {os.path.abspath(dest)}")
 
@@ -2927,6 +2933,11 @@ def main():
     from qikly.agent_api.providers.router import validate_config
 
     args = _parse_args()
+    # --seed sets the one variable every model call already reads. Three runs
+    # of jambo's task under the default seed wrote byte-identical tests, so
+    # "three runs" were one sample.
+    if args.seed is not None:
+        os.environ["AGENT_SEED"] = str(args.seed)
 
     # Before the update check, on purpose. This prints a block to be pasted into
     # a config file, and the update notice goes to stdout: a pasted "qikly X is
@@ -3068,6 +3079,10 @@ def main():
         # budget on its own, so an unattached one is worse than a no-op.
         ("--repeats", args.repeats, "--compare-prompts",
          "qikly --compare-prompts CALC_TAX --repeats 3"),
+        # --seed alone fell through to the ordinary run path, like --repeats:
+        # caught by the smoke test the day the flag was added.
+        ("--seed", args.seed is not None, "--scaffold, --tasks or --demo",
+         "qikly --tasks pricing.py --seed 2"),
     ):
         if not given:
             continue
@@ -3091,6 +3106,7 @@ def main():
                            or args.compare_criteria),
             "--by": bool(args.trends),
             "--repeats": bool(args.compare_prompts),
+            "--seed": bool(args.scaffold or args.tasks or args.demo),
         }[flag]
         if not attached:
             print(f"{flag} goes with {wants}, as in: {example}", file=sys.stderr)
