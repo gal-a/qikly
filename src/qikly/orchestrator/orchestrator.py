@@ -766,11 +766,11 @@ def _validate_generated_tests(source, stage):
     # A test whose only assertion is always true passes whatever the code
     # does. On jambo the test agent called clear_ref_cache(namespace=None) and
     # then `assert True`, so the planted fault it should have caught escaped.
-    from qikly.agent_tools.vacuous_tests import describe as _vacuous
+    from qikly.agent_tools.vacuous_tests import REFUSAL, describe as _vacuous
 
     detail = _vacuous(source)
     if detail:
-        return f"generated {stage} test file has a test that cannot fail: {detail}"
+        return f"generated {stage} test file {REFUSAL}: {detail}"
 
     return None
 
@@ -877,8 +877,9 @@ def _generate_one(stage, generator, task_id, seed, criteria, batch_index, guidan
         # On the last attempt, a file refused only for an always-true assert
         # keeps its tests with that assert taken out: one `assert True` in a
         # file of good tests should cost the assert, not the whole run.
-        if attempt == GENERATE_TESTS_MAX_ATTEMPTS and "cannot fail" in error:
-            from qikly.agent_tools.vacuous_tests import strip as _strip_vacuous
+        from qikly.agent_tools.vacuous_tests import REFUSAL, strip as _strip_vacuous
+
+        if attempt == GENERATE_TESTS_MAX_ATTEMPTS and REFUSAL in error:
             stripped = _strip_vacuous(source)
             if stripped != source and not _validate_generated_tests(stripped, stage):
                 log_transaction({"stage": stage, "error": error, "source": source,

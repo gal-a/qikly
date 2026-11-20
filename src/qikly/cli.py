@@ -1036,7 +1036,8 @@ def _parse_args():
     )
     parser.add_argument(
         "--seed", type=int, default=None, metavar="N",
-        help="The seed for the model calls of --scaffold, --tasks and --demo "
+        help="The seed for the model calls of --scaffold, --tasks, --demo, "
+             "--propose-fixtures and --compare-criteria "
              "(default 42, or AGENT_SEED). On Gemini and OpenAI the same seed tends "
              "to write the same tests, and another seed writes different ones; "
              "Anthropic ignores it."

@@ -20,6 +20,8 @@ not the run.
 import ast
 
 _CHECK_CALLS = ("raises", "warns", "fail", "approx")
+# The validator's refusal says this, and the last attempt looks for it.
+REFUSAL = "has a test that cannot fail"
 
 
 def _always_true(test):
@@ -116,19 +118,32 @@ def describe(source):
 
 def strip(source):
     """
-    The source with the always-true asserts of the flagged tests removed (a
-    `pass` left where a test would be empty), or the source unchanged.
+    The source with each always-true assert of the flagged tests replaced, in
+    place, by the calls it held (`assert (f() == 3, "msg")` becomes
+    `(f() == 3, "msg")`, so f() still runs and still fails the test if it
+    raises), or by `pass` when it held none. Only the assert's own span
+    changes: `x = f(); assert True` keeps `x = f()`. The source unchanged if
+    nothing is flagged.
     """
     try:
         tree = ast.parse(source)
     except SyntaxError:
         return source
-    lines = source.splitlines(keepends=True)
-    drop = sorted({(a.lineno, a.end_lineno) for _, asserts in _vacuous(tree) for a in asserts},
-                  reverse=True)
-    if not drop:
+    asserts = {(a.lineno, a.col_offset): a for _, found in _vacuous(tree) for a in found}
+    if not asserts:
         return source
-    for start, end in drop:
-        indent = lines[start - 1][:len(lines[start - 1]) - len(lines[start - 1].lstrip())]
-        lines[start - 1:end] = [indent + "pass\n"]
-    return "".join(lines)
+    lines = source.splitlines(keepends=True)
+    starts = [0]
+    for line in lines:
+        starts.append(starts[-1] + len(line.encode("utf-8")))
+    data = source.encode("utf-8")
+    for _, node in sorted(asserts.items(), reverse=True):
+        calls = any(isinstance(n, ast.Call) for n in ast.walk(node.test))
+        keep = ast.get_source_segment(source, node.test) if calls else None
+        # A kept expression over several lines needs brackets to stay valid.
+        if keep and "\n" in keep and not keep.lstrip().startswith(("(", "[", "{")):
+            keep = "(" + keep + ")"
+        begin = starts[node.lineno - 1] + node.col_offset
+        end = starts[node.end_lineno - 1] + node.end_col_offset
+        data = data[:begin] + (keep or "pass").encode("utf-8") + data[end:]
+    return data.decode("utf-8")

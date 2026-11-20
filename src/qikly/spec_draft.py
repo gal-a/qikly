@@ -122,26 +122,138 @@ def docs_text(module, cwd):
         return ""
     if not names:
         return ""
-    return _docs_text_cached(root, source, tuple(sorted(names)))
+    return _docs_text_cached(root, _own_code(module, source), tuple(sorted(names)))
 
 
 # A documentation file larger than this is a generated site or a data dump,
 # not prose to quote.
 _DOC_FILE_MAX = 400_000
-# A code line this long or longer, found in a docs page, is taken to be the
-# module's own source; shorter lines ("return x") are too common to judge.
+# A code line this long or longer (whitespace removed), found in a docs page,
+# is taken to be the module's own source; shorter lines ("return x") are too
+# common to judge.
 _SOURCE_LINE_MIN = 12
 
 
+def _normal(line):
+    """
+    A line as compared with the module's source: doctest prompts, a trailing
+    comment and all whitespace taken out, so a body reformatted in a docs page
+    or copied into a doctest still matches.
+    """
+    line = re.sub(r"^\s*(?:>>>|\.\.\.)(?=\s|$)", "", line)
+    line = re.sub(r"(?:^|\s)#.*$", "", line)
+    return re.sub(r"\s+", "", line)
+
+
+@functools.lru_cache(maxsize=64)
+def _code_lines(source):
+    """
+    The source's code lines, normalised, without its docstrings and comments:
+    a docs page that restates a docstring is documentation, not code.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        tree = None
+    skip = set()
+    for node in ast.walk(tree) if tree else ():
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            first = node.body[0] if node.body else None
+            if (isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant)
+                    and isinstance(first.value.value, str)):
+                skip.update(range(first.lineno, first.end_lineno + 1))
+    out = set()
+    for number, line in enumerate(source.splitlines(), 1):
+        if number in skip or line.lstrip().startswith("#"):
+            continue
+        line = _normal(line)
+        if len(line) >= _SOURCE_LINE_MIN:
+            out.add(line)
+    return frozenset(out)
+
+
+def _sibling_sources(module, source):
+    """
+    The sources of the modules of the same package that this module imports.
+    A thin wrapper's behaviour lives in the module it delegates to, so that
+    module's body must stay out of the prompt too.
+    """
+    here = os.path.dirname(os.path.realpath(module))
+    package = os.path.basename(here)
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return ()
+    wanted = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            parts = node.module.split(".") if node.module else []
+            if node.level == 0:
+                if not parts or parts[0] != package:
+                    continue
+                parts = parts[1:]
+            elif node.level != 1:
+                continue
+            if parts:
+                wanted.add(parts[0])
+            else:
+                wanted.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                parts = alias.name.split(".")
+                if len(parts) > 1 and parts[0] == package:
+                    wanted.add(parts[1])
+    found = []
+    for name in sorted(wanted):
+        for path in (os.path.join(here, name + ".py"), os.path.join(here, name, "__init__.py")):
+            real = os.path.realpath(path)
+            if (os.path.isfile(real) and real != os.path.realpath(module)
+                    and real.startswith(here + os.sep)):
+                try:
+                    with open(real, encoding="utf-8-sig", errors="replace") as handle:
+                        found.append(handle.read())
+                except OSError:
+                    pass
+                break
+    return tuple(found)
+
+
+def _own_code(module, source=None):
+    """The normalised code lines of the module and of the siblings it imports."""
+    if source is None:
+        from qikly.start import _read
+        try:
+            source = _read(module)
+        except (OSError, ValueError):
+            return frozenset()
+    own = set(_code_lines(source))
+    for sibling in _sibling_sources(module, source):
+        own |= _code_lines(sibling)
+    return frozenset(own)
+
+
+def _is_source(line, own):
+    """A docs line that holds a code line of the module, in any layout."""
+    line = _normal(line)
+    if len(line) < _SOURCE_LINE_MIN:
+        return False
+    return line in own or any(code in line for code in own)
+
+
+# Cached on the module's code and names: one CLI run drafts several answers
+# from the same pages. A long-running process that drafts (the MCP server does
+# not today) would need the pages' modification times in the key.
 @functools.lru_cache(maxsize=16)
-def _docs_text_cached(root, source, names):
-    own = {line.strip() for line in source.splitlines()
-           if len(line.strip()) >= _SOURCE_LINE_MIN}
+def _docs_text_cached(root, own, names):
     # A mention is a call or a backticked name; a bare word counts only for a
     # name long enough not to be ordinary English ("get", "run", "load").
     called = re.compile(r"`?\b(?:%s)\b(?:\(|`)" % "|".join(re.escape(n) for n in names))
     worded = [n for n in names if len(n) >= 6]
     bare = re.compile(r"\b(?:%s)\b" % "|".join(re.escape(n) for n in worded)) if worded else None
+
+    def mentions(text):
+        return len(called.findall(text)) + (len(bare.findall(text)) if bare else 0)
+
     pages = []
     for folder in DOC_DIRS:
         top = os.path.join(root, folder)
@@ -167,10 +279,12 @@ def _docs_text_cached(root, source, names):
                         text = handle.read()
                 except OSError:
                     continue
+                if not mentions(text):
+                    continue  # not about this module: no need to filter it
                 text = _without_code(text, own)
                 if text is None:
                     continue
-                hits = len(called.findall(text)) + (len(bare.findall(text)) if bare else 0)
+                hits = mentions(text)
                 if hits:
                     rel = os.path.relpath(path, root).replace(os.sep, "/")
                     pages.append((-hits, rel, text))
@@ -189,28 +303,37 @@ def _docs_text_cached(root, source, names):
 
 
 _CODE_DIRECTIVE = re.compile(r"^\s*\.\.\s+(?:code-block|code|sourcecode|literalinclude)::")
+_DEFINES = re.compile(r"\s*(?:(?:>>>|\.\.\.)\s*)?(?:async\s+)?(?:def|class)\s")
 
 
 def _without_code(text, own):
     """
     The page with any code block that defines a function or class, and any
-    line that is a line of the module's own source, taken out. None when most
-    of the page is the module's source: a copy of the code saved as .txt.
-    The spec agent must never see a function body, and documentation pages
-    can hold one.
+    line holding a code line of the module or of a sibling it imports, taken
+    out. None when most of the page is that source: a copy of the code saved
+    as .txt. The spec agent must never see a function body, and documentation
+    pages can hold one. A body that differs from the current code (an old
+    version, rewritten) and sits outside a block with a def cannot be told
+    from prose.
     """
     lines = text.splitlines()
-    if own:
-        matched = sum(1 for line in lines if line.strip() in own)
-        if matched >= max(3, len(own) // 3):
-            return None
+    source = [_is_source(line, own) for line in lines] if own else [False] * len(lines)
+    # A copy of the code: much of the module, and most of the page. A page
+    # that quotes a small module's three lines among its prose is still docs.
+    matched = sum(source)
+    if (own and matched >= max(3, len(own) // 3)
+            and matched * 2 >= sum(1 for line in lines if line.strip())):
+        return None
     out, i = [], 0
     while i < len(lines):
         line = lines[i]
         fence = re.match(r"^\s*(```|~~~)", line)
         rst = _CODE_DIRECTIVE.match(line) or (line.rstrip().endswith("::")
                                                 and not line.lstrip().startswith(".."))
-        if fence or rst:
+        # A Markdown code block: indented four spaces, after a blank line.
+        indented = (not fence and not rst and re.match(r"(?: {4}|\t)\S", line)
+                    and (i == 0 or not lines[i - 1].strip()))
+        if fence or rst or indented:
             j = i + 1
             if fence:
                 while j < len(lines) and not lines[j].lstrip().startswith(fence.group(1)):
@@ -219,20 +342,26 @@ def _without_code(text, own):
             else:
                 while j < len(lines) and (not lines[j].strip() or lines[j][:1] in (" ", "\t")):
                     j += 1
-                block, end = lines[i + 1:j], j
-            if any(re.match(r"\s*(?:async\s+)?(?:def|class)\s", b) for b in block):
+                block, end = (lines[i:j] if indented else lines[i + 1:j]), j
+            if any(_DEFINES.match(b) for b in block):
                 out.append(line if rst and not _CODE_DIRECTIVE.match(line) else "")
                 i = end
                 continue
-        if line.strip() not in own:
+        if not source[i]:
             out.append(line)
         i += 1
     return "\n".join(out)
 
 
 def all_docs(module, cwd):
-    """The README and the documentation folder's relevant pages, as one text."""
-    return "\n\n".join(t for t in (readme_text(module, cwd), docs_text(module, cwd)) if t)
+    """
+    The README and the documentation folder's relevant pages, as one text,
+    with the module's code taken out of both.
+    """
+    readme = readme_text(module, cwd)
+    if readme:
+        readme = _without_code(readme, _own_code(module)) or ""
+    return "\n\n".join(t for t in (readme, docs_text(module, cwd)) if t)
 
 
 def interface_text(source):
@@ -603,13 +732,22 @@ _ONLY_WORKS = re.compile(
     r"|\b(?:does not|doesn't|never) (?:raises?|fails?|errors?|crash(?:es)?)\b"
     r"|\bno (?:error|exception)s?\b", re.IGNORECASE)
 # What a criterion says when it does name an outcome.
-_STATES_A_RESULT = re.compile(
+_RESULT_VERB = (
     r"\b(?:return|raise|equal|give|yield|produce|contain|include|become|hold|write"
     r"|print|reject|accept|leave|clear|remove|add|set|keep|output|exist|emit|log"
-    r"|store|save|create|delete|update|append|match)(?:s|es|ing|ed)?\b"
-    r"|\b(?:is|are|has|have)\b|==|!=|\bTrue\b|\bFalse\b|\bNone\b", re.IGNORECASE)
-# A condition says when, not what: "works when x is 0" names no result.
-_CONDITION = re.compile(r"\b(?:when|whenever|if|unless|for|given|on)\b.*$", re.IGNORECASE)
+    r"|store|save|create|delete|update|append|match)(?:s|es|ing|ed)?\b")
+_STATES_A_RESULT = re.compile(
+    _RESULT_VERB + r"|\b(?:is|are|has|have)\b|==|!=|\bTrue\b|\bFalse\b|\bNone\b",
+    re.IGNORECASE)
+# A condition says when, not what: "works when x is 0" names no result. It
+# ends at a comma, a semicolon or an "and" that goes on to a result:
+# "succeeds when the server is up and returns the body" names one.
+_CONDITION = re.compile(
+    r"\b(?:when|whenever|if|unless|for|given|on)\b.*?(?=[,;]|\band\s+(?:\w+\s+)?%s|$)"
+    % _RESULT_VERB, re.IGNORECASE)
+# A call, its name included: "update(cfg) works" names no result, though
+# "update" is a result verb.
+_BRACKETED_CALL = re.compile(r"[A-Za-z_][\w.]*\x01")
 # A number or a quoted value outside a call's brackets is a stated result:
 # "completes 5 jobs", "succeeds with status 200".
 _LITERAL = re.compile(r"\d|'[^']*'|\"[^\"]*\"")
@@ -624,7 +762,10 @@ def weak_criterion(criterion):
     if not _ONLY_WORKS.search(criterion):
         return None
     # A call's arguments ("apply_discount(100, 0)") are the input, not a result.
-    rest = re.sub(r"\([^()]*\)", "()", criterion)
+    rest, before = criterion, None
+    while rest != before:  # nested brackets, innermost first
+        before, rest = rest, re.sub(r"\([^()]*\)", "\x01", rest)
+    rest = _BRACKETED_CALL.sub(" it ", rest).replace("\x01", " ")
     rest = _CONDITION.sub(" ", _ONLY_WORKS.sub(" ", rest))
     if _STATES_A_RESULT.search(rest) or _LITERAL.search(rest):
         return None

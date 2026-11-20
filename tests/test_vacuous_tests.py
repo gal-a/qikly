@@ -85,6 +85,22 @@ def test_strip_removes_only_the_always_true_asserts():
     compile(out, "t", "exec")
 
 
+def test_strip_keeps_the_calls_and_the_test():
+    """Found by the re-audit: stripping whole lines deleted calls, and a
+    one-line test turned into a module-level `pass`."""
+    from qikly.agent_tools.vacuous_tests import strip
+    cases = {
+        "def test_a():\n    x = f(); assert True\n": "def test_a():\n    x = f(); pass\n",
+        "def test_a(): assert True\n": "def test_a(): pass\n",
+        "def test_a():\n    if f(): assert True\n": "def test_a():\n    if f(): pass\n",
+        "def test_a():\n    assert (f() == 3, 'msg')\n": "def test_a():\n    (f() == 3, 'msg')\n",
+        "def test_a():\n    with x:\n        assert True\n": "def test_a():\n    with x:\n        pass\n",
+    }
+    for src, want in cases.items():
+        assert strip(src) == want, src
+        compile(want, "t", "exec")
+
+
 def test_the_last_attempt_keeps_the_file_with_the_vacuous_assert_removed(monkeypatch):
     """One `assert True` among good tests costs that assert, not the run."""
     from qikly.orchestrator import orchestrator as orch

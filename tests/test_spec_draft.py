@@ -509,3 +509,88 @@ def test_the_audits_weak_criterion_cases():
                  "the merge succeeds, returning the merged dict",
                  "save() completes and the file exists afterwards"):
         assert spec_draft.weak_criterion(fine) is None, fine
+
+
+def test_the_reaudits_weak_criterion_cases():
+    """A function named like a result verb is not a result, and a condition
+    ends where the sentence goes on to one."""
+    for weak in ("add(1, 2) runs without error", "update(cfg) works", "log(msg) never raises",
+                 "store.save() succeeds", "f(g(x)) runs without error"):
+        assert spec_draft.weak_criterion(weak), weak
+    for fine in ("succeeds when the server is up and returns the body",
+                 "succeeds, given a valid url, returning the body",
+                 "apply_discount(100, 0) returns 100"):
+        assert spec_draft.weak_criterion(fine) is None, fine
+
+
+def _module_with_body(tmp_path):
+    (tmp_path / "shop.py").write_text(
+        'def apply_discount(price, rate):\n    """Price after a discount of rate percent."""\n'
+        '    if rate >= 100:\n        raise ValueError("rate too high")\n'
+        "    return round(price * (1 - rate / 100), 2)\n", encoding="utf-8")
+    return str(tmp_path / "shop.py")
+
+
+def test_a_body_in_another_layout_never_reaches_the_spec_agent(tmp_path):
+    """Found by the re-audit: a doctest, a line with a comment, a one-line
+    <pre> and a reformatted line all carried the body past an exact match."""
+    module = _module_with_body(tmp_path)
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "usage.md").write_text(
+        "Use apply_discount(200, 50).\n\nThe price is a number of euros.\n"
+        "The rate is a percentage.\nThe result has two decimal places.\n"
+        "A rate of 100 or more is refused.\n\n>>> if rate >= 100:\n"
+        '...     raise ValueError("rate too high")\n\n'
+        "    return round(price * (1 - rate / 100), 2)  # the price\n\n"
+        '<pre>if rate>=100: raise ValueError("rate too high")</pre>\n', encoding="utf-8")
+    text = spec_draft.all_docs(module, str(tmp_path))
+    assert "Use apply_discount(200, 50)." in text
+    for body in ('ValueError("rate too high")', "rate >= 100", "rate>=100", "round(price"):
+        assert body not in text, body
+
+
+def test_a_body_in_the_readme_never_reaches_the_spec_agent(tmp_path):
+    """Found by the re-audit: the README skipped the code filter."""
+    module = _module_with_body(tmp_path)
+    (tmp_path / "README.md").write_text(
+        "# shop\n\nA rate of 100 or more raises ValueError.\n\n```python\n"
+        "def apply_discount(price, rate):\n    if rate >= 100:\n"
+        '        raise ValueError("rate too high")\n```\n', encoding="utf-8")
+    text = spec_draft.all_docs(module, str(tmp_path))
+    assert "A rate of 100 or more raises ValueError." in text
+    assert "rate too high" not in text
+
+
+def test_a_page_restating_a_docstring_is_kept(tmp_path):
+    """A docstring is documentation: matching it as code dropped the page."""
+    (tmp_path / "api.py").write_text(
+        'def apply_discount(price, rate):\n    """Apply a discount.\n\n'
+        "    The rate is a percentage between zero and one hundred.\n"
+        "    Rates of one hundred or more are refused with ValueError.\n"
+        '    The result is rounded to two places.\n    """\n'
+        "    return round(price * (100 - rate) / 100, 2)\n", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "api.md").write_text(
+        "apply_discount(price, rate)\n\n"
+        "The rate is a percentage between zero and one hundred.\n"
+        "Rates of one hundred or more are refused with ValueError.\n"
+        "The result is rounded to two places.\n", encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "api.py"), str(tmp_path))
+    assert "refused with ValueError" in text
+
+
+def test_the_body_of_a_sibling_the_module_imports_is_kept_out(tmp_path):
+    """A thin wrapper's behaviour lives in the module it delegates to."""
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "_core.py").write_text(
+        "def compute(a, b):\n    total = a * b + 17\n    return total\n", encoding="utf-8")
+    (pkg / "api.py").write_text(
+        "from ._core import compute\n\n\ndef apply_discount(price, rate):\n"
+        "    return compute(price, rate)\n", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "api.md").write_text(
+        "apply_discount(price, rate) applies the rate.\n\nInside: total = a * b + 17\n",
+        encoding="utf-8")
+    text = spec_draft.docs_text(str(pkg / "api.py"), str(tmp_path))
+    assert "applies the rate" in text and "a * b + 17" not in text
