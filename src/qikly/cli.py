@@ -1036,9 +1036,10 @@ def _parse_args():
     )
     parser.add_argument(
         "--seed", type=int, default=None, metavar="N",
-        help="The seed for the model calls of --scaffold and --tasks (default 42, "
-             "or AGENT_SEED). The same seed drafts and writes the same way twice; "
-             "run with different seeds to get independent samples."
+        help="The seed for the model calls of --scaffold, --tasks and --demo "
+             "(default 42, or AGENT_SEED). On Gemini and OpenAI the same seed tends "
+             "to write the same tests, and another seed writes different ones; "
+             "Anthropic ignores it."
     )
     parser.add_argument(
         "--repeats", type=int, default=0, metavar="N",
@@ -3081,7 +3082,8 @@ def main():
          "qikly --compare-prompts CALC_TAX --repeats 3"),
         # --seed alone fell through to the ordinary run path, like --repeats:
         # caught by the smoke test the day the flag was added.
-        ("--seed", args.seed is not None, "--scaffold, --tasks or --demo",
+        ("--seed", args.seed is not None,
+         "--scaffold, --tasks, --demo, --propose-fixtures or --compare-criteria",
          "qikly --tasks pricing.py --seed 2"),
     ):
         if not given:
@@ -3106,7 +3108,8 @@ def main():
                            or args.compare_criteria),
             "--by": bool(args.trends),
             "--repeats": bool(args.compare_prompts),
-            "--seed": bool(args.scaffold or args.tasks or args.demo),
+            "--seed": bool(args.scaffold or args.tasks or args.demo
+                           or args.propose_fixtures or args.compare_criteria),
         }[flag]
         if not attached:
             print(f"{flag} goes with {wants}, as in: {example}", file=sys.stderr)

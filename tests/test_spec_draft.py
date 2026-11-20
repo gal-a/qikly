@@ -452,3 +452,60 @@ def test_the_weak_criterion_note_is_written_beside_the_answer(scored, monkeypatc
     cli._do_scaffold("pricing.py", None)
     text = (scored / TASK).read_text(encoding="utf-8")
     assert "#? CHECK: it names no expected value" in text
+
+
+def test_a_function_body_in_a_docs_page_never_reaches_the_spec_agent(tmp_path):
+    """The promise the whole design rests on. A docs page can embed the
+    module's code (a fenced block, an rst literal block) or be a copy of it
+    saved as .txt; found by the audit of the docs-folder reader."""
+    (tmp_path / "mod.py").write_text(
+        'def load(path):\n    """Load a file."""\n'
+        '    return open(path).read() + "SECRET_BODY_MARKER"\n', encoding="utf-8")
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "internals.md").write_text(
+        "How `load` works:\n\n```python\ndef load(path):\n"
+        '    return open(path).read() + "SECRET_BODY_MARKER"\n```\n', encoding="utf-8")
+    (docs / "usage.rst").write_text(
+        "Call ``load(path)``. ``load`` raises OSError when the path is missing.\n\n"
+        "Example::\n\n    def load(path):\n"
+        '        return open(path).read() + "SECRET_BODY_MARKER"\n\n'
+        "After it, load(path) returns the text.\n", encoding="utf-8")
+    (docs / "copy.txt").write_text((tmp_path / "mod.py").read_text(encoding="utf-8"),
+                                   encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "mod.py"), str(tmp_path))
+    assert "SECRET_BODY_MARKER" not in text
+    assert "copy.txt" not in text
+    assert "raises OSError when the path is missing" in text
+    assert "After it, load(path) returns the text." in text
+
+
+def test_the_most_relevant_page_is_trimmed_rather_than_dropped(tmp_path):
+    (tmp_path / "pricing.py").write_text(PRICING, encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "api.md").write_text("apply_discount(1, 2) is documented. " * 2000,
+                                              encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "pricing.py"), str(tmp_path))
+    assert text.startswith("--- docs/api.md ---")
+    assert len(text) <= spec_draft.DOCS_LIMIT
+
+
+def test_a_common_short_name_in_prose_does_not_make_a_page_relevant(tmp_path):
+    (tmp_path / "mod.py").write_text('def run():\n    """Run it."""\n', encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "start.md").write_text("Get started: run the installer.\n",
+                                                encoding="utf-8")
+    (tmp_path / "docs" / "api.md").write_text("Call `run()` to start.\n", encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "mod.py"), str(tmp_path))
+    assert "api.md" in text and "start.md" not in text
+
+
+def test_the_audits_weak_criterion_cases():
+    for weak in ("f(x) works when x is 0", "runs without error when the list has one item",
+                 "f() runs without error for inputs < 0", "never fails on a valid row"):
+        assert spec_draft.weak_criterion(weak), weak
+    for fine in ("the worker completes 5 jobs", "succeeds with output 3",
+                 "the call succeeds with status 200",
+                 "the merge succeeds, returning the merged dict",
+                 "save() completes and the file exists afterwards"):
+        assert spec_draft.weak_criterion(fine) is None, fine

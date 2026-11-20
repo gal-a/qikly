@@ -874,6 +874,16 @@ def _generate_one(stage, generator, task_id, seed, criteria, batch_index, guidan
         error = _validate_generated_tests(source, stage)
         if not error:
             return source
+        # On the last attempt, a file refused only for an always-true assert
+        # keeps its tests with that assert taken out: one `assert True` in a
+        # file of good tests should cost the assert, not the whole run.
+        if attempt == GENERATE_TESTS_MAX_ATTEMPTS and "cannot fail" in error:
+            from qikly.agent_tools.vacuous_tests import strip as _strip_vacuous
+            stripped = _strip_vacuous(source)
+            if stripped != source and not _validate_generated_tests(stripped, stage):
+                log_transaction({"stage": stage, "error": error, "source": source,
+                                 "attempt": attempt, "action": "tests_generation_vacuous_stripped"})
+                return stripped
         rejected = error
         if attempt < GENERATE_TESTS_MAX_ATTEMPTS:
             log_transaction({"stage": stage, "error": error, "source": source,

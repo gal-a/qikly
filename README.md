@@ -664,9 +664,11 @@ Thirteen example tasks ship with the tool across five domains, listed in
 
 **Measuring rather than producing.** One run is an artifact, not a rate: the
 same task with the same seed converges on some runs and not others. The model
-calls are seeded (42 by default), so the same seed tends to write the same
-tests: for independent samples, give each run its own seed with `--seed N`,
-as in `qikly --tasks pricing.py --seed 2`. To claim how often anything
+calls are seeded (42 by default), so on Gemini and OpenAI the same seed tends
+to write the same tests. To vary them, give each run its own seed with
+`--seed N`, as in `qikly --tasks pricing.py --seed 2`; a seed also sets the
+temperature to 0, so different seeds give different runs, not fully random
+ones. Anthropic's API takes no seed. To claim how often anything
 converges, repeat the sweep and read the interval:
 
 ```bash

@@ -24,6 +24,7 @@ module's purpose, because nothing written decides it, is marked for a person
 to check: those are the key parts of the draft.
 """
 import ast
+import functools
 import json
 import os
 import re
@@ -113,14 +114,34 @@ def docs_text(module, cwd):
     """
     from qikly.start import _read, project_root
 
-    root = os.path.abspath(project_root(module, cwd))
+    root = os.path.realpath(project_root(module, cwd))
     try:
-        names = {n for n in interface_names(_read(module)) if len(n) > 2}
+        source = _read(module)
+        names = {n for n in interface_names(source) if len(n) > 2}
     except (OSError, ValueError):
-        names = set()
+        return ""
     if not names:
         return ""
-    pattern = re.compile(r"\b(?:%s)\b" % "|".join(re.escape(n) for n in sorted(names)))
+    return _docs_text_cached(root, source, tuple(sorted(names)))
+
+
+# A documentation file larger than this is a generated site or a data dump,
+# not prose to quote.
+_DOC_FILE_MAX = 400_000
+# A code line this long or longer, found in a docs page, is taken to be the
+# module's own source; shorter lines ("return x") are too common to judge.
+_SOURCE_LINE_MIN = 12
+
+
+@functools.lru_cache(maxsize=16)
+def _docs_text_cached(root, source, names):
+    own = {line.strip() for line in source.splitlines()
+           if len(line.strip()) >= _SOURCE_LINE_MIN}
+    # A mention is a call or a backticked name; a bare word counts only for a
+    # name long enough not to be ordinary English ("get", "run", "load").
+    called = re.compile(r"`?\b(?:%s)\b(?:\(|`)" % "|".join(re.escape(n) for n in names))
+    worded = [n for n in names if len(n) >= 6]
+    bare = re.compile(r"\b(?:%s)\b" % "|".join(re.escape(n) for n in worded)) if worded else None
     pages = []
     for folder in DOC_DIRS:
         top = os.path.join(root, folder)
@@ -132,13 +153,24 @@ def docs_text(module, cwd):
             for name in sorted(files):
                 if not name.lower().endswith(_DOC_SUFFIXES):
                     continue
-                path = os.path.join(here, name)
+                path = os.path.realpath(os.path.join(here, name))
+                # The real file, inside the project, and a documentation file:
+                # a link named usage.md that points at the module is code.
+                if (not os.path.isfile(path)
+                        or not path.lower().endswith(_DOC_SUFFIXES)
+                        or not path.startswith(root + os.sep)):
+                    continue
                 try:
+                    if os.path.getsize(path) > _DOC_FILE_MAX:
+                        continue
                     with open(path, encoding="utf-8-sig", errors="replace") as handle:
                         text = handle.read()
                 except OSError:
                     continue
-                hits = len(pattern.findall(text))
+                text = _without_code(text, own)
+                if text is None:
+                    continue
+                hits = len(called.findall(text)) + (len(bare.findall(text)) if bare else 0)
                 if hits:
                     rel = os.path.relpath(path, root).replace(os.sep, "/")
                     pages.append((-hits, rel, text))
@@ -146,11 +178,56 @@ def docs_text(module, cwd):
     out, used = [], 0
     for _, rel, text in pages:
         chunk = f"--- {rel} ---\n{text}"
-        if used + len(chunk) > DOCS_LIMIT:
-            continue  # a smaller relevant page may still fit
+        room = DOCS_LIMIT - used
+        if len(chunk) > room:
+            if room < 2000:
+                continue  # a smaller relevant page may still fit
+            chunk = chunk[:room]  # the most relevant page, trimmed, beats none
         out.append(chunk)
         used += len(chunk)
     return "\n\n".join(out)
+
+
+_CODE_DIRECTIVE = re.compile(r"^\s*\.\.\s+(?:code-block|code|sourcecode|literalinclude)::")
+
+
+def _without_code(text, own):
+    """
+    The page with any code block that defines a function or class, and any
+    line that is a line of the module's own source, taken out. None when most
+    of the page is the module's source: a copy of the code saved as .txt.
+    The spec agent must never see a function body, and documentation pages
+    can hold one.
+    """
+    lines = text.splitlines()
+    if own:
+        matched = sum(1 for line in lines if line.strip() in own)
+        if matched >= max(3, len(own) // 3):
+            return None
+    out, i = [], 0
+    while i < len(lines):
+        line = lines[i]
+        fence = re.match(r"^\s*(```|~~~)", line)
+        rst = _CODE_DIRECTIVE.match(line) or (line.rstrip().endswith("::")
+                                                and not line.lstrip().startswith(".."))
+        if fence or rst:
+            j = i + 1
+            if fence:
+                while j < len(lines) and not lines[j].lstrip().startswith(fence.group(1)):
+                    j += 1
+                block, end = lines[i + 1:j], j + 1
+            else:
+                while j < len(lines) and (not lines[j].strip() or lines[j][:1] in (" ", "\t")):
+                    j += 1
+                block, end = lines[i + 1:j], j
+            if any(re.match(r"\s*(?:async\s+)?(?:def|class)\s", b) for b in block):
+                out.append(line if rst and not _CODE_DIRECTIVE.match(line) else "")
+                i = end
+                continue
+        if line.strip() not in own:
+            out.append(line)
+        i += 1
+    return "\n".join(out)
 
 
 def all_docs(module, cwd):
@@ -523,13 +600,19 @@ _CALL_TEXT = re.compile(r"\b[A-Za-z_][\w.]*\([^()]*\)")
 _ONLY_WORKS = re.compile(
     r"\b(?:runs?|succeeds?|works?|completes?|executes?)\b"
     r"|\bwithout (?:an? )?(?:error|exception)s?\b"
-    r"|\b(?:does not|doesn't|never) (?:raise|fail|error|crash)\b"
+    r"|\b(?:does not|doesn't|never) (?:raises?|fails?|errors?|crash(?:es)?)\b"
     r"|\bno (?:error|exception)s?\b", re.IGNORECASE)
 # What a criterion says when it does name an outcome.
 _STATES_A_RESULT = re.compile(
-    r"\b(?:returns?|raises?|equals?|gives?|yields?|produces?|contains?|includes?"
-    r"|becomes?|is|are|has|have|holds?|writes?|prints?|rejects?|accepts?|leaves?"
-    r"|clears?|removes?|adds?|sets?|keeps?)\b|==|!=|<|>", re.IGNORECASE)
+    r"\b(?:return|raise|equal|give|yield|produce|contain|include|become|hold|write"
+    r"|print|reject|accept|leave|clear|remove|add|set|keep|output|exist|emit|log"
+    r"|store|save|create|delete|update|append|match)(?:s|es|ing|ed)?\b"
+    r"|\b(?:is|are|has|have)\b|==|!=|\bTrue\b|\bFalse\b|\bNone\b", re.IGNORECASE)
+# A condition says when, not what: "works when x is 0" names no result.
+_CONDITION = re.compile(r"\b(?:when|whenever|if|unless|for|given|on)\b.*$", re.IGNORECASE)
+# A number or a quoted value outside a call's brackets is a stated result:
+# "completes 5 jobs", "succeeds with status 200".
+_LITERAL = re.compile(r"\d|'[^']*'|\"[^\"]*\"")
 
 
 def weak_criterion(criterion):
@@ -540,8 +623,10 @@ def weak_criterion(criterion):
     """
     if not _ONLY_WORKS.search(criterion):
         return None
-    rest = _ONLY_WORKS.sub(" ", criterion)
-    if _STATES_A_RESULT.search(rest):
+    # A call's arguments ("apply_discount(100, 0)") are the input, not a result.
+    rest = re.sub(r"\([^()]*\)", "()", criterion)
+    rest = _CONDITION.sub(" ", _ONLY_WORKS.sub(" ", rest))
+    if _STATES_A_RESULT.search(rest) or _LITERAL.search(rest):
         return None
     return ("it names no expected value: a test written from it passes "
             "whatever the call returns. Say what the call should return, "

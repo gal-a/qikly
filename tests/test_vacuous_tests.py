@@ -61,3 +61,34 @@ def test_the_validator_refuses_the_file_and_says_why():
 
 def test_unparsable_source_is_left_to_the_syntax_check():
     assert describe("def test_a(:\n") is None
+
+
+def test_a_check_inside_a_helper_of_the_file_counts():
+    src = ("def check(x):\n    assert x == 3\n\n\n"
+           "def test_a():\n    check(f())\n    assert True\n")
+    assert describe(src) is None
+
+
+def test_more_always_true_asserts_are_caught():
+    for body in ("assert (f(), 'msg')", "assert [x]", "assert x or True",
+                 "assert not False", "assert True == True"):
+        assert describe(f"def test_a():\n    {body}\n"), body
+
+
+def test_strip_removes_only_the_always_true_asserts():
+    from qikly.agent_tools.vacuous_tests import strip
+    src = ("def test_good():\n    assert f() == 2\n\n\n"
+           "def test_bad():\n    f()\n    assert True\n")
+    out = strip(src)
+    assert "assert f() == 2" in out and "assert True" not in out
+    assert describe(out) is None
+    compile(out, "t", "exec")
+
+
+def test_the_last_attempt_keeps_the_file_with_the_vacuous_assert_removed(monkeypatch):
+    """One `assert True` among good tests costs that assert, not the run."""
+    from qikly.orchestrator import orchestrator as orch
+    monkeypatch.setattr(orch, "log_transaction", lambda *a, **k: None)
+    src = "from mod import f\n\n\ndef test_a():\n    f()\n    assert True\n"
+    out = orch._generate_one("integration", lambda *a, **k: src, "T", 1, None, 1)
+    assert "assert True" not in out and "f()" in out
