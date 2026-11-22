@@ -664,7 +664,7 @@ h1 {
 .bug-row.anim .b { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(.6); }
 .bug-row.anim.go .b { animation: bug-drop .85s ease-out var(--d) forwards; }
 /* "Show next bug" shakes the landed bugs in place. */
-.bug-row.anim.go.jitter .b { animation: bug-jitter .5s ease-in-out var(--j) both; }
+.bug-row.anim.go.jitter .b { animation: bug-jitter 1.1s ease-in-out var(--j) both; }
 @keyframes bug-jitter {
   0%, 100% { opacity: var(--o, 1); transform: none; }
   20% { opacity: var(--o, 1); transform: translate(var(--jx), var(--jy)) rotate(14deg) scale(1.15); }
@@ -1868,7 +1868,7 @@ from your criteria:
         var olds = row.querySelectorAll(".b");
         for (var k = 0; k < olds.length; k++) {
           var c = olds[k].cloneNode(true);
-          c.style.setProperty("--j", Math.round(Math.random() * 120) + "ms");
+          c.style.setProperty("--j", Math.round(Math.random() * 200) + "ms");
           c.style.setProperty("--jx", (Math.random() < .5 ? -1 : 1) * (2 + Math.round(Math.random() * 2)) + "px");
           c.style.setProperty("--jy", (Math.random() < .5 ? -1 : 1) * (2 + Math.round(Math.random() * 2)) + "px");
           row.replaceChild(c, olds[k]);
