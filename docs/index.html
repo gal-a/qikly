@@ -663,8 +663,14 @@ h1 {
 .bug-row .b svg { display: block; width: 100%; height: 100%; }
 .bug-row.anim .b { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(.6); }
 .bug-row.anim.go .b { animation: bug-drop .85s ease-out var(--d) forwards; }
-/* A replay from "Show next bug" runs at twice the speed. */
-.bug-row.anim.go.quick .b { animation-duration: .43s; }
+/* "Show next bug" shakes the landed bugs in place. */
+.bug-row.anim.go.jitter .b { animation: bug-jitter .5s ease-in-out var(--j) both; }
+@keyframes bug-jitter {
+  0%, 100% { opacity: var(--o, 1); transform: none; }
+  20% { opacity: var(--o, 1); transform: translate(var(--jx), var(--jy)) rotate(14deg) scale(1.15); }
+  45% { transform: translate(calc(var(--jx) * -1), calc(var(--jy) * -.6)) rotate(-12deg); }
+  70% { transform: translate(calc(var(--jx) * .5), calc(var(--jy) * .5)) rotate(6deg); }
+}
 /* Each bug flies in from its own angle, then swells and settles on landing. */
 @keyframes bug-drop {
   0% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(.6); }
@@ -1827,9 +1833,8 @@ from your criteria:
           if (!running.parentNode) cmd.parentNode.insertBefore(running, cmd);
         }
       };
-      var drop = function (quick) {
-        var gap = quick ? 37 : 75;
-        row.classList.toggle("quick", !!quick);
+      var drop = function () {
+        var gap = 75;
         // Fresh copies of the bugs: a new element always plays its animation
         // from the first frame, where re-adding a class may not.
         var olds = row.querySelectorAll(".b");
@@ -1845,7 +1850,7 @@ from your criteria:
             cmd.style.display = "";
             cmd.classList.add("pop");
           }
-        }, quick ? 12 * 37 + 430 : 12 * 75 + 850);
+        }, 12 * 75 + 850);
       };
       hold();
       new IntersectionObserver(function (entries, io) {
@@ -1853,13 +1858,21 @@ from your criteria:
         io.disconnect();
         drop();
       }, { threshold: 0.5 }).observe(row);
-      // "Show next bug", pressed by hand, replays the landing; the tour's own
-      // steps do not, so a visitor who leaves it running is not flooded.
+      // "Show next bug", pressed by hand, shakes the bugs where they sit; the
+      // tour's own steps do not, so a visitor who leaves it running is not
+      // flooded. Fresh copies, since a new element always restarts its animation.
       var nextBtn = document.querySelector(".btn-try");
       if (nextBtn) nextBtn.addEventListener("click", function (e) {
-        if (!e.isTrusted) return;
-        hold();
-        drop(true);
+        if (!e.isTrusted || !row.classList.contains("go")) return;
+        row.classList.add("jitter");
+        var olds = row.querySelectorAll(".b");
+        for (var k = 0; k < olds.length; k++) {
+          var c = olds[k].cloneNode(true);
+          c.style.setProperty("--j", Math.round(Math.random() * 120) + "ms");
+          c.style.setProperty("--jx", (Math.random() < .5 ? -1 : 1) * (2 + Math.round(Math.random() * 2)) + "px");
+          c.style.setProperty("--jy", (Math.random() < .5 ? -1 : 1) * (2 + Math.round(Math.random() * 2)) + "px");
+          row.replaceChild(c, olds[k]);
+        }
       });
     }
   }
