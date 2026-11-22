@@ -672,6 +672,16 @@ h1 {
   100% { opacity: var(--o, 1); transform: none; }
 }
 .pill.miss.wait { opacity: 0; transform: scale(.6); }
+/* Until the bugs land, the command line is still running. */
+.apart .caret { display: inline-block; width: .55em; height: 1.05em; margin-left: 3px;
+  background: #57b8bd; vertical-align: -3px; animation: caret-blink 1s steps(1) infinite; }
+@keyframes caret-blink { 50% { opacity: 0; } }
+.apart .spinner { display: inline-block; width: .8em; height: .8em; margin: 0 7px 0 12px;
+  border: 2px solid #2b8f95; border-top-color: transparent; border-radius: 50%;
+  vertical-align: -1px; animation: spinner .8s linear infinite; }
+@keyframes spinner { to { transform: rotate(360deg); } }
+.apart .planting { color: #6d7b79; }
+.apart > span.pop { animation: pill-pop .45s ease-out; }
 .pill.miss.pop { animation: pill-pop .45s ease-out forwards; }
 @keyframes pill-pop {
   0% { opacity: 0; transform: scale(.6); }
@@ -1791,12 +1801,24 @@ from your criteria:
     if (!still && "IntersectionObserver" in window) {
       row.classList.add("anim");
       if (missPill) missPill.classList.add("wait");
+      // The command line runs until the bugs have landed. A stand-in shows
+      // meanwhile; the original stays in place, since the tour animates its arrow.
+      var cmd = document.querySelector(".hero-art .apart > span");
+      var running = null;
+      if (cmd) {
+        running = document.createElement("span");
+        running.innerHTML = '<span class="prompt">$</span> qikly --score<span class="caret"></span>' +
+          '<span class="spinner"></span><span class="planting">planting faults&hellip;</span>';
+        cmd.style.display = "none";
+        cmd.parentNode.insertBefore(running, cmd);
+      }
       new IntersectionObserver(function (entries, io) {
         if (!entries[0].isIntersecting) return;
         io.disconnect();
         row.classList.add("go");
         setTimeout(function () {
           if (missPill) { missPill.classList.remove("wait"); missPill.classList.add("pop"); }
+          if (cmd) { running.parentNode.removeChild(running); cmd.style.display = ""; cmd.classList.add("pop"); }
         }, 12 * 75 + 850);
       }, { threshold: 0.5 }).observe(row);
     }
