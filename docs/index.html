@@ -1797,28 +1797,64 @@ from your criteria:
       row.appendChild(b);
     }
     if (!still && "IntersectionObserver" in window) {
-      row.classList.add("anim");
-      if (missPill) missPill.classList.add("wait");
       // The command line runs until the bugs have landed. A stand-in shows
       // meanwhile; the original stays in place, since the tour animates its arrow.
       var cmd = document.querySelector(".hero-art .apart > span");
-      var running = null;
-      if (cmd) {
-        running = document.createElement("span");
-        running.innerHTML = '<span class="prompt">$</span> qikly --score' +
-          '<span class="spinner"></span><span class="planting">planting faults&hellip;</span>';
-        cmd.style.display = "none";
-        cmd.parentNode.insertBefore(running, cmd);
-      }
+      var running = document.createElement("span");
+      running.innerHTML = '<span class="prompt">$</span> qikly --score' +
+        '<span class="spinner"></span><span class="planting">planting faults&hellip;</span>';
+      var landed = null;
+      // Every bug from a fresh random angle, 160 to 240 px out, in the upper
+      // three quarters of a circle.
+      var aim = function () {
+        var bugs = row.querySelectorAll(".b");
+        for (var k = 0; k < bugs.length; k++) {
+          var angle = (Math.random() * 1.5 - 1.25) * Math.PI, far = 160 + Math.random() * 80;
+          bugs[k].style.setProperty("--x", Math.round(Math.cos(angle) * far) + "px");
+          bugs[k].style.setProperty("--y", Math.round(Math.sin(angle) * far) + "px");
+          bugs[k].style.setProperty("--r", (Math.round(Math.random() * 300) - 150) + "deg");
+        }
+      };
+      var hold = function () {
+        clearTimeout(landed);
+        row.classList.add("anim");
+        if (missPill) { missPill.classList.remove("pop"); missPill.classList.add("wait"); }
+        if (cmd) {
+          cmd.classList.remove("pop");
+          cmd.style.display = "none";
+          if (!running.parentNode) cmd.parentNode.insertBefore(running, cmd);
+        }
+      };
+      var drop = function () {
+        // Fresh copies of the bugs: a new element always plays its animation
+        // from the first frame, where re-adding a class may not.
+        var olds = row.querySelectorAll(".b");
+        for (var k = 0; k < olds.length; k++) row.replaceChild(olds[k].cloneNode(true), olds[k]);
+        aim();
+        row.classList.add("go");
+        landed = setTimeout(function () {
+          if (missPill) { missPill.classList.remove("wait"); missPill.classList.add("pop"); }
+          if (cmd) {
+            if (running.parentNode) running.parentNode.removeChild(running);
+            cmd.style.display = "";
+            cmd.classList.add("pop");
+          }
+        }, 12 * 75 + 850);
+      };
+      hold();
       new IntersectionObserver(function (entries, io) {
         if (!entries[0].isIntersecting) return;
         io.disconnect();
-        row.classList.add("go");
-        setTimeout(function () {
-          if (missPill) { missPill.classList.remove("wait"); missPill.classList.add("pop"); }
-          if (cmd) { running.parentNode.removeChild(running); cmd.style.display = ""; cmd.classList.add("pop"); }
-        }, 12 * 75 + 850);
+        drop();
       }, { threshold: 0.5 }).observe(row);
+      // "Show next bug", pressed by hand, replays the landing; the tour's own
+      // steps do not, so a visitor who leaves it running is not flooded.
+      var nextBtn = document.querySelector(".btn-try");
+      if (nextBtn) nextBtn.addEventListener("click", function (e) {
+        if (!e.isTrusted) return;
+        hold();
+        drop();
+      });
     }
   }
 
