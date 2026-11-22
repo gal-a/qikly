@@ -655,9 +655,10 @@ h1 {
 .pill.miss { background: #2a1618; border-color: #a34848; color: #f4a4a4; }
 /* The 13 planted faults as bugs: drawn by the script, dropped in once on
    first view. Red stayed hidden from the tests, green were caught. */
-.bug-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; min-height: 18px; }
+.bug-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px;
+  margin: 14px -2px 0 0; min-height: 14px; }
 .bug-row:empty { display: none; }
-.bug-row .b { width: 18px; height: 18px; color: #f4a4a4; opacity: var(--o, 1); }
+.bug-row .b { width: 14px; height: 14px; color: #f4a4a4; opacity: var(--o, 1); }
 .bug-row .b.caught { color: #4ade80; --o: .55; }
 .bug-row .b svg { display: block; width: 100%; height: 100%; }
 .bug-row.anim .b { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(.6); }
@@ -673,9 +674,6 @@ h1 {
 }
 .pill.miss.wait { opacity: 0; transform: scale(.6); }
 /* Until the bugs land, the command line is still running. */
-.apart .caret { display: inline-block; width: .55em; height: 1.05em; margin-left: 3px;
-  background: #57b8bd; vertical-align: -3px; animation: caret-blink 1s steps(1) infinite; }
-@keyframes caret-blink { 50% { opacity: 0; } }
 .apart .spinner { display: inline-block; width: .8em; height: .8em; margin: 0 7px 0 12px;
   border: 2px solid #2b8f95; border-top-color: transparent; border-radius: 50%;
   vertical-align: -1px; animation: spinner .8s linear infinite; }
@@ -1807,7 +1805,7 @@ from your criteria:
       var running = null;
       if (cmd) {
         running = document.createElement("span");
-        running.innerHTML = '<span class="prompt">$</span> qikly --score<span class="caret"></span>' +
+        running.innerHTML = '<span class="prompt">$</span> qikly --score' +
           '<span class="spinner"></span><span class="planting">planting faults&hellip;</span>';
         cmd.style.display = "none";
         cmd.parentNode.insertBefore(running, cmd);
