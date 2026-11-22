@@ -748,7 +748,7 @@ h1 {
 /* On first view the flask erupts: it shakes and swells, the liquid boils up,
    and drops burst from the neck, arc, and spill down over the card. */
 .card-test .tag { position: relative; }
-.card-head .flask.erupt { animation: erupt .95s cubic-bezier(.3, 1.6, .5, 1); }
+.card-head .flask.erupt { animation: erupt 1.7s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes erupt {
   0% { transform: none; }
   10% { transform: rotate(-16deg) scale(1.15); }
@@ -760,10 +760,10 @@ h1 {
   100% { transform: none; }
 }
 .flask .liquid { transform-box: fill-box; transform-origin: 50% 100%; }
-.card-test.splash { animation: card-flash 1.1s ease-out; }
+.card-test.splash { animation: card-flash 1.9s ease-out; }
 @keyframes card-flash { 0%, 100% { box-shadow: none; }
   18% { box-shadow: 0 0 0 2px rgba(87,184,189,.55), 0 0 38px rgba(87,184,189,.55); } }
-.flask.erupt .liquid { animation: boil .95s ease-out; }
+.flask.erupt .liquid { animation: boil 1.7s ease-out; }
 @keyframes boil { 0%, 100% { transform: none; } 25% { transform: scaleY(1.9); } 45% { transform: scaleY(1.3); } 60% { transform: scaleY(1.6); } }
 .eruption { position: absolute; left: 10px; top: 2px; width: 0; height: 0; pointer-events: none; z-index: 3; }
 .eruption i { position: absolute; left: 0; top: 0; width: var(--s); height: var(--s); margin: calc(var(--s) / -2);
@@ -1818,11 +1818,16 @@ from your criteria:
   // The flask erupts once, on first view: drops burst from its neck, arc up
   // and spill down over the card. Skipped for reduced motion.
   var flaskIcon = document.querySelector(".card-test .flask");
+  var eruptNow = null;
   if (flaskIcon && !still && "IntersectionObserver" in window) {
-    new IntersectionObserver(function (entries, io) {
-      if (!entries[0].isIntersecting) return;
-      io.disconnect();
-      var burst = document.createElement("span");
+    var testCard = flaskIcon.closest(".card"), burst = null, settle = null;
+    eruptNow = function () {
+      clearTimeout(settle);
+      if (burst && burst.parentNode) burst.parentNode.removeChild(burst);
+      flaskIcon.classList.remove("erupt");
+      testCard.classList.remove("splash");
+      void flaskIcon.getBoundingClientRect();
+      burst = document.createElement("span");
       burst.className = "eruption";
       for (var n = 0; n < 34; n++) {
         var d = document.createElement("i"), drip = n >= 28;
@@ -1831,19 +1836,24 @@ from your criteria:
         d.style.setProperty("--dx", (drip ? side * (6 + Math.random() * 5) : side * (10 + Math.random() * 120)).toFixed(0) + "px");
         d.style.setProperty("--up", (drip ? 2 : 30 + Math.random() * 70).toFixed(0) + "px");
         d.style.setProperty("--down", (drip ? 40 + Math.random() * 40 : 60 + Math.random() * 120).toFixed(0) + "px");
-        d.style.setProperty("--t", (drip ? 1.6 + Math.random() * .6 : 1 + Math.random() * .6).toFixed(2) + "s");
-        d.style.setProperty("--d", (drip ? 300 + Math.random() * 300 : 120 + Math.random() * 260).toFixed(0) + "ms");
+        d.style.setProperty("--t", (drip ? 2.6 + Math.random() * 1 : 1.7 + Math.random() * 1).toFixed(2) + "s");
+        d.style.setProperty("--d", (drip ? 500 + Math.random() * 500 : 200 + Math.random() * 450).toFixed(0) + "ms");
         burst.appendChild(d);
       }
       flaskIcon.parentNode.insertBefore(burst, flaskIcon);
       flaskIcon.classList.add("erupt");
-      flaskIcon.closest(".card").classList.add("splash");
-      setTimeout(function () {
+      testCard.classList.add("splash");
+      settle = setTimeout(function () {
         flaskIcon.classList.remove("erupt");
-        flaskIcon.closest(".card").classList.remove("splash");
-        if (burst.parentNode) burst.parentNode.removeChild(burst);
-      }, 2600);
-    }, { threshold: 0.6 }).observe(flaskIcon.closest(".card"));
+        testCard.classList.remove("splash");
+        if (burst && burst.parentNode) burst.parentNode.removeChild(burst);
+      }, 4400);
+    };
+    new IntersectionObserver(function (entries, io) {
+      if (!entries[0].isIntersecting) return;
+      io.disconnect();
+      eruptNow();
+    }, { threshold: 0.6 }).observe(testCard);
   }
 
   // The 13 planted faults drop in as bugs, once, on first view: the 3 the
@@ -1887,6 +1897,7 @@ from your criteria:
       };
       var hold = function () {
         clearTimeout(landed);
+        row.classList.remove("jitter");
         row.classList.add("anim");
         if (missPill) { missPill.classList.remove("pop"); missPill.classList.add("wait"); }
         if (cmd) {
@@ -1925,6 +1936,15 @@ from your criteria:
       // "Show next bug", pressed by hand, shakes the bugs where they sit; the
       // tour's own steps do not, so a visitor who leaves it running is not
       // flooded. Fresh copies, since a new element always restarts its animation.
+      // The tour's play button, pressed to resume, replays the opening: the
+      // flask erupts and the bugs fly in again.
+      var playBtn = document.querySelector(".hero-panel .btn-tour");
+      if (playBtn) playBtn.addEventListener("click", function () {
+        if (playBtn.getAttribute("aria-pressed") !== "false") return;
+        if (eruptNow) eruptNow();
+        hold();
+        drop();
+      });
       var nextBtn = document.querySelector(".btn-try");
       if (nextBtn) nextBtn.addEventListener("click", function (e) {
         if (!e.isTrusted || !row.classList.contains("go")) return;
