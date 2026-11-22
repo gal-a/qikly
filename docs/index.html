@@ -826,6 +826,9 @@ h1 {
 }
 @media (max-width: 620px) {
   .hero.hero-panel { padding: 26px 18px 34px; border-radius: 14px; }
+  /* On a phone the cards come first, so the opening effects are on the first
+     screen rather than below the text. */
+  .hero-right { order: -1; }
   .hero-panel .eyebrow { white-space: nowrap; font-size: .68rem; letter-spacing: .05em; }
   .card-fault .card-head .sub { font-size: .7rem; white-space: nowrap; }
   .card-fault .card-head { gap: 8px; }
