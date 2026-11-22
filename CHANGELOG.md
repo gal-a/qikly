@@ -24,6 +24,14 @@ packaging tools would read as `1.1`.
   jambo, the rule behind a question `--score` asked ("passing `None` clears
   every namespace") was only in `docs/source/usage.ref_cache.rst`, so the
   agent could not answer it. A quote from those pages now counts as docs.
+- **It reads your top-level doc files too,** with the same rules as the docs
+  folder: any `.md`, `.rst` or `.markdown` file beside the README that names
+  the module's functions, `CLAUDE.md` and `AGENTS.md` included. Not `.txt`
+  files there, which are as often a diff or a test log. Skipped: README
+  translations, licences, and the contribution, conduct and security policy
+  files. A changelog is read after every other page, so it never crowds one
+  out. On ydnatl, `pop(index=-1)`, "Remove last child", is documented only in
+  `LLM_GUIDE.md`, so the agent could not see it.
 - **`--seed N`** sets the seed for `--scaffold`, `--tasks`, `--demo`,
   `--propose-fixtures` and `--compare-criteria`. Three
   runs of one task under the default seed wrote byte-identical tests. On Gemini
@@ -31,6 +39,17 @@ packaging tools would read as `1.1`.
   to 0, so they are different runs, not fully random ones); Anthropic ignores it.
 
 ### Fixed
+- **A question's values and code reach the spec agent as intended again.** A
+  second pattern of the same name, added in this release, replaced the one
+  that tells a question's values from its code: `True`, `False`, `None` and
+  negative numbers were dropped from questions, and code that starts with a
+  quoted string, such as `'(' in sys.version`, was shown to the agent. Not in
+  0.6.3.
+- **A question about a keyword-only default names its parameter.** On a
+  signature line such as `*, include_packages: bool = True, include_pip: bool =
+  True`, the question reached the agent saying only "What behaviour depends on
+  it?". It is named only when the change points at one default; when several
+  on the line are exactly the flipped value, all are named.
 - **A generated test that can never fail is refused and written again.** A
   test whose only check was `assert True` passed whatever the code did; on
   jambo it hid a planted fault in the exact behaviour it was meant to test. Of

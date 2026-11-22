@@ -41,6 +41,19 @@ README_NAMES = ("README.md", "README.rst", "README.txt", "README")
 # README does not crowd it out.
 DOC_DIRS = ("docs", "doc")
 DOCS_LIMIT = 24000
+# Top-level files that are not about what the code should do: the README (read
+# on its own, translations too), licences, contribution and conduct rules.
+# requirements_spec.md and SECURITY_MODEL.md are kept: they may state intent.
+_ROOT_SKIP = re.compile(
+    r"(?i)(?:(?:readme|licen[cs]e|copying)(?:[-_.][\w.-]*)?"
+    r"|(?:notice|authors|contributors|contributing|code[-_]of[-_]conduct|security"
+    r"|governance|funding|third_party_notices)(?:\.[\w.]+)?)$")
+# At the top level only these: a .txt there is as often a diff, a test log or
+# saved output, whose code lines the docs filter cannot always recognise.
+_ROOT_SUFFIXES = (".md", ".rst", ".markdown")
+# A changelog names the module's functions in every entry and describes old
+# behaviour too, so it is read after every other page, and never crowds one out.
+_CHANGELOG = re.compile(r"(?i)(?:changelog|changes|history|news|release[-_]?notes)(?:[-_.][\w.-]*)?$")
 # Set to 1 to keep --scaffold from calling a model, as the test suite does.
 NO_DRAFT = "QIKLY_NO_DRAFT"
 CHECK = "CHECK"
@@ -106,7 +119,8 @@ def readme_text(module, cwd):
 
 def docs_text(module, cwd):
     """
-    Pages of the project's docs/ (or doc/) folder that name one of the
+    Pages of the project's docs/ (or doc/) folder, and its top-level doc files
+    other than the README, licences and the like, that name one of the
     module's public functions, classes or methods, the most mentions first,
     up to DOCS_LIMIT characters. Documentation files only, never source: the
     spec agent must not see a function body. A page that names nothing from
@@ -340,7 +354,37 @@ def _docs_text_cached(root, own, defined, names):
     def mentions(text):
         return len(called.findall(text)) + (len(bare.findall(text)) if bare else 0)
 
-    pages = []
+    pages, seen = [], set()
+
+    def consider(here, name, tier=0):
+        if not name.lower().endswith(_DOC_SUFFIXES):
+            return
+        path = os.path.realpath(os.path.join(here, name))
+        # The real file, inside the project, and a documentation file: a link
+        # named usage.md that points at the module is code.
+        if (not os.path.isfile(path)
+                or not path.lower().endswith(_DOC_SUFFIXES)
+                or not path.startswith(root + os.sep)
+                or os.path.normcase(path) in seen):
+            return
+        seen.add(os.path.normcase(path))
+        try:
+            if os.path.getsize(path) > _DOC_FILE_MAX:
+                return
+            with open(path, encoding="utf-8-sig", errors="replace") as handle:
+                text = handle.read()
+        except OSError:
+            return
+        if not mentions(text):
+            return  # not about this module: no need to filter it
+        text = _without_code(text, own, defined)
+        if text is None:
+            return
+        hits = mentions(text)
+        if hits:
+            rel = os.path.relpath(path, root).replace(os.sep, "/")
+            pages.append((tier, -hits, rel, text))
+
     for folder in DOC_DIRS:
         top = os.path.join(root, folder)
         if not os.path.isdir(top):
@@ -349,34 +393,21 @@ def _docs_text_cached(root, own, defined, names):
             dirs[:] = sorted(d for d in dirs
                              if not d.startswith((".", "_")) and d not in ("build", "site"))
             for name in sorted(files):
-                if not name.lower().endswith(_DOC_SUFFIXES):
-                    continue
-                path = os.path.realpath(os.path.join(here, name))
-                # The real file, inside the project, and a documentation file:
-                # a link named usage.md that points at the module is code.
-                if (not os.path.isfile(path)
-                        or not path.lower().endswith(_DOC_SUFFIXES)
-                        or not path.startswith(root + os.sep)):
-                    continue
-                try:
-                    if os.path.getsize(path) > _DOC_FILE_MAX:
-                        continue
-                    with open(path, encoding="utf-8-sig", errors="replace") as handle:
-                        text = handle.read()
-                except OSError:
-                    continue
-                if not mentions(text):
-                    continue  # not about this module: no need to filter it
-                text = _without_code(text, own, defined)
-                if text is None:
-                    continue
-                hits = mentions(text)
-                if hits:
-                    rel = os.path.relpath(path, root).replace(os.sep, "/")
-                    pages.append((-hits, rel, text))
+                consider(here, name)
+    # The project's top-level doc files besides the README, which is read on
+    # its own: ydnatl documents pop(index=-1), "Remove last child", only in
+    # LLM_GUIDE.md, and RetroFlow its layout rules in GROUP_BOX_PLAN.md.
+    # CLAUDE.md and AGENTS.md count: they are the author's written intent.
+    try:
+        top_files = sorted(os.listdir(root))
+    except OSError:
+        top_files = []
+    for name in top_files:
+        if not _ROOT_SKIP.match(name) and name.lower().endswith(_ROOT_SUFFIXES):
+            consider(root, name, 1 if _CHANGELOG.match(name) else 0)
     pages.sort()
     out, used = [], 0
-    for _, rel, text in pages:
+    for _, _, rel, text in pages:
         chunk = f"--- {rel} ---\n{text}"
         room = DOCS_LIMIT - used
         if len(chunk) > room:
@@ -692,18 +723,34 @@ def with_parameters(questions, source):
                 if isinstance(line, int) and start <= line < first]
         found = _PARAMETER.match(code)
         name = found.group(1) if found and here else None
-        if name is None and here and code.lstrip().startswith(("def ", "async def ")):
-            name = _default_changed(here[-1], q.get("change") or "")
+        if name and _defaults_on_line(here[-1], line) > 1:
+            # "a=1, b=-1, key=lambda x: x + 1": the first name on the line is
+            # not necessarily the default the change flipped.
+            name = None
+        if name is None and here:
+            # A one-line def, or a signature line _PARAMETER cannot read:
+            # pywho's "*, include_packages: bool = True, include_pip: bool =
+            # True", whose first default is the behaviour its PR #73 tests.
+            name = _default_on_line(here[-1], line, q.get("change") or "")
         if name and name not in ("self", "cls"):
             q = dict(q, parameter=name)
         out.append(q)
     return out
 
 
-def _default_changed(node, change):
+def _defaults_on_line(node, line):
+    """How many of the function's parameter defaults sit on `line`."""
+    a = node.args
+    return sum(1 for d in list(a.defaults) + list(a.kw_defaults)
+               if d is not None and d.lineno == line)
+
+
+def _default_on_line(node, line, change):
     """
-    The one parameter of a one-line `def` whose default is the value a change
-    flipped ("bool False -> True"), or None when none or several have it.
+    The parameter whose default sits on `line` and is the value a change
+    flipped. When several on the line have that value the change does not say
+    which, so all are named ("include_packages or include_pip"); the spec
+    agent sees every signature anyway.
     """
     before = re.match(r"\s*\w+\s+(.+?)\s+->", change)
     if not before:
@@ -712,8 +759,19 @@ def _default_changed(node, change):
     positional = a.posonlyargs + a.args
     pairs = list(zip(positional[len(positional) - len(a.defaults):], a.defaults))
     pairs += [(arg, d) for arg, d in zip(a.kwonlyargs, a.kw_defaults) if d is not None]
-    names = [arg.arg for arg, d in pairs if ast.unparse(d) == before.group(1)]
-    return names[0] if len(names) == 1 else None
+    value = before.group(1)
+    holding = [(arg.arg, d) for arg, d in pairs
+               if d.lineno == line and arg.arg not in ("self", "cls")
+               and any(isinstance(n, ast.Constant) and ast.unparse(n) == value
+                       for n in ast.walk(d))]
+    # One default holds the flipped value (ydnatl's index=-1, whose 1 is
+    # flipped), or several are exactly that value; otherwise the change could
+    # be in any of them (a=1, b=-1, key=lambda x: x + 1), so none is named.
+    if len(holding) == 1:
+        return holding[0][0]
+    if holding and all(ast.unparse(d) == value for _, d in holding):
+        return " or ".join(name for name, _ in holding)
+    return None
 
 
 def in_classes(questions, source):
@@ -935,8 +993,10 @@ _CONDITION = re.compile(
 # "update" is a result verb.
 _BRACKETED_CALL = re.compile(r"[A-Za-z_][\w.]*\x01")
 # A number or a quoted value outside a call's brackets is a stated result:
-# "completes 5 jobs", "succeeds with status 200".
-_LITERAL = re.compile(r"\d|'[^']*'|\"[^\"]*\"")
+# "completes 5 jobs", "succeeds with status 200". Its own name: it once shared
+# _LITERAL's, and replacing that at import let neutral_question show the spec
+# agent code such as `'(' in sys.version` and drop True, False and None.
+_STATED_VALUE = re.compile(r"\d|'[^']*'|\"[^\"]*\"")
 
 
 def weak_criterion(criterion):
@@ -953,7 +1013,7 @@ def weak_criterion(criterion):
         before, rest = rest, re.sub(r"\([^()]*\)", "\x01", rest)
     rest = _BRACKETED_CALL.sub(" it ", rest).replace("\x01", " ")
     rest = _CONDITION.sub(" ", _ONLY_WORKS.sub(" ", rest))
-    if _STATES_A_RESULT.search(rest) or _LITERAL.search(rest):
+    if _STATES_A_RESULT.search(rest) or _STATED_VALUE.search(rest):
         return None
     return ("it names no expected value: a test written from it passes "
             "whatever the call returns. Say what the call should return, "

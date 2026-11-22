@@ -407,6 +407,63 @@ def test_the_docs_folder_pages_naming_the_module_are_read(tmp_path):
     assert "conf.py" not in text and "_build" not in text
 
 
+def test_top_level_doc_files_naming_the_module_are_read(tmp_path):
+    """ydnatl documents pop(index=-1), "Remove last child", only in
+    LLM_GUIDE.md at the project's top level; the reader looked in docs/ alone,
+    so the spec agent never saw it. CLAUDE.md and AGENTS.md are read too. The
+    README is read on its own, so it is not repeated here; licences,
+    contribution rules and dependency lists are not about behaviour."""
+    (tmp_path / "pricing.py").write_text(PRICING, encoding="utf-8")
+    (tmp_path / "LLM_GUIDE.md").write_text(
+        "apply_discount(100, 100) raises ValueError.\n", encoding="utf-8")
+    (tmp_path / "CLAUDE.md").write_text("apply_discount rounds to cents.\n", encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text("label('vip') returns 'gold'.\n", encoding="utf-8")
+    (tmp_path / "README.md").write_text("README_MARKER apply_discount(1, 2)\n", encoding="utf-8")
+    for skipped in ("CONTRIBUTING.md", "LICENSE.txt", "SECURITY.md", "requirements-dev.txt",
+                    "CODE_OF_CONDUCT.md"):
+        (tmp_path / skipped).write_text("SKIP_MARKER apply_discount(1, 2)\n", encoding="utf-8")
+    (tmp_path / "notes.py").write_text("# apply_discount apply_discount\n", encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "pricing.py"), str(tmp_path))
+    assert "--- LLM_GUIDE.md ---" in text and "raises ValueError" in text
+    assert "--- CLAUDE.md ---" in text and "--- AGENTS.md ---" in text
+    assert "README_MARKER" not in text and "SKIP_MARKER" not in text
+    assert "notes.py" not in text
+
+
+def test_a_top_level_doc_holding_the_modules_code_is_filtered(tmp_path):
+    """A CLAUDE.md often pastes the code it describes. The same filter as for
+    docs/ pages applies: the body never reaches the spec agent."""
+    (tmp_path / "mod.py").write_text(
+        'def load(path):\n    """Load a file."""\n'
+        '    return open(path).read() + "SECRET_BODY_MARKER"\n', encoding="utf-8")
+    (tmp_path / "CLAUDE.md").write_text(
+        "`load(path)` raises OSError when the path is missing.\n\n"
+        "```python\ndef load(path):\n"
+        '    return open(path).read() + "SECRET_BODY_MARKER"\n```\n', encoding="utf-8")
+    (tmp_path / "GUIDE.md").write_text((tmp_path / "mod.py").read_text(encoding="utf-8"),
+                                       encoding="utf-8")
+    # A diff or a test log at the top level: its code lines carry a "+" or ">"
+    # the docs filter does not always see past, so no .txt there is read.
+    (tmp_path / "changes.txt").write_text(
+        "load(path) changed:\n+    return open(path).read() + 'SECRET_BODY_MARKER'\n",
+        encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "mod.py"), str(tmp_path))
+    assert "SECRET_BODY_MARKER" not in text
+    assert "raises OSError when the path is missing" in text
+    assert "GUIDE.md" not in text and "changes.txt" not in text
+
+
+def test_top_level_and_docs_folder_pages_share_one_ranking(tmp_path):
+    (tmp_path / "pricing.py").write_text(PRICING, encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "few.md").write_text("apply_discount(1, 2) once.\n", encoding="utf-8")
+    (tmp_path / "GUIDE.md").write_text(
+        "apply_discount(1, 2) and apply_discount(3, 4) and apply_discount(5, 6).\n",
+        encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "pricing.py"), str(tmp_path))
+    assert text.index("GUIDE.md") < text.index("docs/few.md")
+
+
 def test_a_quote_from_the_docs_folder_is_kept(scored, monkeypatch):
     """Before the docs folder was read, a quote from it failed the check that a
     quote is really in the documentation, and the answer was dropped."""
@@ -780,3 +837,105 @@ def test_the_second_reviews_weak_criterion_cases():
                  "Completes without error on an empty file and the report says 0 rows",
                  "Completes for every file in the folder and the folder is empty after"):
         assert spec_draft.weak_criterion(fine) is None, fine
+
+
+def test_the_neutral_question_keeps_literals_and_hides_code():
+    """A second _LITERAL, for weak_criterion, replaced the first at import:
+    True, False, None and negative numbers were taken for code and dropped,
+    and `'(' in sys.version` was taken for a quoted value and shown to the
+    spec agent. Found by the review of the intent-sources experiment."""
+    q = {"function": "f", "question": "Your tests pass whether it is `True` or `False`. "
+         "Your tests pass whether it is `-1` or `None`. "
+         "Here `'(' in sys.version` decides it. What should it be?"}
+    text = spec_draft.neutral_question(q)
+    for value in ("True", "False", "-1", "None"):
+        assert value in text, value
+    assert "sys.version" not in text
+
+
+def test_no_module_level_name_in_spec_draft_is_assigned_twice():
+    """The class of bug behind the test above: the later assignment wins
+    silently, for every function that reads the name."""
+    import ast
+    tree = ast.parse(open(spec_draft.__file__, encoding="utf-8").read())
+    names = [t.id for n in tree.body if isinstance(n, ast.Assign)
+             for t in n.targets if isinstance(t, ast.Name)]
+    names += [n.name for n in tree.body
+              if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]
+    twice = sorted({n for n in names if names.count(n) > 1})
+    assert not twice, twice
+
+
+def test_a_keyword_only_default_on_a_signature_line_is_named():
+    """pywho's question about `include_packages` reached the spec agent with no
+    content: its line starts with "*,", which the parameter pattern cannot
+    read. Found by the review of the intent-sources experiment."""
+    source = ("def inspect_environment(\n"
+              "    *, include_packages: bool = True, include_pip: bool = True\n"
+              ") -> dict:\n    return {}\n\n"
+              "def scale(\n    x, *, factor: int = 2, offset: int = 0\n):\n    return x\n")
+    qs = [{"line": 2, "code": "*, include_packages: bool = True, include_pip: bool = True",
+           "change": "bool True -> False, line 2"},
+          {"line": 7, "code": "x, *, factor: int = 2, offset: int = 0",
+           "change": "int 2 -> 3, line 7"}]
+    named = [q.get("parameter") for q in spec_draft.with_parameters(qs, source)]
+    assert named == ["include_packages or include_pip", "factor"]
+
+
+def test_a_changelog_never_crowds_out_a_docs_page(tmp_path):
+    """A changelog names the module's functions in every entry; ranked by
+    mentions it took the whole budget and the docs/ page read before was lost."""
+    (tmp_path / "pricing.py").write_text(PRICING, encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "api.md").write_text("apply_discount(100, 0) returns 100.0.\n",
+                                              encoding="utf-8")
+    (tmp_path / "CHANGELOG.md").write_text(
+        "".join(f"- {n}: apply_discount(1, 2) changed, again.\n" * 4 for n in range(400)),
+        encoding="utf-8")
+    text = spec_draft.docs_text(str(tmp_path / "pricing.py"), str(tmp_path))
+    assert "--- docs/api.md ---" in text
+    assert text.index("docs/api.md") < text.index("CHANGELOG.md")
+
+
+def test_which_top_level_names_are_skipped():
+    skip = spec_draft._ROOT_SKIP.match
+    for name in ("README.md", "README_es.md", "README.zh-CN.md", "LICENSE", "LICENSE-MIT.md",
+                 "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md"):
+        assert skip(name), name
+    for name in ("requirements_spec.md", "requirements-design.md", "constraints_and_limits.md",
+                 "SECURITY_MODEL.md", "support.md", "CHANGELOG.md", "LLM_GUIDE.md", "CLAUDE.md"):
+        assert not skip(name), name
+
+
+def test_a_default_is_named_only_when_the_change_points_at_one():
+    """The change gives a line, not a column: with a=1, b=-1 and a lambda
+    holding 1 on one line, the flipped 1 could be any of them. ydnatl's
+    index=-1 has its 1 flipped and is named."""
+    source = ("def f(\n    a=1, b=-1, key=lambda x: x + 1\n):\n    return a\n\n"
+              "def pop(\n    self, *, index: int = -1\n):\n    return index\n")
+    qs = [{"line": 2, "code": "a=1, b=-1, key=lambda x: x + 1", "change": "int 1 -> 2, line 2"},
+          {"line": 7, "code": "self, *, index: int = -1", "change": "int 1 -> 2, line 7"}]
+    named = [q.get("parameter") for q in spec_draft.with_parameters(qs, source)]
+    assert named == [None, "index"]
+
+
+def test_a_one_line_def_names_a_default_only_when_the_change_points_at_one():
+    """The one-line def took the first default equal to the flipped value, even
+    when the value could be inside another default. Found by the second review."""
+    cases = [("def f(a=1, b=-1, key=lambda x: x + 1):\n    return a\n", "int 1 -> 2", None),
+             ("def f(a=True, b=not True):\n    return a\n", "bool True -> False", None),
+             ("def f(a=None, b=(None,)):\n    return a\n", "NoneType None -> 0", None),
+             ("class C:\n    def m(self, a=1, b=2):\n        return a\n", "int 1 -> 2", "a")]
+    for source, change, expected in cases:
+        line = 2 if source.startswith("class") else 1
+        code = source.splitlines()[line - 1].strip()
+        q = spec_draft.with_parameters([{"line": line, "code": code,
+                                         "change": f"{change}, line {line}"}], source)[0]
+        assert q.get("parameter") == expected, (source, q.get("parameter"))
+
+
+def test_changelog_name_variants_rank_last_and_conduct_variants_are_skipped():
+    assert spec_draft._CHANGELOG.match("Changelog-old.md")
+    assert spec_draft._CHANGELOG.match("CHANGELOG_v1.md")
+    assert not spec_draft._CHANGELOG.match("newsletter_design.md")
+    assert spec_draft._ROOT_SKIP.match("code-of-conduct.md")
