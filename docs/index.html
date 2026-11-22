@@ -660,11 +660,15 @@ h1 {
 .bug-row .b { width: 18px; height: 18px; color: #f4a4a4; opacity: var(--o, 1); }
 .bug-row .b.caught { color: #4ade80; --o: .55; }
 .bug-row .b svg { display: block; width: 100%; height: 100%; }
-.bug-row.anim .b { opacity: 0; transform: translateY(-180px) rotate(var(--r)); }
-.bug-row.anim.go .b { animation: bug-drop .6s cubic-bezier(.2, .9, .3, 1.3) var(--d) forwards; }
+.bug-row.anim .b { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(.6); }
+.bug-row.anim.go .b { animation: bug-drop .85s ease-out var(--d) forwards; }
+/* Each bug flies in from its own angle, then swells and settles on landing. */
 @keyframes bug-drop {
-  0% { opacity: 0; transform: translateY(-180px) rotate(var(--r)); }
-  45% { opacity: 1; }
+  0% { opacity: 0; transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(.6); }
+  20% { opacity: 1; }
+  62% { transform: translate(0, 0) rotate(0) scale(1); }
+  76% { transform: scale(1.7); }
+  88% { transform: scale(.8); }
   100% { opacity: var(--o, 1); transform: none; }
 }
 .pill.miss.wait { opacity: 0; transform: scale(.6); }
@@ -1777,6 +1781,10 @@ from your criteria:
       b.className = "b" + (caught[i] ? " caught" : "");
       b.style.setProperty("--d", (i * 75) + "ms");
       b.style.setProperty("--r", (Math.round(Math.random() * 300) - 150) + "deg");
+      // From a random angle in the upper three quarters of a circle, 160 to 240 px out.
+      var angle = (Math.random() * 1.5 - 1.25) * Math.PI, far = 160 + Math.random() * 80;
+      b.style.setProperty("--x", Math.round(Math.cos(angle) * far) + "px");
+      b.style.setProperty("--y", Math.round(Math.sin(angle) * far) + "px");
       b.innerHTML = bug;
       row.appendChild(b);
     }
@@ -1789,7 +1797,7 @@ from your criteria:
         row.classList.add("go");
         setTimeout(function () {
           if (missPill) { missPill.classList.remove("wait"); missPill.classList.add("pop"); }
-        }, 12 * 75 + 600);
+        }, 12 * 75 + 850);
       }, { threshold: 0.5 }).observe(row);
     }
   }
