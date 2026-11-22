@@ -748,6 +748,12 @@ h1 {
 /* On first view the flask erupts: it shakes and swells, the liquid boils up,
    and drops burst from the neck, arc, and spill down over the card. */
 .card-test .tag { position: relative; }
+/* Replays the opening: the eruption and the bugs flying in. */
+.card-test .run-again { flex: 0 0 auto; display: inline-flex; align-items: center; margin-left: 2px; padding: 2px; line-height: 0;
+  background: none; border: 0; border-radius: 50%; color: inherit; cursor: pointer; }
+.card-test .run-again:hover svg { transform: rotate(-90deg); }
+.card-test .run-again svg { transition: transform .3s ease; }
+.card-test .run-again:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .card-head .flask.erupt { animation: erupt 1.7s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes erupt {
   0% { transform: none; }
@@ -1948,6 +1954,23 @@ from your criteria:
         hold();
         drop();
       });
+      // A replay button after "your tests", in the text's colour, replays the
+      // opening too. Its own class: .replay is the demo's button.
+      var tagText = document.querySelector(".card-test .tag-text");
+      if (tagText) {
+        var replay = document.createElement("button");
+        replay.type = "button";
+        replay.className = "run-again";
+        replay.setAttribute("aria-label", "Replay the run");
+        replay.setAttribute("data-goatcounter-click", "hero-replay");
+        replay.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M19.97 12.7A8 8 0 1 1 17.66 6.34" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M12.9 6.34H17.66V1.6" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        tagText.parentNode.insertBefore(replay, tagText.nextSibling);
+        replay.addEventListener("click", function () {
+          if (eruptNow) eruptNow();
+          hold();
+          drop();
+        });
+      }
       var nextBtn = document.querySelector(".btn-try");
       if (nextBtn) nextBtn.addEventListener("click", function (e) {
         if (!e.isTrusted || !row.classList.contains("go")) return;
