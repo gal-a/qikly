@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy policy | qikly</title>
+<meta name="description" content="qikly.com counts visits without cookies or personal data. The qikly tool runs on your machine and collects nothing for itself.">
+<link rel="canonical" href="https://qikly.com/privacy-policy">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+:root { --bg: #ffffff; --ink: #14201f; --soft: #4d5c5a; --rule: #dde5e4; --accent: #1f7a80; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0b1011; --ink: #e3eae8; --soft: #a9b6b4; --rule: #26302f; --accent: #57b8bd; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+main { max-width: 720px; margin: 0 auto; padding: 40px 16px 56px; }
+a { color: var(--accent); }
+h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; }
+h2 { font-size: 20px; margin: 30px 0 8px; }
+.updated { color: var(--soft); font-size: 14.5px; margin: 0 0 22px; }
+.short { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; margin: 0 0 8px; }
+ul { padding-left: 22px; } li { margin: 5px 0; }
+footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--rule); color: var(--soft); font-size: 14.5px; }
+</style>
+</head>
+<body>
+<main>
+  <p><a href="/">qikly.com</a></p>
+  <h1>Privacy policy</h1>
+  <p class="updated">Last updated 22 November 2026.</p>
+
+  <p class="short"><b>Short version:</b> this website counts visits without cookies or personal data.
+  The qikly tool runs on your machine and collects nothing for itself.</p>
+
+  <h2>This website (qikly.com)</h2>
+  <ul>
+    <li><b>Visit counts only.</b> The site uses <a href="https://www.goatcounter.com/">GoatCounter</a>
+      to count page views and clicks on its links. GoatCounter sets no cookies, collects no personal
+      data, and does not track you across other sites.</li>
+    <li><b>Nothing else.</b> There are no accounts, no forms, no ads and no other trackers.</li>
+    <li><b>Links out.</b> Links to GitHub, PyPI, Towards Data Science, YouTube, X, Substack and
+      LinkedIn take you to sites with their own privacy policies.</li>
+  </ul>
+
+  <h2>The qikly tool</h2>
+  <ul>
+    <li><b>Runs on your machine.</b> There is no qikly server, no account and no telemetry.</li>
+    <li><b>Scoring your tests</b> (<code>qikly --score</code>) runs entirely on your machine and sends
+      nothing anywhere.</li>
+    <li><b>Writing tests</b> sends your task file and the code under test to the AI model provider
+      you choose (Google, OpenAI or Anthropic), with your own API key, straight from your machine.
+      Nothing is sent to us.</li>
+    <li><b>A version check</b> reads public release indexes (PyPI and GitHub) at startup, carrying no
+      data about you or your project. You can turn it off.</li>
+  </ul>
+  <p>The full details, including how to turn the version check off, are in the tool's
+  <a href="https://github.com/gal-a/qikly/blob/main/PRIVACY.md">privacy policy on GitHub</a>.</p>
+
+  <h2>Questions</h2>
+  <p>Ask in <a href="https://github.com/gal-a/qikly/discussions">qikly's GitHub Discussions</a>.</p>
+
+  <footer>qikly · <a href="/">qikly.com</a> · <a href="https://github.com/gal-a/qikly">github.com/gal-a/qikly</a></footer>
+</main>
+</body>
+</html>
