@@ -5,7 +5,7 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.3.10
+  version: 0.3.11
   requires: qikly >= 0.6.1
 ---
 
@@ -61,8 +61,9 @@ The path is three commands, each taking the same module or folder:
   `inputs_private/config/tasks/<NAME>_VERIFY.yaml`, with the interface, a
   data file of the values their tests already use, and those questions under
   `acceptance_criteria`. With their key set, qikly's own spec agent drafts
-  the `requirements` line and an answer to each question from their README
-  and docstrings, never their code; each drafted answer carries its source,
+  the `requirements` line and an answer to each question from their README,
+  docs folder, top-level guides (`CLAUDE.md` and `AGENTS.md` included) and
+  docstrings, never their code; each drafted answer carries its source,
   a quote from their documentation or `CHECK` where it was judged. **Show
   them the draft, the `CHECK` answers first, and change only what they tell
   you to.** Never redraft an answer yourself: you have read their code, and

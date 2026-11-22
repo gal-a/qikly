@@ -6,6 +6,12 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.6.4
+
+> Drafted answers now use your docs folder and top-level guides, and a generated test that can never fail is refused
+
 ### Added
 - **`--scaffold` reads your docs folder too.** Besides the README and the
   docstrings, the spec agent now reads the pages of `docs/` (or `doc/`) that

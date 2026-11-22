@@ -267,6 +267,9 @@ SKILL_BODY_HASHES = {
     # 0.3.10: --validate catches answers it cannot read and fields of the
     # wrong kind, and a run prints the same problems before it starts.
     "0.3.10": "e333912772fa864306116a4bde62eacf60d931c8e64dfbe94392633a91fdea07",
+    # 0.3.11: the spec agent drafts answers from the docs folder and
+    # top-level guides too, not the README and docstrings alone.
+    "0.3.11": "d4b7b955ac1a75b04aa45e77155fe4fb4f49fef5b8941371fb77aab0dc908a7e",
 }
 
 
