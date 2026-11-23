@@ -604,3 +604,27 @@ def test_a_neutral_option_becomes_the_criterion_it_states():
     text = ("task_id: T\n" + block).replace('"TODO: pick 1, 2, 3 or 4, or write your own"', "1")
     _, expanded, problems = sq.expand_answers(text)
     assert problems == [] and expanded == [("1", q["options"][0])]
+
+
+def test_neutral_options_survive_the_saved_score(tmp_path):
+    """The options are built at --score time and saved for --scaffold. The
+    first version built them and then dropped them in save(), so the task
+    file showed none: tested here through the real save and load."""
+    module = tmp_path / "m.py"
+    module.write_text("def label(code):\n    return code.strip()\n", encoding="utf-8")
+    questions = sq.build([{"path": str(module), "file": "m.py",
+                           "change": ".strip() dropped, line 2"}])
+    assert questions and questions[0]["options"], questions
+    saved = tmp_path / "s_questions.json"
+    sq.save(questions, str(saved), "m.py", [str(module)])
+    loaded, _ = sq.latest_for(str(module), str(tmp_path))
+    assert loaded[0]["options"] == questions[0]["options"]
+    block = sq.yaml_block(loaded)
+    assert "#?   1 = `label` treats" in block and sq.DOESNT_MATTER in block
+
+
+def test_a_score_saved_without_options_still_gets_them_from_its_kind():
+    """A score saved by 0.6.4 has no options; --scaffold has the kind."""
+    q = {"file": "m.py", "path": "/x/m.py", "line": 2, "function": "label",
+         "question": sq.ask(".strip() dropped"), "kind": ".strip() dropped"}
+    assert "#?   1 = `label` treats two inputs" in sq.yaml_block([q])

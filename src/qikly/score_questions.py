@@ -330,10 +330,13 @@ def save(questions, path, label, scored=()):
             "written": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "scored": sorted({os.path.abspath(f) for f in scored}),
             # edge, number and change too: `--scaffold` runs the code
-            # beside each one to say what it does there now.
+            # beside each one to say what it does there now. And options,
+            # the neutral behaviours worked out from the change alone: left
+            # off this list, they were built and then lost before the task
+            # file, so the question shipped with no options at all.
             "questions": [{k: q.get(k) for k in
                            ("file", "path", "line", "function", "code", "question",
-                            "edge", "number", "change")}
+                            "edge", "number", "change", "options")}
                           for q in questions]}
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(data, handle, indent=1)
@@ -930,7 +933,11 @@ def yaml_block(questions, written=None):
                               "with one of these:")
             # Behaviours worked out from the change alone, where it has two
             # honest answers; never what the code does now.
-            neutral = q.get("options") or []
+            # A score saved by 0.6.4 carries no options: work them out from
+            # the kind of change, which --scaffold has matched back by now.
+            neutral = (q.get("options")
+                       or (neutral_options(q["kind"], q.get("function"))
+                           if q.get("kind") else []))
             for n, option in enumerate(neutral, 1):
                 lines.append("  %s   %d = %s" % (MARK, n, exact_text(option)))
             lines += _reserved(len(neutral) + 1)
