@@ -1,10 +1,12 @@
 """
 How long one model call may take before it is treated as a failure.
 
-Every provider SDK here defaults to waiting forever. A stalled connection
-therefore blocks the call, and because it never returns an error, nothing
-downstream can react: `with_retry` sees no exception, the orchestrator's
-attempt budget never advances, and the run neither finishes nor fails.
+Google's SDK defaults to waiting indefinitely, and the OpenAI and Anthropic
+SDKs to ten minutes (checked on openai 3.6.0 and anthropic 1.2.0), far longer
+than any call here should take. A stalled connection therefore blocks the
+call, and because it returns no error for that long, nothing downstream can
+react: `with_retry` sees no exception, the orchestrator's attempt budget never
+advances, and the run neither finishes nor fails.
 
 That is not hypothetical. A ten-repetition sweep hung after its first
 repetition and sat silent for two hours: four live processes, no log line, no
@@ -22,8 +24,9 @@ still far inside a person's patience. It is deliberately not tight: cutting off
 a slow-but-working call wastes the tokens already spent on it, whereas cutting
 off a dead one costs nothing.
 
-`QIKLY_REQUEST_TIMEOUT` overrides it, in seconds. 0 restores the old
-wait-forever behaviour for anyone who needs it.
+`QIKLY_REQUEST_TIMEOUT` overrides it, in seconds. 0 removes the limit
+entirely (every client is then passed no timeout, so a call waits forever),
+for anyone who needs it.
 """
 import os
 
