@@ -132,8 +132,9 @@ qikly --tasks my_module.py       # 3. the run                      a cent or so
    is, or change any answer you disagree with, with or without quotes. What
    the documentation cannot decide is left as a TODO: answer it with an
    option's number where qikly found values by running your code
-   (`1: <value>` for one that asks for a value, `keep` for what the code does
-   now), or a sentence that names a value. A TODO you leave is skipped.
+   (`1: <value>` for one that asks for a value; "doesn't matter" drops the
+   question; `N: <sentence>` is your own answer), or a sentence that names a
+   value. No option says which one the code does now. A TODO you leave is skipped.
    Without a key, every answer is yours to write, and the `requirements`
    line is marked `TODO: MODIFY THIS:`. On a folder it writes one task file
    for each module step 1 asked about. Lines starting `#?` are notes for you,

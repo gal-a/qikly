@@ -6,7 +6,32 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
-Nothing yet.
+### Changed
+- **Quick-pick options no longer say which one your code does now.** The
+  options are shuffled by the question, never sorted by their content, and
+  nothing marks the current behaviour. `keep` is no longer offered: in a new
+  file it is a problem that names the numbers to pick from. A task file
+  written by 0.6.4, with the "(as your code does now)" mark, still expands
+  `keep`.
+- **Every question ends with two reserved options.** "doesn't matter" drops
+  the item (typed out, `doesn't matter`, `don't care`, `either` and
+  `no preference` do the same); `--validate` counts it as decided and stops a
+  file where everything is "doesn't matter". "other" takes your own sentence
+  as `N: <sentence>`.
+- **No yes/no questions.** A dropped normalisation or a moved regex anchor is
+  asked as "How should...", with two neutral behaviour options built from the
+  change alone. The options survive the saved score, and a 0.6.4 score file
+  gets them from the kind of change.
+- The example task files under `docs/examples/` are regenerated in the new
+  format, and the answer guidance in the Skill (0.3.12, needs qikly 0.6.5)
+  and the docs describes the new answers.
+
+### Added
+- Python 3.13 and 3.14 are declared and tested (closes #8, suggested by
+  @Goldziher in discussion #7).
+
+### Fixed
+- The timeout docstring: only Google's SDK waits indefinitely by default.
 
 ## 0.6.4
 

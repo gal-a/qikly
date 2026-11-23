@@ -148,10 +148,12 @@ folder, and every step takes the same path:
 
    What the documentation cannot decide is left as a TODO. Answer it, with
    or without quotes, by an option's number where qikly lists them (`- 2`),
-   a number and your value (`- 1: 0.0`), `keep` for what your code does now,
-   or a sentence that names a value (`- apply_discount(100, 100) raises
-   ValueError`; quote one that has a colon in it), or leave it: a TODO is
-   skipped. Without a key every answer is yours, and the `requirements` line
+   a number and your value (`- 1: 0.0`), the number of "doesn't matter" to
+   drop the question (or write `doesn't matter`), `N: <sentence>` for the
+   "other" option, or a sentence that names a value (`- apply_discount(100,
+   100) raises ValueError`; quote one that has a colon in it), or leave it: a
+   TODO is skipped. The options are in no fixed order and none says which one
+   your code does now. Without a key every answer is yours, and the `requirements` line
    is marked `TODO: MODIFY THIS:`. Lines starting `#?` are notes for you, and
    no agent reads them. Then check it, free; it also shows each short
    answer as the criterion it becomes:
