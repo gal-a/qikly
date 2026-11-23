@@ -117,7 +117,7 @@ def test_only_the_questions_are_left_to_answer(scored):
     # Marked, so it is read before a run; still never a rule from the code.
     assert task["requirements"][0].startswith("TODO: MODIFY THIS: pricing.py ")
     criteria = task["acceptance_criteria"]
-    assert criteria and all(c.startswith("TODO: pick 1 or 2") for c in criteria), criteria
+    assert criteria and all(c.startswith("TODO: pick 1, 2, 3 or 4") for c in criteria), criteria
     assert task["seed"]["implementation"] == "pricing.py"
     data = (scored / "inputs_private" / "data" / "PRICING" / "input_01.csv").read_text()
     assert data.splitlines()[0] == "price,rate,code"
@@ -135,7 +135,7 @@ def test_each_question_says_what_the_code_does_beside_the_value(scored):
     raises = _pick(text, "apply_discount(100, 100)", "raises ValueError")
     assert (f"#?   {raises} = apply_discount(100, 100) raises ValueError   "
             f"(as rate 101 does now)") in text
-    assert '- "TODO: pick 1 or 2, or write your own"' in text
+    assert '- "TODO: pick 1, 2, 3 or 4, or write your own"' in text
     # Nothing marks what the code does now, and `keep` is never offered.
     assert "(as your code does now)" not in text
     assert ", keep, or write your own" not in text
@@ -449,7 +449,7 @@ def test_keep_in_a_new_file_names_the_numbers_to_pick(scored):
     path.write_text(_answer(path.read_text(encoding="utf-8"),
                             "label(' vip ')", "keep"), encoding="utf-8")
     errors, _ = check_task(str(path))
-    assert any("answers 'keep'" in e and "pick 1 or 2" in e for e in errors), errors
+    assert any("answers 'keep'" in e and "pick 1 or 2 or 3 or 4" in e for e in errors), errors
 
 
 def test_keep_still_expands_in_a_file_written_by_0_6_4():
@@ -473,12 +473,12 @@ def test_validate_shows_each_short_answer_and_stops_on_one_it_cannot_read(
     text = path.read_text(encoding="utf-8")
     raises = _pick(text, "apply_discount(100, 100)", "raises")
     text = _answer(text, "apply_discount(100, 100)", raises)
-    text = _answer(text, "apply_discount(100, 0)", "3")
+    text = _answer(text, "apply_discount(100, 0)", "5")
     text = _answer(text, "label('VIP')", "%s: gold" % _pick(text, "label('VIP')", "'gold'"))
     text = _answer(text, "label(' vip ')", "1")
     path.write_text(text, encoding="utf-8")
     errors, _ = check_task(str(path))
-    assert any("answers '3'" in e for e in errors), errors
+    assert any("answers '5'" in e for e in errors), errors
     assert any("takes no value" in e for e in errors), errors
     capsys.readouterr()
     cli._say_expanded(["PRICING_VERIFY"])
@@ -541,3 +541,33 @@ def test_running_the_code_beside_questions_stops_at_its_time_limit(scored, monke
                                           str(scored / "qikly-suite-score"))
     out = start.hinted(found, str(scored / "pricing.py"), str(scored), budget=0)
     assert out and all(q.get("unhinted") and not q.get("hint_prompt") for q in out)
+
+
+def test_validate_counts_doesnt_matter_as_decided_not_as_a_todo(scored):
+    from qikly.validate import check_task
+    cli._do_scaffold("pricing.py", None)
+    path = scored / TASK
+    text = path.read_text(encoding="utf-8")
+    calls = re.findall(r"What should (.+?) do\?", text)
+    # One behaviour picked, every other question "doesn't matter".
+    text = _answer(text, calls[0], _pick(text, calls[0], "raises"))
+    for call in calls[1:]:
+        text = _answer(text, call, "doesn't matter")
+    path.write_text(text, encoding="utf-8")
+    errors, warnings = check_task(str(path))
+    assert errors == [], errors
+    said = " ".join(str(w) for w in warnings)
+    assert f"{len(calls) - 1} questions answered \"doesn't matter\"" in said, said
+    assert "still left as TODO" not in said
+
+
+def test_validate_stops_a_file_where_everything_doesnt_matter(scored):
+    from qikly.validate import check_task
+    cli._do_scaffold("pricing.py", None)
+    path = scored / TASK
+    text = path.read_text(encoding="utf-8")
+    for call in re.findall(r"What should (.+?) do\?", text):
+        text = _answer(text, call, "either")
+    path.write_text(text, encoding="utf-8")
+    errors, _ = check_task(str(path))
+    assert any("every question is answered \"doesn't matter\"" in e for e in errors), errors

@@ -389,6 +389,18 @@ _UNPRINTABLE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f\ud800-\
 
 # Where an option's criterion needs the person's value: "1: 0.0".
 VALUE = "VALUE"
+# The two options every question ends with, after its behaviours. Picking
+# DOESNT_MATTER records that nothing should be tested there: the item is
+# dropped before either agent reads the file, and --validate counts it as
+# decided, not as a TODO. OTHER takes the person's own sentence, `4: <it>`.
+# Neither is a behaviour, so neither says or implies what the code does.
+DOESNT_MATTER = "doesn't matter, so no test for this"
+OTHER = "other: write  N: <your sentence>, or just the sentence"
+_RESERVED = (DOESNT_MATTER, OTHER)
+# Typed instead of the number, these mean "doesn't matter" too.
+_DOESNT_MATTER_WORDS = re.compile(
+    r"(?i)(?:it\s+)?(?:doesn'?t|does\s+not|don'?t|do\s+not)\s+(?:matter|care)"
+    r"|either|no\s+preference")
 _OPTION = re.compile(r"^[ \t]*#\?[ \t]+(\d+) = (.+?)(?:   \((.*)\))?[ \t]*$")
 _ITEM = re.compile(r"^([ \t]+)-([ \t]+)(.*?)[ \t]*$")
 # An option number with something around it: `1)`, `(1)`, `1.`, `#1`,
@@ -444,9 +456,12 @@ def expand_answers(text):
     pick instead. Quotes are
     optional for a short answer. A sentence of the person's own is left as
     written: with a colon and a space in it, YAML reads it as a mapping, so
-    such a sentence needs its quotes, as any YAML string does. `expanded` holds
-    (answer, criterion) pairs; an answer that names no option is turned
-    into a TODO, which a run skips, and said in `problems`.
+    such a sentence needs its quotes, as any YAML string does. Every question
+    ends with two reserved options: "doesn't matter" (or those words typed)
+    removes the item, so no test is written for it, and "other" takes the
+    person's sentence as `N: <sentence>`. `expanded` holds (answer, criterion)
+    pairs, the criterion None for "doesn't matter"; an answer that names no
+    option is turned into a TODO, which a run skips, and said in `problems`.
     """
     lines = (text or "").split("\n")
     start = next((i for i, l in enumerate(lines)
@@ -504,7 +519,12 @@ def expand_answers(text):
         short = value.strip()
         if len(short) > 1 and short[0] in _SMART and short[-1] in _SMART:
             short = short[1:-1].strip()
-        criterion, problem = None, None
+        criterion, problem, decided = None, None, False
+        # "doesn't matter" typed in words, under any question qikly asked.
+        if (mine or asked_here) and _DOESNT_MATTER_WORDS.fullmatch(short.rstrip(".!")):
+            expanded.append((short, None))
+            lines[i] = None
+            continue
         # Only under a question qikly numbered: anywhere else a line such as
         # `- 3: text` or `- id: 7` is the person's own YAML, a criterion
         # written as a mapping, and is left exactly as it is.
@@ -530,6 +550,19 @@ def expand_answers(text):
             problem = (f"criterion {number} answers {short!r}, but that question "
                        f"has no numbered options: write the answer as a sentence "
                        f"that names a value, such as  MAX_RATE is 100")
+        elif pick and mine.get(pick.group(1)) == DOESNT_MATTER:
+            if pick.group(2):
+                problem = (f"criterion {number}: option {pick.group(1)} (doesn't "
+                           f"matter) takes no value, so write just  {pick.group(1)}")
+            else:
+                decided = True
+        elif pick and mine.get(pick.group(1)) == OTHER:
+            if pick.group(2) and pick.group(2).strip():
+                criterion = pick.group(2).strip()
+            else:
+                problem = (f"criterion {number}: option {pick.group(1)} is your own "
+                           f"answer, so write it as  {pick.group(1)}: <your sentence>, "
+                           f"or just the sentence")
         elif pick:
             option = mine.get(pick.group(1))
             if option is None:
@@ -602,7 +635,10 @@ def expand_answers(text):
             # `first`, `keep it`, `n/a`, `raises ValueError`: none is an
             # answer this question takes, and none is a criterion on its own,
             # since the question is removed before the tests are written.
-            example = mine[_listed(mine).split(", ")[0]].replace(VALUE, "0")
+            behaviours = [mine[n] for n in _listed(mine).split(", ")
+                          if mine[n] not in _RESERVED]
+            example = (behaviours[0].replace(VALUE, "0") if behaviours
+                       else "MAX_RATE is 100")
             problem = (f"criterion {number} is {short!r}, which this question does "
                        f"not take as an answer. Write an option number "
                        f"({_listed(mine, ' or ')}), or a whole sentence "
@@ -610,12 +646,17 @@ def expand_answers(text):
         if problem:
             problems.append(problem)
             lines[i] = prefix + _quote(f"TODO: {short} could not be read: {problem}")
+        elif decided:
+            # Nothing to test here, by the person's choice: gone before either
+            # agent reads the file, and counted by --validate as decided.
+            expanded.append((short, None))
+            lines[i] = None
         elif criterion:
             expanded.append((short, criterion))
             lines[i] = prefix + _quote(criterion)
     if options:
         problems.append(_unanswered(options))
-    return "\n".join(lines), expanded, problems
+    return "\n".join(l for l in lines if l is not None), expanded, problems
 
 
 _PICK_WORDS = {"option", "opt", "answer", "pick", "choice", "keep", "yes", "no", "number"}
@@ -772,6 +813,19 @@ def _comment(text, width=78):
                           break_on_hyphens=False)] or ["  " + MARK]
 
 
+def _reserved(first):
+    """The option lines every question ends with, numbered from `first`:
+    "doesn't matter" and "other". Read back by `expand_answers`."""
+    return ["  %s   %d = %s" % (MARK, first + i, text) for i, text in enumerate(_RESERVED)]
+
+
+def _pick_line(count):
+    """The answer line under a question with `count` numbered options."""
+    numbers = [str(n) for n in range(1, count + 1)]
+    listed = ", ".join(numbers[:-1]) + " or " + numbers[-1] if count > 1 else numbers[0]
+    return f'  - "TODO: pick {listed}, or write your own"'
+
+
 def yaml_block(questions, written=None):
     """
     The `acceptance_criteria` block `--scaffold` writes when there are questions.
@@ -828,18 +882,20 @@ def yaml_block(questions, written=None):
                 # On a line of its own, never wrapped: it is read back.
                 lines.append("  %s   %d = %s" % (MARK, n, exact_text(option["criterion"]))
                              + (f"   ({_printable(note)})" if note else ""))
+            lines += _reserved(len(options) + 1)
             if q.get("covers"):
                 lines += _comment(f"(This also answers {q['covers']} more "
                                   f"place{'s' if q['covers'] > 1 else ''} your "
                                   f"tests leave open on the same call.)")
-            numbers = " or ".join(str(n) for n in range(1, len(options) + 1))
             # No `keep`: it picked the option marked as what the code does
             # now, and a mark reads as the answer. 0.6.4 files still expand it.
-            lines.append(f'  - "TODO: pick {numbers}, or write your own"'
-                         if options else _ANSWER)
+            lines.append(_pick_line(len(options) + len(_RESERVED)))
         else:
             lines += _comment(q["question"])
-            lines.append(_ANSWER)
+            lines += _comment("To answer with a number, replace the answer line below "
+                              "with one of these:")
+            lines += _reserved(1)
+            lines.append(_pick_line(len(_RESERVED)))
         lines.append("")
     return "\n".join(lines).rstrip("\n") + "\n"
 

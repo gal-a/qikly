@@ -2241,7 +2241,10 @@ def _say_expanded(task_ids):
         if expanded:
             print(f"{task_id}: your short answers, as the test agent gets them:")
             for answer, criterion in expanded:
-                print(f"  {answer:<6} ->  {criterion}")
+                # None: answered "doesn't matter", so nothing goes to the agent.
+                print(f"  {answer:<6} ->  "
+                      + (criterion if criterion is not None
+                         else "(doesn't matter: no test for this)"))
             print()
 
 

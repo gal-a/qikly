@@ -310,7 +310,10 @@ def check_task(path):
         # Read as both agents read it: a short answer, `2` or `keep`, as the
         # criterion it stands for, and one written without quotes as text.
         written = raw
-        raw, _, unread = expand_answers(raw)
+        raw, expanded, unread = expand_answers(raw)
+        # Answered "doesn't matter": decided, so gone from the criteria, and
+        # never counted as a TODO left or as a missing bar.
+        decided = sum(1 for _, criterion in expanded if criterion is None)
         task = yaml.safe_load(raw)
     except OSError as exc:
         return [f"{name}: cannot be read: {exc}"], []
@@ -343,7 +346,11 @@ def check_task(path):
         errors.append(f"{name}: task_id is {declared!r} but the file is {stem!r}")
 
     criteria = task.get("acceptance_criteria")
-    if criteria is None:
+    if criteria is None and decided:
+        errors.append(f"{name}: every question is answered \"doesn't matter\", so "
+                      f"a run would have nothing to test against. Pick a behaviour "
+                      f"for at least one")
+    elif criteria is None:
         warnings.append(f"{name}: no acceptance_criteria, so a run has no bar "
                         f"to hold the code to. Add some, import them with "
                         f"--criteria-from, or draft them with --generate-criteria")
@@ -430,6 +437,11 @@ def check_task(path):
             f"{name}: {len(all_criteria) - skipped} of its "
             f"{len(all_criteria)} acceptance criteria are answered; a run skips "
             f"the {skipped} still left as TODO", group=("skipped-todo", name)))
+    if decided and all_criteria:
+        warnings.append(Note(
+            f"{name}: {decided} question{'s' if decided != 1 else ''} answered "
+            f"\"doesn't matter\": no test is written for "
+            f"{'them' if decided != 1 else 'it'}", group=("doesnt-matter", name)))
 
     for relative in (task.get("inputs") or []):
         if not _input_exists(relative):

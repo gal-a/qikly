@@ -191,8 +191,10 @@ def _questions(tmp_path, source=MODULE):
 def test_the_block_is_valid_yaml_with_one_todo_per_question(tmp_path):
     questions = _questions(tmp_path)
     data = yaml.safe_load(sq.yaml_block(questions, "2026-10-13 10:00"))
+    # Every question, with options or without, ends with "doesn't matter"
+    # and "other", so the answer line always offers numbers.
     assert data["acceptance_criteria"] == [
-        "TODO: your answer to the question above"] * len(questions)
+        "TODO: pick 1 or 2, or write your own"] * len(questions)
 
 
 @pytest.mark.parametrize("code", [
@@ -211,7 +213,7 @@ def test_no_line_of_code_can_become_a_criterion_or_break_the_file(code):
     q = {"file": "m.py", "path": "/x/m.py", "line": 1, "function": "f",
          "code": code, "question": sq.ask("guard disabled")}
     data = yaml.safe_load("task_id: X\n" + sq.yaml_block([q]))
-    assert data["acceptance_criteria"] == ["TODO: your answer to the question above"]
+    assert data["acceptance_criteria"] == ["TODO: pick 1 or 2, or write your own"]
 
 
 def _scaffold_text(tmp_path):
@@ -505,3 +507,50 @@ def test_validate_says_how_many_answers_are_left(tmp_path):
     checked = _run(["--validate", "--tasks", "PRICING_VERIFY"], str(project))
     out = checked.stdout + checked.stderr
     assert "acceptance criteria are answered; a run skips the" in out, out
+
+
+# ------------------------------------- "doesn't matter" and "other" --
+
+_RESERVED_FILE = (
+    "task_id: T\n"
+    "acceptance_criteria:\n"
+    "  #? What should f(1) do?\n"
+    "  #?   1 = f(1) returns 2\n"
+    "  #?   2 = f(1) raises ValueError\n"
+    "  #?   3 = " + sq.DOESNT_MATTER + "\n"
+    "  #?   4 = " + sq.OTHER + "\n"
+    "  - ANSWER\n")
+
+
+@pytest.mark.parametrize("answer", ["3", '"3"', "doesn't matter", "Doesn't matter.",
+                                    "don't care", "either", "no preference"])
+def test_doesnt_matter_drops_the_item_and_is_never_a_criterion(answer):
+    text, expanded, problems = sq.expand_answers(_RESERVED_FILE.replace("ANSWER", answer))
+    assert problems == []
+    assert expanded == [(answer.strip('"'), None)]
+    assert yaml.safe_load(text)["acceptance_criteria"] is None
+    # Nothing of the question reaches either agent either.
+    assert sq.drop_question_lines(_RESERVED_FILE.replace("ANSWER", answer)).count("f(1)") == 0
+
+
+def test_other_takes_the_persons_sentence():
+    text, expanded, problems = sq.expand_answers(
+        _RESERVED_FILE.replace("ANSWER", '"4: f(1) returns 3 when the cache is warm"'))
+    assert problems == []
+    assert yaml.safe_load(text)["acceptance_criteria"] == ["f(1) returns 3 when the cache is warm"]
+
+
+@pytest.mark.parametrize("answer, said", [("4", "write it as  4: <your sentence>"),
+                                          ("3: x", "takes no value")])
+def test_a_reserved_option_used_wrongly_says_how_to_fix_it(answer, said):
+    _, expanded, problems = sq.expand_answers(_RESERVED_FILE.replace("ANSWER", answer))
+    assert expanded == []
+    assert len(problems) == 1 and said in problems[0], problems
+
+
+def test_every_question_in_a_new_file_ends_with_doesnt_matter_and_other(tmp_path):
+    block = sq.yaml_block(_questions(tmp_path))
+    assert block.count(sq.DOESNT_MATTER) == block.count(sq.OTHER) >= 1
+    for chunk in block.split("  - \"TODO:")[:-1]:
+        tail = chunk.rstrip().splitlines()[-2:]
+        assert sq.DOESNT_MATTER in tail[0] and sq.OTHER in tail[1], tail
