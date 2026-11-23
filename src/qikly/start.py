@@ -755,8 +755,9 @@ def _numbered(option):
     label = option.get("label") or ""
     note = ("as " + label.split(", as ", 1)[1]) if ", as " in label else ""
     note = note.split("; you will type")[0]
-    return {"criterion": criterion, "note": note,
-            "now": label.endswith("as your code does now")}
+    # No option is marked as what the code does now: a mark, like a fixed
+    # position, reads as the answer. (0.6.4 marked one, and offered `keep`.)
+    return {"criterion": criterion, "note": note, "now": False}
 
 
 # Seconds --scaffold spends running the code beside its questions. On
@@ -812,12 +813,17 @@ def hinted(questions, module, cwd, budget=HINT_BUDGET):
             if mark in by_mark:
                 by_mark[mark]["covers"] = by_mark[mark].get("covers", 0) + 1
                 continue
-            # In an order fixed by the values, not "as your code does now"
-            # first, which reads as the answer. Each with the criterion its
-            # number becomes, so a person can answer with the number.
+            # In an order shuffled by the question, never sorted by content:
+            # sorting by the options' text put a raise first, so for a check
+            # switched off or an error never raised the code's own behaviour
+            # was always option 1, which reads as the answer. Sorted first
+            # only so the shuffle starts from the same order every run. Each
+            # with the criterion its number becomes, so a person can answer
+            # with the number.
+            ordered = sorted(behaviours,
+                             key=lambda o: json.dumps(o.get("pins"), sort_keys=True))
             q.update(hint_prompt=prompt,
-                     hint_options=[_numbered(o) for o in sorted(
-                         behaviours, key=lambda o: json.dumps(o.get("pins"), sort_keys=True))])
+                     hint_options=[_numbered(o) for o in so._shuffled(ordered, mark)])
             by_mark[mark] = q
         out.append(q)
     return out

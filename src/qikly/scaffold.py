@@ -121,7 +121,6 @@ requirements:
 # the quotes:
 #   - 2              pick an option numbered above it
 #   - 1: 0.0         an option that asks for a value, and the value
-#   - keep           what your code does now is right
 #   - example_fn(0) returns 1.5      or write your own, naming a value
 # `qikly --validate` shows each short answer as the criterion it becomes.
 # A TODO you leave is skipped. The question lines above each TODO are notes

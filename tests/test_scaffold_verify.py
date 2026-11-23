@@ -92,6 +92,18 @@ def _answer(text, call, answer):
     return text[:todo.start()] + "  - " + answer + text[todo.end():]
 
 
+def _pick(text, call, words):
+    """The number of the option under "What should <call> do?" that says
+    `words`. Options are shuffled by the question, never in a fixed order, so
+    a test finds the behaviour it wants rather than assuming its position."""
+    at = text.index(f"What should {call} do?")
+    end = re.compile(r'^  - "TODO: [^"]*"$', re.M).search(text, at).start()
+    found = [m.group(1) for m in re.finditer(r"^  #\?   (\d+) = (.*)$", text[at:end], re.M)
+             if words in m.group(2)]
+    assert len(found) == 1, (call, words, text[at:end])
+    return found[0]
+
+
 def _task(root):
     return (root / TASK).read_text(encoding="utf-8")
 
@@ -120,8 +132,13 @@ def test_each_question_says_what_the_code_does_beside_the_value(scored):
     assert "today rate 99 returns 1.0" in text
     # Never at the value itself: that is the question.
     assert "as rate 100 does now" not in text
-    assert "#?   2 = apply_discount(100, 100) raises ValueError   (as rate 101 does now)" in text
+    raises = _pick(text, "apply_discount(100, 100)", "raises ValueError")
+    assert (f"#?   {raises} = apply_discount(100, 100) raises ValueError   "
+            f"(as rate 101 does now)") in text
     assert '- "TODO: pick 1 or 2, or write your own"' in text
+    # Nothing marks what the code does now, and `keep` is never offered.
+    assert "(as your code does now)" not in text
+    assert ", keep, or write your own" not in text
 
 
 def test_no_agent_reads_the_notes(scored):
@@ -393,17 +410,21 @@ def test_the_requirements_mark_never_reaches_an_agent(scored):
 
 # ----------------------------------------------- answering with a number --
 
-def test_a_number_a_value_and_keep_become_criteria_with_or_without_quotes(scored):
+def test_a_number_and_a_value_become_criteria_with_or_without_quotes(scored):
     from qikly.agent_api.agent_interface import read_acceptance_criteria
     cli._do_scaffold("pricing.py", None)
     path = scored / TASK
     text = path.read_text(encoding="utf-8")
-    for call, answer in (("apply_discount(100, 0)", "1: 100.0"),
-                         ("apply_discount(100, -11)", "keep"),
-                         ("apply_discount(100, 100)", '"2"'),
-                         ("apply_discount(100, 10.333)", "'keep'"),
-                         ("label(' vip ')", "1"),
-                         ("label('VIP')", "label('VIP') returns 'gold' always")):
+    value = _pick(text, "apply_discount(100, 0)", "returns VALUE")
+    for call, answer in (
+            ("apply_discount(100, 0)", f"{value}: 100.0"),
+            ("apply_discount(100, -11)", _pick(text, "apply_discount(100, -11)", "raises")),
+            ("apply_discount(100, 100)",
+             '"%s"' % _pick(text, "apply_discount(100, 100)", "raises")),
+            ("apply_discount(100, 10.333)",
+             "'%s'" % _pick(text, "apply_discount(100, 10.333)", "returns 89.67")),
+            ("label(' vip ')", _pick(text, "label(' vip ')", "'gold'")),
+            ("label('VIP')", "label('VIP') returns 'gold' always")):
         text = _answer(text, call, answer)
     path.write_text(text, encoding="utf-8")
     assert read_acceptance_criteria("PRICING_VERIFY") == [
@@ -415,7 +436,33 @@ def test_a_number_a_value_and_keep_become_criteria_with_or_without_quotes(scored
         "label('VIP') returns 'gold' always",
     ]
     # The file keeps what was typed.
-    assert "  - 1: 100.0\n" in path.read_text(encoding="utf-8")
+    assert f"  - {value}: 100.0\n" in path.read_text(encoding="utf-8")
+
+
+def test_keep_in_a_new_file_names_the_numbers_to_pick(scored):
+    """A new file marks no option as what the code does now, so `keep` has
+    nothing to pick: it is a problem that says which numbers to choose from,
+    never a silent pick of the code's own behaviour."""
+    from qikly.validate import check_task
+    cli._do_scaffold("pricing.py", None)
+    path = scored / TASK
+    path.write_text(_answer(path.read_text(encoding="utf-8"),
+                            "label(' vip ')", "keep"), encoding="utf-8")
+    errors, _ = check_task(str(path))
+    assert any("answers 'keep'" in e and "pick 1 or 2" in e for e in errors), errors
+
+
+def test_keep_still_expands_in_a_file_written_by_0_6_4():
+    """0.6.4 marked one option "(as your code does now)" and offered `keep`
+    for it. A file it wrote, already answered with `keep`, still works."""
+    text = ("acceptance_criteria:\n"
+            "  #? What should label(' vip ') do?\n"
+            "  #?   1 = label(' vip ') returns 'gold'   (as your code does now)\n"
+            "  #?   2 = label(' vip ') returns 'standard'\n"
+            "  - keep\n")
+    _, expanded, problems = score_questions.expand_answers(text)
+    assert problems == []
+    assert expanded == [("keep", "label(' vip ') returns 'gold'")]
 
 
 def test_validate_shows_each_short_answer_and_stops_on_one_it_cannot_read(
@@ -424,9 +471,10 @@ def test_validate_shows_each_short_answer_and_stops_on_one_it_cannot_read(
     cli._do_scaffold("pricing.py", None)
     path = scored / TASK
     text = path.read_text(encoding="utf-8")
-    text = _answer(text, "apply_discount(100, 100)", "2")
+    raises = _pick(text, "apply_discount(100, 100)", "raises")
+    text = _answer(text, "apply_discount(100, 100)", raises)
     text = _answer(text, "apply_discount(100, 0)", "3")
-    text = _answer(text, "label('VIP')", "2: gold")
+    text = _answer(text, "label('VIP')", "%s: gold" % _pick(text, "label('VIP')", "'gold'"))
     text = _answer(text, "label(' vip ')", "1")
     path.write_text(text, encoding="utf-8")
     errors, _ = check_task(str(path))
@@ -435,7 +483,7 @@ def test_validate_shows_each_short_answer_and_stops_on_one_it_cannot_read(
     capsys.readouterr()
     cli._say_expanded(["PRICING_VERIFY"])
     out = capsys.readouterr().out
-    assert "2      ->  apply_discount(100, 100) raises ValueError" in out
+    assert f"{raises}      ->  apply_discount(100, 100) raises ValueError" in out
 
 
 def test_keep_is_refused_where_no_option_is_what_the_code_does_now(scored):

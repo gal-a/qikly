@@ -139,7 +139,7 @@ def test_where_the_input_cannot_be_known_only_skip_and_own_are_offered(tmp_path,
                                              "type my own answer"]
 
 
-def test_a_difference_is_offered_with_the_current_one_labelled(tmp_path):
+def test_a_difference_is_offered_with_neither_one_marked_as_current(tmp_path):
     from qikly.mutation import make_mutant
     from qikly import mutation_score as ms
     q = _question(tmp_path, edge=None, line=8, function="label",
@@ -149,7 +149,40 @@ def test_a_difference_is_offered_with_the_current_one_labelled(tmp_path):
     prompt, options = so.menu(q, PRICING, [TESTS], str(tmp_path), mutant)
     assert prompt.startswith("What should label(")
     labels = [o["label"] for o in options[:2]]
-    assert sum("as your code does now" in l for l in labels) == 1
+    # Both behaviours are offered, and nothing says which is the code's own:
+    # a mark reads as the answer.
+    assert len(set(labels)) == 2
+    assert not any("does now" in l for l in labels), labels
+
+
+def test_the_codes_own_behaviour_is_not_always_option_1(monkeypatch):
+    """
+    0.6.4 sorted the options by their text, so a raise always came first, and
+    for a check switched off the code's own behaviour (the raise) was always
+    option 1, which reads as the answer. Across many questions, the code's
+    own behaviour lands in both positions.
+    """
+    monkeypatch.setattr(start, "auto_tests", lambda module, cwd: [])
+    monkeypatch.setattr(start, "project_root", lambda module, cwd: ".")
+    monkeypatch.setattr(start, "_read", lambda module: "")
+    monkeypatch.setattr(start, "enrich", lambda qs, missed: qs)
+    monkeypatch.setattr(start, "group", lambda qs: qs)
+
+    def menu(q, source, tests, root, mutant):
+        call = f"f({q['line']})"
+        return (f"What should {call} do?",
+                [{"kind": so.BEHAVIOUR, "call": call, "pins": {"raises": "ValueError"},
+                  "label": "raise ValueError"},
+                 {"kind": so.BEHAVIOUR, "call": call, "pins": {"returns": 1},
+                  "label": "return 1"}])
+    monkeypatch.setattr(so, "menu", menu)
+    questions = [{"path": "m.py", "line": n} for n in range(40)]
+    firsts = [q["hint_options"][0]["criterion"] for q in start.hinted(questions, "m.py", ".")]
+    assert len(firsts) == 40
+    assert 5 < sum("raises" in c for c in firsts) < 35, firsts
+    # The same question always gets the same order, so a rerun is stable.
+    again = [q["hint_options"][0]["criterion"] for q in start.hinted(questions, "m.py", ".")]
+    assert again == firsts
 
 
 # ------------------------------------------------------- what is written --

@@ -438,8 +438,10 @@ def expand_answers(text):
     (text, expanded, problems): the task file with each short answer under
     acceptance_criteria written out as the criterion it stands for, as both
     agents and --validate read it. A short answer is an option's number,
-    `2`; a number and a value, `1: 0.0`, for an option that asks for one;
-    or `keep`, for the option that is what the code does now. Quotes are
+    `2`; or a number and a value, `1: 0.0`, for an option that asks for one.
+    `keep` picks the option a 0.6.4 file marked "(as your code does now)";
+    a new file marks none, so there it is a problem that names the numbers to
+    pick instead. Quotes are
     optional for a short answer. A sentence of the person's own is left as
     written: with a colon and a space in it, YAML reads it as a mapping, so
     such a sentence needs its quotes, as any YAML string does. `expanded` holds
@@ -573,10 +575,12 @@ def expand_answers(text):
                            f"are {_listed(mine)}")
         elif short.lower() == "keep" and (mine or not quoted):
             if mine_now is None:
-                problem = (f"criterion {number} answers 'keep', which picks the "
-                           f"option marked (as your code does now), and this "
-                           f"question has none: "
-                           + (f"pick {_listed(mine, ' or ')}, or write the answer"
+                # Only a 0.6.4 file marks an option as what the code does now;
+                # a new one never does, so `keep` has nothing to pick.
+                problem = (f"criterion {number} answers 'keep', but no option is "
+                           f"marked as what the code does now: "
+                           + (f"pick {_listed(mine, ' or ')}, the option that says "
+                              f"what it should do, or write the answer"
                               if mine else "write the answer as a sentence"))
             else:
                 criterion = mine[mine_now]
@@ -601,7 +605,7 @@ def expand_answers(text):
             example = mine[_listed(mine).split(", ")[0]].replace(VALUE, "0")
             problem = (f"criterion {number} is {short!r}, which this question does "
                        f"not take as an answer. Write an option number "
-                       f"({_listed(mine, ' or ')}), keep, or a whole sentence "
+                       f"({_listed(mine, ' or ')}), or a whole sentence "
                        f"that stands on its own, such as  - {_quote(example)}")
         if problem:
             problems.append(problem)
@@ -811,7 +815,6 @@ def yaml_block(questions, written=None):
             lines += _comment("To answer with a number, replace the answer line below "
                               "with one of these:")
             options = q.get("hint_options") or []
-            now = None
             for n, option in enumerate(options, 1):
                 if isinstance(option, str):
                     option = {"criterion": option, "note": "", "now": False}
@@ -825,15 +828,15 @@ def yaml_block(questions, written=None):
                 # On a line of its own, never wrapped: it is read back.
                 lines.append("  %s   %d = %s" % (MARK, n, exact_text(option["criterion"]))
                              + (f"   ({_printable(note)})" if note else ""))
-                if option.get("now"):
-                    now = n
             if q.get("covers"):
                 lines += _comment(f"(This also answers {q['covers']} more "
                                   f"place{'s' if q['covers'] > 1 else ''} your "
                                   f"tests leave open on the same call.)")
             numbers = " or ".join(str(n) for n in range(1, len(options) + 1))
-            lines.append(f'  - "TODO: pick {numbers}' + (", keep" if now else "")
-                         + ', or write your own"' if options else _ANSWER)
+            # No `keep`: it picked the option marked as what the code does
+            # now, and a mark reads as the answer. 0.6.4 files still expand it.
+            lines.append(f'  - "TODO: pick {numbers}, or write your own"'
+                         if options else _ANSWER)
         else:
             lines += _comment(q["question"])
             lines.append(_ANSWER)
