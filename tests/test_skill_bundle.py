@@ -270,6 +270,9 @@ SKILL_BODY_HASHES = {
     # 0.3.11: the spec agent drafts answers from the docs folder and
     # top-level guides too, not the README and docstrings alone.
     "0.3.11": "d4b7b955ac1a75b04aa45e77155fe4fb4f49fef5b8941371fb77aab0dc908a7e",
+    # 0.3.12: answers are an option number, N: <value>, "doesn't matter" or
+    # N: <sentence>; options never say which one the code does now.
+    "0.3.12": "9c46914677253e449286505eb8aa022bf459706919a8a7534c1e7faf5781df99",
 }
 
 

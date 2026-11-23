@@ -5,8 +5,8 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.3.11
-  requires: qikly >= 0.6.1
+  version: 0.3.12
+  requires: qikly >= 0.6.5
 ---
 
 # qikly: tests written from a spec the coder never read
@@ -70,8 +70,10 @@ The path is three commands, each taking the same module or folder:
   an answer read off the code agrees with it by construction. What the draft
   leaves as a TODO is theirs: put the question and any numbered options
   under it to them **word for word**, and write what they answer, the
-  option's number, `1: <value>`, `keep`, or their own sentence naming a
-  value. A TODO left in place is skipped. Without a key every answer is a
+  option's number, `1: <value>`, the number of "doesn't matter" (or the
+  words, which skip that question), `N: <their sentence>` for "other", or
+  their own sentence naming a value. The options never say which one the
+  code does now, so do not tell them. A TODO left in place is skipped. Without a key every answer is a
   TODO and `requirements` is marked `TODO: MODIFY THIS:`; replace it only
   with their words. `qikly --validate my_module.py` checks it, free.
 - **`qikly --tasks my_module.py`** runs it, which needs their key. It ends by
