@@ -19,6 +19,7 @@ which the cut removes whole, and a test here holds that.
 A question that does not say where. `if rate < 0 or rate > 100:` holds two
 comparisons, and the questions name the expression rather than the operator.
 """
+import re
 import os
 import subprocess
 import sys
@@ -554,3 +555,52 @@ def test_every_question_in_a_new_file_ends_with_doesnt_matter_and_other(tmp_path
     for chunk in block.split("  - \"TODO:")[:-1]:
         tail = chunk.rstrip().splitlines()[-2:]
         assert sq.DOESNT_MATTER in tail[0] and sq.OTHER in tail[1], tail
+
+
+# ------------------------------------------------ no yes/no questions --
+
+@pytest.mark.parametrize("kind", ["regex anchors stripped", ".strip() dropped",
+                                  ".lower() dropped", "guard disabled", "raise swallowed",
+                                  "bool True -> False", "int 2 -> 3", "< became <=",
+                                  "and became or", "== became !="])
+def test_no_question_is_a_yes_no_question(kind):
+    """A yes/no stem puts one answer in the question. Every stem asks what,
+    which or how."""
+    question = sq.ask(kind)
+    assert not re.search(r"\b(Should|Is|Does|Do|Can|Would)\b[^.?]*\?\s*$", question), question
+
+
+@pytest.mark.parametrize("kind, words", [
+    ("regex anchors stripped", ("as valid", "as invalid")),
+    (".rstrip() dropped", ("as the same", "as different")),
+    (".lower() dropped", ("as the same", "as different")),
+])
+def test_a_change_with_two_honest_answers_gets_both_as_options(kind, words):
+    options = sq.neutral_options(kind, "parse")
+    assert len(options) == 2
+    assert {w for w in words for o in options if o.endswith(w)} == set(words)
+    assert all(o.startswith("`parse`") for o in options)
+    assert not any("does now" in o for o in options)
+
+
+def test_neutral_options_come_in_both_orders_across_questions():
+    firsts = {sq.neutral_options(".strip() dropped", f"f{n}")[0].endswith("as the same")
+              for n in range(30)}
+    assert firsts == {True, False}
+
+
+@pytest.mark.parametrize("kind", ["guard disabled", "raise swallowed", "int 2 -> 3"])
+def test_other_kinds_get_no_made_up_options(kind):
+    assert sq.neutral_options(kind, "f") == []
+
+
+def test_a_neutral_option_becomes_the_criterion_it_states():
+    q = {"file": "m.py", "path": "/x/m.py", "line": 3, "function": "label",
+         "question": sq.ask(".strip() dropped"),
+         "options": sq.neutral_options(".strip() dropped", "label")}
+    block = sq.yaml_block([q])
+    assert "#?   3 = " + sq.DOESNT_MATTER in block and "#?   4 = " + sq.OTHER in block
+    assert '- "TODO: pick 1, 2, 3 or 4, or write your own"' in block
+    text = ("task_id: T\n" + block).replace('"TODO: pick 1, 2, 3 or 4, or write your own"', "1")
+    _, expanded, problems = sq.expand_answers(text)
+    assert problems == [] and expanded == [("1", q["options"][0])]

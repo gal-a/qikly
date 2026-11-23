@@ -35,8 +35,10 @@ scenario, so the code became a criterion.
 """
 import ast
 import glob
+import hashlib
 import json
 import os
+import random
 import re
 from datetime import datetime
 
@@ -136,20 +138,51 @@ def ask(kind, source=None, line=None):
     if kind == "guard disabled":
         return ("Your tests pass with this check switched off. Which input, "
                 "if any, should it catch, and what should happen to it?")
+    # Never a yes/no stem: "Should X be accepted?" puts one answer in the
+    # question. These ask how, and neutral_options() states both behaviours.
     if kind == "regex anchors stripped":
         return ("Your tests pass when this pattern matches only part of a "
-                "value. Should a value with extra characters before or after "
-                "a valid one be accepted?")
+                "value. How should a value with extra characters before or "
+                "after a valid one be treated?")
     dropped = _DROPPED.match(kind)
     if dropped:
         how = _NORMALISED.get(dropped.group(1), "only in that normalisation")
-        return (f"Your tests pass without `.{dropped.group(1)}()` here. Should "
-                f"two inputs that differ {how} be treated the same?")
+        return (f"Your tests pass without `.{dropped.group(1)}()` here. How "
+                f"should two inputs that differ {how} be handled?")
     if kind == "raise swallowed":
         return ("Your tests pass when this error is never raised. Which input, "
                 "if any, should raise it?")
     return (f"Your tests pass with this change: {kind}. What should this line "
             f"guarantee?")
+
+
+def neutral_options(kind, function=None):
+    """
+    Two behaviours to pick from for a planted change whose question has two
+    honest answers, worked out from the change alone (no code is run): a
+    dropped normalisation and stripped regex anchors. Each is a statement the
+    test writer can turn into a test, neither says which one the code does,
+    and they come in an order set by the question, not by which is current.
+    Every other kind gets none, and its question keeps only "doesn't matter"
+    and "other" plus the person's own sentence.
+    """
+    where = f"`{function}`" if function else "this code"
+    pair = None
+    if kind == "regex anchors stripped":
+        pair = [f"{where} treats a value with extra characters before or after "
+                f"a valid one as valid",
+                f"{where} treats a value with extra characters before or after "
+                f"a valid one as invalid"]
+    dropped = _DROPPED.match(kind or "")
+    if dropped and dropped.group(1) in _NORMALISED:
+        how = _NORMALISED[dropped.group(1)]
+        pair = [f"{where} treats two inputs that differ {how} as the same",
+                f"{where} treats two inputs that differ {how} as different"]
+    if not pair:
+        return []
+    seed = int(hashlib.sha256(f"{kind}|{function}".encode("utf-8")).hexdigest()[:8], 16)
+    random.Random(seed).shuffle(pair)
+    return pair
 
 
 def _enclosing(source, line):
@@ -234,7 +267,8 @@ def build(missed):
         seen.add(key)
         out.append({"file": label, "path": path, "line": line,
                     "function": function, "code": code, "question": question,
-                    "edge": edge, "number": number, "change": item.get("change")})
+                    "edge": edge, "number": number, "change": item.get("change"),
+                    "options": neutral_options(kind, function)})
     asked_edges = {(q["path"], q["line"], q["edge"]) for q in out if q["edge"]}
     out = [q for q in out
            if not (q["number"] and (q["path"], q["line"], q["number"]) in asked_edges)]
@@ -894,8 +928,13 @@ def yaml_block(questions, written=None):
             lines += _comment(q["question"])
             lines += _comment("To answer with a number, replace the answer line below "
                               "with one of these:")
-            lines += _reserved(1)
-            lines.append(_pick_line(len(_RESERVED)))
+            # Behaviours worked out from the change alone, where it has two
+            # honest answers; never what the code does now.
+            neutral = q.get("options") or []
+            for n, option in enumerate(neutral, 1):
+                lines.append("  %s   %d = %s" % (MARK, n, exact_text(option)))
+            lines += _reserved(len(neutral) + 1)
+            lines.append(_pick_line(len(neutral) + len(_RESERVED)))
         lines.append("")
     return "\n".join(lines).rstrip("\n") + "\n"
 
