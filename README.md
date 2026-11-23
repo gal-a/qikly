@@ -187,6 +187,12 @@ implementation of the same interface.
 - It plants every fault it can, up to 60 in one module or 150 in a folder,
   and a sample when your tests are slow. `--score-mutants 48` sets the
   number, and `--score-seed 1` draws a different sample.
+- It runs up to four faults at once, each in its own copy of your code, so
+  a slow suite takes a fraction of the time. `--score-workers 1` runs them
+  one at a time, and the same seed gives the same result either way. Tests
+  that cannot run beside a copy of themselves, because they share a file, a
+  port or a database, are noticed before anything is planted, and then the
+  faults go one at a time, with a line saying so.
 - `--demo` works in a throwaway `demo/throwaway_<timestamp>/` folder it expects you to
   delete. It is for watching, not for building in. `--example` and `--scaffold`
   create a real project in the directory you are standing in, and those are the
