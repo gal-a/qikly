@@ -792,7 +792,8 @@ class NeverRan(ValueError):
     """The suite passed without running the code being scored."""
 
 
-def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
+def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT,
+          workers=1):
     """
     Plant faults one at a time and report which the suite caught.
 
@@ -804,6 +805,10 @@ def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
     fallback, tried only if the wider copy fails its baseline or never runs
     the code. Which of the two works depends on how the suite imports, and
     only running it shows that.
+
+    `workers` above 1 plants that many faults at once, each in its own copy
+    of the workspace; the faults, their verdicts and their order are the same
+    as with 1. See _plant_in_parallel.
     """
     if isinstance(target, str):
         # Kept because a task id reads naturally at a call site and this was
@@ -811,16 +816,16 @@ def score(target, mutants=DEFAULT_MUTANTS, seed=None, code_root=CODE_ROOT):
         target = from_task(target, code_root)
     fallback = getattr(target, "fallback", None)
     try:
-        result = _score_once(target, mutants, seed, code_root)
+        result = _score_once(target, mutants, seed, code_root, workers)
     except ValueError:
         # NeverRan, or the wider copy tripping the file-count limit. Either
         # way the plain root is still worth trying, and if it fails too its
         # own error is the one the reader needs.
         if fallback is None:
             raise
-        return _score_once(fallback, mutants, seed, code_root)
+        return _score_once(fallback, mutants, seed, code_root, workers)
     if result is not None and not result["baseline"] and fallback is not None:
-        wider = _score_once(fallback, mutants, seed, code_root)
+        wider = _score_once(fallback, mutants, seed, code_root, workers)
         if wider is not None and wider["baseline"]:
             return wider
     return result
@@ -850,7 +855,7 @@ def _generated_suite_task(target):
     return None
 
 
-def _score_once(target, mutants, seed, code_root):
+def _score_once(target, mutants, seed, code_root, workers=1):
     files = target.files
     if not target:
         return None
@@ -937,31 +942,32 @@ def _score_once(target, mutants, seed, code_root):
         # really is untested. Named, so its misses are not read as weak tests.
         never_ran = sorted(unreached)
 
-        # A heartbeat. Each fault reruns the whole suite, and on a real library
-        # scoring ran for over an hour with nothing on screen, which reads as
-        # a hang. A line about every 15 seconds says how far it is and what
-        # is left, estimated from the faults so far.
-        import time
-        began = last_beat = time.monotonic()
-        for done_count, (path, relative, source, family, index, described) in \
-                enumerate(candidates):
-            now = time.monotonic()
-            if done_count and now - last_beat >= HEARTBEAT_SECONDS:
-                last_beat = now
-                left = (now - began) / done_count * (len(candidates) - done_count)
-                print(f"  still scoring: {done_count} of {len(candidates)} faults "
-                      f"planted, {len(caught)} caught so far, about "
-                      + (f"{left / 60:.0f} minute{'' if round(left / 60) == 1 else 's'}"
-                         if left >= 90 else f"{left:.0f} seconds")
-                      + " left", flush=True)
-            mutant, _ = make_mutant(source, index, family)
-            if mutant is None:
+        workers = max(1, min(int(workers or 1), len(candidates)))
+        fell_back = False
+        verdicts = None
+        if workers > 1:
+            verdicts, fault_timeout = _plant_in_parallel(
+                workspace, tmp, target, env, candidates, fault_timeout, workers)
+            if verdicts is None:
+                fell_back = True
+                print(f"  your tests do not pass with {workers} copies running "
+                      f"at once, though they pass alone: they probably share a "
+                      f"file, a port or a database. Planting one fault at a "
+                      f"time instead, which takes longer. --score-workers 1 "
+                      f"skips this check.", flush=True)
+        if verdicts is None:
+            workers = 1
+            verdicts = _plant_in_turn(workspace, target, env, candidates,
+                                      fault_timeout)
+
+        # Tallied in the sampled order whatever order the runs finished in,
+        # so a parallel score and a sequential one list the same faults the
+        # same way.
+        for (path, relative, source, family, index, described), verdict in \
+                zip(candidates, verdicts):
+            if verdict is None:
                 unscorable += 1
                 continue
-            planted = os.path.join(workspace, relative)
-            with open(planted, "w", encoding="utf-8", newline="\n") as handle:
-                handle.write(mutant)
-            verdict = _suite_verdict(workspace, target, env, timeout=fault_timeout)
             if verdict == "timeout":
                 # Counted as caught, as mutation testing does: the suite did
                 # not pass with the fault in. Said in the result, not hidden.
@@ -978,7 +984,6 @@ def _score_once(target, mutants, seed, code_root):
                 (missed if verdict == "pass" else caught).append(
                     {"file": os.path.basename(path), "family": family,
                      "change": described, "path": path})
-            shutil.copy2(path, planted)
 
     if unverified and missed and not caught:
         # The one combination that looks exactly like the bug this guards
@@ -1001,7 +1006,187 @@ def _score_once(target, mutants, seed, code_root):
             "unreached": never_ran,
             "unverified": unverified,
             "timed_out": timed_out,
-            "site_files": site_files, "sites": site_count}
+            "site_files": site_files, "sites": site_count,
+            "workers": workers, "parallel_fallback": fell_back}
+
+
+def default_workers():
+    """
+    How many faults to run at once when --score-workers is not given: four,
+    or fewer on a machine with fewer processors. Each one is a full run of
+    the suite in its own copy of the code, so more than the machine has
+    processors only makes every run slower.
+    """
+    return max(1, min(4, os.cpu_count() or 1))
+
+
+def _plant_one(workspace, target, env, candidate, fault_timeout):
+    """
+    Plant one fault in this workspace, run the suite, put the original back.
+
+    Returns the verdict, or None when the fault cannot be written. The suite
+    run goes through _suite_verdict, which deletes every __pycache__ in this
+    workspace first, so the bytecode rule holds in each copy on its own.
+    """
+    path, relative, source, family, index, described = candidate
+    mutant, _ = make_mutant(source, index, family)
+    if mutant is None:
+        return None
+    planted = os.path.join(workspace, relative)
+    try:
+        with open(planted, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(mutant)
+        return _suite_verdict(workspace, target, env, timeout=fault_timeout)
+    finally:
+        shutil.copy2(path, planted)
+
+
+def _heartbeat(done_count, total, caught, began, now):
+    """The progress line, the same for one fault at a time or several."""
+    left = (now - began) / done_count * (total - done_count)
+    print(f"  still scoring: {done_count} of {total} faults "
+          f"planted, {caught} caught so far, about "
+          + (f"{left / 60:.0f} minute{'' if round(left / 60) == 1 else 's'}"
+             if left >= 90 else f"{left:.0f} seconds")
+          + " left", flush=True)
+
+
+def _caught(verdict):
+    return verdict is not None and verdict not in ("pass", "error")
+
+
+def _plant_in_turn(workspace, target, env, candidates, fault_timeout):
+    """
+    One fault at a time, in one workspace: the verdict for each candidate.
+
+    A heartbeat. Each fault reruns the whole suite, and on a real library
+    scoring ran for over an hour with nothing on screen, which reads as a
+    hang. A line about every 15 seconds says how far it is and what is
+    left, estimated from the faults so far.
+    """
+    import time
+    verdicts, caught = [], 0
+    began = last_beat = time.monotonic()
+    for done_count, candidate in enumerate(candidates):
+        now = time.monotonic()
+        if done_count and now - last_beat >= HEARTBEAT_SECONDS:
+            last_beat = now
+            _heartbeat(done_count, len(candidates), caught, began, now)
+        verdict = _plant_one(workspace, target, env, candidate, fault_timeout)
+        caught += _caught(verdict)
+        verdicts.append(verdict)
+    return verdicts
+
+
+def _moved_env(env, old, new):
+    """
+    The suite's environment for a copy of the workspace: every PYTHONPATH
+    entry that points into the first workspace points into the copy instead,
+    so a src/ layout imports the copy's own code and never a sibling's.
+    """
+    env = dict(env if env is not None else os.environ)
+    entries = env.get("PYTHONPATH")
+    if not entries:
+        return env
+    n = os.path.normcase
+    moved = []
+    for entry in entries.split(os.pathsep):
+        if n(entry) == n(old) or n(entry).startswith(n(old) + os.sep):
+            entry = new + entry[len(old):]
+        moved.append(entry)
+    env["PYTHONPATH"] = os.pathsep.join(moved)
+    return env
+
+
+def _plant_in_parallel(workspace, tmp, target, env, candidates, fault_timeout,
+                       workers):
+    """
+    Several faults at once, each in its own copy of the workspace.
+
+    Returns (verdicts in candidate order, the per-fault time limit used), or
+    (None, fault_timeout) when the untouched suite does not pass in every
+    copy running at the same time. That is a suite sharing something outside
+    its folder, such as a file, a port or a database, and its verdicts in
+    parallel would be one fault's tests tripping over another's: read as
+    faults caught, which is the flattering misreading. The caller then plants
+    one at a time.
+
+    Each copy keeps the rules a single workspace has: one fault planted at a
+    time in it, the original restored after, and every __pycache__ in it
+    deleted before each run (PYTHONDONTWRITEBYTECODE stays set as well). The
+    copies are taken after the watching run has restored the originals, and
+    without any __pycache__, so no copy starts from a cache another wrote.
+    """
+    import queue
+    import time
+    from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+
+    copies, envs = [workspace], [env]
+    for number in range(1, workers):
+        other = os.path.join(tmp, f"ws{number}")
+        shutil.copytree(workspace, other,
+                        ignore=shutil.ignore_patterns("__pycache__"))
+        copies.append(other)
+        envs.append(_moved_env(env, workspace, other))
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        # The control again, every copy at once. A suite that binds a fixed
+        # port or writes a fixed file outside its folder fails here, on
+        # untouched code, before any fault is credited to it.
+        began = time.monotonic()
+        together = list(pool.map(
+            lambda i: _suite_verdict(copies[i], target, envs[i],
+                                     timeout=suite_limit(BASELINE_TIMEOUT)),
+            range(workers)))
+        if any(v != "pass" for v in together):
+            return None, fault_timeout
+        # Runs side by side are slower than one alone, so the limit is ten
+        # times the slower of the two baselines: a fault is not called stuck
+        # because the machine was busy.
+        fault_timeout = max(fault_timeout,
+                            10 * (time.monotonic() - began))
+
+        free = queue.Queue()
+        for i in range(workers):
+            free.put(i)
+
+        def job(candidate):
+            slot = free.get()
+            try:
+                return _plant_one(copies[slot], target, envs[slot], candidate,
+                                  fault_timeout)
+            finally:
+                free.put(slot)
+
+        verdicts = [None] * len(candidates)
+        futures = {pool.submit(job, c): i for i, c in enumerate(candidates)}
+        pending = set(futures)
+        done_count = caught = 0
+        began = last_beat = time.monotonic()
+        try:
+            while pending:
+                finished, pending = wait(pending, timeout=1.0,
+                                         return_when=FIRST_COMPLETED)
+                for future in finished:
+                    # A worker that raised is re-raised here, so the score
+                    # fails loudly instead of counting that fault as caught.
+                    verdict = future.result()
+                    verdicts[futures[future]] = verdict
+                    done_count += 1
+                    caught += _caught(verdict)
+                now = time.monotonic()
+                if (pending and done_count
+                        and now - last_beat >= HEARTBEAT_SECONDS):
+                    last_beat = now
+                    _heartbeat(done_count, len(candidates), caught, began, now)
+        except BaseException:
+            # Ctrl-C or a failed worker: drop every fault not yet started,
+            # so leaving the pool does not run the rest of the list first.
+            for future in pending:
+                future.cancel()
+            pool.shutdown(wait=False, cancel_futures=True)
+            raise
+    return verdicts, fault_timeout
 
 
 def unreachable_criteria(task_id):
@@ -1108,6 +1293,11 @@ def render(result, gaps):
                       f"{'it was' if n == 1 else 'they were'} stopped and "
                       f"counted as caught: the tests did not pass with "
                       f"{'it' if n == 1 else 'them'} in.", ""]
+        if result.get("parallel_fallback"):
+            lines += ["The faults were planted one at a time: your tests did "
+                      "not pass with several copies running at once, though "
+                      "they pass alone, so they probably share a file, a port "
+                      "or a database.", ""]
 
     if gaps is None:
         lines += ["Reachability could not be checked for this task, so read "
@@ -1403,13 +1593,14 @@ class Unscored(str):
     """
 
 
-def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
+def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None,
+        workers=1):
     """The command's body: score, report, and say what the number is worth."""
     if isinstance(target, str):
         target = from_task(target)
     task_id = target.label
 
-    result = score(target, mutants=mutants, seed=seed)
+    result = score(target, mutants=mutants, seed=seed, workers=workers)
     if result is None:
         if target.task_id is None:
             print(f"[{task_id}] nothing to score: no Python files to mutate, "
