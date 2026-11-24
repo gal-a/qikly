@@ -436,8 +436,35 @@ OTHER = "other: write  N: <your sentence>, or just the sentence"
 _RESERVED = (DOESNT_MATTER, OTHER)
 # Typed instead of the number, these mean "doesn't matter" too.
 _DOESNT_MATTER_WORDS = re.compile(
-    r"(?i)(?:it\s+)?(?:doesn'?t|does\s+not|don'?t|do\s+not)\s+(?:matter|care)"
-    r"|either|no\s+preference")
+    r"(?i)(?:(?:it|that|this)\s+)?(?:doesn'?t|does\s+not|don'?t|do\s+not)\s+"
+    r"(?:really\s+)?(?:matter|care)(?:\s+(?:here|to\s+me))?"
+    r"|i\s+(?:don'?t|do\s+not)\s+(?:really\s+)?care(?:\s+(?:which|either\s+way))?"
+    r"|either(?:\s+(?:one|way))?(?:\s+is)?(?:\s+(?:fine|ok|okay|good))?"
+    r"|no\s+preference")
+# The reserved texts as the person might paste them: the option's own line, or
+# the "other" template. Matched against the whole answer only, never a part.
+_OTHER_TEMPLATES = (OTHER, "write  N: <your sentence>, or just the sentence",
+                    "N: <your sentence>", "<your sentence>")
+
+
+def _reserved_kind(text):
+    """
+    "dm", "other" or None: whether a whole answer (or the sentence after
+    `N:`) is nothing but reserved wording, so it must never reach the test
+    agent as a criterion. The rule is conservative: a full-line match after
+    trimming, dropping quotes and a final full stop, folding the typographic
+    apostrophe and case. A longer real sentence that merely contains these
+    words ("it doesn't matter which currency shows, unless the amount is 0")
+    does not match and stays a criterion.
+    """
+    folded = re.sub(r"\s+", " ", text.replace("’", "'").replace("‘", "'")
+                    .replace("“", '"').replace("”", '"')).strip()
+    folded = folded.strip("\"'").strip().rstrip(".!").strip().lower()
+    if folded == DOESNT_MATTER or _DOESNT_MATTER_WORDS.fullmatch(folded):
+        return "dm"
+    if any(folded == re.sub(r"\s+", " ", t).lower().strip() for t in _OTHER_TEMPLATES):
+        return "other"
+    return None
 _OPTION = re.compile(r"^[ \t]*#\?[ \t]+(\d+) = (.+?)(?:   \((.*)\))?[ \t]*$")
 _ITEM = re.compile(r"^([ \t]+)-([ \t]+)(.*?)[ \t]*$")
 # An option number with something around it: `1)`, `(1)`, `1.`, `#1`,
@@ -563,11 +590,16 @@ def expand_answers(text):
         # "doesn't matter". So a bare number is refused, never guessed at.
         only_reserved = bool(mine) and all(text in _RESERVED for text in mine.values())
         other = next((n for n, t in mine.items() if t == OTHER), '2')
-        # "doesn't matter" typed in words, under any question qikly asked.
-        if (mine or asked_here) and _DOESNT_MATTER_WORDS.fullmatch(short.rstrip(".!")):
+        # "doesn't matter" typed in words, or the option's own text pasted,
+        # under any question qikly asked.
+        kind = _reserved_kind(short) if (mine or asked_here) else None
+        if kind == "dm":
             expanded.append((short, None))
             lines[i] = None
             continue
+        dm_number = next((n for n, t in mine.items() if t == DOESNT_MATTER), None)
+        skip_how = (f"write {dm_number} or the words  doesn't matter" if dm_number
+                    else "write the words  doesn't matter")
         # Only under a question qikly numbered: anywhere else a line such as
         # `- 3: text` or `- id: 7` is the person's own YAML, a criterion
         # written as a mapping, and is left exactly as it is.
@@ -579,7 +611,10 @@ def expand_answers(text):
         # a mapping, so it is caught here too, before YAML sees it.
         negative = (re.fullmatch(r"-[ \t]*(\d+)(?:[ \t]*:[ \t]*(.+))?", short)
                     if mine else None)
-        if only_reserved and re.fullmatch(r"-?\d+(?:\.\d+)?", short):
+        if kind == "other":
+            problem = (f"criterion {number} is the template text of the \"other\" "
+                       f"option, not an answer: write your own sentence, or {skip_how}")
+        elif only_reserved and re.fullmatch(r"-?\d+(?:\.\d+)?", short):
             problem = (f"criterion {number} answers {short!r}, but this question "
                        f"has no behaviours to pick, so a bare number could be "
                        f"your value or an option. To give a value, write a "
@@ -607,8 +642,14 @@ def expand_answers(text):
             else:
                 decided = True
         elif pick and mine.get(pick.group(1)) == OTHER:
-            if pick.group(2) and pick.group(2).strip():
-                criterion = pick.group(2).strip()
+            given = (pick.group(2) or "").strip()
+            if given and (_reserved_kind(given) or re.fullmatch(r"-?\d+(?:\.\d+)?", given)):
+                problem = (f"criterion {number}: {given!r} after {pick.group(1)}: is "
+                           f"not a sentence the tests can use (it is reserved "
+                           f"wording or a bare number), so write your own sentence, "
+                           f"or {skip_how}")
+            elif given:
+                criterion = given
             else:
                 problem = (f"criterion {number}: option {pick.group(1)} is your own "
                            f"answer, so write it as  {pick.group(1)}: <your sentence>, "
