@@ -150,7 +150,9 @@ folder, and every step takes the same path:
    or without quotes, by an option's number where qikly lists them (`- 2`),
    a number and your value (`- 1: 0.0`), the number of "doesn't matter" to
    drop the question (or write `doesn't matter`), `N: <sentence>` for the
-   "other" option, or a sentence that names a value (`- apply_discount(100,
+   "other" option (a question that lists no behaviours is not numbered:
+   write a sentence that names the value, or the words `doesn't matter`; a
+   bare number there is refused), or a sentence that names a value (`- apply_discount(100,
    100) raises ValueError`; quote one that has a colon in it), or leave it: a
    TODO is skipped. The options are in no fixed order and none says which one
    your code does now. Without a key every answer is yours, and the `requirements` line

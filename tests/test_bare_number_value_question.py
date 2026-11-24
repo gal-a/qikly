@@ -54,3 +54,53 @@ def test_the_scaffolded_line_does_not_invite_a_bare_number():
     answer = yaml.safe_load("task_id: X\n" + block)["acceptance_criteria"][0]
     assert answer.startswith("TODO:") and "pick" not in answer
     assert "doesn't matter" in answer
+
+
+NEW_VALUE_QUESTION = (
+    "acceptance_criteria:\n"
+    "  #? Your tests pass whether this number is 0 or 1. What should it be?\n"
+    "  #? Write a sentence that names the value, or the words  doesn't matter  "
+    "to skip it.\n"
+)
+_NUMBER_ADVICE = ("write just", "did you mean option", "Write an option number",
+                  "write 1 or", "write 2 or", "Write it as  - 1")
+
+
+def _value_block():
+    return sq.yaml_block([{"file": "m.py", "path": "/x/m.py", "line": 1,
+                           "function": "f", "code": "MAX = 1",
+                           "question": sq.ask("guard disabled")}])
+
+
+def test_a_value_question_is_not_numbered_in_a_new_file():
+    block = _value_block()
+    assert "To answer with a number" not in block
+    assert "#?   1 =" not in block and "#?   2 =" not in block
+    assert sq.DOESNT_MATTER not in block
+    assert "names the value, or the words" in block and "doesn't matter" in block
+
+
+@pytest.mark.parametrize("answer", ["1", "2", "0", "90", "-1", "1.5"])
+def test_a_bare_number_is_refused_under_the_unnumbered_question(answer):
+    _, expanded, problems = expand_answers(NEW_VALUE_QUESTION + f"  - {answer}\n")
+    assert len(problems) == 1, problems
+    assert "doesn't matter" in problems[0]
+    assert not any(advice in problems[0] for advice in _NUMBER_ADVICE), problems
+
+
+def test_the_words_answer_the_unnumbered_question():
+    _, expanded, problems = expand_answers(NEW_VALUE_QUESTION + "  - doesn't matter\n")
+    assert not problems and expanded == [("doesn't matter", None)]
+
+
+@pytest.mark.parametrize("answer", [
+    "1: 90", "2: 90", "-1: 90", "1)", "1 = doesn't matter, so no test for this",
+    "1 2", "yes", "option 1"])
+def test_no_message_sends_the_person_back_to_a_number_under_a_value_question(answer):
+    """In a file whose two reserved options are numbered, every message about a
+    number-like answer names the words, never the number of 'doesn't matter'."""
+    _, expanded, problems = expand_answers(VALUE_QUESTION + f'  - "{answer}"\n')
+    assert len(problems) == 1, problems
+    assert "doesn't matter" in problems[0]
+    assert not any(advice in problems[0] for advice in _NUMBER_ADVICE), problems
+    assert all(criterion is not None for _, criterion in expanded), expanded

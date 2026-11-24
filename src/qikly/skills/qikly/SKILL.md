@@ -72,7 +72,9 @@ The path is three commands, each taking the same module or folder:
   under it to them **word for word**, and write what they answer, the
   option's number, `1: <value>`, the number of "doesn't matter" (or the
   words, which skip that question), `N: <their sentence>` for "other", or
-  their own sentence naming a value. The options never say which one the
+  their own sentence naming a value. A question with no behaviours to pick
+  is not numbered at all, and a bare number there is refused: the answer is
+  a sentence that names the value, or the words. The options never say which one the
   code does now, so do not tell them. A TODO left in place is skipped. Without a key every answer is a
   TODO and `requirements` is marked `TODO: MODIFY THIS:`; replace it only
   with their words. `qikly --validate my_module.py` checks it, free.

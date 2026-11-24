@@ -71,9 +71,8 @@ acceptance_criteria:
   #? Your tests pass whether this is `discount_rate > MAX_DISCOUNT_RATE` or
   #? `discount_rate >= MAX_DISCOUNT_RATE`, so nothing checks the boundary
   #? itself. What should happen at exactly `MAX_DISCOUNT_RATE`?
-  #? To answer with a number, replace the answer line below with one of these:
-  #?   1 = doesn't matter, so no test for this
-  #?   2 = other: write  N: <your sentence>, or just the sentence
+  #? Write a sentence that names the value, or the words doesn't matter to
+  #? skip it.
   - "2: apply_discount(100, 100) raises ValueError"
 
   #? pricing.py, apply_discount, line 5:

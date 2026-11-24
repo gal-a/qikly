@@ -596,7 +596,6 @@ def expand_answers(text, keep_dropped=False):
         # should be 1"), and reading it as option 1 would silently make it
         # "doesn't matter". So a bare number is refused, never guessed at.
         only_reserved = bool(mine) and all(text in _RESERVED for text in mine.values())
-        other = next((n for n, t in mine.items() if t == OTHER), '2')
         # "doesn't matter" typed in words, or the option's own text pasted,
         # under any question qikly asked.
         kind = _reserved_kind(short) if (mine or asked_here) else None
@@ -605,7 +604,10 @@ def expand_answers(text, keep_dropped=False):
             lines[i] = prefix + _quote(DROPPED) if keep_dropped else None
             continue
         dm_number = next((n for n, t in mine.items() if t == DOESNT_MATTER), None)
-        skip_how = (f"write {dm_number} or the words  doesn't matter" if dm_number
+        # Under a question with no behaviours the words are the only way:
+        # the number of "doesn't matter" is refused there as a bare number.
+        skip_how = (f"write {dm_number} or the words  doesn't matter"
+                    if dm_number and not only_reserved
                     else "write the words  doesn't matter")
         # Only under a question qikly numbered: anywhere else a line such as
         # `- 3: text` or `- id: 7` is the person's own YAML, a criterion
@@ -621,13 +623,20 @@ def expand_answers(text, keep_dropped=False):
         if kind == "other":
             problem = (f"criterion {number} is the template text of the \"other\" "
                        f"option, not an answer: write your own sentence, or {skip_how}")
-        elif only_reserved and re.fullmatch(r"-?\d+(?:\.\d+)?", short):
+        elif only_reserved and (
+                re.fullmatch(r"-?\d+(?:\.\d+)?", short) or negative
+                or (pick and mine.get(pick.group(1)) != OTHER)
+                or (not pick and (_SEVERAL.fullmatch(short) or _DECORATED.fullmatch(short)
+                                  or _numbered_slip(short, mine)))):
+            # Older files numbered the two reserved options; a new one does
+            # not. Either way a number here is the person's value, not a pick.
+            value = (short if re.fullmatch(r"-?\d+(?:\.\d+)?", short)
+                     else (re.findall(r"-?\d+(?:\.\d+)?", short) or ["100"])[-1])
             problem = (f"criterion {number} answers {short!r}, but this question "
-                       f"has no behaviours to pick, so a bare number could be "
+                       f"has no behaviours to pick, so a number could be "
                        f"your value or an option. To give a value, write a "
-                       f"sentence that names it, such as  MAX_RATE is {short}  "
-                       f"(or  {other}: <your sentence>); to skip the "
-                       f"question, write the words  doesn't matter")
+                       f"sentence that names it, such as  MAX_RATE is {value}; "
+                       f"to skip the question, write the words  doesn't matter")
         elif negative:
             digit, given = negative.group(1), negative.group(2)
             fixed = digit + (f": {given.strip()}" if given else "")
@@ -640,8 +649,10 @@ def expand_answers(text, keep_dropped=False):
                            f"are {_listed(mine)}")
         elif not mine and asked_here and re.fullmatch(r"-?\d+(?:\.\d+)?", short):
             problem = (f"criterion {number} answers {short!r}, but that question "
-                       f"has no numbered options: write the answer as a sentence "
-                       f"that names a value, such as  MAX_RATE is 100")
+                       f"has no numbered options, so a bare number could be "
+                       f"your value or an option: write the answer as a sentence "
+                       f"that names a value, such as  MAX_RATE is {short}  "
+                       f"or, to skip it, the words  doesn't matter")
         elif pick and mine.get(pick.group(1)) == DOESNT_MATTER:
             if pick.group(2):
                 problem = (f"criterion {number}: option {pick.group(1)} (doesn't "
@@ -737,10 +748,16 @@ def expand_answers(text, keep_dropped=False):
                           if mine[n] not in _RESERVED]
             example = (behaviours[0].replace(VALUE, "0") if behaviours
                        else "MAX_RATE is 100")
-            problem = (f"criterion {number} is {short!r}, which this question does "
-                       f"not take as an answer. Write an option number "
-                       f"({_listed(mine, ' or ')}), or a whole sentence "
-                       f"that stands on its own, such as  - {_quote(example)}")
+            if only_reserved:
+                problem = (f"criterion {number} is {short!r}, which this question "
+                           f"does not take as an answer. Write a whole sentence "
+                           f"that names the value, such as  - {_quote(example)}, "
+                           f"or the words  doesn't matter")
+            else:
+                problem = (f"criterion {number} is {short!r}, which this question does "
+                           f"not take as an answer. Write an option number "
+                           f"({_listed(mine, ' or ')}), or a whole sentence "
+                           f"that stands on its own, such as  - {_quote(example)}")
         if problem:
             problems.append(problem)
             lines[i] = prefix + _quote(f"TODO: {short} could not be read: {problem}")
@@ -917,11 +934,22 @@ def _reserved(first):
     return ["  %s   %d = %s" % (MARK, first + i, text) for i, text in enumerate(_RESERVED)]
 
 
+def _answer_header(behaviours):
+    """The comment line above a question's options. With no behaviour to pick
+    there are no numbered options at all, so a number is never invited: the
+    person writes a sentence that names the value, or the words."""
+    if not behaviours:
+        return _comment("Write a sentence that names the value, or the words  "
+                        "doesn't matter  to skip it.")
+    return _comment("To answer with a number, replace the answer line below "
+                    "with one of these:")
+
+
 def _pick_line(count):
     """The answer line under a question with `count` numbered options. With
     only the two reserved options there is nothing to pick: a bare number
     there would be read as an option, so the line asks for words instead."""
-    if count == len(_RESERVED):
+    if count <= len(_RESERVED):
         return ("  - \"TODO: write your answer as a sentence, "
                 "or the words doesn't matter\"")
     numbers = [str(n) for n in range(1, count + 1)]
@@ -969,9 +997,8 @@ def yaml_block(questions, written=None):
                 lines.append("  %s " % MARK + _printable(found + ask))
             else:
                 lines += _comment(prompt)
-            lines += _comment("To answer with a number, replace the answer line below "
-                              "with one of these:")
             options = q.get("hint_options") or []
+            lines += _answer_header(options)
             for n, option in enumerate(options, 1):
                 if isinstance(option, str):
                     option = {"criterion": option, "note": "", "now": False}
@@ -985,18 +1012,17 @@ def yaml_block(questions, written=None):
                 # On a line of its own, never wrapped: it is read back.
                 lines.append("  %s   %d = %s" % (MARK, n, exact_text(option["criterion"]))
                              + (f"   ({_printable(note)})" if note else ""))
-            lines += _reserved(len(options) + 1)
+            if options:
+                lines += _reserved(len(options) + 1)
             if q.get("covers"):
                 lines += _comment(f"(This also answers {q['covers']} more "
                                   f"place{'s' if q['covers'] > 1 else ''} your "
                                   f"tests leave open on the same call.)")
             # No `keep`: it picked the option marked as what the code does
             # now, and a mark reads as the answer. 0.6.4 files still expand it.
-            lines.append(_pick_line(len(options) + len(_RESERVED)))
+            lines.append(_pick_line(len(options) + len(_RESERVED) if options else 0))
         else:
             lines += _comment(q["question"])
-            lines += _comment("To answer with a number, replace the answer line below "
-                              "with one of these:")
             # Behaviours worked out from the change alone, where it has two
             # honest answers; never what the code does now.
             # A score saved by 0.6.4 carries no options: work them out from
@@ -1004,10 +1030,12 @@ def yaml_block(questions, written=None):
             neutral = (q.get("options")
                        or (neutral_options(q["kind"], q.get("function"))
                            if q.get("kind") else []))
+            lines += _answer_header(neutral)
             for n, option in enumerate(neutral, 1):
                 lines.append("  %s   %d = %s" % (MARK, n, exact_text(option)))
-            lines += _reserved(len(neutral) + 1)
-            lines.append(_pick_line(len(neutral) + len(_RESERVED)))
+            if neutral:
+                lines += _reserved(len(neutral) + 1)
+            lines.append(_pick_line(len(neutral) + len(_RESERVED) if neutral else 0))
         lines.append("")
     return "\n".join(lines).rstrip("\n") + "\n"
 

@@ -549,9 +549,16 @@ def test_a_reserved_option_used_wrongly_says_how_to_fix_it(answer, said):
     assert len(problems) == 1 and said in problems[0], problems
 
 
-def test_every_question_in_a_new_file_ends_with_doesnt_matter_and_other(tmp_path):
-    block = sq.yaml_block(_questions(tmp_path))
-    assert block.count(sq.DOESNT_MATTER) == block.count(sq.OTHER) >= 1
+def test_every_question_with_behaviours_ends_with_doesnt_matter_and_other():
+    """A question with behaviours to pick ends with the two reserved options.
+    One with none is not numbered at all (see test_bare_number_value_question)."""
+    block = sq.yaml_block([{
+        "file": "m.py", "path": "/x/m.py", "line": 1, "function": "f", "code": "x = 1",
+        "question": "What should f(1) do?",
+        "hint_prompt": "What should f(1) do?",
+        "hint_options": [{"criterion": "f(1) returns 1", "note": "", "now": False},
+                         {"criterion": "f(1) returns 2", "note": "", "now": False}]}])
+    assert block.count(sq.DOESNT_MATTER) == block.count(sq.OTHER) == 1
     for chunk in block.split("  - \"TODO:")[:-1]:
         tail = chunk.rstrip().splitlines()[-2:]
         assert sq.DOESNT_MATTER in tail[0] and sq.OTHER in tail[1], tail
