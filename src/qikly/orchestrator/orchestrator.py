@@ -384,6 +384,15 @@ def generate_and_write_acceptance_criteria_if_missing(task_id, seed=None):
     task_config = yaml.safe_load(drop_question_lines(text)) or {}
     if task_config.get("acceptance_criteria"):
         return False
+    # Questions the person answered "doesn't matter" are gone from that view,
+    # but they are decisions, not a missing bar: a draft written over them
+    # would replace the block and undo the choices.
+    from qikly.score_questions import expand_answers
+    if any(criterion is None for _, criterion in expand_answers(text)[1]):
+        print(f"[{task_id}] --generate-criteria: some questions are answered "
+              f"\"doesn't matter\", so this file's criteria are the person's "
+              f"own decisions: nothing was generated.")
+        return False
 
     print(f"[{task_id}] --generate-criteria: no acceptance_criteria yet, generating a first draft from requirements alone...")
     criteria = agent_generate_acceptance_criteria(task_id, seed=seed)

@@ -46,6 +46,12 @@ def build(task_id):
                                                  _task_without_acceptance_criteria)
 
     full = _read_task(task_id)
+    from qikly.score_questions import expand_answers
+    try:
+        with open(task_config_path(task_id), encoding="utf-8-sig") as handle:
+            decided = sum(1 for _, c in expand_answers(handle.read())[1] if c is None)
+    except OSError:
+        decided = 0
     withheld = _task_without_acceptance_criteria(task_id)
     criteria = (yaml.safe_load(full) or {}).get("acceptance_criteria") or []
 
@@ -65,6 +71,8 @@ def build(task_id):
         "task_id": task_id,
         "task_path": path,
         "criteria_count": len(criteria),
+        # Questions answered "doesn't matter": decided, with nothing to test.
+        "decided": decided,
         "criteria": criteria,
         "test_generation_chars": len(full),
         "coding_agent_chars": len(withheld),
@@ -118,6 +126,12 @@ def render(facts):
     lines.append("  what each agent sees")
     lines.append("=" * 72)
     lines.append("")
+
+    if not count and facts.get("decided"):
+        lines.append(f"  Every question in {task_id} is answered \"doesn't matter\",")
+        lines.append("  so there is no criterion to withhold and nothing to show.")
+        lines.append("  Pick a behaviour for at least one, or write an answer.")
+        return "\n".join(lines)
 
     if not count:
         lines.append(f"  {task_id} declares no acceptance_criteria, so there is")
