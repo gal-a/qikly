@@ -437,9 +437,11 @@ _RESERVED = (DOESNT_MATTER, OTHER)
 # Typed instead of the number, these mean "doesn't matter" too.
 _DOESNT_MATTER_WORDS = re.compile(
     r"(?i)(?:(?:it|that|this)\s+)?(?:doesn'?t|does\s+not|don'?t|do\s+not)\s+"
-    r"(?:really\s+)?(?:matter|care)(?:\s+(?:here|to\s+me))?"
+    r"(?:really\s+)?(?:matter|care)(?:\s+(?:here|to\s+me))?(?:,?\s+either\s+way)?"
     r"|i\s+(?:don'?t|do\s+not)\s+(?:really\s+)?care(?:\s+(?:which|either\s+way))?"
-    r"|either(?:\s+(?:one|way))?(?:\s+is)?(?:\s+(?:fine|ok|okay|good))?"
+    r"|either(?:\s+(?:one|way))?(?:\s+(?:is|are))?(?:\s+(?:fine|ok|okay|good))?"
+    r"|both\s+(?:are|is)\s+(?:fine|ok|okay|good)"
+    r"|whatever(?:\s+(?:you\s+(?:like|want|prefer)|is\s+fine|works))?"
     r"|no\s+preference")
 # The reserved texts as the person might paste them: the option's own line, or
 # the "other" template. Matched against the whole answer only, never a part.

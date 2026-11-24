@@ -83,3 +83,42 @@ def test_a_longer_real_sentence_is_not_swallowed(sentence):
 def test_other_with_a_real_sentence_still_works():
     _, expanded, problems = _read('"4: f(2) returns 7"')
     assert not problems and expanded == [("4: f(2) returns 7", "f(2) returns 7")]
+
+
+@pytest.mark.parametrize("answer", [
+    "Both are fine",
+    "Doesn't matter to me, either way",
+    "either are ok",
+    "Whatever",
+    "whatever you like",
+])
+def test_more_ways_of_saying_doesnt_matter_never_become_a_criterion(answer):
+    text, expanded, problems = _read(f'"{answer}"')
+    assert not problems, problems
+    assert expanded and expanded[0][1] is None, expanded
+    assert answer.split(": ")[-1] not in text  # the line is gone
+
+
+@pytest.mark.parametrize("answer", ["4: whatever you like", "4: Both are fine",
+                                    "4: Doesn't matter to me, either way"])
+def test_these_after_the_other_option_are_refused_not_sent_as_a_criterion(answer):
+    _, expanded, problems = _read(f'"{answer}"')
+    assert len(problems) == 1 and "reserved wording" in problems[0], problems
+    assert all(criterion is None for _, criterion in expanded), expanded
+
+
+@pytest.mark.parametrize("sentence", [
+    "Letter case doesn't matter",
+    "label('VIP') returns either 'gold' or 'GOLD'",
+    "No preference between gold and standard for empty code",
+    "I don't care about spaces, but VIP must be gold",
+    "Both are fine only when the code is empty",
+    "whatever the input, f returns a string",
+])
+def test_a_real_sentence_that_contains_those_words_is_still_a_criterion(sentence):
+    from qikly.score_questions import _reserved_kind
+    assert _reserved_kind(sentence) is None
+    text, expanded, problems = _read(f'"{sentence}"')
+    assert not problems, problems
+    assert expanded == []  # a sentence is left exactly as written
+    assert sentence in text
