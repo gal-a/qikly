@@ -150,3 +150,36 @@ def test_criteria_from_still_replaces_a_file_of_only_todos(task, capsys):
                     encoding="utf-8")
     assert cli._append_criteria_to_task("X_VERIFY", ["a ticket criterion"]) == 0
     assert "a ticket criterion" in path.read_text(encoding="utf-8")
+
+
+def _write_mixed(root, answers):
+    """Two questions: the given answers, in order, under the same options."""
+    return _write(root, *answers)
+
+
+def test_explain_of_a_mixed_file_does_not_say_every_question_is_doesnt_matter(task):
+    _write_mixed(task, ["3", '"TODO: pick 1, 2, 3 or 4, or write your own"'])
+    facts = explain.build("X_VERIFY")
+    assert facts["criteria_count"] == 0 and facts["decided"] == 1
+    text = explain.render(facts)
+    assert "Every question" not in text
+    assert "TODO" in text and "doesn't matter" in text
+    assert "nothing to show" in text
+
+
+def test_explain_of_an_all_decided_file_still_says_so(task):
+    _write_mixed(task, ["3", "either"])
+    text = explain.render(explain.build("X_VERIFY"))
+    assert "Every question in X_VERIFY is answered" in text
+
+
+def test_explain_reads_a_task_file_saved_in_the_old_local_encoding(task, monkeypatch):
+    import locale
+    path = _write(task, "3")
+    text = path.read_text(encoding="utf-8").replace(
+        "  #? What should f(2) do?", "  #? What should f(2) do for caf\u00e9?", 1)
+    path.write_bytes(text.encode("cp1252"))
+    monkeypatch.setattr(locale, "getpreferredencoding", lambda *a, **k: "cp1252")
+    facts = explain.build("X_VERIFY")
+    assert facts["decided"] == 1
+    assert "Every question" in explain.render(facts)
