@@ -377,9 +377,9 @@ def criteria_with_origin(cwd, task_id):
     """
     import yaml
 
-    from qikly.score_questions import _ITEM, expand_answers, is_todo
+    from qikly.score_questions import DROPPED, _ITEM, expand_answers, is_todo
     path = os.path.join(cwd, "inputs_private", "config", "tasks", task_id + ".yaml")
-    text = expand_answers(_read(path))[0]
+    text = expand_answers(_read(path), keep_dropped=True)[0]
     # The values come from YAML, as test generation reads them. Parsing each
     # line by hand dropped what it could not read, a folded `- >` item or one
     # ending in a backslash, and every later criterion was then reported
@@ -412,7 +412,7 @@ def criteria_with_origin(cwd, task_id):
                 origin = "you"
     out = []
     for value, origin in zip(values, origins + ["you"] * (len(values) - len(origins))):
-        if value is not None and not is_todo(value):
+        if value is not None and value != DROPPED and not is_todo(value):
             out.append((value if isinstance(value, str) else str(value), origin))
     return out
 
