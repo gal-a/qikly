@@ -289,7 +289,7 @@ def check_task(path):
     errors, warnings = [], []
     name = os.path.basename(path)
 
-    from qikly.score_questions import expand_answers
+    from qikly.score_questions import DROPPED, expand_answers
     unread = []
     try:
         # As a run reads it (agent_interface._read_task): UTF-8 with or
@@ -310,11 +310,20 @@ def check_task(path):
         # Read as both agents read it: a short answer, `2` or `keep`, as the
         # criterion it stands for, and one written without quotes as text.
         written = raw
-        raw, expanded, unread = expand_answers(raw)
+        raw, expanded, unread = expand_answers(raw, keep_dropped=True)
         # Answered "doesn't matter": decided, so gone from the criteria, and
         # never counted as a TODO left or as a missing bar.
         decided = sum(1 for _, criterion in expanded if criterion is None)
         task = yaml.safe_load(raw)
+        # Items answered "doesn't matter" were kept, as DROPPED, to hold their
+        # place: every message names an item by its position in the file, as
+        # expand_answers does. They are removed from the criteria themselves.
+        file_position = None
+        if isinstance(task, dict) and isinstance(task.get("acceptance_criteria"), list):
+            listed = task["acceptance_criteria"]
+            file_position = [n for n, c in enumerate(listed, 1) if c != DROPPED]
+            if decided:
+                task["acceptance_criteria"] = [c for c in listed if c != DROPPED] or None
     except OSError as exc:
         return [f"{name}: cannot be read: {exc}"], []
     except yaml.YAMLError as exc:
@@ -360,7 +369,7 @@ def check_task(path):
     elif not isinstance(criteria, list):
         errors.append(f"{name}: acceptance_criteria should be a list")
     else:
-        for i, item in enumerate(criteria, start=1):
+        for i, item in zip(file_position or range(1, len(criteria) + 1), criteria):
             if isinstance(item, dict):
                 # `- f(100) returns: 0`: a sentence with a colon and a space,
                 # which YAML reads as a mapping. It crashed this check, and a
@@ -428,14 +437,21 @@ def check_task(path):
     all_criteria = [c for c in all_criteria
                     if not (is_todo(c) and " could not be read: " in c)]
     if skipped and skipped == len(all_criteria):
+        # Counted as the file numbers them: an item answered "doesn't matter"
+        # is still one of its items, answered, but has nothing to test.
         errors.append(
+            f"{name}: none of its {skipped + decided} acceptance criteria is "
+            f"answered with something to test"
+            if decided else
             f"{name}: none of its {skipped} acceptance criteria is answered "
-            f"yet, so a run would have nothing to test against. Write an "
-            f"answer in place of at least one TODO")
+            f"yet")
+        errors[-1] += (", so a run would have nothing to test against. Write an "
+                       "answer in place of at least one TODO")
     elif skipped:
+        total = len(all_criteria) + decided
         warnings.append(Note(
-            f"{name}: {len(all_criteria) - skipped} of its "
-            f"{len(all_criteria)} acceptance criteria are answered; a run skips "
+            f"{name}: {total - skipped} of its "
+            f"{total} acceptance criteria are answered; a run skips "
             f"the {skipped} still left as TODO", group=("skipped-todo", name)))
     if decided and all_criteria:
         warnings.append(Note(
@@ -494,7 +510,8 @@ def check_task(path):
     # A bare number or a yes/no is none either: YAML reads `- 1` as 1.
     answered = [c for c in (task.get("acceptance_criteria") or [])
                 if isinstance(c, str) and not is_todo(c)]
-    for n, c in enumerate(task.get("acceptance_criteria") or [], 1):
+    for n, c in zip(file_position or range(1, len(task.get("acceptance_criteria") or []) + 1),
+                    task.get("acceptance_criteria") or []):
         if c is not None and not isinstance(c, (str, dict)):
             number_like = isinstance(c, (int, float)) and not isinstance(c, bool)
             if not number_like:

@@ -509,7 +509,11 @@ def _listed(options, joiner=", "):
     return joiner.join(sorted(options, key=int))
 
 
-def expand_answers(text):
+# What an item answered "doesn't matter" is written as, with `keep_dropped`.
+DROPPED = "qikly: answered doesn't matter"
+
+
+def expand_answers(text, keep_dropped=False):
     """
     (text, expanded, problems): the task file with each short answer under
     acceptance_criteria written out as the criterion it stands for, as both
@@ -526,6 +530,9 @@ def expand_answers(text):
     person's sentence as `N: <sentence>`. `expanded` holds (answer, criterion)
     pairs, the criterion None for "doesn't matter"; an answer that names no
     option is turned into a TODO, which a run skips, and said in `problems`.
+    With `keep_dropped`, an item answered "doesn't matter" stays in the text,
+    as the string DROPPED, instead of vanishing, so a reader that numbers the
+    items by their position in the file, as the problems here do, still can.
     """
     lines = (text or "").split("\n")
     start = next((i for i, l in enumerate(lines)
@@ -595,7 +602,7 @@ def expand_answers(text):
         kind = _reserved_kind(short) if (mine or asked_here) else None
         if kind == "dm":
             expanded.append((short, None))
-            lines[i] = None
+            lines[i] = prefix + _quote(DROPPED) if keep_dropped else None
             continue
         dm_number = next((n for n, t in mine.items() if t == DOESNT_MATTER), None)
         skip_how = (f"write {dm_number} or the words  doesn't matter" if dm_number
@@ -741,7 +748,7 @@ def expand_answers(text):
             # Nothing to test here, by the person's choice: gone before either
             # agent reads the file, and counted by --validate as decided.
             expanded.append((short, None))
-            lines[i] = None
+            lines[i] = prefix + _quote(DROPPED) if keep_dropped else None
         elif criterion:
             expanded.append((short, criterion))
             lines[i] = prefix + _quote(criterion)
