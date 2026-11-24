@@ -82,4 +82,4 @@ acceptance_criteria:
   #? To answer with a number, replace the answer line below with one of these:
   #?   1 = doesn't matter, so no test for this
   #?   2 = other: write  N: <your sentence>, or just the sentence
-  - "TODO: pick 1 or 2, or write your own"
+  - "TODO: write your answer as a sentence, or the words doesn't matter"

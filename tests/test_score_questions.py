@@ -195,7 +195,7 @@ def test_the_block_is_valid_yaml_with_one_todo_per_question(tmp_path):
     # Every question, with options or without, ends with "doesn't matter"
     # and "other", so the answer line always offers numbers.
     assert data["acceptance_criteria"] == [
-        "TODO: pick 1 or 2, or write your own"] * len(questions)
+        "TODO: write your answer as a sentence, or the words doesn't matter"] * len(questions)
 
 
 @pytest.mark.parametrize("code", [
@@ -214,7 +214,7 @@ def test_no_line_of_code_can_become_a_criterion_or_break_the_file(code):
     q = {"file": "m.py", "path": "/x/m.py", "line": 1, "function": "f",
          "code": code, "question": sq.ask("guard disabled")}
     data = yaml.safe_load("task_id: X\n" + sq.yaml_block([q]))
-    assert data["acceptance_criteria"] == ["TODO: pick 1 or 2, or write your own"]
+    assert data["acceptance_criteria"] == ["TODO: write your answer as a sentence, or the words doesn't matter"]
 
 
 def _scaffold_text(tmp_path):

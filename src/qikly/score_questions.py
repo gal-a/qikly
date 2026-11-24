@@ -557,6 +557,12 @@ def expand_answers(text):
         if len(short) > 1 and short[0] in _SMART and short[-1] in _SMART:
             short = short[1:-1].strip()
         criterion, problem, decided = None, None, False
+        # A question with no behaviour to pick, only the two reserved options:
+        # a bare number there is most likely the person's own value ("it
+        # should be 1"), and reading it as option 1 would silently make it
+        # "doesn't matter". So a bare number is refused, never guessed at.
+        only_reserved = bool(mine) and all(text in _RESERVED for text in mine.values())
+        other = next((n for n, t in mine.items() if t == OTHER), '2')
         # "doesn't matter" typed in words, under any question qikly asked.
         if (mine or asked_here) and _DOESNT_MATTER_WORDS.fullmatch(short.rstrip(".!")):
             expanded.append((short, None))
@@ -573,7 +579,14 @@ def expand_answers(text):
         # a mapping, so it is caught here too, before YAML sees it.
         negative = (re.fullmatch(r"-[ \t]*(\d+)(?:[ \t]*:[ \t]*(.+))?", short)
                     if mine else None)
-        if negative:
+        if only_reserved and re.fullmatch(r"-?\d+(?:\.\d+)?", short):
+            problem = (f"criterion {number} answers {short!r}, but this question "
+                       f"has no behaviours to pick, so a bare number could be "
+                       f"your value or an option. To give a value, write a "
+                       f"sentence that names it, such as  MAX_RATE is {short}  "
+                       f"(or  {other}: <your sentence>); to skip the "
+                       f"question, write the words  doesn't matter")
+        elif negative:
             digit, given = negative.group(1), negative.group(2)
             fixed = digit + (f": {given.strip()}" if given else "")
             if digit in mine:
@@ -857,7 +870,12 @@ def _reserved(first):
 
 
 def _pick_line(count):
-    """The answer line under a question with `count` numbered options."""
+    """The answer line under a question with `count` numbered options. With
+    only the two reserved options there is nothing to pick: a bare number
+    there would be read as an option, so the line asks for words instead."""
+    if count == len(_RESERVED):
+        return ("  - \"TODO: write your answer as a sentence, "
+                "or the words doesn't matter\"")
     numbers = [str(n) for n in range(1, count + 1)]
     listed = ", ".join(numbers[:-1]) + " or " + numbers[-1] if count > 1 else numbers[0]
     return f'  - "TODO: pick {listed}, or write your own"'
