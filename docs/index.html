@@ -433,10 +433,14 @@ h1 {
 .found-list { list-style: none; margin: 14px 0 0; padding: 0; border: 1px solid var(--rule);
   border-radius: 10px; background: var(--surface); }
 .found-list li { display: grid; grid-template-columns: 11.5rem minmax(0, 1fr) auto;
-  grid-template-areas: "name what state"; gap: 4px 16px; align-items: baseline; padding: 9px 16px; }
+  grid-template-areas: "name what state" ". out out"; gap: 2px 16px; align-items: baseline; padding: 9px 16px; }
 .found-list li + li { border-top: 1px solid var(--rule); }
-.found-list a { grid-area: name; font-weight: 600; }
+.found-list li > a { grid-area: name; font-weight: 600; }
 .found-list .what { grid-area: what; color: var(--ink-soft); font-size: .92rem; }
+.found-list .kind { color: var(--ink); font-weight: 600; font-size: .78rem; letter-spacing: .02em;
+  text-transform: uppercase; margin-right: 6px; }
+.found-list .out { grid-area: out; color: var(--ink-soft); font-size: .84rem; }
+.found-list .out a { font-weight: 500; }
 .found-list .state { grid-area: state; font-size: .78rem; font-weight: 600; border-radius: 999px;
   padding: 1px 9px; white-space: nowrap; }
 .found-list .state.fixed { color: var(--accent); background: var(--accent-soft); }
@@ -453,7 +457,7 @@ h1 {
 .found-list.paged li { transition: opacity .45s ease; }
 .found-list.paged li.fade { opacity: 0; }
 @media (max-width: 620px) {
-  .found-list li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name state" "what what"; }
+  .found-list li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name state" "what what" "out out"; }
 }
 /* FAQ */
 .faq details { border-top: 1px solid var(--rule); padding: 12px 0; }
@@ -1265,29 +1269,38 @@ def test_label():
     <ul class="found-list">
       <li><a href="https://github.com/Vedantgitbot/booth/pull/42" data-goatcounter-click="found-booth">booth</a>
         <span class="state fixed">tests merged</span>
-        <span class="what">An evidence threshold no test checked at its edge.</span></li>
+        <span class="what"><b class="kind">Test gap</b> An evidence threshold no test checked at its edge.</span>
+        <span class="out">The maintainer credited the runs in the <a href="https://github.com/Vedantgitbot/booth/releases/tag/v0.6.0" data-goatcounter-click="found-booth-release">v0.6.0 release</a>.</span></li>
       <li><a href="https://github.com/AlexFlipnote/discord.http/pull/39" data-goatcounter-click="found-discord-http">discord.http</a>
         <span class="state fixed">tests merged</span>
-        <span class="what">A download method no test had ever called.</span></li>
+        <span class="what"><b class="kind">Test gap</b> A download method no test had ever called.</span>
+        <span class="out">The maintainer answered the four questions in <a href="https://github.com/AlexFlipnote/discord.http/issues/40" data-goatcounter-click="found-discord-http-issue">issue #40</a> and fixed them with new tests.</span></li>
       <li><a href="https://github.com/onlyreadai/onlyread/pull/45" data-goatcounter-click="found-onlyread">OnlyRead</a>
         <span class="state fixed">test merged</span>
-        <span class="what">A release check its tests could not tell had broken.</span></li>
+        <span class="what"><b class="kind">Test gap</b> A release check its tests could not tell had broken.</span>
+        <span class="out">The test checks that a release refuses a wrong name or title alone.</span></li>
       <li><a href="https://github.com/ronikobrosly/RetroFlow/pull/1" data-goatcounter-click="found-retroflow">RetroFlow</a>
         <span class="state fixed">test merged</span>
-        <span class="what">A per-call font option no test had ever checked.</span></li>
+        <span class="what"><b class="kind">Test gap</b> A per-call font option no test had ever checked.</span>
+        <span class="out">The maintainer then merged two large PRs and released 0.11.0.</span></li>
       <li><a href="https://github.com/AhsanSheraz/pywho/pull/73" data-goatcounter-click="found-pywho">pywho</a>
         <span class="state fixed">test merged</span>
-        <span class="what">A default option no test checked.</span></li>
+        <span class="what"><b class="kind">Test gap</b> A default option no test checked.</span>
+        <span class="out">Approved and merged the same day.</span></li>
       <li><a href="https://github.com/BrianPugh/cyclopts/issues/1044" data-goatcounter-click="found-cyclopts">cyclopts</a>
         <span class="state fixed">fixed in 5.4.0</span>
-        <span class="what">An error that crashed when it was printed.</span></li>
+        <span class="what"><b class="kind">Bug</b> An error that crashed when it was printed.</span>
+        <span class="out">The maintainer fixed it and thanked the report.</span></li>
       <li><a href="https://github.com/Goldziher/prompt-template/issues/48" data-goatcounter-click="found-prompt-template">prompt-template</a>
         <span class="state fixed">fixed in 1.2.1</span>
-        <span class="what">A README example that fails as written.</span></li>
+        <span class="what"><b class="kind">Docs bug</b> A README example that fails as written.</span>
+        <span class="out">The maintainer fixed it by correcting the README example.</span></li>
       <li><a href="https://github.com/basnijholt/markdown-code-runner/pull/64" data-goatcounter-click="found-markdown-code-runner">markdown-code-runner</a>
-        <span class="what">Empties the file it runs on, on Windows.</span></li>
+        <span class="what"><b class="kind">Bug</b> Empties the file it runs on, on Windows.</span>
+        <span class="out">A pull request with the fix.</span></li>
       <li><a href="https://github.com/martinblech/xmltodict/pull/437" data-goatcounter-click="found-xmltodict">xmltodict</a>
-        <span class="what">README namespace examples that no longer hold.</span></li>
+        <span class="what"><b class="kind">Docs bug</b> README namespace examples that no longer hold.</span>
+        <span class="out">A pull request with the docs fix.</span></li>
     </ul>
     <p class="found-ctrls" hidden><button type="button" class="btn-step prev" aria-label="Previous page" data-goatcounter-click="found-prev"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="found-page" aria-live="polite">1 / 1</span><button type="button" class="btn-step next" aria-label="Next page" data-goatcounter-click="found-next"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button type="button" class="btn-tour" aria-pressed="false" aria-label="Pause the list" data-goatcounter-click="found-tour-pause"><svg class="i-pause" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg><svg class="i-play" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></button></p>
     <p class="found-note">Four of these came from <a href="https://towardsdatascience.com/i-mutation-tested-50-python-libraries-tests-in-the-young-ones-missed-41-of-planted-faults/" data-goatcounter-click="found-article">a study of 50 Python libraries</a>.</p>
