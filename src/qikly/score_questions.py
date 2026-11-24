@@ -649,11 +649,13 @@ def expand_answers(text, keep_dropped=False):
             else:
                 problem = (f"criterion {number} answers {short!r}, but its options "
                            f"are {_listed(mine)}")
-        elif not mine and asked_here and re.fullmatch(r"-?\d+(?:\.\d+)?", short):
+        elif (not mine and asked_here
+              and re.fullmatch(r"(?:\d+[ \t]*:[ \t]*)?-?\d+(?:\.\d+)?", short)):
             problem = (f"criterion {number} answers {short!r}, but that question "
                        f"has no numbered options, so a bare number could be "
                        f"your value or an option: write the answer as a sentence "
-                       f"that names a value, such as  MAX_RATE is {short}  "
+                       f"that names a value, such as  MAX_RATE is "
+                       f"{short.split(':')[-1].strip()}  "
                        f"or, to skip it, the words  doesn't matter")
         elif pick and mine.get(pick.group(1)) == DOESNT_MATTER:
             if pick.group(2):

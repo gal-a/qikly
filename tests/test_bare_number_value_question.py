@@ -104,3 +104,14 @@ def test_no_message_sends_the_person_back_to_a_number_under_a_value_question(ans
     assert "doesn't matter" in problems[0]
     assert not any(advice in problems[0] for advice in _NUMBER_ADVICE), problems
     assert all(criterion is not None for _, criterion in expanded), expanded
+
+
+@pytest.mark.parametrize("answer", ["1: 90", "2: 0.5"])
+def test_a_quoted_number_and_value_is_refused_under_the_unnumbered_question(answer):
+    """Quoted, `1: 90` is a string and not a YAML mapping, so it would reach
+    the test agent as the criterion "1: 90"."""
+    _, expanded, problems = expand_answers(NEW_VALUE_QUESTION + f'  - "{answer}"\n')
+    assert len(problems) == 1, problems
+    assert "doesn't matter" in problems[0]
+    assert f"MAX_RATE is {answer.split(': ')[1]}" in problems[0], problems
+    assert all(criterion is not None for _, criterion in expanded), expanded
