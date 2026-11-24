@@ -185,6 +185,38 @@ def test_the_codes_own_behaviour_is_not_always_option_1(monkeypatch):
     assert again == firsts
 
 
+def test_the_presented_order_does_not_depend_on_the_input_order(monkeypatch):
+    """
+    The test above always feeds the options in one fixed order, so it would
+    pass for an order that merely followed which option came first. Feed the
+    same options reversed, and rotated: what is presented must be identical.
+    """
+    monkeypatch.setattr(start, "auto_tests", lambda module, cwd: [])
+    monkeypatch.setattr(start, "project_root", lambda module, cwd: ".")
+    monkeypatch.setattr(start, "_read", lambda module: "")
+    monkeypatch.setattr(start, "enrich", lambda qs, missed: qs)
+    monkeypatch.setattr(start, "group", lambda qs: qs)
+    options = lambda call: [
+        {"kind": so.BEHAVIOUR, "call": call, "pins": {"raises": "ValueError"},
+         "label": "raise ValueError"},
+        {"kind": so.BEHAVIOUR, "call": call, "pins": {"returns": 1}, "label": "return 1"},
+        {"kind": so.BEHAVIOUR, "call": call, "pins": {"returns": 0}, "label": "return 0"}]
+    questions = [{"path": "m.py", "line": n} for n in range(40)]
+
+    def presented(arrange):
+        def menu(q, source, tests, root, mutant):
+            call = f"f({q['line']})"
+            return f"What should {call} do?", arrange(options(call))
+        monkeypatch.setattr(so, "menu", menu)
+        return [[o["criterion"] for o in q["hint_options"]]
+                for q in start.hinted(questions, "m.py", ".")]
+
+    forward = presented(lambda opts: opts)
+    assert presented(lambda opts: opts[::-1]) == forward
+    assert presented(lambda opts: opts[1:] + opts[:1]) == forward
+    assert 0 < sum("raises" in order[0] for order in forward) < 40, forward
+
+
 # ------------------------------------------------------- what is written --
 
 
