@@ -17,7 +17,26 @@ packaging tools would read as `1.1`.
   the item (typed out, `doesn't matter`, `don't care`, `either` and
   `no preference` do the same); `--validate` counts it as decided and stops a
   file where everything is "doesn't matter". "other" takes your own sentence
-  as `N: <sentence>`.
+  as `N: <sentence>`. A question with no behaviour to pick, such as the value
+  of a constant, is not numbered at all: it asks for a sentence that names the
+  value, or the words `doesn't matter`, and a bare number there is refused
+  with a message, because it could be your value or an option.
+- **A run needs something to test.** It is refused when every question is
+  answered "doesn't matter" (also `either`, `no preference` and the like), or
+  when those are mixed with TODOs, since there is nothing to test.
+- **Reserved wording never reaches the test agent as a criterion.** The pasted
+  option text, `Either is fine`, `Both are fine`, `I don't care`, `whatever
+  you like`, `4: either`, `4: 3` and the pasted "other" template are read as
+  "doesn't matter" or refused, and a curly apostrophe works. A longer real
+  sentence that merely contains these words is still a criterion.
+- `--validate` numbers every item by its position in the file, counting an
+  item answered "doesn't matter", so "criterion 2" is always the second item.
+- `--criteria-from`, `--explain` and `--generate-criteria` read a file
+  answered "doesn't matter" the way a run does: none of them writes over those
+  decisions or says the file has no criteria. `--criteria-from` also stops, and
+  leaves the file as it is, when an answer in it could not be read.
+- `--take-tests` does not label your own pick "check" when the note above it
+  belongs to a question you answered "doesn't matter".
 - **No yes/no questions.** A dropped normalisation or a moved regex anchor is
   asked as "How should...". Where qikly can run your code beside the question
   (as it can for `.strip()` and `.lower()` in the pricing example), the options
@@ -35,25 +54,6 @@ packaging tools would read as `1.1`.
 
 ### Fixed
 - The timeout docstring: only Google's SDK waits indefinitely by default.
-- A run is refused when every question is answered "doesn't matter" (also
-  `either`, `no preference` and the like), or when those are mixed with TODOs:
-  there is nothing to test, and it used to start and spend money anyway.
-- A bare number under a question with nothing to pick except "doesn't matter"
-  and "other" is refused with a message, instead of being read as "doesn't
-  matter" when you meant it as a value. The scaffolded answer line for those
-  questions now asks for a sentence or the words "doesn't matter".
-- Reserved wording can no longer reach the test agent as a criterion: the
-  pasted option text, `Either is fine`, `I don't care`, `4: either`, `4: 3` and
-  the pasted "other" template are read as "doesn't matter" or refused, and a
-  curly apostrophe works. A longer real sentence that merely contains these
-  words is still a criterion.
-- `--validate` numbers every item by its position in the file, counting an
-  item answered "doesn't matter", so "criterion 2" is always the second item.
-- `--criteria-from`, `--explain` and `--generate-criteria` read a file
-  answered "doesn't matter" correctly: none of them writes over those
-  decisions or says the file has no criteria.
-- `--take-tests` no longer labels your own pick "check" when the note above
-  it belonged to a question you answered "doesn't matter".
 
 ## 0.6.4
 
