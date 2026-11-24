@@ -6,6 +6,12 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.6.5
+
+> Quick-pick questions are now neutral: shuffled options, no yes or no, and "doesn't matter" is always a choice.
+
 ### Changed
 - **Quick-pick options no longer say which one your code does now.** The
   options are shuffled by the question, never sorted by their content, and
