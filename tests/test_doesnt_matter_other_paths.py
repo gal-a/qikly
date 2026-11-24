@@ -115,3 +115,38 @@ def test_a_generating_run_of_an_all_decided_file_is_refused(task, monkeypatch, c
     with pytest.raises(SystemExit) as stopped:
         cli.main()
     assert stopped.value.code == 2
+
+
+def _write_value_question(root, *answers):
+    """Two TODO items and then the given answers under a value question, the
+    shape --scaffold writes for MAX_DISCOUNT_RATE."""
+    path = root / "inputs_private" / "config" / "tasks" / "X_VERIFY.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    todo = '  - "TODO: pick 1, 2, 3 or 4, or write your own"\n'
+    path.write_text(
+        'task_id: "X_VERIFY"\ntask_name: "f"\ndescription: "f"\n'
+        'requirements: "f returns its input"\n'
+        'interface:\n  integration_functions: ["f"]\n'
+        "acceptance_criteria:\n" + todo + todo
+        + "  #? Your tests pass whether this number is 100 or 101. What should it be?\n"
+        "  #? Write a sentence that names the value, or the words  doesn't matter  "
+        "to skip it.\n" + "".join(f"  - {a}\n" for a in answers),
+        encoding="utf-8")
+    return path
+
+
+def test_criteria_from_never_overwrites_an_answer_that_was_refused(task, capsys):
+    path = _write_value_question(task, "1")
+    before = path.read_bytes()
+    assert cli._append_criteria_to_task("X_VERIFY", ["a ticket criterion"]) == 2
+    err = capsys.readouterr().err
+    assert "could not be read" in err and "doesn't matter" in err
+    assert path.read_bytes() == before
+
+
+def test_criteria_from_still_replaces_a_file_of_only_todos(task, capsys):
+    path = _write_value_question(task)
+    path.write_text(path.read_text(encoding="utf-8").split("  #? Your tests")[0],
+                    encoding="utf-8")
+    assert cli._append_criteria_to_task("X_VERIFY", ["a ticket criterion"]) == 0
+    assert "a ticket criterion" in path.read_text(encoding="utf-8")

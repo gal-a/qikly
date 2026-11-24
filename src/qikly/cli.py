@@ -2926,7 +2926,19 @@ def _append_criteria_to_task(task_id, criteria):
     # questions answered "doesn't matter" removed; raw, a bare `3` looked like
     # a criterion the file already had.
     from qikly.score_questions import expand_answers, is_todo
-    expanded_text, answers, _ = expand_answers(text)
+    expanded_text, answers, problems = expand_answers(text)
+    if problems:
+        # An answer that could not be read is written back as a TODO, which
+        # looks like a placeholder, so without this the person's answer (a
+        # refused number, say) would be deleted along with the question.
+        print(file=sys.stderr)
+        print(f"  {task_id} has an answer that could not be read, so nothing "
+              f"was written over it:", file=sys.stderr)
+        for problem in problems:
+            print(f"    {problem}", file=sys.stderr)
+        print("  Fix that answer (or put the TODO back) and run this again.",
+              file=sys.stderr)
+        return 2
     existing = (yaml.safe_load(expanded_text) or {}).get("acceptance_criteria") or []
     decided = sum(1 for _, criterion in answers if criterion is None)
     if decided and (not existing or all(is_todo(c) for c in existing)):
