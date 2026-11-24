@@ -171,6 +171,10 @@ in this order:
   one large one.
 - The tests workflow must be green. It runs on every pull request.
 - If an AI assistant helped write the change, say so in the description.
+- Sign off each commit with `git commit -s`. The `Signed-off-by` line certifies the
+  [Developer Certificate of Origin](https://developercertificate.org/): you wrote
+  the change, or have the right to submit it, under the project's licence. The
+  sign-off is asked for, and no automatic check enforces it yet.
 - The maintainer reviews every pull request and merges it by hand. Nothing
   merges on its own.
 
@@ -190,3 +194,5 @@ profile or README:
 
 Contributions are accepted under the project's
 [Apache License 2.0](https://github.com/gal-a/qikly/blob/main/LICENSE).
+Unless you state otherwise, anything you submit is licensed under those terms
+(section 5 of the licence). You keep the copyright in what you wrote.
