@@ -45,14 +45,13 @@ requirements:
 # the quotes:
 #   - 2              pick an option numbered above it
 #   - 1: 0.0         an option that asks for a value, and the value
-#   - keep           what your code does now is right
 #   - example_fn(0) returns 1.5      or write your own, naming a value
 # `qikly --validate` shows each short answer as the criterion it becomes.
 # A TODO you leave is skipped. The question lines above each TODO are notes
 # for you, and no agent reads them. Keep these values out of every
 # other line of this file, comments included: the coding agent reads the rest.
 acceptance_criteria:
-  #? 3 questions from qikly --score on 2026-10-25 10:48: what your tests do
+  #? 3 questions from qikly --score on 2026-11-24 00:01: what your tests do
   #? not check. Answer from what the code is meant to do, not from what it
   #? does now.
 
@@ -60,20 +59,26 @@ acceptance_criteria:
   #?     if code.strip().lower() == 'vip':
   #? What should label(' vip ') do?
   #? To answer with a number, replace the answer line below with one of these:
-  #?   1 = label(' vip ') returns 'gold'   (as your code does now)
-  #?   2 = label(' vip ') returns 'standard'
-  - "TODO: pick 1 or 2, keep, or write your own"
+  #?   1 = label(' vip ') returns 'standard'
+  #?   2 = label(' vip ') returns 'gold'
+  #?   3 = doesn't matter, so no test for this
+  #?   4 = other: write  N: <your sentence>, or just the sentence
+  - "TODO: pick 1, 2, 3 or 4, or write your own"
 
   #? rules.py, label, line 5:
   #?     if code.strip().lower() == 'vip':
   #? What should label('VIP') do?
   #? To answer with a number, replace the answer line below with one of these:
-  #?   1 = label('VIP') returns 'gold'   (as your code does now)
-  #?   2 = label('VIP') returns 'standard'
-  - "TODO: pick 1 or 2, keep, or write your own"
+  #?   1 = label('VIP') returns 'standard'
+  #?   2 = label('VIP') returns 'gold'
+  #?   3 = doesn't matter, so no test for this
+  #?   4 = other: write  N: <your sentence>, or just the sentence
+  - "TODO: pick 1, 2, 3 or 4, or write your own"
 
   #? rules.py, line 1:
   #?     MAX_DISCOUNT_RATE = 100
   #? Your tests pass whether this number is 100 or 101. What should it be, and
   #? which input would show the difference?
-  - "TODO: your answer to the question above"
+  #? Write a sentence that names the value, or the words doesn't matter to
+  #? skip it.
+  - "TODO: write your answer as a sentence, or the words doesn't matter"

@@ -10,12 +10,12 @@ off the code.** So:
   "raise ValueError, as rate 101 does now". What 100 should do is still
   unknown to qikly, which is the point.
 - **Elsewhere, an input is searched for where the code and the code with the
-  planted change disagree**, and both results are offered, the current one
-  labelled as such. The user sees the code line anyway; the label is honest
-  about which is which, and the prompt asks what it *should* do.
-- **The order of the two behaviours carries no signal**: `--scaffold` lists
-  them in an order fixed by the values, so the first never comes to mean
-  "what my code does".
+  planted change disagree**, and both results are offered, neither marked as
+  the current one: a mark reads as the answer (0.6.4 marked it, as "as your
+  code does now"). The prompt asks what the call *should* do.
+- **The order of the behaviours carries no signal**: `--scaffold` shuffles
+  them by the question, so the first never comes to mean "what my code
+  does". It once sorted them by their text, which put a raise first.
 - **Where the line's own function has no test call**, the public functions
   and classes the tests call are tried, and only a call that ran the line
   counts. A check switched off and an error never raised get the same search.
@@ -793,7 +793,7 @@ def _first_difference(question, function, calls, root, mutant, through=False):
             behaviours = [
                 {"kind": BEHAVIOUR, "call": call, "args": args, "kwargs": kwargs,
                  "function": name, "pins": a,
-                 "label": f"{_verb(a)}, as your code does now"},
+                 "label": _verb(a)},
                 {"kind": BEHAVIOUR, "call": call, "args": args, "kwargs": kwargs,
                  "function": name, "pins": b,
                  "label": _verb(b)},

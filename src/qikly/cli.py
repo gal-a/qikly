@@ -2241,7 +2241,10 @@ def _say_expanded(task_ids):
         if expanded:
             print(f"{task_id}: your short answers, as the test agent gets them:")
             for answer, criterion in expanded:
-                print(f"  {answer:<6} ->  {criterion}")
+                # None: answered "doesn't matter", so nothing goes to the agent.
+                print(f"  {answer:<6} ->  "
+                      + (criterion if criterion is not None
+                         else "(doesn't matter: no test for this)"))
             print()
 
 
@@ -2360,22 +2363,61 @@ def _seed_module(task_id):
     return implementation if str(implementation or "").endswith(".py") else None
 
 
-def _all_todo(task_ids):
-    """The tasks among these whose acceptance criteria are all placeholders."""
+def _read_expanded(task_id):
+    """
+    A task file as both agents read it: short answers written out and the
+    items answered "doesn't matter" removed. Returns (expanded, text), where
+    `expanded` is expand_answers's (answer, criterion) pairs, or None when the
+    file cannot be read.
+    """
+    from qikly.agent_api.agent_interface import task_config_path
+    from qikly.score_questions import expand_answers
+
+    try:
+        with open(task_config_path(task_id), "rb") as handle:
+            data = handle.read()
+        try:
+            text = data.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            import locale
+            text = data.decode(locale.getpreferredencoding(False), errors="replace")
+    except OSError:
+        return None
+    text, expanded, _ = expand_answers(text.replace("\r\n", "\n"))
+    return expanded, text
+
+
+def _all_todo(task_ids, decided_only=False):
+    """
+    The tasks among these with no real acceptance criterion: each is still a
+    TODO, or was answered "doesn't matter". Judged on the file as the agents
+    read it (the same text --validate checks), not on the raw YAML, where a
+    bare `3` or `either` looks like an answer. With `decided_only`, only
+    those holding an answer of "doesn't matter" (see --generate-criteria).
+    """
     import yaml
 
-    from qikly.agent_api.agent_interface import task_config_path
     from qikly.score_questions import is_todo
 
     out = []
     for task_id in task_ids:
+        read = _read_expanded(task_id)
+        if read is None:
+            continue
+        expanded, text = read
         try:
-            with open(task_config_path(task_id), encoding="utf-8") as handle:
-                criteria = (yaml.safe_load(handle) or {}).get("acceptance_criteria")
+            criteria = (yaml.safe_load(text) or {}).get("acceptance_criteria")
         except Exception:
             continue
-        if isinstance(criteria, list) and criteria and all(is_todo(c) for c in criteria):
-            out.append(task_id)
+        decided = any(criterion is None for _, criterion in expanded)
+        if decided_only and not decided:
+            continue
+        if criteria is None and not decided:
+            continue
+        if not criteria or (isinstance(criteria, list)
+                            and all(is_todo(c) for c in criteria)):
+            if criteria is None or isinstance(criteria, list):
+                out.append(task_id)
     return out
 
 
@@ -2880,7 +2922,33 @@ def _append_criteria_to_task(task_id, criteria):
         return 2
     with open(dest, encoding="utf-8") as handle:
         text = handle.read()
-    existing = (yaml.safe_load(text) or {}).get("acceptance_criteria") or []
+    # Read as both agents read it, with short answers written out and the
+    # questions answered "doesn't matter" removed; raw, a bare `3` looked like
+    # a criterion the file already had.
+    from qikly.score_questions import expand_answers, is_todo
+    expanded_text, answers, problems = expand_answers(text)
+    if problems:
+        # An answer that could not be read is written back as a TODO, which
+        # looks like a placeholder, so without this the person's answer (a
+        # refused number, say) would be deleted along with the question.
+        print(file=sys.stderr)
+        print(f"  {task_id} has an answer that could not be read, so nothing "
+              f"was written over it:", file=sys.stderr)
+        for problem in problems:
+            print(f"    {problem}", file=sys.stderr)
+        print("  Fix that answer (or put the TODO back) and run this again.",
+              file=sys.stderr)
+        return 2
+    existing = (yaml.safe_load(expanded_text) or {}).get("acceptance_criteria") or []
+    decided = sum(1 for _, criterion in answers if criterion is None)
+    if decided and (not existing or all(is_todo(c) for c in existing)):
+        print(file=sys.stderr)
+        print(f"  {task_id} has {decided} question{'s' if decided != 1 else ''} "
+              f"answered \"doesn't matter\", which are decisions, so nothing was "
+              f"written over them.", file=sys.stderr)
+        print("  Change those answers (or delete the questions) and run this "
+              "again.", file=sys.stderr)
+        return 2
     # A placeholder qikly wrote itself is not a bar to protect. --scaffold
     # seeds a TODO line so the shape of the file is obvious, and treating that
     # as real criteria blocked the natural sequence: scaffold from your code,
@@ -3174,16 +3242,21 @@ def main():
 
     # A task whose criteria are all still TODO would run with none, since a
     # run skips them, and spend money testing nothing anyone decided.
-    unanswered = [] if args.generate_criteria else _all_todo(task_ids)
+    # With --generate-criteria a file with no criteria at all gets a draft, but
+    # one holding "doesn't matter" answers is never generated over, so it is
+    # still a run with nothing to test.
+    unanswered = _all_todo(task_ids, decided_only=args.generate_criteria)
     if unanswered and args.tasks:
-        print(f"Nothing is answered yet in {', '.join(unanswered)}: every "
-              f"acceptance criterion is still a TODO, which a run skips. Write "
-              f"an answer in place of at least one, then run it again.",
+        print(f"Nothing to test yet in {', '.join(unanswered)}: every "
+              f"acceptance criterion is still a TODO or was answered \"doesn't "
+              f"matter\", and a run skips both. Pick a behaviour or write an "
+              f"answer for at least one, then run it again.",
               file=sys.stderr)
         sys.exit(2)
     if unanswered:
-        print(f"Leaving out {', '.join(unanswered)}: nothing is answered in it "
-              f"yet, since every acceptance criterion is still a TODO.")
+        print(f"Leaving out {', '.join(unanswered)}: nothing to test in it yet, "
+              f"since every acceptance criterion is still a TODO or answered "
+              f"\"doesn't matter\".")
         task_ids = [t for t in task_ids if t not in unanswered]
         if not task_ids:
             sys.exit(2)

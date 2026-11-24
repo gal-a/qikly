@@ -8,6 +8,59 @@ packaging tools would read as `1.1`.
 
 Nothing yet.
 
+## 0.6.5
+
+> Quick-pick questions are now neutral: shuffled options, no yes or no, and "doesn't matter" is always a choice.
+
+### Changed
+- **Quick-pick options no longer say which one your code does now.** The
+  options are shuffled by the question, never sorted by their content, and
+  nothing marks the current behaviour. `keep` is no longer offered: in a new
+  file it is a problem that names the numbers to pick from. A task file
+  written by 0.6.4, with the "(as your code does now)" mark, still expands
+  `keep`.
+- **Every question ends with two reserved options.** "doesn't matter" drops
+  the item (typed out, `doesn't matter`, `don't care`, `either` and
+  `no preference` do the same); `--validate` counts it as decided and stops a
+  file where everything is "doesn't matter". "other" takes your own sentence
+  as `N: <sentence>`. A question with no behaviour to pick, such as the value
+  of a constant, is not numbered at all: it asks for a sentence that names the
+  value, or the words `doesn't matter`, and a bare number there is refused
+  with a message, because it could be your value or an option.
+- **A run needs something to test.** It is refused when every question is
+  answered "doesn't matter" (also `either`, `no preference` and the like), or
+  when those are mixed with TODOs, since there is nothing to test.
+- **Reserved wording never reaches the test agent as a criterion.** The pasted
+  option text, `Either is fine`, `Both are fine`, `I don't care`, `whatever
+  you like`, `4: either`, `4: 3` and the pasted "other" template are read as
+  "doesn't matter" or refused, and a curly apostrophe works. A longer real
+  sentence that merely contains these words is still a criterion.
+- `--validate` numbers every item by its position in the file, counting an
+  item answered "doesn't matter", so "criterion 2" is always the second item.
+- `--criteria-from`, `--explain` and `--generate-criteria` read a file
+  answered "doesn't matter" the way a run does: none of them writes over those
+  decisions or says the file has no criteria. `--criteria-from` also stops, and
+  leaves the file as it is, when an answer in it could not be read.
+- `--take-tests` does not label your own pick "check" when the note above it
+  belongs to a question you answered "doesn't matter".
+- **No yes/no questions.** A dropped normalisation or a moved regex anchor is
+  asked as "How should...". Where qikly can run your code beside the question
+  (as it can for `.strip()` and `.lower()` in the pricing example), the options
+  are the values it found by running it. Only when it could not run the code
+  does the question get two neutral behaviour options built from the change
+  alone. The options survive the saved score, and a 0.6.4 score file gets
+  them from the kind of change.
+- The example task files under `docs/examples/` are regenerated in the new
+  format, and the answer guidance in the Skill (0.3.12, needs qikly 0.6.5)
+  and the docs describes the new answers.
+
+### Added
+- Python 3.13 and 3.14 are declared and tested (closes #8, suggested by
+  @Goldziher in discussion #7).
+
+### Fixed
+- The timeout docstring: only Google's SDK waits indefinitely by default.
+
 ## 0.6.4
 
 > Drafted answers now use your docs folder and top-level guides, and a generated test that can never fail is refused

@@ -270,6 +270,11 @@ SKILL_BODY_HASHES = {
     # 0.3.11: the spec agent drafts answers from the docs folder and
     # top-level guides too, not the README and docstrings alone.
     "0.3.11": "d4b7b955ac1a75b04aa45e77155fe4fb4f49fef5b8941371fb77aab0dc908a7e",
+    # 0.3.12: answers are an option number, N: <value>, "doesn't matter" or
+    # N: <sentence>; options never say which one the code does now. A
+    # question with no behaviours is not numbered. Unreleased, so the entry
+    # is updated in place rather than skipping a version.
+    "0.3.12": "8a745ba234a5810ff283eff4deb90d05bf25ae3ba5e0c74e460a7e1ab1bf7dd1",
 }
 
 

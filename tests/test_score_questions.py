@@ -19,6 +19,7 @@ which the cut removes whole, and a test here holds that.
 A question that does not say where. `if rate < 0 or rate > 100:` holds two
 comparisons, and the questions name the expression rather than the operator.
 """
+import re
 import os
 import subprocess
 import sys
@@ -191,8 +192,10 @@ def _questions(tmp_path, source=MODULE):
 def test_the_block_is_valid_yaml_with_one_todo_per_question(tmp_path):
     questions = _questions(tmp_path)
     data = yaml.safe_load(sq.yaml_block(questions, "2026-10-13 10:00"))
+    # Every question, with options or without, ends with "doesn't matter"
+    # and "other", so the answer line always offers numbers.
     assert data["acceptance_criteria"] == [
-        "TODO: your answer to the question above"] * len(questions)
+        "TODO: write your answer as a sentence, or the words doesn't matter"] * len(questions)
 
 
 @pytest.mark.parametrize("code", [
@@ -211,7 +214,7 @@ def test_no_line_of_code_can_become_a_criterion_or_break_the_file(code):
     q = {"file": "m.py", "path": "/x/m.py", "line": 1, "function": "f",
          "code": code, "question": sq.ask("guard disabled")}
     data = yaml.safe_load("task_id: X\n" + sq.yaml_block([q]))
-    assert data["acceptance_criteria"] == ["TODO: your answer to the question above"]
+    assert data["acceptance_criteria"] == ["TODO: write your answer as a sentence, or the words doesn't matter"]
 
 
 def _scaffold_text(tmp_path):
@@ -505,3 +508,130 @@ def test_validate_says_how_many_answers_are_left(tmp_path):
     checked = _run(["--validate", "--tasks", "PRICING_VERIFY"], str(project))
     out = checked.stdout + checked.stderr
     assert "acceptance criteria are answered; a run skips the" in out, out
+
+
+# ------------------------------------- "doesn't matter" and "other" --
+
+_RESERVED_FILE = (
+    "task_id: T\n"
+    "acceptance_criteria:\n"
+    "  #? What should f(1) do?\n"
+    "  #?   1 = f(1) returns 2\n"
+    "  #?   2 = f(1) raises ValueError\n"
+    "  #?   3 = " + sq.DOESNT_MATTER + "\n"
+    "  #?   4 = " + sq.OTHER + "\n"
+    "  - ANSWER\n")
+
+
+@pytest.mark.parametrize("answer", ["3", '"3"', "doesn't matter", "Doesn't matter.",
+                                    "don't care", "either", "no preference"])
+def test_doesnt_matter_drops_the_item_and_is_never_a_criterion(answer):
+    text, expanded, problems = sq.expand_answers(_RESERVED_FILE.replace("ANSWER", answer))
+    assert problems == []
+    assert expanded == [(answer.strip('"'), None)]
+    assert yaml.safe_load(text)["acceptance_criteria"] is None
+    # Nothing of the question reaches either agent either.
+    assert sq.drop_question_lines(_RESERVED_FILE.replace("ANSWER", answer)).count("f(1)") == 0
+
+
+def test_other_takes_the_persons_sentence():
+    text, expanded, problems = sq.expand_answers(
+        _RESERVED_FILE.replace("ANSWER", '"4: f(1) returns 3 when the cache is warm"'))
+    assert problems == []
+    assert yaml.safe_load(text)["acceptance_criteria"] == ["f(1) returns 3 when the cache is warm"]
+
+
+@pytest.mark.parametrize("answer, said", [("4", "write it as  4: <your sentence>"),
+                                          ("3: x", "takes no value")])
+def test_a_reserved_option_used_wrongly_says_how_to_fix_it(answer, said):
+    _, expanded, problems = sq.expand_answers(_RESERVED_FILE.replace("ANSWER", answer))
+    assert expanded == []
+    assert len(problems) == 1 and said in problems[0], problems
+
+
+def test_every_question_with_behaviours_ends_with_doesnt_matter_and_other():
+    """A question with behaviours to pick ends with the two reserved options.
+    One with none is not numbered at all (see test_bare_number_value_question)."""
+    block = sq.yaml_block([{
+        "file": "m.py", "path": "/x/m.py", "line": 1, "function": "f", "code": "x = 1",
+        "question": "What should f(1) do?",
+        "hint_prompt": "What should f(1) do?",
+        "hint_options": [{"criterion": "f(1) returns 1", "note": "", "now": False},
+                         {"criterion": "f(1) returns 2", "note": "", "now": False}]}])
+    assert block.count(sq.DOESNT_MATTER) == block.count(sq.OTHER) == 1
+    for chunk in block.split("  - \"TODO:")[:-1]:
+        tail = chunk.rstrip().splitlines()[-2:]
+        assert sq.DOESNT_MATTER in tail[0] and sq.OTHER in tail[1], tail
+
+
+# ------------------------------------------------ no yes/no questions --
+
+@pytest.mark.parametrize("kind", ["regex anchors stripped", ".strip() dropped",
+                                  ".lower() dropped", "guard disabled", "raise swallowed",
+                                  "bool True -> False", "int 2 -> 3", "< became <=",
+                                  "and became or", "== became !="])
+def test_no_question_is_a_yes_no_question(kind):
+    """A yes/no stem puts one answer in the question. Every stem asks what,
+    which or how."""
+    question = sq.ask(kind)
+    assert not re.search(r"\b(Should|Is|Does|Do|Can|Would)\b[^.?]*\?\s*$", question), question
+
+
+@pytest.mark.parametrize("kind, words", [
+    ("regex anchors stripped", ("as valid", "as invalid")),
+    (".rstrip() dropped", ("as the same", "as different")),
+    (".lower() dropped", ("as the same", "as different")),
+])
+def test_a_change_with_two_honest_answers_gets_both_as_options(kind, words):
+    options = sq.neutral_options(kind, "parse")
+    assert len(options) == 2
+    assert {w for w in words for o in options if o.endswith(w)} == set(words)
+    assert all(o.startswith("`parse`") for o in options)
+    assert not any("does now" in o for o in options)
+
+
+def test_neutral_options_come_in_both_orders_across_questions():
+    firsts = {sq.neutral_options(".strip() dropped", f"f{n}")[0].endswith("as the same")
+              for n in range(30)}
+    assert firsts == {True, False}
+
+
+@pytest.mark.parametrize("kind", ["guard disabled", "raise swallowed", "int 2 -> 3"])
+def test_other_kinds_get_no_made_up_options(kind):
+    assert sq.neutral_options(kind, "f") == []
+
+
+def test_a_neutral_option_becomes_the_criterion_it_states():
+    q = {"file": "m.py", "path": "/x/m.py", "line": 3, "function": "label",
+         "question": sq.ask(".strip() dropped"),
+         "options": sq.neutral_options(".strip() dropped", "label")}
+    block = sq.yaml_block([q])
+    assert "#?   3 = " + sq.DOESNT_MATTER in block and "#?   4 = " + sq.OTHER in block
+    assert '- "TODO: pick 1, 2, 3 or 4, or write your own"' in block
+    text = ("task_id: T\n" + block).replace('"TODO: pick 1, 2, 3 or 4, or write your own"', "1")
+    _, expanded, problems = sq.expand_answers(text)
+    assert problems == [] and expanded == [("1", q["options"][0])]
+
+
+def test_neutral_options_survive_the_saved_score(tmp_path):
+    """The options are built at --score time and saved for --scaffold. The
+    first version built them and then dropped them in save(), so the task
+    file showed none: tested here through the real save and load."""
+    module = tmp_path / "m.py"
+    module.write_text("def label(code):\n    return code.strip()\n", encoding="utf-8")
+    questions = sq.build([{"path": str(module), "file": "m.py",
+                           "change": ".strip() dropped, line 2"}])
+    assert questions and questions[0]["options"], questions
+    saved = tmp_path / "s_questions.json"
+    sq.save(questions, str(saved), "m.py", [str(module)])
+    loaded, _ = sq.latest_for(str(module), str(tmp_path))
+    assert loaded[0]["options"] == questions[0]["options"]
+    block = sq.yaml_block(loaded)
+    assert "#?   1 = `label` treats" in block and sq.DOESNT_MATTER in block
+
+
+def test_a_score_saved_without_options_still_gets_them_from_its_kind():
+    """A score saved by 0.6.4 has no options; --scaffold has the kind."""
+    q = {"file": "m.py", "path": "/x/m.py", "line": 2, "function": "label",
+         "question": sq.ask(".strip() dropped"), "kind": ".strip() dropped"}
+    assert "#?   1 = `label` treats two inputs" in sq.yaml_block([q])

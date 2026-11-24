@@ -35,8 +35,10 @@ scenario, so the code became a criterion.
 """
 import ast
 import glob
+import hashlib
 import json
 import os
+import random
 import re
 from datetime import datetime
 
@@ -136,20 +138,51 @@ def ask(kind, source=None, line=None):
     if kind == "guard disabled":
         return ("Your tests pass with this check switched off. Which input, "
                 "if any, should it catch, and what should happen to it?")
+    # Never a yes/no stem: "Should X be accepted?" puts one answer in the
+    # question. These ask how, and neutral_options() states both behaviours.
     if kind == "regex anchors stripped":
         return ("Your tests pass when this pattern matches only part of a "
-                "value. Should a value with extra characters before or after "
-                "a valid one be accepted?")
+                "value. How should a value with extra characters before or "
+                "after a valid one be treated?")
     dropped = _DROPPED.match(kind)
     if dropped:
         how = _NORMALISED.get(dropped.group(1), "only in that normalisation")
-        return (f"Your tests pass without `.{dropped.group(1)}()` here. Should "
-                f"two inputs that differ {how} be treated the same?")
+        return (f"Your tests pass without `.{dropped.group(1)}()` here. How "
+                f"should two inputs that differ {how} be handled?")
     if kind == "raise swallowed":
         return ("Your tests pass when this error is never raised. Which input, "
                 "if any, should raise it?")
     return (f"Your tests pass with this change: {kind}. What should this line "
             f"guarantee?")
+
+
+def neutral_options(kind, function=None):
+    """
+    Two behaviours to pick from for a planted change whose question has two
+    honest answers, worked out from the change alone (no code is run): a
+    dropped normalisation and stripped regex anchors. Each is a statement the
+    test writer can turn into a test, neither says which one the code does,
+    and they come in an order set by the question, not by which is current.
+    Every other kind gets none, and its question keeps only "doesn't matter"
+    and "other" plus the person's own sentence.
+    """
+    where = f"`{function}`" if function else "this code"
+    pair = None
+    if kind == "regex anchors stripped":
+        pair = [f"{where} treats a value with extra characters before or after "
+                f"a valid one as valid",
+                f"{where} treats a value with extra characters before or after "
+                f"a valid one as invalid"]
+    dropped = _DROPPED.match(kind or "")
+    if dropped and dropped.group(1) in _NORMALISED:
+        how = _NORMALISED[dropped.group(1)]
+        pair = [f"{where} treats two inputs that differ {how} as the same",
+                f"{where} treats two inputs that differ {how} as different"]
+    if not pair:
+        return []
+    seed = int(hashlib.sha256(f"{kind}|{function}".encode("utf-8")).hexdigest()[:8], 16)
+    random.Random(seed).shuffle(pair)
+    return pair
 
 
 def _enclosing(source, line):
@@ -234,7 +267,8 @@ def build(missed):
         seen.add(key)
         out.append({"file": label, "path": path, "line": line,
                     "function": function, "code": code, "question": question,
-                    "edge": edge, "number": number, "change": item.get("change")})
+                    "edge": edge, "number": number, "change": item.get("change"),
+                    "options": neutral_options(kind, function)})
     asked_edges = {(q["path"], q["line"], q["edge"]) for q in out if q["edge"]}
     out = [q for q in out
            if not (q["number"] and (q["path"], q["line"], q["number"]) in asked_edges)]
@@ -296,10 +330,13 @@ def save(questions, path, label, scored=()):
             "written": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "scored": sorted({os.path.abspath(f) for f in scored}),
             # edge, number and change too: `--scaffold` runs the code
-            # beside each one to say what it does there now.
+            # beside each one to say what it does there now. And options,
+            # the neutral behaviours worked out from the change alone: left
+            # off this list, they were built and then lost before the task
+            # file, so the question shipped with no options at all.
             "questions": [{k: q.get(k) for k in
                            ("file", "path", "line", "function", "code", "question",
-                            "edge", "number", "change")}
+                            "edge", "number", "change", "options")}
                           for q in questions]}
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(data, handle, indent=1)
@@ -389,6 +426,47 @@ _UNPRINTABLE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x84\x86-\x9f\ud800-\
 
 # Where an option's criterion needs the person's value: "1: 0.0".
 VALUE = "VALUE"
+# The two options every question ends with, after its behaviours. Picking
+# DOESNT_MATTER records that nothing should be tested there: the item is
+# dropped before either agent reads the file, and --validate counts it as
+# decided, not as a TODO. OTHER takes the person's own sentence, `4: <it>`.
+# Neither is a behaviour, so neither says or implies what the code does.
+DOESNT_MATTER = "doesn't matter, so no test for this"
+OTHER = "other: write  N: <your sentence>, or just the sentence"
+_RESERVED = (DOESNT_MATTER, OTHER)
+# Typed instead of the number, these mean "doesn't matter" too.
+_DOESNT_MATTER_WORDS = re.compile(
+    r"(?i)(?:(?:it|that|this)\s+)?(?:doesn'?t|does\s+not|don'?t|do\s+not)\s+"
+    r"(?:really\s+)?(?:matter|care)(?:\s+(?:here|to\s+me))?(?:,?\s+either\s+way)?"
+    r"|i\s+(?:don'?t|do\s+not)\s+(?:really\s+)?care(?:\s+(?:which|either\s+way))?"
+    r"|either(?:\s+(?:one|way))?(?:\s+(?:is|are))?(?:\s+(?:fine|ok|okay|good))?"
+    r"|both\s+(?:are|is)\s+(?:fine|ok|okay|good)"
+    r"|whatever(?:\s+(?:you\s+(?:like|want|prefer)|is\s+fine|works))?"
+    r"|no\s+preference")
+# The reserved texts as the person might paste them: the option's own line, or
+# the "other" template. Matched against the whole answer only, never a part.
+_OTHER_TEMPLATES = (OTHER, "write  N: <your sentence>, or just the sentence",
+                    "N: <your sentence>", "<your sentence>")
+
+
+def _reserved_kind(text):
+    """
+    "dm", "other" or None: whether a whole answer (or the sentence after
+    `N:`) is nothing but reserved wording, so it must never reach the test
+    agent as a criterion. The rule is conservative: a full-line match after
+    trimming, dropping quotes and a final full stop, folding the typographic
+    apostrophe and case. A longer real sentence that merely contains these
+    words ("it doesn't matter which currency shows, unless the amount is 0")
+    does not match and stays a criterion.
+    """
+    folded = re.sub(r"\s+", " ", text.replace("’", "'").replace("‘", "'")
+                    .replace("“", '"').replace("”", '"')).strip()
+    folded = folded.strip("\"'").strip().rstrip(".!").strip().lower()
+    if folded == DOESNT_MATTER or _DOESNT_MATTER_WORDS.fullmatch(folded):
+        return "dm"
+    if any(folded == re.sub(r"\s+", " ", t).lower().strip() for t in _OTHER_TEMPLATES):
+        return "other"
+    return None
 _OPTION = re.compile(r"^[ \t]*#\?[ \t]+(\d+) = (.+?)(?:   \((.*)\))?[ \t]*$")
 _ITEM = re.compile(r"^([ \t]+)-([ \t]+)(.*?)[ \t]*$")
 # An option number with something around it: `1)`, `(1)`, `1.`, `#1`,
@@ -433,18 +511,30 @@ def _listed(options, joiner=", "):
     return joiner.join(sorted(options, key=int))
 
 
-def expand_answers(text):
+# What an item answered "doesn't matter" is written as, with `keep_dropped`.
+DROPPED = "qikly: answered doesn't matter"
+
+
+def expand_answers(text, keep_dropped=False):
     """
     (text, expanded, problems): the task file with each short answer under
     acceptance_criteria written out as the criterion it stands for, as both
     agents and --validate read it. A short answer is an option's number,
-    `2`; a number and a value, `1: 0.0`, for an option that asks for one;
-    or `keep`, for the option that is what the code does now. Quotes are
+    `2`; or a number and a value, `1: 0.0`, for an option that asks for one.
+    `keep` picks the option a 0.6.4 file marked "(as your code does now)";
+    a new file marks none, so there it is a problem that names the numbers to
+    pick instead. Quotes are
     optional for a short answer. A sentence of the person's own is left as
     written: with a colon and a space in it, YAML reads it as a mapping, so
-    such a sentence needs its quotes, as any YAML string does. `expanded` holds
-    (answer, criterion) pairs; an answer that names no option is turned
-    into a TODO, which a run skips, and said in `problems`.
+    such a sentence needs its quotes, as any YAML string does. Every question
+    ends with two reserved options: "doesn't matter" (or those words typed)
+    removes the item, so no test is written for it, and "other" takes the
+    person's sentence as `N: <sentence>`. `expanded` holds (answer, criterion)
+    pairs, the criterion None for "doesn't matter"; an answer that names no
+    option is turned into a TODO, which a run skips, and said in `problems`.
+    With `keep_dropped`, an item answered "doesn't matter" stays in the text,
+    as the string DROPPED, instead of vanishing, so a reader that numbers the
+    items by their position in the file, as the problems here do, still can.
     """
     lines = (text or "").split("\n")
     start = next((i for i, l in enumerate(lines)
@@ -502,7 +592,25 @@ def expand_answers(text):
         short = value.strip()
         if len(short) > 1 and short[0] in _SMART and short[-1] in _SMART:
             short = short[1:-1].strip()
-        criterion, problem = None, None
+        criterion, problem, decided = None, None, False
+        # A question with no behaviour to pick, only the two reserved options:
+        # a bare number there is most likely the person's own value ("it
+        # should be 1"), and reading it as option 1 would silently make it
+        # "doesn't matter". So a bare number is refused, never guessed at.
+        only_reserved = bool(mine) and all(text in _RESERVED for text in mine.values())
+        # "doesn't matter" typed in words, or the option's own text pasted,
+        # under any question qikly asked.
+        kind = _reserved_kind(short) if (mine or asked_here) else None
+        if kind == "dm":
+            expanded.append((short, None))
+            lines[i] = prefix + _quote(DROPPED) if keep_dropped else None
+            continue
+        dm_number = next((n for n, t in mine.items() if t == DOESNT_MATTER), None)
+        # Under a question with no behaviours the words are the only way:
+        # the number of "doesn't matter" is refused there as a bare number.
+        skip_how = (f"write {dm_number} or the words  doesn't matter"
+                    if dm_number and not only_reserved
+                    else "write the words  doesn't matter")
         # Only under a question qikly numbered: anywhere else a line such as
         # `- 3: text` or `- id: 7` is the person's own YAML, a criterion
         # written as a mapping, and is left exactly as it is.
@@ -514,7 +622,24 @@ def expand_answers(text):
         # a mapping, so it is caught here too, before YAML sees it.
         negative = (re.fullmatch(r"-[ \t]*(\d+)(?:[ \t]*:[ \t]*(.+))?", short)
                     if mine else None)
-        if negative:
+        if kind == "other":
+            problem = (f"criterion {number} is the template text of the \"other\" "
+                       f"option, not an answer: write your own sentence, or {skip_how}")
+        elif only_reserved and (
+                re.fullmatch(r"-?\d+(?:\.\d+)?", short) or negative
+                or (pick and mine.get(pick.group(1)) != OTHER)
+                or (not pick and (_SEVERAL.fullmatch(short) or _DECORATED.fullmatch(short)
+                                  or _numbered_slip(short, mine)))):
+            # Older files numbered the two reserved options; a new one does
+            # not. Either way a number here is the person's value, not a pick.
+            value = (short if re.fullmatch(r"-?\d+(?:\.\d+)?", short)
+                     else (re.findall(r"-?\d+(?:\.\d+)?", short) or ["100"])[-1])
+            problem = (f"criterion {number} answers {short!r}, but this question "
+                       f"has no behaviours to pick, so a number could be "
+                       f"your value or an option. To give a value, write a "
+                       f"sentence that names it, such as  MAX_RATE is {value}; "
+                       f"to skip the question, write the words  doesn't matter")
+        elif negative:
             digit, given = negative.group(1), negative.group(2)
             fixed = digit + (f": {given.strip()}" if given else "")
             if digit in mine:
@@ -524,10 +649,33 @@ def expand_answers(text):
             else:
                 problem = (f"criterion {number} answers {short!r}, but its options "
                            f"are {_listed(mine)}")
-        elif not mine and asked_here and re.fullmatch(r"-?\d+(?:\.\d+)?", short):
+        elif (not mine and asked_here
+              and re.fullmatch(r"(?:\d+[ \t]*:[ \t]*)?-?\d+(?:\.\d+)?", short)):
             problem = (f"criterion {number} answers {short!r}, but that question "
-                       f"has no numbered options: write the answer as a sentence "
-                       f"that names a value, such as  MAX_RATE is 100")
+                       f"has no numbered options, so a bare number could be "
+                       f"your value or an option: write the answer as a sentence "
+                       f"that names a value, such as  MAX_RATE is "
+                       f"{short.split(':')[-1].strip()}  "
+                       f"or, to skip it, the words  doesn't matter")
+        elif pick and mine.get(pick.group(1)) == DOESNT_MATTER:
+            if pick.group(2):
+                problem = (f"criterion {number}: option {pick.group(1)} (doesn't "
+                           f"matter) takes no value, so write just  {pick.group(1)}")
+            else:
+                decided = True
+        elif pick and mine.get(pick.group(1)) == OTHER:
+            given = (pick.group(2) or "").strip()
+            if given and (_reserved_kind(given) or re.fullmatch(r"-?\d+(?:\.\d+)?", given)):
+                problem = (f"criterion {number}: {given!r} after {pick.group(1)}: is "
+                           f"not a sentence the tests can use (it is reserved "
+                           f"wording or a bare number), so write your own sentence, "
+                           f"or {skip_how}")
+            elif given:
+                criterion = given
+            else:
+                problem = (f"criterion {number}: option {pick.group(1)} is your own "
+                           f"answer, so write it as  {pick.group(1)}: <your sentence>, "
+                           f"or just the sentence")
         elif pick:
             option = mine.get(pick.group(1))
             if option is None:
@@ -573,10 +721,12 @@ def expand_answers(text):
                            f"are {_listed(mine)}")
         elif short.lower() == "keep" and (mine or not quoted):
             if mine_now is None:
-                problem = (f"criterion {number} answers 'keep', which picks the "
-                           f"option marked (as your code does now), and this "
-                           f"question has none: "
-                           + (f"pick {_listed(mine, ' or ')}, or write the answer"
+                # Only a 0.6.4 file marks an option as what the code does now;
+                # a new one never does, so `keep` has nothing to pick.
+                problem = (f"criterion {number} answers 'keep', but no option is "
+                           f"marked as what the code does now: "
+                           + (f"pick {_listed(mine, ' or ')}, the option that says "
+                              f"what it should do, or write the answer"
                               if mine else "write the answer as a sentence"))
             else:
                 criterion = mine[mine_now]
@@ -598,20 +748,34 @@ def expand_answers(text):
             # `first`, `keep it`, `n/a`, `raises ValueError`: none is an
             # answer this question takes, and none is a criterion on its own,
             # since the question is removed before the tests are written.
-            example = mine[_listed(mine).split(", ")[0]].replace(VALUE, "0")
-            problem = (f"criterion {number} is {short!r}, which this question does "
-                       f"not take as an answer. Write an option number "
-                       f"({_listed(mine, ' or ')}), keep, or a whole sentence "
-                       f"that stands on its own, such as  - {_quote(example)}")
+            behaviours = [mine[n] for n in _listed(mine).split(", ")
+                          if mine[n] not in _RESERVED]
+            example = (behaviours[0].replace(VALUE, "0") if behaviours
+                       else "MAX_RATE is 100")
+            if only_reserved:
+                problem = (f"criterion {number} is {short!r}, which this question "
+                           f"does not take as an answer. Write a whole sentence "
+                           f"that names the value, such as  - {_quote(example)}, "
+                           f"or the words  doesn't matter")
+            else:
+                problem = (f"criterion {number} is {short!r}, which this question does "
+                           f"not take as an answer. Write an option number "
+                           f"({_listed(mine, ' or ')}), or a whole sentence "
+                           f"that stands on its own, such as  - {_quote(example)}")
         if problem:
             problems.append(problem)
             lines[i] = prefix + _quote(f"TODO: {short} could not be read: {problem}")
+        elif decided:
+            # Nothing to test here, by the person's choice: gone before either
+            # agent reads the file, and counted by --validate as decided.
+            expanded.append((short, None))
+            lines[i] = prefix + _quote(DROPPED) if keep_dropped else None
         elif criterion:
             expanded.append((short, criterion))
             lines[i] = prefix + _quote(criterion)
     if options:
         problems.append(_unanswered(options))
-    return "\n".join(lines), expanded, problems
+    return "\n".join(l for l in lines if l is not None), expanded, problems
 
 
 _PICK_WORDS = {"option", "opt", "answer", "pick", "choice", "keep", "yes", "no", "number"}
@@ -768,6 +932,35 @@ def _comment(text, width=78):
                           break_on_hyphens=False)] or ["  " + MARK]
 
 
+def _reserved(first):
+    """The option lines every question ends with, numbered from `first`:
+    "doesn't matter" and "other". Read back by `expand_answers`."""
+    return ["  %s   %d = %s" % (MARK, first + i, text) for i, text in enumerate(_RESERVED)]
+
+
+def _answer_header(behaviours):
+    """The comment line above a question's options. With no behaviour to pick
+    there are no numbered options at all, so a number is never invited: the
+    person writes a sentence that names the value, or the words."""
+    if not behaviours:
+        return _comment("Write a sentence that names the value, or the words  "
+                        "doesn't matter  to skip it.")
+    return _comment("To answer with a number, replace the answer line below "
+                    "with one of these:")
+
+
+def _pick_line(count):
+    """The answer line under a question with `count` numbered options. With
+    only the two reserved options there is nothing to pick: a bare number
+    there would be read as an option, so the line asks for words instead."""
+    if count <= len(_RESERVED):
+        return ("  - \"TODO: write your answer as a sentence, "
+                "or the words doesn't matter\"")
+    numbers = [str(n) for n in range(1, count + 1)]
+    listed = ", ".join(numbers[:-1]) + " or " + numbers[-1] if count > 1 else numbers[0]
+    return f'  - "TODO: pick {listed}, or write your own"'
+
+
 def yaml_block(questions, written=None):
     """
     The `acceptance_criteria` block `--scaffold` writes when there are questions.
@@ -808,10 +1001,8 @@ def yaml_block(questions, written=None):
                 lines.append("  %s " % MARK + _printable(found + ask))
             else:
                 lines += _comment(prompt)
-            lines += _comment("To answer with a number, replace the answer line below "
-                              "with one of these:")
             options = q.get("hint_options") or []
-            now = None
+            lines += _answer_header(options)
             for n, option in enumerate(options, 1):
                 if isinstance(option, str):
                     option = {"criterion": option, "note": "", "now": False}
@@ -825,18 +1016,30 @@ def yaml_block(questions, written=None):
                 # On a line of its own, never wrapped: it is read back.
                 lines.append("  %s   %d = %s" % (MARK, n, exact_text(option["criterion"]))
                              + (f"   ({_printable(note)})" if note else ""))
-                if option.get("now"):
-                    now = n
+            if options:
+                lines += _reserved(len(options) + 1)
             if q.get("covers"):
                 lines += _comment(f"(This also answers {q['covers']} more "
                                   f"place{'s' if q['covers'] > 1 else ''} your "
                                   f"tests leave open on the same call.)")
-            numbers = " or ".join(str(n) for n in range(1, len(options) + 1))
-            lines.append(f'  - "TODO: pick {numbers}' + (", keep" if now else "")
-                         + ', or write your own"' if options else _ANSWER)
+            # No `keep`: it picked the option marked as what the code does
+            # now, and a mark reads as the answer. 0.6.4 files still expand it.
+            lines.append(_pick_line(len(options) + len(_RESERVED) if options else 0))
         else:
             lines += _comment(q["question"])
-            lines.append(_ANSWER)
+            # Behaviours worked out from the change alone, where it has two
+            # honest answers; never what the code does now.
+            # A score saved by 0.6.4 carries no options: work them out from
+            # the kind of change, which --scaffold has matched back by now.
+            neutral = (q.get("options")
+                       or (neutral_options(q["kind"], q.get("function"))
+                           if q.get("kind") else []))
+            lines += _answer_header(neutral)
+            for n, option in enumerate(neutral, 1):
+                lines.append("  %s   %d = %s" % (MARK, n, exact_text(option)))
+            if neutral:
+                lines += _reserved(len(neutral) + 1)
+            lines.append(_pick_line(len(neutral) + len(_RESERVED) if neutral else 0))
         lines.append("")
     return "\n".join(lines).rstrip("\n") + "\n"
 

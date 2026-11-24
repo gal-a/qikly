@@ -7,7 +7,7 @@
 <!-- mcp-name: io.github.gal-a/qikly -->
 
 [![Agent Skill](https://img.shields.io/badge/Agent_Skill-qikly%20--install--skill-7e22ce)](https://github.com/gal-a/qikly/blob/main/docs/skill.md)
-[![2,600+ tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=2%2C600%2B%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
+[![2,800+ tests](https://img.shields.io/github/actions/workflow/status/gal-a/qikly/ci.yml?branch=main&event=push&label=2%2C800%2B%20tests)](https://github.com/gal-a/qikly/actions/workflows/ci.yml)
 [![pypi](https://img.shields.io/pypi/v/qikly?color=blue)](https://pypi.org/project/qikly/)
 [![python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://pypi.org/project/qikly/)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](https://github.com/gal-a/qikly/blob/main/LICENSE)
@@ -132,8 +132,9 @@ qikly --tasks my_module.py       # 3. the run                      a cent or so
    is, or change any answer you disagree with, with or without quotes. What
    the documentation cannot decide is left as a TODO: answer it with an
    option's number where qikly found values by running your code
-   (`1: <value>` for one that asks for a value, `keep` for what the code does
-   now), or a sentence that names a value. A TODO you leave is skipped.
+   (`1: <value>` for one that asks for a value; "doesn't matter" drops the
+   question; `N: <sentence>` is your own answer), or a sentence that names a
+   value. No option says which one the code does now. A TODO you leave is skipped.
    Without a key, every answer is yours to write, and the `requirements`
    line is marked `TODO: MODIFY THIS:`. On a folder it writes one task file
    for each module step 1 asked about. Lines starting `#?` are notes for you,
@@ -795,7 +796,7 @@ a run.
 
 **Two ways to pin, and the choice is yours.** `@v0` is a moving alias that
 this project repoints at every release, so you receive fixes without receiving
-a breaking change. `@v0.6.4` is an exact pin that never moves, so nothing
+a breaking change. `@v0.6.5` is an exact pin that never moves, so nothing
 changes under you and nothing reaches you either. The templates use `@v0`
 because most people want the fixes; use the exact form if your policy requires
 it.
@@ -861,7 +862,7 @@ left holding afterwards.
 | **Cost forecast** | Printed before a run starts, from your own history when you have any, labelled as a projection rather than a price |
 | **PR comments** | `--pr-comment` renders the latest run as markdown; the template workflow updates one comment in place rather than adding many |
 | **Pre-commit hook** | `qikly-validate`, the free check, so a hook never bills you for typing `git commit` |
-| **GitHub Action** | `gal-a/qikly@v0.6.4`, uploading the suite, the code and the JUnit XML |
+| **GitHub Action** | `gal-a/qikly@v0.6.5`, uploading the suite, the code and the JUnit XML |
 
 ## Where it fits today
 

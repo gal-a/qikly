@@ -13,7 +13,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qikly"
-version = "0.6.4"
+version = "0.6.5"
 description = "Generates a test suite from acceptance criteria, then converges code against it with an agent that never sees those criteria."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,6 +28,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Software Development :: Testing",
 ]

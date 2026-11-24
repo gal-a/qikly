@@ -58,7 +58,8 @@ of these, with or without quotes, or leave it, and a run skips it:
 ```yaml
   - 2                                          # option 2, where qikly lists options
   - 1: 0.0                                     # option 1, with your value
-  - keep                                       # what your code does now, where one is shown
+  - 3                                          # the option "doesn't matter": drops the question
+  - 4: label('VIP') returns 'gold'             # "other": N, then your sentence
   - apply_discount(100, 100) raises ValueError # or your own sentence, naming a value
 ```
 
@@ -74,9 +75,13 @@ criterion it becomes.
   agent drafted it from the README, run on 2026-10-22 with Gemini. In
   `pricing/` it drafted all six answers, one marked `CHECK`.
 - `PRICING_VERIFY.answered.yaml` is the no-key file answered by hand: by
-  number, by number and value, and with `keep`, quoted and not.
-  `shop_folder/`'s also answers one question with a sentence, and its
-  `RULES_VERIFY.answered.yaml` leaves one as TODO, to show a run skips it.
+  number, by number and value, with "doesn't matter" and with "other"
+  (`N: <sentence>`), quoted and not. `shop_folder/`'s also answers one
+  question with a sentence, and its `RULES_VERIFY.answered.yaml` leaves one
+  as TODO, to show a run skips it.
+
+The drafted files predate 0.6.5 and show the older option format, with the
+"(as your code does now)" mark and `keep`; new files no longer offer either.
 
 Your own answers can differ: they are decisions about what the code should
 do. The dates and line numbers in the `#?` notes are from the run that wrote

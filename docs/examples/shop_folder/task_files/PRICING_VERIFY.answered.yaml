@@ -45,14 +45,13 @@ requirements:
 # the quotes:
 #   - 2              pick an option numbered above it
 #   - 1: 0.0         an option that asks for a value, and the value
-#   - keep           what your code does now is right
 #   - example_fn(0) returns 1.5      or write your own, naming a value
 # `qikly --validate` shows each short answer as the criterion it becomes.
 # A TODO you leave is skipped. The question lines above each TODO are notes
 # for you, and no agent reads them. Keep these values out of every
 # other line of this file, comments included: the coding agent reads the rest.
 acceptance_criteria:
-  #? 4 questions from qikly --score on 2026-10-25 10:48: what your tests do
+  #? 4 questions from qikly --score on 2026-11-24 00:01: what your tests do
   #? not check. Answer from what the code is meant to do, not from what it
   #? does now.
 
@@ -63,28 +62,36 @@ acceptance_criteria:
   #? To answer with a number, replace the answer line below with one of these:
   #?   1 = apply_discount(100, 0) returns VALUE   (write "1: <the value>"; today discount_rate 1 returns 99.0)
   #?   2 = apply_discount(100, 0) raises ValueError   (as discount_rate -1 does now)
-  - 1: 100.0
+  #?   3 = doesn't matter, so no test for this
+  #?   4 = other: write  N: <your sentence>, or just the sentence
+  - "1: 100.0"
 
   #? pricing.py, apply_discount, line 5:
   #?     if discount_rate < 0 or discount_rate > MAX_DISCOUNT_RATE:
-  #? Your tests pass whether this is `discount_rate > MAX_DISCOUNT_RATE` or `discount_rate >= MAX_DISCOUNT_RATE`,
-  #? so nothing checks the boundary itself. What should happen at exactly
-  #? `MAX_DISCOUNT_RATE`?
-  - apply_discount(100, 100) raises ValueError
+  #? Your tests pass whether this is `discount_rate > MAX_DISCOUNT_RATE` or
+  #? `discount_rate >= MAX_DISCOUNT_RATE`, so nothing checks the boundary
+  #? itself. What should happen at exactly `MAX_DISCOUNT_RATE`?
+  #? Write a sentence that names the value, or the words doesn't matter to
+  #? skip it.
+  - "2: apply_discount(100, 100) raises ValueError"
 
   #? pricing.py, apply_discount, line 5:
   #?     if discount_rate < 0 or discount_rate > MAX_DISCOUNT_RATE:
   #? What should apply_discount(100, -11) do?
   #? To answer with a number, replace the answer line below with one of these:
-  #?   1 = apply_discount(100, -11) raises ValueError   (as your code does now)
-  #?   2 = apply_discount(100, -11) returns 111.0
+  #?   1 = apply_discount(100, -11) returns 111.0
+  #?   2 = apply_discount(100, -11) raises ValueError
+  #?   3 = doesn't matter, so no test for this
+  #?   4 = other: write  N: <your sentence>, or just the sentence
   #? (This also answers 2 more places your tests leave open on the same call.)
-  - keep
+  - 2
 
   #? pricing.py, apply_discount, line 7:
   #?     return round(price * (1 - discount_rate / 100), 2)
   #? What should apply_discount(100, 10.333) do?
   #? To answer with a number, replace the answer line below with one of these:
   #?   1 = apply_discount(100, 10.333) returns 89.667
-  #?   2 = apply_discount(100, 10.333) returns 89.67   (as your code does now)
-  - "keep"
+  #?   2 = apply_discount(100, 10.333) returns 89.67
+  #?   3 = doesn't matter, so no test for this
+  #?   4 = other: write  N: <your sentence>, or just the sentence
+  - "doesn't matter"

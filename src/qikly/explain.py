@@ -46,6 +46,19 @@ def build(task_id):
                                                  _task_without_acceptance_criteria)
 
     full = _read_task(task_id)
+    # Read the way the run reads it, including a file saved in the old local
+    # encoding, which a plain utf-8 read would stop on.
+    from qikly.cli import _read_expanded
+    from qikly.score_questions import is_todo
+    decided, pending = 0, 0
+    got = _read_expanded(task_id)
+    if got is not None:
+        decided = sum(1 for _, c in got[0] if c is None)
+        try:
+            items = (yaml.safe_load(got[1]) or {}).get("acceptance_criteria") or []
+        except yaml.YAMLError:
+            items = []
+        pending = sum(1 for c in items if isinstance(c, str) and is_todo(c))
     withheld = _task_without_acceptance_criteria(task_id)
     criteria = (yaml.safe_load(full) or {}).get("acceptance_criteria") or []
 
@@ -65,6 +78,10 @@ def build(task_id):
         "task_id": task_id,
         "task_path": path,
         "criteria_count": len(criteria),
+        # Questions answered "doesn't matter": decided, with nothing to test.
+        "decided": decided,
+        # Questions still left as a TODO: skipped, so nothing to test either.
+        "pending": pending,
         "criteria": criteria,
         "test_generation_chars": len(full),
         "coding_agent_chars": len(withheld),
@@ -96,13 +113,11 @@ def _restated_lines(task_id):
     # the whole body once hid a NameError in this very function and returned
     # "nothing restated", which is the shape of guard this project exists to
     # argue against: it reported a clean result while checking nothing.
-    try:
-        with open(task_config_path(task_id), encoding="utf-8") as handle:
-            raw = handle.read()
-    except OSError:
+    from qikly.cli import _read_expanded
+    got = _read_expanded(task_id)
+    if got is None:
         return []
-    from qikly.score_questions import expand_answers
-    raw = expand_answers(raw)[0]
+    raw = got[1]
     task = yaml.safe_load(raw) or {}
     return [{"line": line, "criterion": crit, "score": score}
             for line, crit, score in _restated_outside_requirements(raw, task)]
@@ -118,6 +133,18 @@ def render(facts):
     lines.append("  what each agent sees")
     lines.append("=" * 72)
     lines.append("")
+
+    if not count and facts.get("decided"):
+        if facts.get("pending"):
+            lines.append(f"  No question in {task_id} has an answer to test: each is")
+            lines.append("  a TODO or answered \"doesn't matter\", so there is no")
+            lines.append("  criterion to withhold and nothing to show.")
+            lines.append("  Pick a behaviour for at least one, or write an answer.")
+            return "\n".join(lines)
+        lines.append(f"  Every question in {task_id} is answered \"doesn't matter\",")
+        lines.append("  so there is no criterion to withhold and nothing to show.")
+        lines.append("  Pick a behaviour for at least one, or write an answer.")
+        return "\n".join(lines)
 
     if not count:
         lines.append(f"  {task_id} declares no acceptance_criteria, so there is")

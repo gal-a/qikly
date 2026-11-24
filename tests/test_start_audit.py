@@ -491,7 +491,8 @@ def test_a_helper_reached_only_through_a_public_function_gets_options(tmp_path):
     prompt, options = so.menu(q, source, [tests], str(tmp_path), mutant)
     assert prompt and prompt.startswith("What should apply(") and "runs through _check" in prompt
     labels = [o["label"] for o in options]
-    assert any(l.startswith("raise TypeError") and "as your code does now" in l for l in labels)
+    assert any(l.startswith("raise TypeError") for l in labels), labels
+    assert not any("does now" in l for l in labels), labels
     assert labels[-1] == "type my own answer"
 
 
