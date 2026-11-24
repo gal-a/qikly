@@ -19,9 +19,12 @@ packaging tools would read as `1.1`.
   file where everything is "doesn't matter". "other" takes your own sentence
   as `N: <sentence>`.
 - **No yes/no questions.** A dropped normalisation or a moved regex anchor is
-  asked as "How should...", with two neutral behaviour options built from the
-  change alone. The options survive the saved score, and a 0.6.4 score file
-  gets them from the kind of change.
+  asked as "How should...". Where qikly can run your code beside the question
+  (as it can for `.strip()` and `.lower()` in the pricing example), the options
+  are the values it found by running it. Only when it could not run the code
+  does the question get two neutral behaviour options built from the change
+  alone. The options survive the saved score, and a 0.6.4 score file gets
+  them from the kind of change.
 - The example task files under `docs/examples/` are regenerated in the new
   format, and the answer guidance in the Skill (0.3.12, needs qikly 0.6.5)
   and the docs describes the new answers.
@@ -32,6 +35,25 @@ packaging tools would read as `1.1`.
 
 ### Fixed
 - The timeout docstring: only Google's SDK waits indefinitely by default.
+- A run is refused when every question is answered "doesn't matter" (also
+  `either`, `no preference` and the like), or when those are mixed with TODOs:
+  there is nothing to test, and it used to start and spend money anyway.
+- A bare number under a question with nothing to pick except "doesn't matter"
+  and "other" is refused with a message, instead of being read as "doesn't
+  matter" when you meant it as a value. The scaffolded answer line for those
+  questions now asks for a sentence or the words "doesn't matter".
+- Reserved wording can no longer reach the test agent as a criterion: the
+  pasted option text, `Either is fine`, `I don't care`, `4: either`, `4: 3` and
+  the pasted "other" template are read as "doesn't matter" or refused, and a
+  curly apostrophe works. A longer real sentence that merely contains these
+  words is still a criterion.
+- `--validate` numbers every item by its position in the file, counting an
+  item answered "doesn't matter", so "criterion 2" is always the second item.
+- `--criteria-from`, `--explain` and `--generate-criteria` read a file
+  answered "doesn't matter" correctly: none of them writes over those
+  decisions or says the file has no criteria.
+- `--take-tests` no longer labels your own pick "check" when the note above
+  it belonged to a question you answered "doesn't matter".
 
 ## 0.6.4
 
