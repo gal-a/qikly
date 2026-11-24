@@ -12,6 +12,9 @@ Found a bug, or tried it and got stuck? Use the
 form, or tell us what happened in the
 [feedback thread](https://github.com/gal-a/qikly/discussions/6).
 
+Want to work on the code itself, such as tooling, CI, typing or performance?
+See [Working on the code](#working-on-the-code) at the end of this page.
+
 ## 1. Propose it first
 
 Open a [task proposal](https://github.com/gal-a/qikly/issues/new?template=task_proposal.yml):
@@ -111,6 +114,67 @@ Include:
 - the proposal issue it closes
 - the provider and model the run used, and whether it converged
 - where the fixture data came from
+
+## Working on the code
+
+The open improvement issues are listed with the
+[good first issue](https://github.com/gal-a/qikly/labels/good%20first%20issue)
+and [help wanted](https://github.com/gal-a/qikly/labels/help%20wanted) labels.
+Comment on the one you want, so two people do not pick the same one, and ask
+before starting anything large.
+
+### Set up
+
+Python 3.10 or newer. From a clone:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scriptsctivate
+pip install -e ".[all-providers]"
+pip install pytest-xdist
+```
+
+Running the tests needs no API key and no network: the suite is offline. A key
+is only needed for a real run (`qikly --demo`), see
+[provider key setup](docs/PROVIDER_KEY_SETUP.md).
+
+### Run the tests the way CI does
+
+```bash
+python -m pytest -q -n auto --dist loadgroup
+```
+
+CI runs this on Python 3.10 to 3.14, on Linux, plus Windows and macOS. Keep
+`--dist loadgroup`: without it, two tests that share the project folder can race
+on different workers and fail for reasons that are not bugs. Serial runs take
+8 to 12 minutes.
+
+### Where things are
+
+- `src/qikly/` is the package. `cli.py` is the entry point, `mutation.py` and
+  `mutation_score.py` plant and score faults, and `orchestrator/` runs the agents.
+- `tests/` mirrors it. A change to behaviour needs a test that fails without it.
+- `tools/release_check.py` and [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) cover
+  releases. Maintainers do the release, contributors do not need to.
+
+To see how the parts fit before you change one, read the three design documents,
+in this order:
+
+1. [The case for it, and one repair end to end](docs/design_1_case_study.md)
+2. [What was measured, and the results withdrawn](docs/design_2_performance.md)
+3. [How it is built](docs/design_3_mechanism.md)
+
+### Send the pull request
+
+- One issue per pull request, and say which one it closes.
+- Keep the change small. Several small pull requests are easier to review than
+  one large one.
+- The tests workflow must be green. It runs on every pull request.
+- If an AI assistant helped write the change, say so in the description.
+- The maintainer reviews every pull request and merges it by hand. Nothing
+  merges on its own.
+
+Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Credit
 
