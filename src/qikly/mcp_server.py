@@ -105,7 +105,9 @@ TOOL_SPECS = [
             "This does NOT wait for the run: a run takes minutes to hours. "
             "Poll qikly_status with the returned run_id. The acceptance "
             "criteria are never returned by any qikly tool, because the agent "
-            "writing the code must not see them."),
+            "writing the code must not see them. Returns {ok, run_id, state, "
+            "next}, or {ok: false, error} if the task is not found or an "
+            "argument is invalid."),
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -128,10 +130,14 @@ TOOL_SPECS = [
             "Report on a run started by qikly_run. States: running, passed, "
             "failed, stalled, unknown. 'stalled' means the process is gone "
             "without writing a summary, which is a crash rather than a failing "
-            "suite. Includes the stage and iteration while a run is in flight."),
+            "suite. Includes the stage and iteration while a run is in flight. "
+            "Returns an object with ok (false only when the state is unknown) "
+            "and state."),
         "inputSchema": {
             "type": "object",
-            "properties": {"run_id": {"type": "string"}},
+            "properties": {"run_id": {"type": "string",
+                                      "description": "The run_id returned by "
+                                                     "qikly_run."}},
             "required": ["run_id"],
         },
     },
@@ -147,10 +153,15 @@ TOOL_SPECS = [
             "the separate `qikly --check-criteria`, which costs a model call and "
             "is not exposed here. It returns no criterion text: validation "
             "messages quote the criterion they are about, so read those with "
-            "`qikly --validate` in a terminal instead."),
+            "`qikly --validate` in a terminal instead. Returns {ok, task_id, "
+            "valid, error_count, warning_count, note}."),
         "inputSchema": {
             "type": "object",
-            "properties": {"task_id": {"type": "string"}},
+            "properties": {"task_id": {"type": "string",
+                                       "description": "The task_id to "
+                                                      "validate, as named in "
+                                                      "inputs_private/config/"
+                                                      "tasks/"}},
             "required": ["task_id"],
         },
     },
@@ -167,10 +178,15 @@ TOOL_SPECS = [
             "as <task_id>.yaml. requirements and "
             "acceptance_criteria are left as TODO on purpose and will not be "
             "filled in, because criteria derived from an implementation can "
-            "only describe what that implementation already does."),
+            "only describe what that implementation already does. Returns "
+            "{ok, task_yaml, note}. Writes nothing to disk."),
         "inputSchema": {
             "type": "object",
-            "properties": {"file_path": {"type": "string"}},
+            "properties": {"file_path": {"type": "string",
+                                         "description": "One Python (.py) "
+                                                        "file, absolute or "
+                                                        "relative to the "
+                                                        "project root."}},
             "required": ["file_path"],
         },
     },
