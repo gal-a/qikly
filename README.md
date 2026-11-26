@@ -14,6 +14,7 @@
 [![marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Qikly%20Test%20Generation-2b8f95)](https://github.com/marketplace/actions/qikly-test-generation)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-one--line_MCP_setup-D97757?logo=claude&logoColor=white)](https://github.com/gal-a/qikly#use-it-from-your-coding-agent)
 [![VS Code](https://img.shields.io/badge/VS_Code-Install_qikly_MCP-0098FF?logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=qikly&config=%7B%22name%22%3A%22qikly%22%2C%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22--from%22%2C%22qikly%5Bmcp%5D%22%2C%22qikly-mcp%22%5D%7D)
+[![gal-a/qikly MCP server](https://glama.ai/mcp/servers/gal-a/qikly/badges/score.svg)](https://glama.ai/mcp/servers/gal-a/qikly)
 
 [Website](https://qikly.com) · [Start here](https://github.com/gal-a/qikly#start-here) · [Use it from your agent](https://github.com/gal-a/qikly#use-it-from-your-coding-agent) · [What it has caught](https://github.com/gal-a/qikly#examples-of-what-qikly-has-actually-caught) · [Where it fits today](https://github.com/gal-a/qikly#where-it-fits-today) · [Contributing](https://github.com/gal-a/qikly#contributing-a-task) · [Privacy](https://github.com/gal-a/qikly#privacy)
 
