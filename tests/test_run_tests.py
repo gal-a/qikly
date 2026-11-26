@@ -18,6 +18,13 @@ import pytest
 
 from qikly.agent_tools import run_tests as rt
 
+# The child pytest these tests start failed once on Windows with a
+# FileNotFoundError for a `qikly-install-example-*` folder, which
+# test_scaffold_examples.py makes and removes in the shared Temp folder while
+# the child was collecting. Running both on one worker keeps them from
+# overlapping. Not reproduced locally, so this is a precaution, not a proven fix.
+pytestmark = pytest.mark.xdist_group("project_root")
+
 
 # --------------------------------------------------------------- counts ----
 
