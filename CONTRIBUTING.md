@@ -182,8 +182,8 @@ Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Credit
 
-Every accepted task is credited by name or GitHub handle in the changelog entry
-for the release that ships it. You can also add the contributor badge to your
+Every accepted task and every merged pull request is credited by name or
+GitHub handle in the changelog entry for the release that ships it. You can also add the contributor badge to your
 profile or README:
 
 [![qikly task contributor](https://img.shields.io/badge/qikly-task_contributor-2b8f95)](https://qikly.com/?ref=contributor)
