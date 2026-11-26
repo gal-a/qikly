@@ -213,6 +213,31 @@ most naturally where verification already has to be independent, such as
 automotive, medical devices, fintech and defence: `ADAS_HEADWAY`, a bundled
 example, checks following distance from forward-radar samples. See [What it is for](#what-it-is-for).
 
+### Installing with uv
+
+`pip install qikly` is the simplest way, and it is what to use inside a project's
+own environment. If you use [uv](https://docs.astral.sh/uv/), these work too:
+
+```
+uv tool install qikly          # the qikly command on your PATH
+uv tool upgrade qikly          # later, to update it
+uvx qikly --score pricing.py   # a one-off run, nothing installed
+```
+
+qikly runs your tests with the Python it is installed in. A `uv tool install` lives
+in its own environment, so if your project needs its own packages, `--score`
+stops with `No module named ...` even though the tests pass in your project's
+environment. Either install qikly into the project (`pip install qikly`, or
+`uv pip install qikly`), or add what the project needs to the tool:
+
+```
+uv tool install --force --with tabulate qikly
+uvx --with tabulate qikly --score fmt.py
+```
+
+`uvx` keeps the version it first fetched. To get a newer release, run it with
+`--refresh`, for example `uvx --refresh qikly --version`.
+
 ## What it is for
 
 Built for **self-contained Python modules that transform data, not for a large
