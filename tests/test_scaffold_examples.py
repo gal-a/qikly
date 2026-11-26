@@ -32,6 +32,10 @@ import tempfile
 
 import pytest
 
+# Makes and removes folders in the shared Temp folder, which test_run_tests.py's
+# child pytest can be scanning at the same time. See the note there.
+pytestmark = pytest.mark.xdist_group("project_root")
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXAMPLE = os.path.join(ROOT, "src", "qikly", "inputs_public", "examples")
 TASKS = os.path.join(EXAMPLE, "config", "tasks")

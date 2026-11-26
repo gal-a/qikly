@@ -18,6 +18,13 @@ import pytest
 
 from qikly.agent_tools import run_tests as rt
 
+# The child pytest these tests start failed once on Windows with a
+# FileNotFoundError for a `qikly-install-example-*` folder, which
+# test_scaffold_examples.py makes and removes in the shared Temp folder while
+# the child was collecting. Running both on one worker keeps them from
+# overlapping. Not reproduced locally, so this is a precaution, not a proven fix.
+pytestmark = pytest.mark.xdist_group("project_root")
+
 
 # --------------------------------------------------------------- counts ----
 
@@ -188,7 +195,7 @@ def test_run_tests_reports_a_real_pass(suite):
 
     result = rt.run_tests("integration", str(tmp_path / "tests"),
                           task_id="T", iteration=1, run_timestamp="TS")
-    assert result["status"] == "pass"
+    assert result["status"] == "pass", result["raw_output"]
     assert result["counts"]["passed"] == 2
     assert result["counts"]["total"] == 2
     assert result["failed_tests"] == []
@@ -203,9 +210,9 @@ def test_run_tests_reports_a_real_failure(suite):
 
     result = rt.run_tests("integration", str(tmp_path / "tests"),
                           task_id="T", iteration=1, run_timestamp="TS")
-    assert result["status"] == "fail"
-    assert result["counts"]["passed"] == 1
-    assert result["counts"]["failed"] == 1
+    assert result["status"] == "fail", result["raw_output"]
+    assert result["counts"]["passed"] == 1, result["raw_output"]
+    assert result["counts"]["failed"] == 1, result["raw_output"]
     assert any("test_bad" in line for line in result["failed_tests"])
 
 
@@ -219,7 +226,7 @@ def test_run_tests_survives_a_module_that_cannot_be_imported(suite):
 
     result = rt.run_tests("integration", str(tmp_path / "tests"),
                           task_id="T", iteration=1, run_timestamp="TS")
-    assert result["status"] == "fail"
+    assert result["status"] == "fail", result["raw_output"]
     assert result["raw_output"].strip(), "the error text is what the agent gets to fix"
 
 
@@ -278,8 +285,8 @@ def test_counts_survive_a_project_that_sets_quiet(tmp_path, monkeypatch):
     result = rt.run_tests("integration", str(tmp_path / "tests"),
                           task_id="T", iteration=1, run_timestamp="TS")
     assert result["counts"]["total"] == 2, "the summary line must survive"
-    assert result["counts"]["passed"] == 1
-    assert result["counts"]["failed"] == 1
+    assert result["counts"]["passed"] == 1, result["raw_output"]
+    assert result["counts"]["failed"] == 1, result["raw_output"]
 
 
 def test_the_research_harnesses_pin_their_pytest_rootdir():
