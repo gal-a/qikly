@@ -6,7 +6,19 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
-Nothing yet.
+### Added
+- **Two MCP tools score a test suite you already have.** `qikly_score` starts
+  `--score` in the background and returns an id; `qikly_score_result` reports
+  the headline (for example `3 of 12 planted faults missed (25%), 9 caught`),
+  the missed faults, how many open questions the tests leave and the report
+  path, or why nothing was scored. Free, no model call, none of your files
+  modified. Neither tool reads a task, and `qikly_score` refuses any path
+  inside or holding `outputs/`, where the generated tests are kept, so neither
+  can return acceptance criteria.
+
+### Changed
+- **Every MCP tool parameter has a description, and every tool says what it
+  returns**, so a host's agent can call them without guessing.
 
 ## 0.6.5
 

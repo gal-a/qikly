@@ -182,7 +182,7 @@ def _alive(pid):
     return True
 
 
-def _claim_run_id(task_id, limit=120):
+def _claim_run_id(task_id, limit=120, folder=None):
     """
     Reserve a run id nobody else holds, and return it with its open claim.
 
@@ -199,12 +199,13 @@ def _claim_run_id(task_id, limit=120):
     matching the \\d{8}_\\d{6} the orchestrator validates.
     """
     check_task_id(task_id)
-    os.makedirs(runs_dir(), exist_ok=True)
+    folder = folder or runs_dir()
+    os.makedirs(folder, exist_ok=True)
     when = datetime.now()
     for _ in range(limit):
         stamp = when.strftime("%Y%m%d_%H%M%S")
         run_id = "%s_%s" % (task_id, stamp)
-        path = _record_path(run_id)
+        path = os.path.join(folder, "%s.json" % run_id)
         try:
             handle = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
@@ -394,3 +395,190 @@ def list_runs(limit=20):
         return []
     names.sort(key=lambda n: split_run_id(n)[1] or "", reverse=True)
     return [status(n) for n in names[:limit]]
+
+
+# ---------------------------------------------------------------- scoring ----
+#
+# `--score` plants faults in a copy of your code and reports which ones your
+# tests miss. It needs no model and no task, takes seconds to over an hour, and
+# so gets the same treatment as a run: started in the background, polled for
+# its result. Its records live in their own folder, not in outputs/runs, so
+# `status()` and `list_runs()` never mistake a score for a run that crashed:
+# a score has no run summary to find, and "stalled" would be the wrong word.
+
+_SCORE_RUNS_REL = os.path.join("outputs", "score_runs")
+
+# A score still "alive" after this long is not believed, for the reason
+# SILENCE_BEFORE_DOUBT exists: a reused pid answers yes about a stranger.
+# The log is not used the way a run's transaction log is, so a cap on age
+# takes the place of the silence rule. It is generous: the slowest library
+# measured took 75 minutes.
+SCORE_MAX_SECONDS = 6 * 60 * 60
+
+
+def score_runs_dir():
+    return os.path.join(_root(), _SCORE_RUNS_REL)
+
+
+def _score_log_path(score_id):
+    return os.path.join(log_dir(), "%s.log" % score_id)
+
+
+def start_score(code, tests=None, mutants=None, env=None, python=None):
+    """
+    Launch `qikly --score` in its own process and return its id straight away.
+
+    `code` and `tests` are paths the caller has already checked. The child's
+    output goes to a log file, because the headline and the report path are
+    what `score_result()` reads back, and a detached process has nowhere else
+    to say them.
+    """
+    stem = re.sub(r"[^A-Za-z0-9_.-]+", "-", os.path.basename(os.path.normpath(code)))
+    stem = stem.strip(".-") or "code"
+    score_id, stamp, claim = _claim_run_id("score-%s" % stem[:60],
+                                           folder=score_runs_dir())
+    record = {"score_id": score_id, "kind": "score", "code": code, "tests": tests,
+              "mutants": mutants, "pid": None, "cwd": _root(),
+              "started_at": datetime.now().astimezone().isoformat(timespec="seconds")}
+    _write_record(claim, record)
+
+    child_env = dict(os.environ if env is None else env)
+    child_env["QIKLY_NO_VERSION_CHECK"] = "1"
+    child_env["PYTHONIOENCODING"] = "utf-8"
+    # Written to a file, so otherwise block-buffered: the headline could reach
+    # the log before the lines that follow it, and a poll in between would
+    # read a finished score with no report.
+    child_env["PYTHONUNBUFFERED"] = "1"
+    # Nobody is at this process's keyboard. With it set, a slow suite makes the
+    # command ask "plant fewer faults?", read end of file, and stop.
+    child_env.pop("QIKLY_INTERACTIVE", None)
+
+    cmd = [python or sys.executable, "-m", "qikly.cli", "--score", code]
+    if tests:
+        cmd += ["--score-tests", tests]
+    if mutants:
+        cmd += ["--score-mutants", str(int(mutants))]
+
+    os.makedirs(log_dir(), exist_ok=True)
+    log = io.open(_score_log_path(score_id), "wb")
+    kwargs = {"stdout": log, "stderr": subprocess.STDOUT,
+              "stdin": subprocess.DEVNULL, "env": child_env, "cwd": _root()}
+    if os.name == "nt":
+        kwargs["creationflags"] = (getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                                   | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    else:
+        kwargs["start_new_session"] = True
+    try:
+        proc = subprocess.Popen(cmd, **kwargs)
+    except Exception:
+        log.close()
+        for leftover in (claim, _score_log_path(score_id)):
+            try:
+                os.unlink(leftover)
+            except OSError:
+                pass
+        raise
+    log.close()
+
+    record["pid"] = proc.pid
+    _write_record(claim, record)
+    return score_id
+
+
+_HEADLINE_RE = re.compile(
+    r"\[(?P<label>[^\]]+)\] (?P<missed>\d+) of (?P<planted>\d+) planted faults "
+    r"missed \((?P<percent>\d+)%\), (?P<caught>\d+) caught")
+_REPORT_RE = re.compile(r"what it missed, one line each: (?P<path>.+?)\s*$", re.M)
+_QUESTIONS_RE = re.compile(r"(?P<n>\d+) questions? your tests leave open")
+_BANNER_RE = re.compile(r"^qikly \d")
+# The lines the command prints under "what pytest said:", indented under the
+# label: pytest's own assertion text and its FAILED summary.
+_QUOTED_RE = re.compile(r"^\[[^\]]*\]\s{4,}\S")
+
+# How many missed faults come back by value. The rest are in the report file.
+MAX_MISSED_LINES = 40
+
+
+def _missed_faults(report_path):
+    """The numbered lines under 'What it missed' in the report, as text."""
+    try:
+        with io.open(report_path, encoding="utf-8") as handle:
+            text = handle.read()
+    except OSError:
+        return []
+    section = re.search(r"^## What it missed\s*$(.*?)(?=^## |\Z)", text, re.M | re.S)
+    if not section:
+        return []
+    return [m.group(1).strip() for m in
+            re.finditer(r"^\s*\d+\.\s+(.*\S)\s*$", section.group(1), re.M)]
+
+
+def score_result(score_id):
+    """
+    What happened to one `start_score()`, read from the log it wrote.
+
+    States: `running`, `finished` (a score with its headline), `not_scored`
+    (it ended without a score, with the reason in `detail`, for example a suite
+    that fails on the untouched code), `stalled` (gone with nothing readable)
+    and `unknown` (no such score).
+    """
+    task, stamp = split_run_id(score_id)
+    if not task or not task.startswith("score-"):
+        return {"score_id": score_id, "state": "unknown",
+                "detail": "not a score id of the form score-<name>_<YYYYmmdd_HHMMSS>"}
+    record = _read_json(os.path.join(score_runs_dir(), "%s.json" % score_id), {}) or {}
+    if not record:
+        return {"score_id": score_id, "state": "unknown",
+                "detail": "no record of this score in %s" % score_runs_dir()}
+
+    try:
+        with io.open(_score_log_path(score_id), encoding="utf-8", errors="replace") as handle:
+            log = handle.read()
+    except OSError:
+        log = ""
+
+    out = {"score_id": score_id, "started_at": record.get("started_at"),
+           "code": record.get("code")}
+    found = _HEADLINE_RE.search(log)
+    report = _REPORT_RE.search(log)
+    too_old = False
+    try:
+        seen = datetime.fromisoformat(str(record.get("started_at")))
+        now = datetime.now(seen.tzinfo) if seen.tzinfo else datetime.now()
+        too_old = (now - seen).total_seconds() > SCORE_MAX_SECONDS
+    except (TypeError, ValueError):
+        pass
+    running = (_alive(record["pid"]) if record.get("pid") else True) and not too_old
+
+    # The headline is printed before the report line and the question count.
+    # "finished" is final, so it waits for the report line, or for the process
+    # to be gone, rather than answering from half the output.
+    if found and (report or not running):
+        out["state"] = "finished"
+        out.update(planted=int(found.group("planted")), missed=int(found.group("missed")),
+                   caught=int(found.group("caught")), missed_percent=int(found.group("percent")),
+                   headline=found.group(0).split("] ", 1)[1])
+        if report:
+            out["report_path"] = report.group("path")
+            out["missed_faults"] = _missed_faults(report.group("path"))[:MAX_MISSED_LINES]
+        questions = _QUESTIONS_RE.search(log)
+        out["open_questions"] = int(questions.group("n")) if questions else 0
+        return out
+
+    if running:
+        out["state"] = "running"
+        return out
+
+    # What pytest said is left out. When the suite that failed is one whose
+    # assertions quote a rule, those lines quote it to whoever reads this.
+    tail = [line.strip() for line in log.splitlines()
+            if line.strip() and not _BANNER_RE.match(line.strip())
+            and not _QUOTED_RE.match(line) and "what pytest said" not in line]
+    if tail:
+        out["state"] = "not_scored"
+        out["detail"] = "\n".join(tail[-8:])
+    else:
+        out["state"] = "stalled"
+        out["detail"] = ("the process is gone and wrote nothing, or ran longer "
+                         "than %d hours" % (SCORE_MAX_SECONDS // 3600))
+    return out

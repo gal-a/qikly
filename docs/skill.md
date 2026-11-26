@@ -93,7 +93,7 @@ different halves of the same problem, and neither replaces the other.
 | | MCP server | Skill |
 |---|---|---|
 | What it ships | a running process exposing typed tools | a folder of Markdown |
-| What it gives the model | the ability to call `qikly_run`, `qikly_status`, `qikly_validate` and `qikly_scaffold` | the judgement around those calls |
+| What it gives the model | the ability to call `qikly_run`, `qikly_status`, `qikly_validate`, `qikly_scaffold`, `qikly_score` and `qikly_score_result` | the judgement around those calls |
 | Setup | `qikly --install-mcp`, then host configuration | `qikly --install-skill` |
 | Can enforce a rule | **yes**, in server code | no, it is instructions |
 | Works when the agent has no shell | yes | no |

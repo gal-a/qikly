@@ -45,7 +45,8 @@ from qikly import runs
 # Every tool, in one place, so the withholding tests can assert the list they
 # cover matches the list that exists. A tool added without a test is a tool
 # nobody has shown is safe.
-TOOLS = ("qikly_run", "qikly_status", "qikly_validate", "qikly_scaffold")
+TOOLS = ("qikly_run", "qikly_status", "qikly_validate", "qikly_scaffold",
+         "qikly_score", "qikly_score_result")
 
 
 def _error(message, **extra):
@@ -297,6 +298,128 @@ def qikly_scaffold(file_path):
                             "is left as TODO on purpose, since criteria taken from code "
                             "can only restate it, and requirements is a starting line "
                             "for the person to replace in their own words" % task_id})
+
+
+def _existing_path(path, root):
+    """The one place `path` exists: under the project root, else as given."""
+    candidates = [path] if os.path.isabs(path) else [
+        os.path.join(root, path), os.path.abspath(path)]
+    return next((c for c in candidates if os.path.exists(c)), None)
+
+
+def _touches_outputs(path, root):
+    """
+    Whether `path` is inside qikly's `outputs/` folder, or is a folder that
+    holds it.
+
+    The generated tests under `outputs/tests/` are written from the acceptance
+    criteria. Scoring them would put their failure text (a failing assertion
+    quotes the rule it broke) and their constants (a missed fault names a
+    number from a test) into the response. `docs/mcp.md` tells the user to
+    keep the agent from reading that folder, and the server process is not
+    bound by that rule, so the tool has to enforce it itself. Compared by real
+    path, so a link or `..` does not get round it.
+    """
+    outputs = os.path.realpath(os.path.join(root, "outputs"))
+    path = os.path.realpath(path)
+    for inner, outer in ((path, outputs), (outputs, path)):
+        try:
+            if os.path.commonpath([inner, outer]) == outer:
+                return True
+        except ValueError:                           # another drive
+            continue
+    return False
+
+
+def qikly_score(code_path, tests_path=None, mutants=None):
+    """
+    Start scoring an existing test suite and return an id at once.
+
+    Plants small faults in a copy of the code and reports which ones the tests
+    miss: free, no model call, nothing of the caller's modified. It does not
+    wait, for the reason `qikly_run` does not: scoring takes seconds to over an
+    hour and no host holds a call that long. `qikly_score_result` is how the
+    caller finds out what happened.
+
+    This tool never reads a task, and it refuses any path inside or holding
+    `outputs/` (see `_touches_outputs`), so there are no acceptance criteria
+    for it to return. It is the one tool here a caller can point at code they did not
+    write through qikly, which is why it exists: "how good are my tests?" is
+    the first question most people arrive with.
+    """
+    if not code_path or not isinstance(code_path, str):
+        return _error("code_path is required")
+    try:
+        from qikly import paths
+        root = paths.project_root()
+    except Exception as exc:                         # noqa: BLE001
+        return _error("could not resolve a project root: %s" % exc)
+
+    code = _existing_path(code_path, root)
+    if code is None:
+        return _error(
+            "no such path: %s. Looked under the project root %s and under the "
+            "server's working directory %s. Pass an absolute path, or set "
+            "QIKLY_PROJECT_ROOT to the project this code belongs to."
+            % (code_path, root, os.getcwd()))
+    if os.path.isfile(code) and not code.lower().endswith(".py"):
+        return _error("%s is not a Python file. qikly_score plants faults in a "
+                      ".py module or a folder of them" % code_path)
+
+    tests = None
+    if tests_path not in (None, ""):
+        if not isinstance(tests_path, str):
+            return _error("tests_path must be a path, or left out so qikly "
+                          "finds the test files that import the code")
+        tests = _existing_path(tests_path, root)
+        if tests is None:
+            return _error("no such tests path: %s. Name a test file or a "
+                          "folder of them, or leave it out so qikly finds the "
+                          "tests that import the code" % tests_path)
+
+    for given, found in ((code_path, code), (tests_path, tests)):
+        if found and _touches_outputs(found, root):
+            return _error(
+                "%s is inside, or contains, qikly's outputs/ folder. That "
+                "folder holds the generated tests, which are written from the "
+                "acceptance criteria and are kept from the agent, so "
+                "qikly_score does not read it. Score your own module and your "
+                "own tests." % given)
+
+    if mutants in (None, ""):
+        mutants = None
+    elif isinstance(mutants, bool) or not isinstance(mutants, int) or not 1 <= mutants <= 1000:
+        return _error("mutants must be a whole number from 1 to 1000, or left "
+                      "out so qikly plants every fault it can up to its cap, "
+                      "not %r" % (mutants,))
+
+    try:
+        score_id = runs.start_score(os.path.abspath(code),
+                                    os.path.abspath(tests) if tests else None,
+                                    mutants=mutants)
+    except Exception as exc:                         # noqa: BLE001 - reported, not raised
+        return _error("could not start the score: %s" % exc)
+    return _redact({"ok": True, "score_id": score_id, "state": "running",
+                    "next": "call qikly_score_result with this score_id"})
+
+
+def qikly_score_result(score_id):
+    """
+    What happened to one `qikly_score`: still running, scored, or why not.
+
+    Derived from what the score wrote to its own log, so it stays correct if
+    the process died. A suite that fails on the untouched code is `not_scored`
+    with the reason, not a score of zero: every fault would fail for the
+    original's reason, and the number would mean nothing.
+    """
+    if not score_id or not isinstance(score_id, str):
+        return _error("score_id is required")
+    try:
+        info = dict(runs.score_result(score_id))
+    except Exception as exc:                         # noqa: BLE001
+        return _error("could not read that score: %s" % exc)
+    info["ok"] = info.get("state") not in ("unknown",)
+    return _redact(info)
 
 
 _FORBIDDEN_KEYS = ("acceptance_criteria", "criteria", "criterion")

@@ -5,7 +5,7 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.3.12
+  version: 0.3.13
   requires: qikly >= 0.6.5
 ---
 
@@ -56,7 +56,9 @@ The path is three commands, each taking the same module or folder:
   exists (before 0.6.0 the flag is `--score-code`). Free, no model call,
   nothing of theirs modified. It finds the tests that import the module, or
   take `--score-tests their_tests.py`, and answers "is the suite we have
-  worth anything" with named faults it missed, each as a question.
+  worth anything" with named faults it missed, each as a question. In an MCP
+  host the same step is the `qikly_score` tool, polled with
+  `qikly_score_result`; it returns the headline and the missed faults.
 - **`qikly --scaffold my_module.py`** then writes the task file,
   `inputs_private/config/tasks/<NAME>_VERIFY.yaml`, with the interface, a
   data file of the values their tests already use, and those questions under

@@ -190,6 +190,72 @@ TOOL_SPECS = [
             "required": ["file_path"],
         },
     },
+    {
+        "name": "qikly_score",
+        # Writes a report folder (qikly-suite-score/) in the project and runs
+        # the caller's own tests many times, in a temporary copy of the code.
+        # No model call, no network of its own. Not idempotent in the sense
+        # that matters here: each call is a new timestamped report.
+        "annotations": {"readOnlyHint": False, "destructiveHint": False,
+                        "idempotentHint": False, "openWorldHint": False},
+        "description": (
+            "Answer 'how good are my tests?' for a Python module you already "
+            "have. Plants small faults in a temporary copy of the code, runs "
+            "your existing tests against each, and reports which faults no "
+            "test noticed. Free: no model call, no API key, and none of your "
+            "files are modified (a report is written to qikly-suite-score/ in "
+            "the project, and paths inside outputs/ are refused). Returns a score_id immediately and does NOT wait: "
+            "scoring takes seconds to over an hour. Poll qikly_score_result "
+            "with the returned score_id. Returns {ok, score_id, state, next}, "
+            "or {ok: false, error} if a path does not exist or an argument is "
+            "invalid."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "code_path": {"type": "string",
+                              "description": "The Python module (.py) or "
+                                             "folder to plant faults in, "
+                                             "absolute or relative to the "
+                                             "project root."},
+                "tests_path": {"type": "string",
+                               "description": "Optional. The test file or "
+                                              "folder that should notice the "
+                                              "faults. Left out, qikly finds "
+                                              "the test files that import the "
+                                              "code."},
+                "mutants": {"type": "integer", "minimum": 1, "maximum": 1000,
+                            "description": "Optional. How many faults to "
+                                           "plant. Left out, qikly plants "
+                                           "every fault it can up to its own "
+                                           "cap, and samples only when the "
+                                           "test suite is slow."},
+            },
+            "required": ["code_path"],
+        },
+    },
+    {
+        "name": "qikly_score_result",
+        # Reads the log the score wrote, and the report it points at.
+        "annotations": {"readOnlyHint": True, "destructiveHint": False,
+                        "idempotentHint": True, "openWorldHint": False},
+        "description": (
+            "Report on a score started by qikly_score. States: running, "
+            "finished, not_scored, stalled, unknown. 'finished' carries the "
+            "headline, for example '3 of 12 planted faults missed (25%), 9 "
+            "caught', the counts, the missed faults as one line each, how many "
+            "open questions the tests leave, and the report_path. 'not_scored' "
+            "means no score was possible, usually because the tests do not "
+            "pass on the untouched code; the reason is in detail. A miss is a "
+            "question rather than a verdict: some planted faults are "
+            "equivalent to the original and no test could catch them."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"score_id": {"type": "string",
+                                        "description": "The score_id returned "
+                                                       "by qikly_score."}},
+            "required": ["score_id"],
+        },
+    },
 ]
 
 
@@ -340,7 +406,18 @@ def build_server():
     def _scaffold(file_path: Annotated[str, _arg("qikly_scaffold", "file_path")]) -> str:
         return call_tool("qikly_scaffold", {"file_path": file_path})
 
-    for index, fn in enumerate((_run, _status, _check, _scaffold)):
+    def _score(code_path: Annotated[str, _arg("qikly_score", "code_path")],
+               tests_path: Annotated[str, _arg("qikly_score", "tests_path")] = None,
+               mutants: Annotated[int, _arg("qikly_score", "mutants")] = None) -> str:
+        return call_tool("qikly_score", {"code_path": code_path,
+                                         "tests_path": tests_path,
+                                         "mutants": mutants})
+
+    def _score_result(score_id: Annotated[str, _arg("qikly_score_result", "score_id")]) -> str:
+        return call_tool("qikly_score_result", {"score_id": score_id})
+
+    for index, fn in enumerate((_run, _status, _check, _scaffold,
+                                _score, _score_result)):
         register(index, fn)
 
     return server

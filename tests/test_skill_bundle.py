@@ -275,6 +275,9 @@ SKILL_BODY_HASHES = {
     # question with no behaviours is not numbered. Unreleased, so the entry
     # is updated in place rather than skipping a version.
     "0.3.12": "8a745ba234a5810ff283eff4deb90d05bf25ae3ba5e0c74e460a7e1ab1bf7dd1",
+    # 0.3.13: in an MCP host, `--score` is the qikly_score tool, polled with
+    # qikly_score_result.
+    "0.3.13": "c4809231c55a6a44e147116cf1df2337ef099496e811c7a32762046261349d4d",
 }
 
 
