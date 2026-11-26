@@ -14,6 +14,13 @@ import pytest
 
 from qikly import fixture_reach as fr
 
+# The bundled-task test below globs the bundled tasks folder and then opens each
+# file. test_end_to_end writes a temporary ZZ_SMOKE_TASK.yaml into that same
+# folder, so on another worker the file can vanish between the glob and the
+# open (FileNotFoundError, seen in CI). The shared "project_root" group runs
+# both on one worker.
+pytestmark = pytest.mark.xdist_group("project_root")
+
 
 RADAR = ("sample_id,ego_speed_mps,gap_m\n"
          "S001,20.0,40.0\n"
