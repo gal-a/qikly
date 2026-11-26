@@ -379,3 +379,99 @@ def test_a_headline_alone_is_not_yet_a_finished_score(project):
     done = mcp_tools.qikly_score_result("score-pricing.py_20260910_120001")
     assert done["state"] == "finished"
     assert "report_path" not in done
+
+
+# ------------------------------- found by the second independent review ------
+#
+# Each of these was reproduced against the first fix before it was repaired.
+
+BS = chr(92)
+
+
+def test_a_long_path_prefix_does_not_get_round_the_check(project, hidden):
+    if os.name != "nt":
+        pytest.skip("the long-path prefix is a Windows form")
+    spelled = BS * 2 + "?" + BS + str(hidden)
+    out = mcp_tools.qikly_score("pricing.py", tests_path=spelled)
+    assert out["ok"] is False
+    assert SENTINEL not in json.dumps(out)
+
+
+def test_a_link_inside_a_tests_folder_is_refused(project, hidden):
+    holder = project / "mytests"
+    holder.mkdir()
+    try:
+        os.symlink(str(hidden), str(holder / "gen"), target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("this system cannot make a symbolic link here")
+    assert mcp_tools.qikly_score("pricing.py", tests_path="mytests")["ok"] is False
+
+
+def test_a_hard_link_to_a_generated_test_is_refused(project, hidden):
+    holder = project / "mytests"
+    holder.mkdir()
+    try:
+        os.link(str(hidden / "test_hidden.py"), str(holder / "test_copy.py"))
+    except (OSError, NotImplementedError):
+        pytest.skip("this system cannot make a hard link here")
+    assert mcp_tools.qikly_score("pricing.py", tests_path="mytests")["ok"] is False
+
+
+def test_tests_found_automatically_are_checked_too(project, hidden, monkeypatch):
+    """Leaving tests_path out must not skip the check on what the CLI would find."""
+    import qikly.start
+    monkeypatch.setattr(qikly.start, "auto_tests",
+                        lambda code, cwd=None: str(hidden / "test_hidden.py"))
+    started = []
+    monkeypatch.setattr(runs, "start_score", lambda *a, **k: started.append(a))
+    out = mcp_tools.qikly_score("pricing.py")
+    assert out["ok"] is False and started == []
+
+
+def test_a_label_with_a_bracket_does_not_defeat_the_pytest_filter(project):
+    label = "a]b"
+    _log(project, "score-%s_20260910_120000" % label.replace("]", "-"),
+         "[%s] your suite does not pass your untouched code.\n"
+         "[%s] what pytest said:\n"
+         "[%s]     E       AssertionError: %s a full discount is free\n"
+         "[%s]     FAILED t.py::t - %s\n"
+         "[%s] This is a problem in your project's environment.\n"
+         % ((label,) * 3 + (SENTINEL,) + (label,) + (SENTINEL,) + (label,)),
+         pid=999999991)
+    out = mcp_tools.qikly_score_result("score-a-b_20260910_120000")
+    assert SENTINEL not in json.dumps(out)
+    assert "problem in your project's environment" in out["detail"]
+
+
+def test_a_report_path_outside_the_report_folder_is_not_read(project, tmp_path):
+    secret = tmp_path / "other.md"
+    secret.write_text("## What it missed\n\n1. SECRETLINE\n", encoding="utf-8")
+    _log(project, "score-pricing.py_20260910_120000",
+         "[pricing.py] 5 of 10 planted faults missed (50%), 5 caught.\n"
+         "[pricing.py] what it missed, one line each: {secret}\n".replace(
+             "{secret}", str(secret)),
+         pid=999999991)
+    out = mcp_tools.qikly_score_result("score-pricing.py_20260910_120000")
+    assert "SECRETLINE" not in json.dumps(out)
+
+
+def test_the_child_is_told_not_to_quote_pytest(project, monkeypatch):
+    seen = {}
+
+    class FakeProc:
+        pid = 4243
+
+    monkeypatch.setattr(runs.subprocess, "Popen",
+                        lambda cmd, **kw: seen.update(env=kw["env"]) or FakeProc())
+    runs.start_score(str(project / "pricing.py"))
+    assert seen["env"]["QIKLY_NO_PYTEST_QUOTE"] == "1"
+
+
+def test_optional_arguments_accept_an_explicit_null():
+    import asyncio
+    from qikly.mcp_server import build_server
+    server = build_server()
+    schema = {t.name: t.input_schema for t in asyncio.run(server.list_tools())}
+    for prop in ("tests_path", "mutants"):
+        spec = schema["qikly_score"]["properties"][prop]
+        assert "null" in json.dumps(spec), spec

@@ -175,6 +175,13 @@ def _alive(pid):
             if len(row) > 1 and row[1].strip() == str(pid):
                 return True
         return False
+    # A child this process started and nobody waited for stays a zombie, and
+    # kill(pid, 0) says a zombie is alive. Reaping it settles the question.
+    try:
+        if os.waitpid(pid, os.WNOHANG)[0] == pid:
+            return False
+    except (OSError, AttributeError):
+        pass                                 # not our child, or no waitpid
     try:
         os.kill(pid, 0)
     except OSError as exc:
@@ -452,6 +459,9 @@ def start_score(code, tests=None, mutants=None, env=None, python=None):
     # Nobody is at this process's keyboard. With it set, a slow suite makes the
     # command ask "plant fewer faults?", read end of file, and stop.
     child_env.pop("QIKLY_INTERACTIVE", None)
+    # The score is read by an agent, so the command must not print pytest's own
+    # failure text: an assertion in a generated suite quotes a criterion.
+    child_env["QIKLY_NO_PYTEST_QUOTE"] = "1"
 
     cmd = [python or sys.executable, "-m", "qikly.cli", "--score", code]
     if tests:
@@ -493,7 +503,34 @@ _QUESTIONS_RE = re.compile(r"(?P<n>\d+) questions? your tests leave open")
 _BANNER_RE = re.compile(r"^qikly \d")
 # The lines the command prints under "what pytest said:", indented under the
 # label: pytest's own assertion text and its FAILED summary.
-_QUOTED_RE = re.compile(r"^\[[^\]]*\]\s{4,}\S")
+_QUOTED_RE = re.compile(r"^\[.*\]\s{4,}\S")
+
+def _without_pytest_text(log):
+    """
+    The log's lines minus anything pytest said. The command is told not to print
+    them (QIKLY_NO_PYTEST_QUOTE), and this is the second layer: after a
+    "what pytest said:" line, every line carrying the same prefix and indented
+    under it is dropped, whatever the label contains.
+    """
+    kept, prefix = [], None
+    for line in log.splitlines():
+        marker = line.find("what pytest said")
+        if marker >= 0:
+            prefix = line[:marker]
+            continue
+        if prefix is not None:
+            lead = prefix.rstrip()
+            if lead and line.startswith(lead) \
+                    and re.match(r"\s{4,}\S", line[len(lead):]):
+                continue
+            prefix = None
+        if _QUOTED_RE.match(line):
+            continue
+        text = line.strip()
+        if text and not _BANNER_RE.match(text):
+            kept.append(text)
+    return kept
+
 
 # How many missed faults come back by value. The rest are in the report file.
 MAX_MISSED_LINES = 40
@@ -531,16 +568,8 @@ def score_result(score_id):
         return {"score_id": score_id, "state": "unknown",
                 "detail": "no record of this score in %s" % score_runs_dir()}
 
-    try:
-        with io.open(_score_log_path(score_id), encoding="utf-8", errors="replace") as handle:
-            log = handle.read()
-    except OSError:
-        log = ""
-
     out = {"score_id": score_id, "started_at": record.get("started_at"),
            "code": record.get("code")}
-    found = _HEADLINE_RE.search(log)
-    report = _REPORT_RE.search(log)
     too_old = False
     try:
         seen = datetime.fromisoformat(str(record.get("started_at")))
@@ -548,7 +577,17 @@ def score_result(score_id):
         too_old = (now - seen).total_seconds() > SCORE_MAX_SECONDS
     except (TypeError, ValueError):
         pass
+    # Liveness first, then the log. In the other order a process that prints its
+    # last line and exits between the two reads answers "stalled" with a full
+    # score sitting in the log.
     running = (_alive(record["pid"]) if record.get("pid") else True) and not too_old
+    try:
+        with io.open(_score_log_path(score_id), encoding="utf-8", errors="replace") as handle:
+            log = handle.read()
+    except OSError:
+        log = ""
+    found = _HEADLINE_RE.search(log)
+    report = _REPORT_RE.search(log)
 
     # The headline is printed before the report line and the question count.
     # "finished" is final, so it waits for the report line, or for the process
@@ -558,7 +597,9 @@ def score_result(score_id):
         out.update(planted=int(found.group("planted")), missed=int(found.group("missed")),
                    caught=int(found.group("caught")), missed_percent=int(found.group("percent")),
                    headline=found.group(0).split("] ", 1)[1])
-        if report:
+        # Only a report qikly itself writes: the log also holds whatever the
+        # caller's own tests printed, which could name any file.
+        if report and "qikly-suite-score" in re.split(r"[\\/]", report.group("path")):
             out["report_path"] = report.group("path")
             out["missed_faults"] = _missed_faults(report.group("path"))[:MAX_MISSED_LINES]
         questions = _QUESTIONS_RE.search(log)
@@ -571,9 +612,7 @@ def score_result(score_id):
 
     # What pytest said is left out. When the suite that failed is one whose
     # assertions quote a rule, those lines quote it to whoever reads this.
-    tail = [line.strip() for line in log.splitlines()
-            if line.strip() and not _BANNER_RE.match(line.strip())
-            and not _QUOTED_RE.match(line) and "what pytest said" not in line]
+    tail = _without_pytest_text(log)
     if tail:
         out["state"] = "not_scored"
         out["detail"] = "\n".join(tail[-8:])

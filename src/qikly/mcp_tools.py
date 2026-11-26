@@ -307,28 +307,96 @@ def _existing_path(path, root):
     return next((c for c in candidates if os.path.exists(c)), None)
 
 
+_WALK_LIMIT = 200000
+
+
+def _plain(path):
+    """`path` without a Windows long-path prefix, which realpath keeps."""
+    bs = chr(92)
+    unc = bs * 2 + "?" + bs + "UNC" + bs
+    if path.startswith(unc):
+        return bs * 2 + path[len(unc):]
+    for prefix in (bs * 2 + "?" + bs, bs * 2 + "." + bs):
+        if path.startswith(prefix):
+            return path[len(prefix):]
+    return path
+
+
+def _identity(path):
+    """(device, file id) of what `path` is, whatever it is spelled as."""
+    st = os.stat(path)
+    if st.st_ino:
+        return (st.st_dev, st.st_ino)
+    return ("path", os.path.normcase(os.path.realpath(path)))
+
+
+def _identities_under(top):
+    """
+    The identity of every folder and file in `top`, through links, plus `top`.
+    Raises OverflowError past the limit, so a huge tree is refused, not skipped.
+    """
+    found, seen, count = {_identity(top)}, set(), 0
+    for here, dirs, files in os.walk(top, followlinks=True):
+        try:
+            mark = _identity(here)
+        except OSError:
+            continue
+        if mark in seen:
+            dirs[:] = []                              # a loop through a link
+            continue
+        seen.add(mark)
+        found.add(mark)
+        for name in dirs + files:
+            count += 1
+            if count > _WALK_LIMIT:
+                raise OverflowError
+            try:
+                found.add(_identity(os.path.join(here, name)))
+            except OSError:
+                continue
+    return found
+
+
 def _touches_outputs(path, root):
     """
-    Whether `path` is inside qikly's `outputs/` folder, or is a folder that
-    holds it.
+    Whether `path` is inside qikly's `outputs/` folder, holds it, or holds a
+    link or hard link to anything in it.
 
     The generated tests under `outputs/tests/` are written from the acceptance
     criteria. Scoring them would put their failure text (a failing assertion
     quotes the rule it broke) and their constants (a missed fault names a
     number from a test) into the response. `docs/mcp.md` tells the user to
     keep the agent from reading that folder, and the server process is not
-    bound by that rule, so the tool has to enforce it itself. Compared by real
-    path, so a link or `..` does not get round it.
+    bound by that rule, so the tool has to enforce it itself.
+
+    Compared by file identity, not by spelling: long-path and UNC forms, 8.3
+    names, junctions, symlinks and hard links all name the same file. A path
+    that cannot be examined is refused rather than allowed.
     """
-    outputs = os.path.realpath(os.path.join(root, "outputs"))
-    path = os.path.realpath(path)
-    for inner, outer in ((path, outputs), (outputs, path)):
-        try:
-            if os.path.commonpath([inner, outer]) == outer:
+    try:
+        homes = {os.path.join(root, "outputs"), os.path.join(os.getcwd(), "outputs")}
+        marks = set()
+        for home in homes:
+            if os.path.exists(home):
+                marks |= _identities_under(home)
+        if not marks:
+            return False
+        path = _plain(os.path.realpath(path))
+        # Inside it, or at it: a folder on the way up is one of its folders.
+        here = path
+        while True:
+            if _identity(here) in marks:
                 return True
-        except ValueError:                           # another drive
-            continue
-    return False
+            above = os.path.dirname(here)
+            if above == here:
+                break
+            here = above
+        # Holding it, or a link into it: a file or folder below is one of its own.
+        if os.path.isdir(path):
+            return bool(_identities_under(path) & marks)
+        return False
+    except (OSError, ValueError, OverflowError):
+        return True
 
 
 def qikly_score(code_path, tests_path=None, mutants=None):
@@ -376,6 +444,20 @@ def qikly_score(code_path, tests_path=None, mutants=None):
             return _error("no such tests path: %s. Name a test file or a "
                           "folder of them, or leave it out so qikly finds the "
                           "tests that import the code" % tests_path)
+
+    if tests is None:
+        # Left out, the command looks for the test files that import the code,
+        # following links. What it would pick is checked here, before it runs.
+        try:
+            from qikly.start import auto_tests
+            picked = auto_tests(os.path.abspath(code), root)
+        except Exception as exc:                     # noqa: BLE001
+            return _error("could not look for the tests: %s" % exc)
+        if picked and _touches_outputs(picked, root):
+            return _error(
+                "the tests found for that code lead into qikly's outputs/ "
+                "folder, which holds the generated tests. Name your own tests "
+                "with tests_path.")
 
     for given, found in ((code_path, code), (tests_path, tests)):
         if found and _touches_outputs(found, root):

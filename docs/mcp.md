@@ -234,6 +234,13 @@ assertion would quote them. Pass your own module and your own tests. A score
 writes its report and questions to `qikly-suite-score/` in the project and keeps
 its own records under `outputs/score_runs/` and `outputs/logs/`.
 
+The refusal compares files by identity, not by spelling, so long-path and network
+forms, short names, links, junctions and hard links into `outputs/` are refused
+too, and so are tests the command would find on its own that lead there. A path
+that cannot be examined is refused. It cannot stop a test you wrote from reading
+`outputs/` itself: the tests run as your user, so keep denying your agent read
+access to that folder, as above.
+
 ## What these tools will not tell you
 
 No qikly tool returns your acceptance criteria. Not on success, and especially

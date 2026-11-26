@@ -14,7 +14,9 @@ packaging tools would read as `1.1`.
   path, or why nothing was scored. Free, no model call, none of your files
   modified. Neither tool reads a task, and `qikly_score` refuses any path
   inside or holding `outputs/`, where the generated tests are kept, so neither
-  can return acceptance criteria.
+  can return acceptance criteria. The check compares files by identity, so
+  long-path, network, short-name, link, junction and hard-link spellings are
+  refused too, and a score's result never carries pytest's own failure text.
 
 ### Changed
 - **Every MCP tool parameter has a description, and every tool says what it

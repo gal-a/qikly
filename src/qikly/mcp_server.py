@@ -376,7 +376,7 @@ def build_server():
     # never reached a host: tools/list served "Task Id" and a type. The spec
     # stays the one place the words live, and each parameter pulls its
     # description and limits from it here.
-    from typing import Annotated
+    from typing import Annotated, Optional
 
     def _arg(tool, prop):
         from pydantic import Field
@@ -392,8 +392,8 @@ def build_server():
                      json_schema_extra=extra, **limits)
 
     def _run(task_id: Annotated[str, _arg("qikly_run", "task_id")],
-             provider: Annotated[str, _arg("qikly_run", "provider")] = None,
-             model: Annotated[str, _arg("qikly_run", "model")] = None) -> str:
+             provider: Annotated[Optional[str], _arg("qikly_run", "provider")] = None,
+             model: Annotated[Optional[str], _arg("qikly_run", "model")] = None) -> str:
         return call_tool("qikly_run", {"task_id": task_id, "provider": provider,
                                        "model": model})
 
@@ -407,8 +407,8 @@ def build_server():
         return call_tool("qikly_scaffold", {"file_path": file_path})
 
     def _score(code_path: Annotated[str, _arg("qikly_score", "code_path")],
-               tests_path: Annotated[str, _arg("qikly_score", "tests_path")] = None,
-               mutants: Annotated[int, _arg("qikly_score", "mutants")] = None) -> str:
+               tests_path: Annotated[Optional[str], _arg("qikly_score", "tests_path")] = None,
+               mutants: Annotated[Optional[int], _arg("qikly_score", "mutants")] = None) -> str:
         return call_tool("qikly_score", {"code_path": code_path,
                                          "tests_path": tests_path,
                                          "mutants": mutants})
