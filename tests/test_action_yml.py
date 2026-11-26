@@ -165,7 +165,11 @@ def test_every_documented_repo_url_points_at_the_real_one():
     owner = GITHUB_REPO.split("/")[0]
     bad = {}
     for path in (["README.md", "action.yml", "pyproject.toml",
-                  ".pre-commit-hooks.yaml"] + glob.glob("docs/*.md")
+                  ".pre-commit-hooks.yaml"]
+                 # docs/tools.md lists other people's tools, so it names their
+                 # repositories on purpose.
+                 + [p for p in glob.glob("docs/*.md")
+                    if os.path.basename(p) != "tools.md"]
                  + ["docs/index.html"] + glob.glob(".github/workflows/*.yml")):
         with open(os.path.join(ROOT, path), encoding="utf-8") as handle:
             text = handle.read()
