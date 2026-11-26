@@ -468,6 +468,7 @@ def test_the_child_is_told_not_to_quote_pytest(project, monkeypatch):
 
 
 def test_optional_arguments_accept_an_explicit_null():
+    pytest.importorskip("mcp")          # an optional extra, not on every CI job
     import asyncio
     from qikly.mcp_server import build_server
     server = build_server()
