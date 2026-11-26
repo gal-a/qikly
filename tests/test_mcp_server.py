@@ -402,3 +402,29 @@ def test_the_validate_tool_says_it_is_not_the_contradiction_check():
     assert "--validate" in spec["description"]
     assert "contradiction" in spec["description"]
     assert "qikly_check_criteria" not in [t["name"] for t in TOOL_SPECS]
+
+
+def test_every_served_parameter_carries_its_description():
+    """
+    What a host reads is the schema the SDK serves, built from the Python
+    signature. A description written only in TOOL_SPECS never reached it: the
+    served schema said "Task Id" and a type. This reads what is actually
+    served, so the words in the spec cannot be decorative again.
+    """
+    import asyncio
+
+    pytest.importorskip("mcp")
+    server = mcp_server.build_server()
+
+    async def served():
+        return await server.list_tools()
+
+    tools = {t.name: t for t in asyncio.run(served())}
+    assert set(tools) == set(mcp_tools.TOOLS)
+    for spec in mcp_server.TOOL_SPECS:
+        schema = getattr(tools[spec["name"]], "input_schema", None) \
+            or getattr(tools[spec["name"]], "inputSchema")
+        for prop, declared in spec["inputSchema"]["properties"].items():
+            if "description" in declared:
+                assert schema["properties"][prop].get("description") == declared["description"], (
+                    spec["name"], prop)
