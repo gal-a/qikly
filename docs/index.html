@@ -1661,6 +1661,25 @@ from your criteria:
         devices, fintech and defence.</p>
     </details>
     <details>
+      <summary>Can I install it with uv?</summary>
+      <p>Yes. <code>pip install qikly</code> is the simplest way, and the one to
+        use inside a project's own environment. With
+        <a href="https://docs.astral.sh/uv/" data-goatcounter-click="faq-uv">uv</a>,
+        <code>uv tool install qikly</code> puts the command on your PATH, and
+        <code>uvx qikly --score your_module.py</code> runs it once without
+        installing.</p>
+      <p>qikly runs your tests with the Python it is installed in. A uv tool has
+        its own environment, so if your project needs its own packages, the score
+        stops with <code>No module named ...</code> even though your tests pass
+        in your project. Install qikly into the project
+        (<code>pip install qikly</code> or <code>uv pip install qikly</code>), or
+        add what the project needs:
+        <code>uv tool install --force --with &lt;package&gt; qikly</code>.</p>
+      <p>To update, run <code>uv tool upgrade qikly</code>. <code>uvx</code> keeps
+        the version it first fetched, so use <code>uvx --refresh</code> to get a
+        newer one.</p>
+    </details>
+    <details>
       <summary>Is it open source?</summary>
       <p>Yes, under the Apache License 2.0.</p>
     </details>
