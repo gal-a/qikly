@@ -430,7 +430,7 @@ def auto_tests(code, cwd=None):
 QUICK_ENOUGH = 300   # seconds of scoring before the user is asked first
 
 
-def how_many(console, target, tests, cwd, many):
+def how_many(console, target, tests, cwd, many, workers=1):
     """
     (faults it could plant, faults to plant): every one up to the cap, fewer
     when the suite is slow. With a fixed 12, `--score` said 9 of 12 missed
@@ -440,11 +440,11 @@ def how_many(console, target, tests, cwd, many):
     sites = sum(len(ms.sites(_read(path))) for path, _ in target.files)
     planted = min(sites, SCORE_CAP_MANY if many else SCORE_CAP_ONE)
     if planted:
-        planted = _fit_to_time(console, tests, cwd, planted)
+        planted = _fit_to_time(console, tests, cwd, planted, workers)
     return sites, planted
 
 
-def _fit_to_time(console, tests, cwd, planted):
+def _fit_to_time(console, tests, cwd, planted, workers=1):
     """
     How many faults to plant, given how long the suite takes. Every fault
     runs the whole suite once, and tabulate's folder ran for over an hour
@@ -465,7 +465,13 @@ def _fit_to_time(console, tests, cwd, planted):
         raise SuiteStuck(stuck_message("score", [tests], _suite_limit()))
     except OSError:
         return planted
-    each = max(time.monotonic() - started, 0.3)
+    alone = max(time.monotonic() - started, 0.3)
+    # With several faults running at once each takes the suite's time but
+    # they overlap, so the cost per fault is the suite's time shared out.
+    # Only the count of faults depends on this, never which ones are drawn
+    # for a given count and seed.
+    workers = max(1, int(workers or 1))
+    each = alone / workers
     total = each * planted
 
     def minutes(seconds):
@@ -475,9 +481,10 @@ def _fit_to_time(console, tests, cwd, planted):
     if total <= QUICK_ENOUGH:
         return planted
     sample = min(planted, max(12, int(QUICK_ENOUGH / each)))
-    console.say(f"Your tests take about {each:.0f} seconds to run, and each "
-                f"planted fault runs them once, so all {planted} would take "
-                f"about {minutes(total)}.")
+    console.say(f"Your tests take about {alone:.0f} seconds to run, and each "
+                f"planted fault runs them once"
+                + (f", {workers} at a time" if workers > 1 else "")
+                + f", so all {planted} would take about {minutes(total)}.")
     if sample >= planted:
         # A sample of 12 from 10 is all of them, and offering it read as a cut.
         console.say(f"That is fewer than a useful sample, so all {planted} are planted.")

@@ -951,6 +951,15 @@ def _parse_args():
              "you took before you changed the suite."
     )
     parser.add_argument(
+        "--score-workers", type=int, default=None, metavar="N",
+        help="How many planted faults --score and --score-suite run at once, "
+             "each in its own copy of your code (default 4, or fewer on a "
+             "machine with fewer processors). 1 plants one at a time. The "
+             "same seed gives the same faults and verdicts either way. If "
+             "your tests fail with several copies running at once but pass "
+             "alone, it falls back to one at a time and says so."
+    )
+    parser.add_argument(
         "--propose-fixtures", action="store_true",
         help="For each acceptance criterion, ask whether any row in your input "
              "data reaches it, and propose a row for the ones nothing reaches. "
@@ -1720,7 +1729,7 @@ def _long_path_hint(exc):
     return ""
 
 
-def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
+def _do_score_suite(tasks, mutants, seed, code=None, tests=None, workers=None):
     """
     `--score-suite`: how much of your own code can be broken without the suite
     noticing.
@@ -1733,8 +1742,19 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
     `--score-tests` score a suite and an implementation that already exist,
     which is what everybody actually has before they have anything else.
     """
-    from qikly.mutation_score import DEFAULT_MUTANTS, from_paths, run
+    from qikly.mutation_score import DEFAULT_MUTANTS, default_workers, from_paths, run
     from qikly.orchestrator.orchestrator import discover_task_ids
+
+    if workers is not None and workers < 1:
+        # Checked before anything is copied or timed. 0 or a negative count
+        # has no meaning, and reading it as 1 would hide the typo.
+        print(f"--score-workers needs a whole number of 1 or more, not "
+              f"{workers}: 1 plants one fault at a time, as in: qikly --score "
+              f"pricing.py --score-tests tests/ --score-workers 1",
+              file=sys.stderr)
+        return 2
+    if workers is None:
+        workers = default_workers()
 
     stamp(project_root_matters=not (code or tests))
 
@@ -1809,7 +1829,8 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
             from qikly import start
             try:
                 sites, mutants = start.how_many(start.Console(), target, tests,
-                                                INVOKED_FROM, os.path.isdir(code))
+                                                INVOKED_FROM, os.path.isdir(code),
+                                                workers=workers)
             except (start.Stop, EOFError, KeyboardInterrupt):
                 print("\nStopped before anything was planted.")
                 return 130
@@ -1833,7 +1854,7 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
                 seed = 0
         try:
             report = run(target, mutants=mutants, seed=seed,
-                         invoked_from=INVOKED_FROM)
+                         invoked_from=INVOKED_FROM, workers=workers)
         except Exception as exc:
             print(f"[{target.label}] could not be scored: "
                   f"{type(exc).__name__}: {exc}{_long_path_hint(exc)}")
@@ -1844,7 +1865,8 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None):
     ids = [t.strip() for t in tasks.split(",")] if tasks else discover_task_ids()
     for task_id in [t for t in ids if t]:
         try:
-            run(task_id, mutants=mutants or DEFAULT_MUTANTS, seed=seed)
+            run(task_id, mutants=mutants or DEFAULT_MUTANTS, seed=seed,
+                workers=workers)
         except Exception as exc:
             print(f"[{task_id}] could not be scored: {type(exc).__name__}: {exc}")
     return 0
@@ -3130,6 +3152,9 @@ def main():
         ("--score-seed", args.score_seed is not None,
          "--score-suite, or --score with --score-tests",
          "qikly --score-suite --tasks CALC_TAX --score-seed 3"),
+        ("--score-workers", args.score_workers is not None,
+         "--score-suite, or --score with --score-tests",
+         "qikly --score pricing.py --score-tests tests/ --score-workers 2"),
         # Found by the audit of the fix above, which is the point of auditing
         # a fix: the same unguarded fallthrough, in the sibling flag nobody
         # thought to check. Given alone it reached the ordinary run path and
@@ -3172,6 +3197,8 @@ def main():
                                     or args.score_tests),
             "--score-seed": bool(args.score_suite or args.score_code
                                  or args.score_tests),
+            "--score-workers": bool(args.score_suite or args.score_code
+                                    or args.score_tests),
             "--artifacts-url": bool(args.pr_comment),
             "--json": bool(args.validate or args.explain or args.trends
                            or args.compare_criteria),
@@ -3229,7 +3256,8 @@ def main():
         return _do_install_skill(args.install_skill, args.force, args.dry_run)
     if args.score_suite or args.score_code or args.score_tests:
         return _do_score_suite(args.tasks, args.score_mutants, args.score_seed,
-                               code=args.score_code, tests=args.score_tests)
+                               code=args.score_code, tests=args.score_tests,
+                               workers=args.score_workers)
 
     if args.demo and not args.tasks:
         task_ids = [DEMO_TASK]

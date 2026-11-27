@@ -6,7 +6,8 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
-Nothing yet.
+### Added
+- **`--score-workers N` plants several faults at once.** Each fault runs in its own copy of your code, up to four at a time by default (fewer on a machine with fewer processors), so a slow suite scores in a fraction of the time. `--score-workers 1` plants one at a time. The same seed gives the same faults, verdicts and order whatever the count. A suite that fails when several copies run together but passes alone is noticed before anything is planted, and is then scored one fault at a time with a line saying so.
 
 ## 0.6.6
 
