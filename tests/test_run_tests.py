@@ -178,9 +178,39 @@ def test_a_collection_error_is_reported_as_nothing_having_run(tmp_path, monkeypa
 
 # ---------------------------------------------------------- end to end -----
 
+_LEAKY = ("PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "PYTEST_ADDOPTS",
+          "PYTEST_PLUGINS", "PYTEST_DEBUG_TEMPROOT", "PYTEST_CURRENT_TEST")
+
+
+def why(result):
+    """
+    A failed assertion's message: what pytest said, plus the state the child
+    inherited. These tests flaked on Windows CI with a child pytest failing to
+    stat some other test's temp directory; the output alone never said how the
+    child came to look at it.
+    """
+    env = {k: v for k, v in os.environ.items()
+           if k in _LEAKY or k.startswith(("PYTEST", "QIKLY", "TMP", "TEMP"))}
+    nl = chr(10)
+    return nl.join(["%s", "--- state the child inherited ---", "cwd=%r", "env=%r"]) % (
+        result.get("raw_output"), os.getcwd(), env)
+
+
+def isolate(monkeypatch, tmp_path):
+    """
+    Run the child pytest from this test's own folder, with nothing inherited
+    from another test that shares the worker: the working directory and the
+    environment variables that change what pytest looks at.
+    """
+    monkeypatch.chdir(tmp_path)
+    for name in _LEAKY:
+        monkeypatch.delenv(name, raising=False)
+
+
 @pytest.fixture
 def suite(tmp_path, monkeypatch):
     """A real two test stage on disk, so pytest is actually invoked."""
+    isolate(monkeypatch, tmp_path)
     monkeypatch.setattr(rt, "REPORT_DIR", str(tmp_path / "reports"))
     stage_dir = tmp_path / "tests" / "integration"
     stage_dir.mkdir(parents=True)
@@ -195,7 +225,7 @@ def test_run_tests_reports_a_real_pass(suite):
 
     result = rt.run_tests("integration", str(tmp_path / "tests"),
                           task_id="T", iteration=1, run_timestamp="TS")
-    assert result["status"] == "pass", result["raw_output"]
+    assert result["status"] == "pass", why(result)
     assert result["counts"]["passed"] == 2
     assert result["counts"]["total"] == 2
     assert result["failed_tests"] == []
@@ -210,9 +240,9 @@ def test_run_tests_reports_a_real_failure(suite):
 
     result = rt.run_tests("integration", str(tmp_path / "tests"),
                           task_id="T", iteration=1, run_timestamp="TS")
-    assert result["status"] == "fail", result["raw_output"]
-    assert result["counts"]["passed"] == 1, result["raw_output"]
-    assert result["counts"]["failed"] == 1, result["raw_output"]
+    assert result["status"] == "fail", why(result)
+    assert result["counts"]["passed"] == 1, why(result)
+    assert result["counts"]["failed"] == 1, why(result)
     assert any("test_bad" in line for line in result["failed_tests"])
 
 
@@ -226,7 +256,7 @@ def test_run_tests_survives_a_module_that_cannot_be_imported(suite):
 
     result = rt.run_tests("integration", str(tmp_path / "tests"),
                           task_id="T", iteration=1, run_timestamp="TS")
-    assert result["status"] == "fail", result["raw_output"]
+    assert result["status"] == "fail", why(result)
     assert result["raw_output"].strip(), "the error text is what the agent gets to fix"
 
 
@@ -285,8 +315,8 @@ def test_counts_survive_a_project_that_sets_quiet(tmp_path, monkeypatch):
     result = rt.run_tests("integration", str(tmp_path / "tests"),
                           task_id="T", iteration=1, run_timestamp="TS")
     assert result["counts"]["total"] == 2, "the summary line must survive"
-    assert result["counts"]["passed"] == 1, result["raw_output"]
-    assert result["counts"]["failed"] == 1, result["raw_output"]
+    assert result["counts"]["passed"] == 1, why(result)
+    assert result["counts"]["failed"] == 1, why(result)
 
 
 def test_the_research_harnesses_pin_their_pytest_rootdir():
