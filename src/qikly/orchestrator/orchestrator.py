@@ -1711,7 +1711,7 @@ def orchestrate(task_id, seed=None, resume=False):
             with open(patch_path, "r", encoding="utf-8", errors="replace") as f:
                 pending_fix_patch = f.read()
             applied_patch_hashes.append(
-                hashlib.sha1(pending_fix_patch.encode("utf-8", "replace")).hexdigest())
+                hashlib.sha256(pending_fix_patch.encode("utf-8", "replace")).hexdigest())
 
     # All stages passed
     log_transaction({"action": "all_tests_passed"})
