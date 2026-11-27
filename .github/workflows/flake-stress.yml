@@ -10,7 +10,7 @@ jobs:
       fail-fast: false
       matrix:
         python: ["3.10", "3.13"]
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4, 5]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,13 +19,17 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: pip install -e ".[dev]" pytest-xdist || pip install -e . pytest pytest-xdist
         shell: bash
-      - name: Run the suite 4 times, keep going on failure
+      - name: Run the suite 10 times, keep going on failure
         shell: bash
         run: |
           fails=0
-          for i in 1 2 3 4; do
-            pytest -q -n auto --dist loadgroup 2>&1 | tee run_$i.log | tail -3
-            if grep -q "^FAILED" run_$i.log; then fails=$((fails+1)); grep "^FAILED" run_$i.log | cut -c1-160; fi
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            pytest -q -n auto --dist loadgroup --color=no -p no:cacheprovider > run_$i.log 2>&1
+            tail -1 run_$i.log
+            if grep -q "^FAILED" run_$i.log; then
+              fails=$((fails+1))
+              grep "^FAILED" run_$i.log | cut -c1-200 | sed 's/^/STRESSFAIL /'
+            fi
           done
-          echo "RUNS WITH FAILURES: $fails of 4"
+          echo "RUNS WITH FAILURES: $fails of 10"
           test "$fails" = "0"
