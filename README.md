@@ -26,7 +26,7 @@ pip install qikly
 qikly --score your_module.py
 ```
 
-[![qikly --score on the bundled pricing example: 10 of 13 planted faults missed, and three of the questions they leave open](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_score.png)](#start-here)
+[![qikly --score on the bundled pricing example: 10 of 13 planted faults missed, and three of the questions they leave open](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_score.gif)](#start-here)
 
 It plants faults in a copy of your code, one at a time, and turns each one your
 tests miss into a question about behaviour nothing checks. Nothing of yours is
