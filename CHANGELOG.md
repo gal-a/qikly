@@ -6,6 +6,12 @@ packaging tools would read as `1.1`.
 
 ## Unreleased
 
+Nothing yet.
+
+## 0.6.6
+
+> An agent can now score a test suite it already has, through two new MCP tools.
+
 ### Added
 - **Two MCP tools score a test suite you already have.** `qikly_score` starts
   `--score` in the background and returns an id; `qikly_score_result` reports
