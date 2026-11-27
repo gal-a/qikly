@@ -168,7 +168,7 @@ resolved root has no `inputs_private/`, they say so and name the directory they
 resolved, because that one fact is the difference between a misconfiguration
 and an apparently broken tool.
 
-## The four tools
+## The six tools
 
 | Tool | What it achieves | Input | Returns | Safe to call unattended? | CLI equivalent |
 | --- | --- | --- | --- | --- | --- |
@@ -176,11 +176,15 @@ and an apparently broken tool.
 | `qikly_status` | Reports where a run got to, reading what the run itself wrote rather than watching the process. That is what lets it tell a crash from a failing suite: `stalled` means the process is gone without writing a summary. While a run is in flight it also gives the stage and iteration. | `run_id` | One of `running`, `passed`, `failed`, `stalled`, `unknown`, plus stage and iteration | **Yes.** Reads local run records only. Free, no network. | `qikly --status <run_id>` |
 | `qikly_validate` | Checks a task file offline before you spend anything on it: valid YAML, the required sections present, `acceptance_criteria` a list rather than one long string, and fixture paths that actually resolve. It does **not** look for contradictions between requirements and criteria: that is `qikly --check-criteria`, a paid model call this server deliberately does not expose. | `task_id` | Counts and a verdict | **Yes.** No model call, so no network and no cost. Returns no criterion text. | `qikly --validate --tasks <task>` |
 | `qikly_scaffold` | Turns a Python file you already have into a task that tests it: the module path, the real signatures of its public functions and classes, a guessed entrypoint, and a seed pointing back at the file. `requirements` and `acceptance_criteria` are left as `TODO` on purpose, because criteria read out of an implementation can only describe what it already does. | `file_path` | The task YAML as text, for you to save under `inputs_private/config/tasks/` | **Yes.** Returns the YAML rather than writing it, so saving stays your decision. | `qikly --scaffold <file>` |
+| `qikly_score` | Answers "how good are my tests?" for a Python module you already have. Plants small faults in a temporary copy of the code, runs your existing tests against each, and reports which faults no test noticed. Returns **immediately**, because scoring takes seconds to over an hour. | `code_path`, optional `tests_path` and `mutants` | A `score_id` to poll with | **Yes.** No model call, no API key and none of your files modified. It writes a report to `qikly-suite-score/` in the project and runs your own tests many times, so call it when the user asked for a score, not on every edit. | `qikly --score <module>` |
+| `qikly_score_result` | Reports what became of a `qikly_score`: still running, finished with the headline (for example `3 of 12 planted faults missed (25%), 9 caught`), the missed faults as one line each, how many open questions the tests leave and the report path, or not scored with the reason. A suite that fails on the untouched code is not scored, since a number would mean nothing. | `score_id` | One of `running`, `finished`, `not_scored`, `stalled`, `unknown`, plus the fields above | **Yes.** Reads the score's own log and report. Free, no network. | the output of `qikly --score` |
 
 Every tool carries the four MCP behaviour annotations, so a host can act on the
 column above rather than guess: `readOnlyHint`, `destructiveHint`,
-`idempotentHint` and `openWorldHint`. Three of the four are read-only, free and
-local. Only `qikly_run` is none of those things.
+`idempotentHint` and `openWorldHint`. Four of the six are read-only, free and
+local. `qikly_score` is free and local too, but it writes a report folder and
+runs your tests, so it is not read-only. Only `qikly_run` calls a model or
+touches the network.
 
 ## Why `qikly_run` does not wait
 
@@ -205,6 +209,37 @@ ask for the status tomorrow. The run outlives the conversation that started it.
 `stalled` is worth knowing about: it means the run died without writing a
 summary, which is a crash rather than a failing suite. The two need different
 reactions, so they get different words.
+
+## Why `qikly_score` does not wait either
+
+Scoring runs your whole test suite once per planted fault, so a small module takes
+seconds and a large one over an hour. `qikly_score` starts it detached, like
+`qikly_run`, and hands back an id:
+
+```
+qikly_score(code_path="pricing.py")
+  -> {"ok": true, "score_id": "score-pricing.py_20261126_230110", "state": "running"}
+
+qikly_score_result(score_id="score-pricing.py_20261126_230110")
+  -> {"state": "finished", "headline": "5 of 10 planted faults missed (50%), 5 caught",
+      "missed_faults": ["`pricing.py`: < became <=, line 2 (arithmetic)", ...],
+      "open_questions": 3, "report_path": "..."}
+```
+
+A missed fault is a question, not a verdict: some planted faults are equivalent to
+the original, and no test could catch them. The tool never reads a task file, and
+it refuses any path inside, or holding, your `outputs/` folder, because the
+generated tests there are written from the acceptance criteria and a failing
+assertion would quote them. Pass your own module and your own tests. A score
+writes its report and questions to `qikly-suite-score/` in the project and keeps
+its own records under `outputs/score_runs/` and `outputs/logs/`.
+
+The refusal compares files by identity, not by spelling, so long-path and network
+forms, short names, links, junctions and hard links into `outputs/` are refused
+too, and so are tests the command would find on its own that lead there. A path
+that cannot be examined is refused. It cannot stop a test you wrote from reading
+`outputs/` itself: the tests run as your user, so keep denying your agent read
+access to that folder, as above.
 
 ## What these tools will not tell you
 

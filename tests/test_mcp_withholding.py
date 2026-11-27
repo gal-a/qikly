@@ -150,7 +150,14 @@ def test_no_tool_response_may_carry_the_criteria_key(project, monkeypatch):
         "qikly_run": lambda: mcp_tools.qikly_run("MCP_SENTINEL"),
         "qikly_status": lambda: mcp_tools.qikly_status("MCP_SENTINEL_20260910_120000"),
         "qikly_validate": lambda: mcp_tools.qikly_validate("MCP_SENTINEL"),
+        "qikly_score": lambda: mcp_tools.qikly_score(__file__),
+        "qikly_score_result": lambda: mcp_tools.qikly_score_result(
+            "score-sample.py_20260910_120000"),
     }
+    monkeypatch.setattr(mcp_tools.runs, "start_score",
+                        lambda *a, **k: "score-sample.py_20260910_120000")
+    monkeypatch.setattr(mcp_tools.runs, "score_result",
+                        lambda s: {"score_id": s, "state": "running"})
     for name, call in calls.items():
         _assert_no_criteria(_wire(call()), name)
 
@@ -160,7 +167,8 @@ def test_every_declared_tool_is_covered_here():
     The list of tools and the list of things this file checks must not drift.
     A tool added without a line here is a tool nobody proved is safe.
     """
-    covered = {"qikly_run", "qikly_status", "qikly_validate", "qikly_scaffold"}
+    covered = {"qikly_run", "qikly_status", "qikly_validate", "qikly_scaffold",
+               "qikly_score", "qikly_score_result"}
     assert set(mcp_tools.TOOLS) == covered, (
         "a tool was added or removed without updating the withholding tests: "
         f"{set(mcp_tools.TOOLS) ^ covered}")
@@ -267,10 +275,18 @@ def test_every_tool_declares_its_behaviour_hints():
     # The three that only read this machine. If one of these ever starts
     # writing, calling a model or reaching the network, this fails and the
     # annotation has to be corrected rather than the test relaxed.
-    for name in ("qikly_status", "qikly_validate", "qikly_scaffold"):
+    for name in ("qikly_status", "qikly_validate", "qikly_scaffold",
+                 "qikly_score_result"):
         assert by_name[name]["readOnlyHint"] is True, name
         assert by_name[name]["destructiveHint"] is False, name
         assert by_name[name]["openWorldHint"] is False, name
+
+    # qikly_score writes a report folder and runs the caller's tests, so it is
+    # not read-only, but it calls no model, reaches no network of its own and
+    # modifies none of the caller's files.
+    assert by_name["qikly_score"]["readOnlyHint"] is False
+    assert by_name["qikly_score"]["destructiveHint"] is False
+    assert by_name["qikly_score"]["openWorldHint"] is False
 
 
 def test_an_sdk_that_rejects_annotations_still_gets_all_four_tools():
@@ -368,7 +384,15 @@ def test_the_documented_run_response_matches_what_the_tool_returns():
               encoding="utf-8") as handle:
         source = handle.read()
 
-    returned = set(re.findall(r'"state":\s*"(\w+)"', source))
+    # Score states (finished, not_scored, ...) are produced in runs.py and
+    # returned unchanged by qikly_score_result, so both files count.
+    with open(os.path.join(root, "src", "qikly", "runs.py"),
+              encoding="utf-8") as handle:
+        source += handle.read()
+
+    # Both spellings: a dict literal, and `out["state"] = "..."` as runs.py
+    # writes the score states.
+    returned = set(re.findall(r'"state"\]?\s*[:=]\s*"(\w+)"', source))
     documented = set(re.findall(r'"state":\s*"(\w+)"', doc))
     unknown = documented - returned
     assert not unknown, (

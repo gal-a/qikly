@@ -243,7 +243,7 @@ same command for you.
 Your agent sees which tests failed and the pytest output, never the rule it
 broke.
 
-[`docs/mcp.md`](https://github.com/gal-a/qikly/blob/main/docs/mcp.md) has the four tools, other hosts,
+[`docs/mcp.md`](https://github.com/gal-a/qikly/blob/main/docs/mcp.md) has the six tools, other hosts,
 installing with pip instead, what to do when the server does not start, and
 how to keep the generated tests out of your agent's reach.
 

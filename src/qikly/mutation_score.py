@@ -1446,9 +1446,10 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None):
                     where = os.path.join(target.root, suite)
                     tail = _pytest_tail(where, target.root, lines=4, env=env)
                     if tail:
-                        print(f"[{task_id}] what pytest said:")
-                        for line in tail:
-                            print(f"[{task_id}]     {line}")
+                        if not os.environ.get("QIKLY_NO_PYTEST_QUOTE"):
+                            print(f"[{task_id}] what pytest said:")
+                            for line in tail:
+                                print(f"[{task_id}]     {line}")
                         said = tail
                         break
                 for line in setup_advice(said, target):

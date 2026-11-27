@@ -80,8 +80,9 @@ source rather than a promise in a document.
 ## The MCP server
 
 `qikly-mcp` speaks to your editor over stdin and stdout on your own machine. It
-opens no listening socket and accepts no remote connection. Its four tools
-(`qikly_run`, `qikly_status`, `qikly_validate`, `qikly_scaffold`) operate on
+opens no listening socket and accepts no remote connection. Its six tools
+(`qikly_run`, `qikly_status`, `qikly_validate`, `qikly_scaffold`, `qikly_score`,
+`qikly_score_result`) operate on
 files in the project directory you point them at, and the same model-provider
 rules above apply to `qikly_run`, which is the only one that calls a model.
 
