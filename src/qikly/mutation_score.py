@@ -1282,6 +1282,15 @@ def outside_copy_lines(target):
     ]
 
 
+def _has_pip():
+    """Whether the Python qikly runs in can install packages with pip."""
+    import importlib.util
+    try:
+        return importlib.util.find_spec("pip") is not None
+    except (ImportError, ValueError):
+        return True                      # cannot tell: keep the usual advice
+
+
 def setup_advice(said, target):
     """
     What to look at when a suite fails before any fault is planted, said as
@@ -1297,10 +1306,20 @@ def setup_advice(said, target):
              "To fix it:"]
     missing = re.search(r"No module named '([\w.]+)'", text)
     if missing:
-        lines.append(f"  - install the missing package in the Python qikly runs in: "
-                     f"{sys.executable} -m pip install {missing.group(1).split('.')[0]}")
-        lines.append("    (if it is your own package, install your project instead: "
-                     "pip install -e .)")
+        package = missing.group(1).split(".")[0]
+        if _has_pip():
+            lines.append(f"  - install the missing package in the Python qikly runs in: "
+                         f"{sys.executable} -m pip install {package}")
+            lines.append("    (if it is your own package, install your project instead: "
+                         "pip install -e .)")
+        else:
+            # A uv tool install lives in its own environment with no pip, so
+            # the pip command above would fail with "No module named pip".
+            lines.append(f"  - qikly runs in its own environment here, which has no pip. "
+                         f"Give it the package:  uv tool install --force --with {package} "
+                         f"qikly   (or run  uvx --with {package} qikly ...)")
+            lines.append("    or install qikly into your project's environment "
+                         "instead:  pip install qikly")
     if re.search(r"requires a different Python", text):
         lines.append(f"  - check the Python version: qikly runs Python "
                      f"{sys.version.split()[0]}; your project may need another")

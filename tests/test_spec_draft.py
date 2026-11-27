@@ -245,6 +245,23 @@ def test_a_suite_failing_on_its_own_is_said_to_be_the_setup_not_qikly():
     assert "python -m pytest tests" in text
 
 
+def test_with_no_pip_the_advice_is_a_command_that_can_work():
+    """In a uv tool environment `python -m pip` fails with "No module named pip"."""
+    from qikly import mutation_score as ms
+    target = ms.Target("x", [], ["tests"], ".")
+    said = ["E   ModuleNotFoundError: No module named 'click.core'"]
+    ms_has = ms._has_pip
+    try:
+        ms._has_pip = lambda: False
+        text = chr(10).join(ms.setup_advice(said, target))
+    finally:
+        ms._has_pip = ms_has
+    assert "-m pip install" not in text
+    assert "uv tool install --force --with click qikly" in text
+    assert "uvx --with click qikly" in text
+    assert "python -m pytest tests" in text, "the rest of the advice stays"
+
+
 def test_with_no_readme_and_no_docstrings_nothing_is_drafted(scored, monkeypatch, capsys):
     """With names alone, every drafted answer was a guess, label('VIP') raising."""
     os.remove(scored / "README.md")
