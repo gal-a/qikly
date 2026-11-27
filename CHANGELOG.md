@@ -21,6 +21,11 @@ packaging tools would read as `1.1`.
 ### Changed
 - **Every MCP tool parameter has a description, and every tool says what it
   returns**, so a host's agent can call them without guessing.
+- **A missing package no longer sends a `uv tool install` user to a pip that
+  is not there.** The setup advice said `python -m pip install <package>`, but a
+  uv tool environment has no pip. Without pip it now says
+  `uv tool install --force --with <package> qikly`, or install qikly into the
+  project.
 
 ## 0.6.5
 
