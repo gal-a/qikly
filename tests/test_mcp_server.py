@@ -1,7 +1,7 @@
 """
 The protocol layer, checked without the protocol.
 
-`mcp_server` is meant to be thin: it declares four tools and forwards each to
+`mcp_server` is meant to be thin: it declares six tools and forwards each to
 `mcp_tools`. Everything that decides *what comes back* lives there, so these
 tests check the two things this file can still get wrong. Dispatching to the
 wrong function, and letting the declared surface drift from the implemented

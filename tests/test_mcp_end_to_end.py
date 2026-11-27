@@ -48,14 +48,14 @@ def _run(coro_fn):
     return asyncio.run(_session(coro_fn))
 
 
-def test_the_server_starts_and_advertises_exactly_its_four_tools():
+def test_the_server_starts_and_advertises_exactly_its_six_tools():
     async def go(session):
         listed = await session.list_tools()
         return sorted(t.name for t in listed.tools), [t.description for t in listed.tools]
 
     names, descriptions = _run(go)
-    assert names == ["qikly_run", "qikly_scaffold",
-                     "qikly_status", "qikly_validate"]
+    assert names == ["qikly_run", "qikly_scaffold", "qikly_score",
+                     "qikly_score_result", "qikly_status", "qikly_validate"]
     assert all(descriptions), "a tool was advertised with no description"
 
 
