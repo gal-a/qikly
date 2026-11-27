@@ -40,6 +40,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Read-only: this job only builds and checks. The jobs that publish or push
+    # declare their own, wider permissions below.
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
 

@@ -90,7 +90,7 @@ def test_the_repair_loop_is_drawn_and_highlighted():
     """
     diagram = _diagram()
     edges = [line.strip() for line in diagram.split("\n")
-             if re.search(r"(-->|\.->|\.-x)", line)
+             if any(arrow in line for arrow in ("-->", ".->", ".-x"))
              and not line.strip().startswith(("linkStyle", "class"))]
 
     back = next((i for i, e in enumerate(edges) if e.startswith("FAIL")), None)

@@ -17,6 +17,7 @@ version works fine on a machine with a working connection.
 import os
 import re
 import string
+from urllib.parse import urlparse
 
 import pytest
 
@@ -179,7 +180,7 @@ def test_a_failing_release_title_still_announces_the_version(monkeypatch, capsys
     monkeypatch.delenv(vc.NO_CHECK_ENV, raising=False)
 
     def get(url):
-        if "api.github.com" in url:
+        if urlparse(url).hostname == "api.github.com":
             raise OSError("rate limited")
         return {"info": {"version": "99.0.0"}}
 
