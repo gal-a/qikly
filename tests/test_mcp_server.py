@@ -428,3 +428,20 @@ def test_every_served_parameter_carries_its_description():
             if "description" in declared:
                 assert schema["properties"][prop].get("description") == declared["description"], (
                     spec["name"], prop)
+
+
+def test_the_scaffold_description_does_not_contradict_itself():
+    """
+    A tool-quality review read "Save it under ..." next to "Writes nothing to
+    disk" and could not tell whether the tool writes a file. It does not: it
+    returns text, and the caller saves it. The description says that once, says
+    when to use the tool, and says how it differs from its neighbours.
+    """
+    spec = next(s for s in mcp_server.TOOL_SPECS if s["name"] == "qikly_scaffold")
+    text = spec["description"]
+    assert spec["annotations"]["readOnlyHint"] is True
+    assert "writes nothing to disk" in text.lower()
+    assert "Save it under" not in text, "an instruction to save sits beside 'writes nothing'"
+    assert "the caller saves it" in text
+    for neighbour in ("qikly_validate", "qikly_run", "qikly_score"):
+        assert neighbour in text, "no word on how it differs from " + neighbour
