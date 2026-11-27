@@ -1264,9 +1264,28 @@ def test_label():
   <section class="band" id="found">
     <p class="eyebrow">Found in real code</p>
     <h2>What it found in other people's libraries</h2>
-    <!-- Newest change first. OnlyRead came after the study, so the note
-         under the list says which four came from it. -->
+    <!-- Bugs first (code bugs, then docs bugs), then test gaps: finding a
+         bug matters more than finding a gap. Five rows a page, so page 1 is
+         the bugs and page 2 the test gaps. OnlyRead came after the study, so
+         the note under the list says which four came from it. -->
     <ul class="found-list">
+      <li><a href="https://github.com/BrianPugh/cyclopts/issues/1044" data-goatcounter-click="found-cyclopts">cyclopts</a>
+        <span class="state fixed">fixed in 5.4.0</span>
+        <span class="what"><b class="kind">Bug</b> An error that crashed when it was printed.</span>
+        <span class="out">The maintainer fixed it and thanked the report.</span></li>
+      <li><a href="https://github.com/Yhonatangayer/shroom/issues/17" data-goatcounter-click="found-shroom">shroom</a>
+        <span class="what"><b class="kind">Bug</b> Two functions validate the same inputs differently: one accepts sh_order=-1, the other rejects it.</span>
+        <span class="out">The maintainer thanked the report and asked for a small pull request with the exact rule.</span></li>
+      <li><a href="https://github.com/basnijholt/markdown-code-runner/pull/64" data-goatcounter-click="found-markdown-code-runner">markdown-code-runner</a>
+        <span class="what"><b class="kind">Bug</b> Empties the file it runs on, on Windows.</span>
+        <span class="out">A pull request with the fix.</span></li>
+      <li><a href="https://github.com/Goldziher/prompt-template/issues/48" data-goatcounter-click="found-prompt-template">prompt-template</a>
+        <span class="state fixed">fixed in 1.2.1</span>
+        <span class="what"><b class="kind">Docs bug</b> A README example that fails as written.</span>
+        <span class="out">The maintainer fixed it by correcting the README example.</span></li>
+      <li><a href="https://github.com/martinblech/xmltodict/pull/437" data-goatcounter-click="found-xmltodict">xmltodict</a>
+        <span class="what"><b class="kind">Docs bug</b> README namespace examples that no longer hold.</span>
+        <span class="out">A pull request with the docs fix.</span></li>
       <li><a href="https://github.com/Vedantgitbot/booth/pull/42" data-goatcounter-click="found-booth">booth</a>
         <span class="state fixed">tests merged</span>
         <span class="what"><b class="kind">Test gap</b> An evidence threshold no test checked at its edge.</span>
@@ -1287,23 +1306,6 @@ def test_label():
         <span class="state fixed">test merged</span>
         <span class="what"><b class="kind">Test gap</b> A default option no test checked.</span>
         <span class="out">Approved and merged the same day.</span></li>
-      <li><a href="https://github.com/BrianPugh/cyclopts/issues/1044" data-goatcounter-click="found-cyclopts">cyclopts</a>
-        <span class="state fixed">fixed in 5.4.0</span>
-        <span class="what"><b class="kind">Bug</b> An error that crashed when it was printed.</span>
-        <span class="out">The maintainer fixed it and thanked the report.</span></li>
-      <li><a href="https://github.com/Yhonatangayer/shroom/issues/17" data-goatcounter-click="found-shroom">shroom</a>
-        <span class="what"><b class="kind">Bug</b> Two functions validate the same inputs differently: one accepts sh_order=-1, the other rejects it.</span>
-        <span class="out">The maintainer thanked the report and asked for a small pull request with the exact rule.</span></li>
-      <li><a href="https://github.com/Goldziher/prompt-template/issues/48" data-goatcounter-click="found-prompt-template">prompt-template</a>
-        <span class="state fixed">fixed in 1.2.1</span>
-        <span class="what"><b class="kind">Docs bug</b> A README example that fails as written.</span>
-        <span class="out">The maintainer fixed it by correcting the README example.</span></li>
-      <li><a href="https://github.com/basnijholt/markdown-code-runner/pull/64" data-goatcounter-click="found-markdown-code-runner">markdown-code-runner</a>
-        <span class="what"><b class="kind">Bug</b> Empties the file it runs on, on Windows.</span>
-        <span class="out">A pull request with the fix.</span></li>
-      <li><a href="https://github.com/martinblech/xmltodict/pull/437" data-goatcounter-click="found-xmltodict">xmltodict</a>
-        <span class="what"><b class="kind">Docs bug</b> README namespace examples that no longer hold.</span>
-        <span class="out">A pull request with the docs fix.</span></li>
     </ul>
     <p class="found-ctrls" hidden><button type="button" class="btn-step prev" aria-label="Previous page" data-goatcounter-click="found-prev"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><span class="found-page" aria-live="polite">1 / 1</span><button type="button" class="btn-step next" aria-label="Next page" data-goatcounter-click="found-next"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button type="button" class="btn-tour" aria-pressed="false" aria-label="Pause the list" data-goatcounter-click="found-tour-pause"><svg class="i-pause" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg><svg class="i-play" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></button></p>
     <p class="found-note">Four of these came from <a href="https://towardsdatascience.com/i-mutation-tested-50-python-libraries-tests-in-the-young-ones-missed-41-of-planted-faults/" data-goatcounter-click="found-article">a study of 50 Python libraries</a>.</p>
