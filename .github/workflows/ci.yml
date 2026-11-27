@@ -103,6 +103,16 @@ jobs:
           pip install -e ".[all-providers]"
           pytest -q -n auto --dist loadgroup
 
+      - name: The MCP server tests, with the MCP extra installed
+        # The server tests skip themselves when the `mcp` SDK is absent, and no
+        # job above installs it, so they ran nowhere: the end-to-end test still
+        # expected four tools after the server had six, and only the release
+        # check noticed. One job is enough to run them.
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        run: |
+          pip install -e ".[mcp]"
+          pytest -q -n auto --dist loadgroup tests/test_mcp_server.py tests/test_mcp_end_to_end.py tests/test_mcp_withholding.py tests/test_mcp_score.py
+
   package:
     runs-on: ubuntu-latest
     timeout-minutes: 15
