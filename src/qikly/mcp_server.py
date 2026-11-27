@@ -174,19 +174,28 @@ TOOL_SPECS = [
         "description": (
             "Read a Python file and return a task YAML that tests that code: "
             "module path, real signatures, a guessed entrypoint, and a seed "
-            "pointing at the file. Save it under inputs_private/config/tasks/ "
-            "as <task_id>.yaml. requirements and "
+            "pointing at the file. Read-only: this tool writes nothing to "
+            "disk. It returns the YAML as text, and the caller saves it as "
+            "inputs_private/config/tasks/<task_id>.yaml. Use it when you have "
+            "a module but no task yet; the saved task is then checked with "
+            "qikly_validate and run with qikly_run. It is not qikly_score, "
+            "which scores tests you already have and needs no task. The file "
+            "must exist and be a .py file. requirements and "
             "acceptance_criteria are left as TODO on purpose and will not be "
             "filled in, because criteria derived from an implementation can "
             "only describe what that implementation already does. Returns "
-            "{ok, task_yaml, note}. Writes nothing to disk."),
+            "{ok, task_yaml, note}."),
         "inputSchema": {
             "type": "object",
             "properties": {"file_path": {"type": "string",
                                          "description": "One Python (.py) "
-                                                        "file, absolute or "
+                                                        "file that exists, "
+                                                        "absolute or "
                                                         "relative to the "
-                                                        "project root."}},
+                                                        "project root. Its "
+                                                        "path becomes the "
+                                                        "seed in the "
+                                                        "returned YAML."}},
             "required": ["file_path"],
         },
     },
