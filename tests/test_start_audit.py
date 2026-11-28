@@ -205,7 +205,7 @@ def test_score_code_says_how_to_name_tests_when_none_import_it(tmp_path, monkeyp
     (tmp_path / "pricing.py").write_text(PRICING)
     monkeypatch.setattr(cli, "INVOKED_FROM", str(tmp_path))
     assert cli._do_score_suite(None, None, None, code="pricing.py", tests=None) == 2
-    assert "--score-tests" in capsys.readouterr().err
+    assert "--with-tests" in capsys.readouterr().err
 
 
 # ------------------------------------------- real libraries, 2026-10-16 --

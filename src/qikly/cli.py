@@ -924,7 +924,7 @@ def _parse_args():
         help="Score your tests: the module or package to plant faults in, one "
              "at a time, to see which ones your tests notice. (--score-code is "
              "the older name.) "
-             "plant faults in. Without --score-tests it finds the test files "
+             "plant faults in. Without --with-tests it finds the test files "
              "that import it, searched from the project root. Absolute, or relative to "
              "where you run the command, not to the project root. Needs no "
              "task file and no "
@@ -933,7 +933,7 @@ def _parse_args():
              "nothing of yours is modified."
     )
     parser.add_argument(
-        "--score-tests", metavar="PATH", default=None,
+        "--with-tests", "--score-tests", dest="score_tests", metavar="PATH", default=None,
         help="The suite to run against those planted faults: a test file or a "
              "directory of them, absolute or relative the same way. Goes with "
              "--score, and names the tests instead of letting "
@@ -1739,7 +1739,7 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None, workers=None):
 
     Two ways in. `--tasks` scores a converged run's own output, which is what
     this did for one release and assumes a qikly project. `--score-code` and
-    `--score-tests` score a suite and an implementation that already exist,
+    `--with-tests` score a suite and an implementation that already exist,
     which is what everybody actually has before they have anything else.
     """
     from qikly.mutation_score import DEFAULT_MUTANTS, default_workers, from_paths, run
@@ -1750,7 +1750,7 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None, workers=None):
         # has no meaning, and reading it as 1 would hide the typo.
         print(f"--score-workers needs a whole number of 1 or more, not "
               f"{workers}: 1 plants one fault at a time, as in: qikly --score "
-              f"pricing.py --score-tests tests/ --score-workers 1",
+              f"pricing.py --with-tests tests/ --score-workers 1",
               file=sys.stderr)
         return 2
     if workers is None:
@@ -1774,24 +1774,24 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None, workers=None):
             if not found:
                 print("No test files that import it were found (test_*.py or "
                       "*_test.py, searched from the project root). Name them "
-                      "with --score-tests <file or folder>.", file=sys.stderr)
+                      "with --with-tests <file or folder>.", file=sys.stderr)
                 return 2
             code_dir = os.path.abspath(where if os.path.isdir(where) else os.path.dirname(where))
             if os.path.isdir(found) and (code_dir == os.path.abspath(found)
                                          or code_dir.startswith(os.path.abspath(found) + os.sep)):
                 # Tests beside the code in the folder being scored: as one
                 # path they are both, which scoring refuses, and the refusal
-                # named a --score-tests the user never typed.
+                # named a --with-tests the user never typed.
                 print(f"The tests that import it sit inside {shown_path(found, INVOKED_FROM)}, "
                       f"the folder being scored. Score one module instead, such "
                       f"as  qikly --score <module>.py, or name the tests "
-                      f"with --score-tests <file>.", file=sys.stderr)
+                      f"with --with-tests <file>.", file=sys.stderr)
                 return 2
             # Absolute, not relative: a project on another drive than the
             # one the command ran from has no relative path, and relpath raised.
             tests = os.path.abspath(found)
             print(f"Scoring against {shown_path(found, INVOKED_FROM)}, the test files that "
-                  f"import it. To name others, add --score-tests <file or folder>.")
+                  f"import it. To name others, add --with-tests <file or folder>.")
             # One path is scored, so tests --take-tests copied in elsewhere
             # (tests/qikly_generated/ beside a testing/ folder) are left out.
             # Said, rather than left out silently.
@@ -1807,7 +1807,7 @@ def _do_score_suite(tasks, mutants, seed, code=None, tests=None, workers=None):
                       f"copied in {'are' if len(left) != 1 else 'is'} not under it, so "
                       f"{'they are' if len(left) != 1 else 'it is'} not scored. To score "
                       f"{'them' if len(left) != 1 else 'it'} too, name a folder holding "
-                      f"both with --score-tests.")
+                      f"both with --with-tests.")
         if not (code and tests):
             print("--score is needed too: one says what to break, the "
                   "other says what should notice.", file=sys.stderr)
@@ -3147,14 +3147,14 @@ def main():
         # over every bundled task. An audit reproduced it by accident and spent
         # money doing so.
         ("--score-mutants", args.score_mutants is not None,
-         "--score-suite, or --score with --score-tests",
+         "--score-suite, or --score with --with-tests",
          "qikly --score-suite --tasks CALC_TAX --score-mutants 8"),
         ("--score-seed", args.score_seed is not None,
-         "--score-suite, or --score with --score-tests",
+         "--score-suite, or --score with --with-tests",
          "qikly --score-suite --tasks CALC_TAX --score-seed 3"),
         ("--score-workers", args.score_workers is not None,
-         "--score-suite, or --score with --score-tests",
-         "qikly --score pricing.py --score-tests tests/ --score-workers 2"),
+         "--score-suite, or --score with --with-tests",
+         "qikly --score pricing.py --with-tests tests/ --score-workers 2"),
         # Found by the audit of the fix above, which is the point of auditing
         # a fix: the same unguarded fallthrough, in the sibling flag nobody
         # thought to check. Given alone it reached the ordinary run path and

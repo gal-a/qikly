@@ -228,7 +228,7 @@ def test_a_namespace_package_on_an_installed_copy_is_refused(tmp_path,
 def test_a_suite_inside_the_package_is_scored_against_the_copy(tmp_path,
                                                                monkeypatch):
     """
-    `--score-code src/widget --score-tests src/widget/tests`.
+    `--score-code src/widget --with-tests src/widget/tests`.
 
     The directory holding both was the package itself, so the workspace had no
     `widget` in it and the suite imported the original. The test file was also

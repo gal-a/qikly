@@ -125,7 +125,7 @@ def test_the_tool_arguments_arrive_through_the_dispatcher(project, monkeypatch):
 # ----------------------------------------------------- reading the result ---
 
 FINISHED = """qikly 0.6.5  2026-11-26 23:01:00  run in /somewhere
-Scoring against tests/test_pricing.py, the test files that import it. To name others, add --score-tests <file or folder>.
+Scoring against tests/test_pricing.py, the test files that import it. To name others, add --with-tests <file or folder>.
 [pricing.py] 5 of 10 planted faults missed (50%), 5 caught.
 [pricing.py] what it missed, one line each: {report}
 [pricing.py] 3 questions your tests leave open, in the same report.

@@ -71,7 +71,7 @@ def _run(arguments, cwd):
 def scored(tmp_path):
     (tmp_path / "pricing.py").write_text(MODULE, encoding="utf-8")
     (tmp_path / "test_pricing.py").write_text(WEAK_SUITE, encoding="utf-8")
-    done = _run(["--score-code", "pricing.py", "--score-tests",
+    done = _run(["--score-code", "pricing.py", "--with-tests",
                  "test_pricing.py", "--score-mutants", "12",
                  "--score-seed", "1"], str(tmp_path))
     asked = list((tmp_path / "qikly-suite-score").glob("*" + sq.QUESTIONS_SUFFIX))
@@ -496,7 +496,7 @@ def test_validate_says_how_many_answers_are_left(tmp_path):
     project = tmp_path
     (project / "pricing.py").write_text(MODULE, encoding="utf-8")
     (project / "test_pricing.py").write_text(WEAK_SUITE, encoding="utf-8")
-    _run(["--score-code", "pricing.py", "--score-tests", "test_pricing.py",
+    _run(["--score-code", "pricing.py", "--with-tests", "test_pricing.py",
           "--score-seed", "1"], str(project))
     _run(["--scaffold", "pricing.py"], str(project))
     task = project / "inputs_private" / "config" / "tasks" / "PRICING_VERIFY.yaml"

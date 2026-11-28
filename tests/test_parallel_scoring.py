@@ -205,7 +205,7 @@ def _main(argv, monkeypatch):
 
 @pytest.mark.parametrize("value", ["0", "-2"])
 def test_a_worker_count_below_one_is_refused(value, monkeypatch, capsys):
-    code = _main(["--score", "pricing.py", "--score-tests", "tests",
+    code = _main(["--score", "pricing.py", "--with-tests", "tests",
                   "--score-workers", value], monkeypatch)
     err = capsys.readouterr().err
     assert code == 2
@@ -214,7 +214,7 @@ def test_a_worker_count_below_one_is_refused(value, monkeypatch, capsys):
 
 def test_a_worker_count_that_is_not_a_number_is_refused(monkeypatch):
     with pytest.raises(SystemExit) as stopped:
-        _main(["--score", "pricing.py", "--score-tests", "tests",
+        _main(["--score", "pricing.py", "--with-tests", "tests",
                "--score-workers", "many"], monkeypatch)
     assert stopped.value.code == 2
 

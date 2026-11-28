@@ -278,6 +278,8 @@ SKILL_BODY_HASHES = {
     # 0.3.13: in an MCP host, `--score` is the qikly_score tool, polled with
     # qikly_score_result.
     "0.3.13": "c4809231c55a6a44e147116cf1df2337ef099496e811c7a32762046261349d4d",
+    # 0.3.14: `--score-tests` renamed `--with-tests` (the old name still works).
+    "0.3.14": "88a4a794e28f0d9bffcbb90152910c8694dc7b5ba0d4d76fce7e117ef2e4cba1",
 }
 
 

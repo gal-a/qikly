@@ -12,6 +12,9 @@ measured. This part is the architecture: what separates it from the
 alternatives, the six agents, and the command to run for whichever parts of a
 task file you already have.
 
+If you only want to check code you already have, go straight to
+[What you already have decides how you use it](#what-you-already-have-decides-how-you-use-it).
+
 
 ---
 

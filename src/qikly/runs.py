@@ -465,7 +465,7 @@ def start_score(code, tests=None, mutants=None, env=None, python=None):
 
     cmd = [python or sys.executable, "-m", "qikly.cli", "--score", code]
     if tests:
-        cmd += ["--score-tests", tests]
+        cmd += ["--with-tests", tests]
     if mutants:
         cmd += ["--score-mutants", str(int(mutants))]
 

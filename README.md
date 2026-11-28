@@ -41,11 +41,12 @@ of all three steps on the bundled pricing example, with English subtitles.
 
 [![qikly: one spec in, code and tests out, written by a coding agent and a test agent that are kept apart](https://raw.githubusercontent.com/gal-a/qikly/main/docs/images/qikly_hero.png)](https://qikly.com)
 
-*One logged run. The test agent builds the test suite: it was told, from the
-spec's acceptance criteria, that a rate may not exceed 100. The coding agent
-never saw the acceptance criteria and discovered that rate limit from a failing
-test: it then added `or rate > 100` by itself, so the 9 of 9 is code eventually
-passing the test suite after applying fixes in an automated repair loop.*
+*A worked example from one logged run. The test agent wrote a test, from the
+spec's acceptance criteria alone, that a rate may not exceed 100. The coding
+agent never saw the acceptance criteria and discovered that rate limit from the
+failing test: it then added `or rate > 100` by itself, so the 9 of 9 is code
+eventually passing the test suite after applying fixes in an automated repair
+loop.*
 
 **Run on 50 young Python libraries,** it surfaced 4 real problems as well as the
 test gaps, each confirmed by hand and reported upstream. 2 are fixed so far:
@@ -69,11 +70,13 @@ and [xmltodict](https://github.com/martinblech/xmltodict/pull/437) are in review
 
 ## Why use qikly?
 
-A student who writes the exam paper, writes the answer key and then sits the
-exam will pass. That is what happens when one model is given the acceptance
-criteria and asked to produce both the implementation and the suite that checks
-it. Everything goes green, and the green can mean nothing. **qikly takes the answer
-key away from the student: the coding agent never sees the acceptance criteria.**
+Tests written from the same context as the code, or from the code itself, can
+only agree with it. A student who writes the exam paper, writes the answer key
+and then sits the exam will pass. That is what happens when one model is given
+the acceptance criteria and asked to produce both the implementation and the
+suite that checks it. Everything goes green, and the green can mean nothing.
+**qikly takes the answer key away from the student: the tests come from
+acceptance criteria the coding agent never sees, and they run on your code.**
 
 ## Start here
 
@@ -108,7 +111,7 @@ qikly --tasks my_module.py       # 3. the run                      a cent or so
    code, one at a time, and names the ones your tests did not notice, each as
    a question about behaviour nothing checks. It finds your tests itself: the
    `test_*.py` and `*_test.py` files that import your code, searched from the
-   project root. To name them instead, add `--score-tests tests/`. No model is
+   project root. To name them instead, add `--with-tests tests/`. No model is
    called and nothing of yours is changed.
 2. **`--scaffold` drafts the spec**, `inputs_private/config/tasks/MY_MODULE_VERIFY.yaml`,
    with everything it can read from your code filled in, and a data file of
@@ -251,6 +254,9 @@ existing repository**: ETL, merges, calculations, validation. That is the layer 
 right answer, and where a test written from the rule is the only thing that
 catches it.
 
+**Most useful when somebody or something else wrote the code:** see the
+[use cases, most valuable first](https://github.com/gal-a/qikly/blob/main/docs/design_3_mechanism.md#what-you-already-have-decides-how-you-use-it).
+
 **Where it does not fit today:** an existing large repository. PATCH prompts
 load only the files a FIX names, and while a large file is now excerpted rather
 than loaded whole, there is no cross-file index. See
@@ -310,10 +316,12 @@ what is in it, how to check it loads, and the difference stated in full.
 
 ## The idea
 
-qikly takes the answer key away from the student. It generates a test suite
-from the acceptance criteria, then writes an implementation and repairs it
-against that suite until every test passes or a retry budget runs out,
-recording every failure, every piece of reasoning and every diff.
+qikly takes the answer key away from the student. It writes a test suite from
+acceptance criteria kept apart from the code. To show that the suite can fail,
+a separate coding agent that never sees the criteria repairs a copy of your
+code, or writes a new implementation with `--fresh`, until every test passes or
+a retry budget runs out, recording every failure, every piece of reasoning and
+every diff.
 
 <!-- An image rather than a mermaid block, because PyPI prints mermaid as source.
      It is rendered from the diagram in docs/design_1_case_study.md by
@@ -394,7 +402,7 @@ that matters most. Every other AI test generator in this space writes its tests
 *from an implementation that already exists*, so it can only describe what the
 code already does. That makes an excellent regression harness, and it cannot
 tell you the code is wrong. qikly writes the integration and system suites from
-the acceptance criteria **before any implementation exists**, so the standard
+the acceptance criteria **without reading any code**, so the standard
 cannot have been shaped by the thing it judges.
 
 **The withholding is a mechanism you can watch.** Not a prompt asking a

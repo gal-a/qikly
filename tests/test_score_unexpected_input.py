@@ -108,7 +108,7 @@ def test_a_syntax_error_is_one_line_not_a_traceback(here, capsys):
 
 @pytest.mark.skipif(os.name != "nt", reason="only Windows finds a file by another case")
 def test_named_tests_skip_the_case_check(here):
-    # 0.6.2 scored `--score CALC.PY --score-tests ...`; the case only matters
+    # 0.6.2 scored `--score CALC.PY --with-tests ...`; the case only matters
     # when qikly searches for the tests itself.
     assert cli._score_target_problem("Calc.py", check_case=False) is None
 

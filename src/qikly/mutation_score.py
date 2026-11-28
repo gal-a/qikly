@@ -145,7 +145,7 @@ def from_task(task_id, code_root=CODE_ROOT):
 
 def _nearby_suite(code, tests):
     """
-    A hint naming test files that do exist, for a `--score-tests` path that
+    A hint naming test files that do exist, for a `--with-tests` path that
     does not.
 
     The usual cause is a `test_*.py` sitting beside the module rather than in
@@ -163,11 +163,11 @@ def _nearby_suite(code, tests):
                     seen.add(match)
                     found.append(match)
     if not found:
-        return (". Point --score-tests at a test file or a folder of them, "
-                "for example --score-tests tests/ or --score-tests test_my_module.py")
+        return (". Point --with-tests at a test file or a folder of them, "
+                "for example --with-tests tests/ or --with-tests test_my_module.py")
     names = ", ".join(os.path.basename(f) for f in found[:3])
     # Relative to where the command was typed, which is the folder the given
-    # --score-tests path sits in: this process has moved to a project root by
+    # --with-tests path sits in: this process has moved to a project root by
     # now, so the working directory says nothing about where the user is.
     pick = found[0]
     try:
@@ -175,7 +175,7 @@ def _nearby_suite(code, tests):
         pick = found[0] if rel.startswith("..") else rel
     except ValueError:
         pass
-    return (f". Found {names} next to it: try --score-tests "
+    return (f". Found {names} next to it: try --with-tests "
             f"{pick if ' ' not in pick else repr(pick)}")
 
 
@@ -228,7 +228,7 @@ def from_paths(code, tests):
             f"  tests: {tests}")
 
     # The directory holding both can be a package itself, when the suite lives
-    # inside it: `--score-code src/widget --score-tests src/widget/tests`.
+    # inside it: `--score-code src/widget --with-tests src/widget/tests`.
     # Copying only that directory leaves no `widget` in the workspace, so a
     # suite doing `from widget.calc import ...` imported the original and
     # every mutant ran against untouched code. The fix is to copy from the
@@ -276,9 +276,9 @@ def from_paths(code, tests):
         # so all of it was set aside as suite. Saying "no Python files" would
         # send the reader looking for a missing file instead.
         raise ValueError(
-            f"--score and --score-tests are the same directory, so "
+            f"--score and --with-tests are the same directory, so "
             f"every file in it counts as a test and there is nothing left to "
-            f"mutate.\n  {code}\nPoint --score-tests at the test files "
+            f"mutate.\n  {code}\nPoint --with-tests at the test files "
             f"themselves, for example {os.path.join(code, 'test_*.py')}, or "
             f"move them into a tests/ folder.")
     if not sources:
@@ -309,7 +309,7 @@ def _inside(path, directory):
     """
     Whether `path` is `directory` or somewhere under it.
 
-    Case-insensitive where the filesystem is: on Windows `--score-tests
+    Case-insensitive where the filesystem is: on Windows `--with-tests
     pkg/tests` names a folder that is `pkg/Tests` on disk, and a
     case-sensitive comparison scored the suite's own files as code.
     """
@@ -355,7 +355,7 @@ def _workspace(target, tmp, code_root=CODE_ROOT):
                 raise ValueError(
                     f"a directory link under {target.root} points back at "
                     f"something already inside it, so there is no finite tree "
-                    f"to copy:\n  {base}\nPoint --score and --score-tests "
+                    f"to copy:\n  {base}\nPoint --score and --with-tests "
                     f"at directories that do not contain that link.")
             seen.add(real)
             dirs[:] = [d for d in dirs if d not in _SKIP]
@@ -364,7 +364,7 @@ def _workspace(target, tmp, code_root=CODE_ROOT):
                 raise ValueError(
                     f"{target.root} holds more than {_MAX_FILES} files, which "
                     f"is almost certainly wider than you meant. Point "
-                    f"--score and --score-tests at directories closer to "
+                    f"--score and --with-tests at directories closer to "
                     f"the code.")
         # Dereferencing, deliberately, now that the count above follows links
         # too. Recreating the links instead was tried and is worse: a link with
@@ -997,7 +997,7 @@ def _score_once(target, mutants, seed, code_root, workers=1):
             "check. Together those look exactly like a suite importing an "
             "installed copy of the package, so no score is given. Score from "
             "an environment where the package is not installed, or with the "
-            "source-reading tests left out of --score-tests.")
+            "source-reading tests left out of --with-tests.")
 
     return {"task": target.label, "baseline": True, "caught": caught,
             "missed": missed, "unscorable": unscorable,
@@ -1253,7 +1253,7 @@ def render(result, gaps):
         # The console message was made mode-aware and this one was not, so the
         # file a user actually keeps and pastes into a pull request still told
         # them to converge a run they had never started.
-        nothing_yet = ("Check that the path given to `--score-tests` holds "
+        nothing_yet = ("Check that the path given to `--with-tests` holds "
                        "tests that run and pass on their own."
                        if result.get("generated") is False
                        else "Get the run to converge first.")
@@ -1468,7 +1468,7 @@ def outside_copy_lines(target):
         f"a module from outside it, such as a file one folder up.",
         "  - to score them, put the tests (or a copy) in a folder that sits above "
         "everything they read, such as your repository's root folder, and point "
-        "--score-tests at it",
+        "--with-tests at it",
     ]
 
 
@@ -1581,7 +1581,7 @@ def stuck_message(label, suites, seconds):
             f"a network connection, or stuck in a loop: run  python -m pytest "
             f"{' '.join(suites)}  to see which one. Or the suite is just slow: "
             f"allow it more time with QIKLY_SUITE_TIMEOUT=<seconds>, or name a "
-            f"smaller set with --score-tests <file>.")
+            f"smaller set with --with-tests <file>.")
 
 
 class Unscored(str):
@@ -1637,7 +1637,7 @@ def run(target, mutants=DEFAULT_MUTANTS, seed=None, invoked_from=None,
                   f"at {path}")
             # What pytest itself said, so the cause is on screen: on a real
             # library it was a module generated at build time, which no
-            # amount of checking --score-tests would have found.
+            # amount of checking --with-tests would have found.
             try:
                 from qikly.start import _pytest_tail
                 # With the same source roots scoring adds, so the error shown

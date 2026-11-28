@@ -5,7 +5,7 @@ license: Apache-2.0
 metadata:
   author: Gal Arav
   homepage: https://github.com/gal-a/qikly
-  version: 0.3.13
+  version: 0.3.14
   requires: qikly >= 0.6.6
 ---
 
@@ -55,7 +55,7 @@ The path is three commands, each taking the same module or folder:
 - **`qikly --score my_module.py`**, the best first move when any suite
   exists (before 0.6.0 the flag is `--score-code`). Free, no model call,
   nothing of theirs modified. It finds the tests that import the module, or
-  take `--score-tests their_tests.py`, and answers "is the suite we have
+  take `--with-tests their_tests.py`, and answers "is the suite we have
   worth anything" with named faults it missed, each as a question. In an MCP
   host the same step is the `qikly_score` tool, polled with
   `qikly_score_result`; it returns the headline and the missed faults.
@@ -384,7 +384,7 @@ yet.
 | `qikly --validate --tasks X` | free | always, before any run. Catches a missing input file, a leftover TODO, an answer it cannot read (`1)`, `first`, `2 = 99`), a field of the wrong kind, a criterion made of adjectives, a requirement restating a criterion, and criteria the data cannot reach. A run prints the same problems before it starts |
 | `qikly --explain X` | free | to show the user exactly what each agent receives, criteria present on one side and absent on the other |
 | `qikly --score-suite --tasks X` | free, and slow | after a run converges, to find what the suite would not have noticed. It plants one fault at a time in the code and reports which ones the tests missed. Free because every fault is an edit to the code's syntax tree and no model is asked anything; slow because each fault means running your whole suite again |
-| `qikly --score PATH --score-tests PATH` | free, and slow | **for a suite qikly did not write**, which is what somebody already has before they have anything else. Point it at a module or package and the tests for it, and it reports which planted faults the tests did not notice, with a question for the user about each, which `--scaffold` then writes into the task file. No task file, no run, no model call. The report lands in `qikly-suite-score/` in the directory they ran it from |
+| `qikly --score PATH --with-tests PATH` | free, and slow | **for a suite qikly did not write**, which is what somebody already has before they have anything else. Point it at a module or package and the tests for it, and it reports which planted faults the tests did not notice, with a question for the user about each, which `--scaffold` then writes into the task file. No task file, no run, no model call. The report lands in `qikly-suite-score/` in the directory they ran it from |
 | `qikly --check-criteria --tasks X` | one model call | when a spec may contradict itself, before spending a run on it |
 | `qikly --propose-fixtures --tasks X` | one model call | when `--validate` says a criterion's values are missing from the data, to get the rows it would take |
 

@@ -126,7 +126,7 @@ folder, and every step takes the same path:
    one your tests did not notice into a question about behaviour nothing
    checks. It finds your tests itself, the `test_*.py` and `*_test.py` files
    that import your code, searched from the project root; to name them
-   instead, add `--score-tests tests/`.
+   instead, add `--with-tests tests/`.
 
 2. **Check the drafted spec.** A fraction of a cent with a key:
 

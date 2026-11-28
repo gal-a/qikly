@@ -77,7 +77,7 @@ def _run(arguments, cwd):
 
 def _score(project, extra=()):
     return _run(["--score-code", "pricing.py",
-                 "--score-tests", "test_pricing.py",
+                 "--with-tests", "test_pricing.py",
                  "--score-mutants", "6", "--score-seed", "1"] + list(extra),
                 str(project))
 
@@ -145,7 +145,7 @@ def test_a_directory_of_code_works_as_well_as_one_file(tmp_path):
         WEAK_SUITE.replace("from pricing import",
                            "from src.billing.pricing import"), encoding="utf-8")
 
-    done = _run(["--score-code", "src/billing", "--score-tests", "tests",
+    done = _run(["--score-code", "src/billing", "--with-tests", "tests",
                  "--score-mutants", "4", "--score-seed", "1"], str(tmp_path))
     assert "planted faults missed" in done.stdout or "not scored" in done.stdout.lower(), (
         done.stdout + done.stderr)
@@ -157,7 +157,7 @@ def test_score_tests_alone_is_refused_and_score_code_alone_finds_them(project):
     `--start` does, so the two steps on the home page read the same. Tests
     with nothing to break are still refused.
     """
-    done = _run(["--score-tests", "test_pricing.py"], str(project))
+    done = _run(["--with-tests", "test_pricing.py"], str(project))
     assert done.returncode == 2
     assert "--score " in done.stderr
     done = _run(["--score-code", "pricing.py"], str(project))
@@ -165,8 +165,18 @@ def test_score_tests_alone_is_refused_and_score_code_alone_finds_them(project):
     assert "the test files that import it" in done.stdout
 
 
+def test_the_old_score_tests_name_still_works_as_an_alias(project):
+    """`--with-tests` replaced `--score-tests` (2026-11-28); old commands and CI files keep working."""
+    old = _run(["--score", "pricing.py", "--score-tests", "test_pricing.py",
+                "--score-mutants", "2", "--score-seed", "1"], str(project))
+    new = _run(["--score", "pricing.py", "--with-tests", "test_pricing.py",
+                "--score-mutants", "2", "--score-seed", "1"], str(project))
+    assert old.returncode == new.returncode, (old.stdout + old.stderr, new.stdout + new.stderr)
+    assert "unrecognized arguments" not in old.stderr
+
+
 def test_a_path_that_does_not_exist_is_reported_not_raised(project):
-    done = _run(["--score-code", "nope.py", "--score-tests", "test_pricing.py"],
+    done = _run(["--score-code", "nope.py", "--with-tests", "test_pricing.py"],
                 str(project))
     assert "Traceback" not in done.stdout + done.stderr
     assert done.returncode == 1
@@ -214,7 +224,7 @@ def test_the_saved_report_gives_advice_that_fits_the_mode(tmp_path):
                "missed": [], "unscorable": 0, "total": 0, "generated": False}
     text = render(foreign, [])
     assert "converge" not in text, text
-    assert "--score-tests" in text
+    assert "--with-tests" in text
 
     generated = dict(foreign, task="CALC_TAX", generated=True)
     assert "converge" in render(generated, [])
@@ -306,7 +316,7 @@ def test_a_byte_order_mark_does_not_stop_it(tmp_path):
     import ast
     ast.parse(module.read_text(encoding="utf-8-sig"))
 
-    done = _run(["--score-code", "pricing.py", "--score-tests",
+    done = _run(["--score-code", "pricing.py", "--with-tests",
                  "test_pricing.py", "--score-mutants", "4", "--score-seed", "1"],
                 str(tmp_path))
     output = done.stdout + done.stderr
@@ -440,14 +450,14 @@ def test_the_project_root_line_is_not_shown_where_it_would_be_false(monkeypatch)
 def test_a_missing_tests_folder_names_the_test_file_beside_the_code(project):
     """
     A first run had test_pricing.py beside pricing.py and typed
-    --score-tests tests/, as the docs show. "no suite at ...\\tests" said
+    --with-tests tests/, as the docs show. "no suite at ...\\tests" said
     nothing about the file that was there; the message now names it.
     """
-    done = _run(["--score-code", "pricing.py", "--score-tests", "tests/"],
+    done = _run(["--score-code", "pricing.py", "--with-tests", "tests/"],
                 str(project))
     output = done.stdout + done.stderr
     assert "no suite at" in output
-    assert "try --score-tests test_pricing.py" in output, output[-400:]
+    assert "try --with-tests test_pricing.py" in output, output[-400:]
 
 
 # ------------------------------------------- tests that read outside the copy ----
@@ -483,7 +493,7 @@ def test_a_suite_that_passes_at_home_is_not_blamed_on_the_environment(tmp_path):
     that said "1 passed". The user was sent to fix something that was fine.
     """
     lib = _reads_one_folder_up(tmp_path)
-    done = _run(["--score-code", "pricing.py", "--score-tests", "test_pricing.py",
+    done = _run(["--score-code", "pricing.py", "--with-tests", "test_pricing.py",
                  "--score-mutants", "3", "--score-seed", "1"], str(lib))
     out = done.stdout + done.stderr
     assert "fail in qikly's copy" in out
@@ -495,7 +505,7 @@ def test_a_suite_that_passes_at_home_is_not_blamed_on_the_environment(tmp_path):
 
 def test_checking_at_home_leaves_nothing_behind(tmp_path):
     lib = _reads_one_folder_up(tmp_path)
-    _run(["--score-code", "pricing.py", "--score-tests", "test_pricing.py",
+    _run(["--score-code", "pricing.py", "--with-tests", "test_pricing.py",
           "--score-mutants", "3", "--score-seed", "1"], str(lib))
     left = {p.name for p in lib.rglob("*")} - {"pricing.py", "test_pricing.py"}
     assert not {n for n in left if n == "__pycache__" or n.endswith(".pyc")}
@@ -506,7 +516,7 @@ def test_a_suite_that_fails_at_home_still_gets_the_setup_advice(tmp_path):
     (tmp_path / "test_pricing.py").write_text(
         "from pricing import line_total\n\n\ndef test_wrong():\n"
         "    assert line_total(2, 3) == 7\n", encoding="utf-8")
-    done = _run(["--score-code", "pricing.py", "--score-tests", "test_pricing.py",
+    done = _run(["--score-code", "pricing.py", "--with-tests", "test_pricing.py",
                  "--score-mutants", "3", "--score-seed", "1"], str(tmp_path))
     out = done.stdout + done.stderr
     assert "problem in your project's environment" in out

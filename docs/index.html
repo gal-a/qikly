@@ -368,7 +368,7 @@ h1 {
   padding: 8px 10px;
   font-size: .8rem;
   line-height: 1.45;
-  /* Wrap between words only, so a flag such as --score-tests stays whole. */
+  /* Wrap between words only, so a flag such as --with-tests stays whole. */
   white-space: normal;
   word-break: normal;
   overflow-wrap: normal;
@@ -1350,7 +1350,7 @@ def test_label():
           module or a whole folder, and every step takes the same path.
           <b>No tests yet?</b> Start at step 2. <b>No code yet?</b>
           <code>qikly --init</code> makes a blank task file for your answers,
-          and step 3 writes the code.</p>
+          and step 3 writes tests from it, with a throwaway implementation to check them.</p>
       </li>
       <li class="row">
         <div class="step">
@@ -1419,7 +1419,7 @@ from your criteria:
       Anywhere in your project, such as a <code>tests/</code> folder or beside
       your code, in files named <code>test_*.py</code> that import your module.
       Step 1 finds them; to name them instead, add
-      <code>--score-tests test_folder/</code>.</p>
+      <code>--with-tests test_folder/</code>.</p>
 
     <p class="eyebrow also">Other ways in</p>
     <ul class="also-list">
@@ -1451,8 +1451,8 @@ from your criteria:
       <figcaption>
         <p>This was run by two independent AI agents:</p>
         <ol>
-          <li><b>The Test Agent builds the test suite:</b> it was told, from
-            the spec's acceptance criteria, that the rate may not exceed
+          <li><b>The Test Agent wrote a test from the spec alone:</b> it was told,
+            from the spec's acceptance criteria, that the rate may not exceed
             100.</li>
           <li><b>The Coding Agent never saw the acceptance criteria and
             discovered that rate limit from a failing test:</b> it then added
